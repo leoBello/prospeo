@@ -70,6 +70,7 @@ LiteLLM est écarté **à ce stade** : introduire un proxy en conteneur pour un 
 prospeo/
 ├── apps/
 │   ├── web/          React + Vite + TypeScript, TanStack Query & Table, Tailwind
+│   │                 locales/fr.json (défaut) et locales/en.json
 │   └── collector/    CLI Node/TypeScript, Playwright
 ├── packages/
 │   ├── core/         types, classification, scoring, appariement — logique pure, sans I/O
@@ -275,27 +276,94 @@ Densité concurrentielle, historique de score, multi-utilisateur : sur un premie
 
 ## 9. Dashboard
 
-### Écrans
+Les décisions de cette section ont été arbitrées sur maquettes. Celles-ci sont conservées dans `.superpowers/brainstorm/` (dossier ignoré par git) et restent consultables.
 
-**Aujourd'hui** — page d'accueil. Relances dues et nouveaux prospects à fort score. En prospection téléphonique, la relance oubliée coûte plus que tout le reste : l'application doit s'ouvrir sur les appels du jour, non sur un tableau de quatre cents lignes.
+### 9.1 Coquille applicative — liste et panneau latéral
+
+**La liste ne disparaît jamais.** Sélectionner une ligne ouvre le détail dans un panneau à droite ; les flèches haut et bas parcourent les prospects sans quitter le panneau. Patron d'une boîte mail ou de Linear.
+
+Raison du choix : le dashboard sert deux gestes opposés — qualifier, qui exige de comparer beaucoup de lignes, et appeler, qui exige de se concentrer sur une seule. Le panneau latéral est le seul des trois patrons envisagés qui ne sacrifie ni l'un ni l'autre, et il évite l'aller-retour vers une page de détail à chaque prospect.
+
+**La navigation au clavier fait partie du contrat**, pas des finitions : haut/bas pour changer de prospect, et des raccourcis pour les transitions de pipeline. C'est ce qui rend le patron rentable sur cinquante fiches d'affilée.
+
+**Évolution identifiée mais hors périmètre :** un mode « session d'appels » plein écran, enchaînant les prospects d'une file préparée, déclenché depuis l'écran d'ouverture. Retenu comme direction, non implémenté ici.
+
+### 9.2 Écrans
+
+**Aujourd'hui** — page d'accueil, structurée en deux temps :
+
+1. Une bande d'indicateurs : prospects en base, contactés, intéressés, taux de réponse.
+2. Les listes de travail : relances dues, puis nouveaux prospects à fort score.
+
+Chaque ligne de liste porte **la raison de sa présence** (« relance prévue aujourd'hui », « 92 · page FB active, 4,6 ★, domaine libre »). Cela ne coûte rien et supprime l'effet boîte noire.
+
+Note assumée : les indicateurs seront proches de zéro les premières semaines. Choix retenu en connaissance de cause.
 
 **Exploration** — table dense triée par score décroissant. Filtres : métier, ville, catégorie de présence web, plage de score, statut de pipeline, type de téléphone, note, nombre d'avis, effectif, ancienneté, domaine disponible, jamais contacté.
 
-**Fiche prospect** — détail du score, captures, coordonnées, journal des échanges, actions.
+**Fiche prospect** — dans le panneau latéral : score détaillé, captures, coordonnées, journal des échanges, actions.
 
 **File d'appariements** — cas `ambiguous` présentés côte à côte, fiche Sirene contre candidats Google, tranchés en un clic.
 
 **Réglages du barème** — curseurs de pondération. Les règles étant pures, le front **recalcule et reclasse instantanément la page affichée**. « Appliquer » persiste une nouvelle version du barème et déclenche le recalcul global.
 
-### Pipeline
+### 9.3 Restitution du score — deux échelles de lecture
+
+| Contexte | Représentation |
+|---|---|
+| Ligne de liste | barre segmentée en trois blocs — présence, vitalité, joignabilité — plus le total chiffré |
+| Panneau de détail | le calcul ligne par ligne, groupé par bloc, avec libellé lisible et points signés, total en pied |
+
+La barre segmentée dit **de quoi** un score est fait, pas seulement combien il vaut : deux prospects à 71 dont l'un manque de joignabilité et l'autre de vitalité se distinguent au coup d'œil.
+
+**Le panneau ne cherche pas à formuler l'argumentaire commercial.** C'est le rôle du générateur de message (section 10), qui produit la prose. Le panneau sert à comprendre et à régler ; le message sert à parler.
+
+### 9.4 Direction visuelle
+
+Intention générale : **moderne, simple, clair.** Densité élevée sans encombrement, aucun ornement qui ne serve pas la lecture.
+
+**Thème sombre par défaut, thème clair en bascule.** Les deux partagent exactement la même densité, la même typographie et les mêmes composants : seules changent des variables CSS.
+
+| | Sombre (défaut) | Clair (bascule) |
+|---|---|---|
+| Fond | `#0f1115` | `#fafafa` |
+| Surfaces | `#171a21` | `#ffffff` |
+| Bordures | `#262b35` | `#e8e8e8` |
+| Texte | `#d5d9e0` | `#1a1a1a` |
+| Texte secondaire | `#6b7280` | `#8a8a8a` |
+| Accent | `#5b8cff` | `#4f46e5` |
+
+- Typographie sans-serif système (Inter en priorité), tailles resserrées.
+- Lignes de table compactes, privilégiant le nombre de prospects visibles sans défilement.
+- Gris neutres, un unique accent, réservé au score et aux actions primaires.
+
+Raison du choix de la densité : l'usage réel consiste à trier des centaines de lignes. Une mise en page plus aérée montrait environ moitié moins de prospects à surface égale — un coût payé chaque jour.
+
+**Tous les tokens de couleur et d'espacement sont déclarés en variables CSS dès le départ**, sans quoi la bascule de thème devient une reprise coûteuse.
+
+**Outillage :** le skill `ui-ux-pro-max` est à mobiliser à l'étape de construction du dashboard (étape 4 de la livraison), pour le détail des composants et de la grille. Il n'apporte rien au stade de la conception.
+
+### 9.6 Internationalisation
+
+Le terme « i18n » recouvre **deux sujets distincts** dans ce projet. Ils sont notés ensemble ici pour éviter la confusion.
+
+**a) L'interface du dashboard — dans le périmètre de ce spec.**
+
+Toutes les chaînes affichées passent par des fichiers de traduction dès la première ligne de code. Deux locales : `fr` par défaut, `en` disponible. Aucune chaîne en dur dans les composants.
+
+Justification : externaliser les textes dès le départ est presque gratuit ; le faire après coup impose de repasser sur chaque composant, et c'est exactement le genre de reprise qu'on ne fait jamais. La discipline sert accessoirement à valider le format qu'on emploiera pour les sites générés.
+
+Précision importante : **les messages de prospection produits par le LLM ne relèvent pas de l'i18n.** Ce sont des données, rédigées en français parce que les artisans ciblés sont francophones, et stockées comme telles dans `generated_message`. Elles ne sont pas traduites.
+
+**b) Les fichiers de traduction du template de site vitrine — périmètre du spec n°2.**
+
+C'est le mécanisme retenu pour la personnalisation par LLM : le template GitHub place tout son contenu textuel dans des fichiers i18n, et l'adaptation à chaque prospect se limite à réécrire ces fichiers, sans toucher aux images Unsplash ni au code. Rappelé ici pour mémoire ; conçu dans le spec n°2.
+
+### 9.5 Pipeline
 
 États : `à contacter` → `contacté` → `relance` → `intéressé` → `gagné` / `perdu`, plus `ne pas contacter`.
 
 Champ `next_action_at` et journal horodaté des échanges.
-
-### Restitution du score
-
-Barre segmentée en trois blocs — présence, vitalité, joignabilité — dépliable en lignes détaillées issues du `breakdown`.
 
 ---
 
