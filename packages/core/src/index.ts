@@ -4,3 +4,4 @@ export * from './normalize.js';
 export * from './phone.js';
 export * from './effectif.js';
 export * from './web-presence.js';
+export * from './scoring.js';
