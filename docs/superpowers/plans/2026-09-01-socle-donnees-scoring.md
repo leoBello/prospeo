@@ -1193,7 +1193,8 @@ create table prospect_enrichment (
 
 create table web_presence (
   prospect_id        uuid primary key references prospect (id) on delete cascade,
-  category           web_presence_category not null,
+  -- Nullable : `probe` s'exécute avant `classify`, qui seul détermine la catégorie.
+  category           web_presence_category,
   probed_url         text,
   http_status        integer,
   is_https           boolean,
@@ -2313,7 +2314,6 @@ Ajouter au `switch` de `apps/collector/src/cli.ts` :
         const { error: writeError } = await client.from('web_presence').upsert(
           {
             prospect_id: row.prospect_id,
-            category: 'none',
             probed_url: result.url,
             http_status: result.httpStatus,
             is_https: result.isHttps,
