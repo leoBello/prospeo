@@ -15,6 +15,7 @@
 ## Global Constraints
 
 - TypeScript en mode `strict`, `noUncheckedIndexedAccess` activé.
+- Environnement vérifié du poste : Node v26.3.0, pnpm 11.24.0. Ne pas épingler d'autres versions.
 - `packages/core` ne fait **aucune I/O** : ni réseau, ni fichier, ni base. Aucune dépendance runtime hors `zod`.
 - Chaque étage du collector écrit **un prospect à la fois**, jamais par lot.
 - Codes NAF au format API avec point : `43.22A`, jamais `4322A`.
@@ -84,9 +85,9 @@ packages:
   "devDependencies": {
     "typescript": "^5.6.0",
     "vitest": "^2.1.0",
-    "@types/node": "^22.7.0"
+    "@types/node": "^26.0.0"
   },
-  "packageManager": "pnpm@9.12.0"
+  "packageManager": "pnpm@11.24.0"
 }
 ```
 
