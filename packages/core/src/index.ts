@@ -1,3 +1,5 @@
 export * from './types.js';
 export * from './trades.js';
 export * from './normalize.js';
+export * from './phone.js';
+export * from './effectif.js';
