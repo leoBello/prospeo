@@ -531,7 +531,15 @@ import type { NormalizedPhone } from './types.js';
 export function normalizePhone(raw: string | null): NormalizedPhone | null {
   if (raw === null) return null;
 
-  let digits = raw.replace(/[^\d+]/g, '');
+  // Une etiquette AVANT le numero est toleree (« Tél : 06 ... »), frequente dans
+  // les donnees scrapees. Une lettre A L'INTERIEUR ou APRES invalide l'entree :
+  // un faux numero se paie par un appel a un inconnu.
+  const start = raw.search(/[\d+]/);
+  if (start === -1) return null;
+  const body = raw.slice(start);
+  if (/\p{L}/u.test(body)) return null;
+
+  let digits = body.replace(/[^\d+]/g, '');
 
   if (digits.startsWith('+33')) digits = `0${digits.slice(3)}`;
   else if (digits.startsWith('0033')) digits = `0${digits.slice(4)}`;
@@ -1035,13 +1043,18 @@ export function computeScore(input: ScoreInput, now: Date = new Date()): ScoreRe
   }
 
   const lastPost = parseDate(input.lastSocialPostAt);
-  if (lastPost !== null && daysBetween(lastPost, now) <= R.socialFresh.maxAgeDays) {
-    lines.push({
-      code: 'social_fresh',
-      label: `Publication il y a ${Math.round(daysBetween(lastPost, now))} j`,
-      points: R.socialFresh.points,
-      group: 'vitalite',
-    });
+  if (lastPost !== null) {
+    // Borne basse indispensable : sans elle une date future satisfait `<= 90`
+    // et produit un libelle absurde (« il y a -12 j »).
+    const postAge = daysBetween(lastPost, now);
+    if (postAge >= 0 && postAge <= R.socialFresh.maxAgeDays) {
+      lines.push({
+        code: 'social_fresh',
+        label: `Publication il y a ${Math.round(postAge)} j`,
+        points: R.socialFresh.points,
+        group: 'vitalite',
+      });
+    }
   }
 
   const headcount = minHeadcount(input.effectifCode);
@@ -1366,9 +1379,9 @@ export default defineConfig({
 });
 ```
 
-`.env.example` :
+`.env.example` (le fichier existe deja a la racine, cree en amont) :
 ```
-SUPABASE_URL=https://xxxx.supabase.co
+SUPABASE_URL=https://xxxxxxxxxxxx.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=
 ```
 
