@@ -110,7 +110,7 @@ signal qui n'entre pas au barème.
 
 ### 4.1 Découplage
 
-Implémente l'interface déjà posée au socle :
+La source Google Maps est cachée derrière cette interface :
 
 ```ts
 interface MapsSource {
