@@ -76,6 +76,13 @@ describe('buildEnrichmentRow', () => {
     expect(row.matched_name).toBeNull();
   });
 
+  it('n écrit pas social_urls, colonne que enrich ne peuple jamais', () => {
+    // La poser à [] écraserait sur conflit une donnée que l étage ne connaît
+    // pas ; l omettre la préserve, la colonne ayant un défaut en base.
+    const row = buildEnrichmentRow(prospect, [candidate()], trade, MATCHING_CONFIG);
+    expect(row).not.toHaveProperty('social_urls');
+  });
+
   it('classe une URL de site propre comme telle', () => {
     const row = buildEnrichmentRow(
       prospect,
@@ -144,6 +151,82 @@ describe('runEnrich', () => {
     expect(report.processed).toBe(0);
     expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ status: 'blocked' }));
     // Le second prospect n est pas tenté : marteler une protection la durcit.
+    expect(blocking.search).toHaveBeenCalledTimes(1);
+  });
+
+  it('essaie la requête suivante quand la première ne retient aucun candidat', async () => {
+    // La règle est « arrêt à la première requête qui produit un candidat
+    // *retenu* ». S arrêter au premier candidat trouvé condamnerait ce
+    // prospect à un `not_found` définitif, faute d avoir essayé la requête
+    // par raison sociale — celle qui trouve la bonne fiche.
+    const upsert = vi.fn(async () => undefined);
+    const searching = source([
+      [candidate({ name: 'Boulangerie Dupont', category: 'Boulangerie' })],
+      [candidate()],
+    ]);
+    const report = await runEnrich({
+      prospects: [prospect],
+      trade,
+      config: MATCHING_CONFIG,
+      source: searching,
+      upsert,
+      dailyRemaining: 10,
+    });
+    expect(report.ok).toBe(1);
+    expect(searching.search).toHaveBeenCalledTimes(2);
+    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ status: 'ok' }));
+  });
+
+  it('interrompt le run après trois échecs d écriture consécutifs', async () => {
+    // Au-delà ce n est plus un incident mais une panne : continuer ne ferait
+    // que consommer du quota Google pour jeter le résultat.
+    const upsert = vi.fn(async () => {
+      throw new Error('permission denied for table prospect_enrichment');
+    });
+    const searching = source([[candidate()], [candidate()], [candidate()], [candidate()]]);
+    const report = await runEnrich({
+      prospects: [
+        prospect,
+        { ...prospect, id: 'p2' },
+        { ...prospect, id: 'p3' },
+        { ...prospect, id: 'p4' },
+      ],
+      trade,
+      config: MATCHING_CONFIG,
+      source: searching,
+      upsert,
+      dailyRemaining: 10,
+    });
+    expect(report.writeFailed).toBe(3);
+    expect(report.failed).toBe(0);
+    expect(report.processed).toBe(0);
+    expect(report.stoppedByWriteFailures).toBe(true);
+    // Le quatrième prospect n est même pas cherché chez Google.
+    expect(searching.search).toHaveBeenCalledTimes(3);
+  });
+
+  it('constate le blocage même si la ligne blocked ne peut pas être écrite', async () => {
+    // Le blocage est un fait constaté : il ne doit pas dépendre de la
+    // réussite de sa persistance, sinon le CLI sort en 1 au lieu de 2.
+    const upsert = vi.fn(async () => {
+      throw new Error('réseau coupé');
+    });
+    const blocking = {
+      search: vi.fn(async () => {
+        throw new BlockedError('https://google.com/sorry/index');
+      }),
+      close: vi.fn(async () => undefined),
+    };
+    const report = await runEnrich({
+      prospects: [prospect, { ...prospect, id: 'p2' }],
+      trade,
+      config: MATCHING_CONFIG,
+      source: blocking,
+      upsert,
+      dailyRemaining: 10,
+    });
+    expect(report.blocked).toBe(true);
+    expect(report.writeFailed).toBe(1);
     expect(blocking.search).toHaveBeenCalledTimes(1);
   });
 

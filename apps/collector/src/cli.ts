@@ -142,6 +142,25 @@ async function main(argv: string[]): Promise<number> {
         return 1;
       }
 
+      // Même validation que `discover`, et pour la même raison : `Number('abc')`
+      // rend NaN, et toute comparaison à NaN est fausse — la garde ne se
+      // déclencherait jamais. Ici l'enjeu est plus lourd que là-bas : un
+      // `enrich` sans borne part sur 300 prospects, soit jusqu'à 1800 pages
+      // Google, alors que `--limit` sert justement à éprouver prudemment des
+      // seuils non calibrés.
+      let limit: number | undefined;
+      if (argv.includes('--limit')) {
+        const limitRaw = flag(argv, 'limit');
+        const parsed = limitRaw === undefined ? Number.NaN : Number(limitRaw);
+        if (!Number.isInteger(parsed) || parsed <= 0) {
+          process.stderr.write(
+            `--limit attend un entier positif, reçu : ${limitRaw ?? '(rien)'}\n`,
+          );
+          return 1;
+        }
+        limit = parsed;
+      }
+
       const config = loadConfig(process.env);
       const client = createClient(config);
 
@@ -195,7 +214,10 @@ async function main(argv: string[]): Promise<number> {
         .select('prospect_id', { count: 'exact', head: true })
         .gte('enriched_at', since.toISOString());
       if (countError) throw new Error(countError.message);
-      const dailyRemaining = Math.max(0, DAILY_CAP - (count ?? 0));
+      const capRemaining = Math.max(0, DAILY_CAP - (count ?? 0));
+      // `--limit` borne le nombre de prospects traités, au même titre que le
+      // plafond journalier : c'est le plus contraignant des deux qui s'applique.
+      const dailyRemaining = limit === undefined ? capRemaining : Math.min(capRemaining, limit);
 
       const source = createGoogleMapsSource({
         userDataDir: process.env.PLAYWRIGHT_USER_DATA_DIR ?? '.playwright-profile',
@@ -220,20 +242,38 @@ async function main(argv: string[]): Promise<number> {
         await source.close();
       }
 
+      // Les deux familles d'échec sont rapportées séparément : un échec de
+      // lecture est un incident isolé, un échec d'écriture veut dire qu'on a
+      // scrapé Google sans rien garder.
       process.stdout.write(
         `enrich ${trade.slug} : ${report.ok} appariés, ${report.ambiguous} à trancher, ` +
-          `${report.notFound} introuvables, ${report.failed} en échec ` +
+          `${report.notFound} introuvables, ${report.failed} en échec de lecture, ` +
+          `${report.writeFailed} en échec d'écriture ` +
           `(${source.navigations} pages Google chargées)\n`,
       );
       if (report.stoppedByCap) {
-        process.stdout.write(`Plafond journalier de ${DAILY_CAP} prospects atteint.\n`);
+        const raison =
+          limit !== undefined && limit <= capRemaining
+            ? `limite demandée de ${limit} prospects`
+            : `plafond journalier de ${DAILY_CAP} prospects`;
+        process.stdout.write(`Arrêt : ${raison} atteint.\n`);
+      }
+      if (report.stoppedByWriteFailures) {
+        process.stderr.write(
+          "Arrêt : trop d'échecs d'écriture consécutifs — vérifier la migration et les droits de la clé.\n",
+        );
       }
       if (report.blocked) {
         process.stderr.write('Arrêt : Google a interposé une vérification.\n');
         // Code 2, distinct du 1 des erreurs d'usage : une automatisation doit
-        // pouvoir reconnaître un blocage anti-bot sans lire stderr.
+        // pouvoir reconnaître un blocage anti-bot sans lire stderr. Il l'emporte
+        // sur le code 1 des échecs d'écriture : c'est la cause à traiter en
+        // premier, et relancer avant de l'avoir traitée ne peut que la durcir.
         return 2;
       }
+      // Une écriture perdue casse le point de reprise du run : le sortir en 0
+      // ferait passer « 300 prospects scrapés, rien d'écrit » pour un succès.
+      if (report.writeFailed > 0) return 1;
       return 0;
     }
     case 'probe': {
