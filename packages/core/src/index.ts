@@ -6,3 +6,4 @@ export * from './phone.js';
 export * from './effectif.js';
 export * from './web-presence.js';
 export * from './scoring.js';
+export * from './matching.js';
