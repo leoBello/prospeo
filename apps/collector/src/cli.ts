@@ -21,6 +21,7 @@ import { probeUrl, shouldProbe } from './stages/probe.js';
 import { reconcileExitCode, runReconcile, type ReconcileProspect } from './stages/reconcile.js';
 import {
   replayEnrichment,
+  rewriteFromReplay,
   summarizeReplays,
   type StoredEnrichment,
 } from './stages/calibrate.js';
@@ -40,7 +41,7 @@ Commandes
   discover --trade <slug> --postal-code <cp>   Ingère les établissements Sirene
   enrich --trade <slug>                        Apparie les fiches Google Maps
   review                                       Tranche les appariements douteux
-  calibrate [--trade <slug>]                   Rejoue l'appariement hors ligne
+  calibrate [--trade <slug>] [--apply]         Rejoue l'appariement hors ligne
   probe                                        Sonde les URL déclarées
   score                                        Classe et note les prospects
   reconcile                                    Revérifie l'état Sirene des prospects
@@ -71,9 +72,14 @@ Calibrer les seuils d'appariement
   dans packages/core/src/matching.ts, relancer calibrate, regarder les
   verdicts qui bougent. Aucune requête Google dans cette boucle.
 
-  Une fois les nombres arrêtés : incrémenter MATCHING_CONFIG.version, puis
-  rejouer la population concernée avec enrich --retry-not-found. Les lignes
-  déjà ok ou ambiguous ne sont jamais reprises automatiquement.
+  Une fois les nombres arrêtés, --apply propage les nouveaux verdicts aux
+  lignes déjà en base, toujours sans requête Google : les candidats y sont,
+  il n'y a qu'à les renoter. Sans --apply, calibrate n'écrit rien.
+
+  --apply ne touche JAMAIS une ligne tranchée en revue par un humain. C'est
+  la seule donnée de cette base que rien ne permet de reconstituer, et un
+  recalcul qui la contredirait ne ferait aucun bruit. Le décompte des lignes
+  ainsi protégées est affiché.
 
 Supprimer des prospects, en deux temps
   1. prospeo reconcile --dry-run
@@ -557,7 +563,7 @@ async function main(argv: string[]): Promise<number> {
         const { data, error } = await client
           .from('prospect_enrichment')
           .select(
-            'prospect_id, status, matched_name, candidates, prospect(denomination, denomination_usuelle, latitude, longitude, trade_slug)',
+            'prospect_id, status, matched_name, candidates, decided_by, enriched_at, prospect(denomination, denomination_usuelle, latitude, longitude, trade_slug)',
           )
           .order('prospect_id')
           .range(from, from + PAGE_SIZE - 1);
@@ -593,6 +599,8 @@ async function main(argv: string[]): Promise<number> {
           status: row.status as StoredEnrichment['status'],
           matchedName: row.matched_name as string | null,
           candidates: (row.candidates ?? []) as ReviewCandidate[],
+          decidedBy: (row.decided_by ?? 'matcher') as StoredEnrichment['decidedBy'],
+          enrichedAt: row.enriched_at as string,
         });
       }
 
@@ -639,6 +647,38 @@ async function main(argv: string[]): Promise<number> {
         }
       }
 
+      let applied = 0;
+      let protege = 0;
+      let applyFailed = 0;
+      if (argv.includes('--apply')) {
+        for (let index = 0; index < replays.length; index += 1) {
+          const subject = subjects[index];
+          const replay = replays[index];
+          if (subject === undefined || replay === undefined) continue;
+          if (subject.decidedBy === 'human') {
+            protege += 1;
+            continue;
+          }
+          const rewritten = rewriteFromReplay(subject, replay);
+          if (rewritten === null) continue;
+          // Rien n'est écrit quand le verdict ne bouge pas : une écriture
+          // inutile ferait remonter la ligne dans tout suivi de modification
+          // et coûterait un aller-retour par prospect.
+          if (!replay.changed) continue;
+          const { error } = await client
+            .from('prospect_enrichment')
+            .upsert(rewritten, { onConflict: 'prospect_id' });
+          if (error !== null) {
+            applyFailed += 1;
+            process.stderr.write(
+              `calibrate: échec d'écriture sur ${subject.prospectId} — ${error.message}\n`,
+            );
+            continue;
+          }
+          applied += 1;
+        }
+      }
+
       const summary = summarizeReplays(replays);
       process.stdout.write(
         `\ncalibrate : ${summary.replayed} lignes rejouées, ${summary.changed} verdicts changés, ` +
@@ -650,6 +690,18 @@ async function main(argv: string[]): Promise<number> {
       );
       if (sansMetier > 0) {
         process.stdout.write(`  ${sansMetier} lignes ignorées : métier inconnu de la configuration\n`);
+      }
+      if (argv.includes('--apply')) {
+        process.stdout.write(
+          `  appliqué : ${applied} verdicts réécrits` +
+            (protege > 0 ? `, ${protege} préservés (tranchés en revue par un humain)` : '') +
+            (applyFailed > 0 ? `, ${applyFailed} en échec d'écriture` : '') +
+            '\n',
+        );
+      } else if (summary.changed > 0) {
+        process.stdout.write(
+          '  Relancer avec --apply pour propager ces verdicts en base, sans requête Google.\n',
+        );
       }
       if (summary.unreplayable > 0) {
         process.stdout.write(

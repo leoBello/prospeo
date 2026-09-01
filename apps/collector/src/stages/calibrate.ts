@@ -6,7 +6,7 @@ import {
   type ScoredCandidate,
   type Trade,
 } from '@prospeo/core';
-import type { EnrichmentRow, ReviewCandidate } from './enrich.js';
+import { buildEnrichmentRow, type EnrichmentRow, type ReviewCandidate } from './enrich.js';
 
 /**
  * Rejeu hors ligne de l'appariement, sur les candidats déjà en base.
@@ -34,6 +34,10 @@ export interface StoredEnrichment {
   status: EnrichmentRow['status'];
   matchedName: string | null;
   candidates: readonly ReviewCandidate[];
+  /** Qui a tranché. Une décision humaine ne se réécrit jamais. */
+  decidedBy: EnrichmentRow['decided_by'];
+  /** Horodatage existant, repris tel quel : aucun run n'a eu lieu. */
+  enrichedAt: string;
 }
 
 export interface ReplayedOutcome {
@@ -46,6 +50,14 @@ export interface ReplayedOutcome {
 export interface Replay {
   prospectId: string;
   denomination: string;
+  /**
+   * La configuration sous laquelle ce rejeu a été fait.
+   *
+   * Portée par le rejeu et non redemandée à l'appelant : propager un verdict
+   * sous une configuration autre que celle qui l'a produit écrirait en base
+   * un résultat que personne n'a mesuré.
+   */
+  config: MatchingConfig;
   stored: { status: EnrichmentRow['status']; matchedName: string | null };
   /** `null` quand la ligne ne porte pas de quoi être rejouée. */
   replayed: ReplayedOutcome | null;
@@ -107,6 +119,7 @@ export function replayEnrichment(row: StoredEnrichment, config: MatchingConfig):
   const base = {
     prospectId: row.prospectId,
     denomination: row.denomination,
+    config,
     stored: { status: row.status, matchedName: row.matchedName },
   };
 
@@ -173,4 +186,53 @@ export function summarizeReplays(replays: readonly Replay[]): ReplaySummary {
   }
 
   return summary;
+}
+
+/**
+ * La ligne à écrire pour propager un rejeu, ou `null` s'il ne faut pas y
+ * toucher.
+ *
+ * Deux refus, et ils n'ont pas le même poids :
+ *
+ * - **Une décision humaine ne se réécrit jamais.** Un opérateur a regardé les
+ *   fiches et tranché ; c'est la seule donnée de cette base que rien ne
+ *   permet de reconstituer. Un recalcul qui la contredirait dans son dos
+ *   détruirait le travail que la revue existe pour produire — et sans bruit,
+ *   puisque le résultat aurait exactement la forme d'un verdict légitime.
+ *   Le rejet compte autant que l'acceptation : « aucune de ces fiches n'est
+ *   la bonne » est une conclusion.
+ * - Une ligne qu'on n'a pas su rejouer n'a rien produit à écrire.
+ *
+ * L'horodatage d'enrichissement est repris et non rafraîchi : aucune requête
+ * n'est partie chez Google, et le réécrire ferait consommer au scraping du
+ * lendemain le quota d'un simple recalcul. Même raison qu'en revue.
+ */
+export function rewriteFromReplay(
+  row: StoredEnrichment,
+  replay: Replay,
+): EnrichmentRow | null {
+  if (row.decidedBy === 'human') return null;
+  if (replay.replayed === null) return null;
+
+  // `buildEnrichmentRow` est réutilisée telle quelle : la propagation doit
+  // produire EXACTEMENT ce qu'un nouveau run produirait, sinon la base
+  // divergerait selon le chemin emprunté pour y arriver.
+  const rebuilt = buildEnrichmentRow(
+    {
+      id: row.prospectId,
+      denomination: row.denomination,
+      denominationUsuelle: row.denominationUsuelle,
+      // `city` et `address` ne servent qu'à composer les requêtes Google, et
+      // il n'en part aucune ici.
+      city: '',
+      address: '',
+      latitude: row.latitude,
+      longitude: row.longitude,
+    },
+    row.candidates.map(toMapsCandidate),
+    row.trade,
+    replay.config,
+  );
+
+  return { ...rebuilt, enriched_at: row.enrichedAt };
 }

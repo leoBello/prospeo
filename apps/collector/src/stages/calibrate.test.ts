@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { MATCHING_CONFIG, getTrade, type MatchingConfig, type Trade } from '@prospeo/core';
-import { replayEnrichment, summarizeReplays, type StoredEnrichment } from './calibrate.js';
+import {
+  replayEnrichment,
+  rewriteFromReplay,
+  summarizeReplays,
+  type StoredEnrichment,
+} from './calibrate.js';
 import type { ReviewCandidate } from './enrich.js';
 
 const plombier = getTrade('plombier');
@@ -29,9 +34,13 @@ function stored(over: Partial<ReviewCandidate> = {}): ReviewCandidate {
   };
 }
 
+const ENRICHED_AT = '2026-08-15T09:30:00.000Z';
+
 function row(over: Partial<StoredEnrichment> = {}): StoredEnrichment {
   return {
     prospectId: 'p1',
+    enrichedAt: ENRICHED_AT,
+    decidedBy: 'matcher',
     denomination: 'SARL ALLARD',
     denominationUsuelle: null,
     latitude: 47.2213,
@@ -165,5 +174,45 @@ describe('summarizeReplays', () => {
     ]);
     expect(summary.eliminated.distance).toBe(1);
     expect(summary.eliminated.confiance).toBe(0);
+  });
+});
+
+describe('rewriteFromReplay — propager un reglage sans effacer un humain', () => {
+  it('reecrit le verdict d une ligne tranchee par la machine', () => {
+    const replay = replayEnrichment(row(), MATCHING_CONFIG);
+    const rewritten = rewriteFromReplay(row(), replay);
+    expect(rewritten?.status).toBe('ok');
+    expect(rewritten?.matched_name).toBe('Allard Plomberie');
+    expect(rewritten?.decided_by).toBe('matcher');
+  });
+
+  it('refuse de toucher une ligne tranchee par un humain', () => {
+    // La donnee la plus chere de la base : un operateur a regarde les fiches
+    // et choisi. Aucun recalcul ne doit la contredire dans son dos — elle est
+    // la seule que rien ne permette de reconstituer.
+    const humaine = row({ decidedBy: 'human', matchedName: 'Choix de l operateur' });
+    const replay = replayEnrichment(humaine, MATCHING_CONFIG);
+    expect(rewriteFromReplay(humaine, replay)).toBeNull();
+  });
+
+  it('reprend l horodatage d enrichissement au lieu de le rafraichir', () => {
+    // Aucune requete n est partie chez Google : rafraichir `enriched_at`
+    // ferait consommer au scraping du lendemain le quota d un simple
+    // recalcul. Meme raison qu en revue.
+    const replay = replayEnrichment(row(), MATCHING_CONFIG);
+    expect(rewriteFromReplay(row(), replay)?.enriched_at).toBe(ENRICHED_AT);
+  });
+
+  it('ne reecrit pas ce qui n a pas pu etre rejoue', () => {
+    const bloquee = row({ status: 'blocked', matchedName: null, candidates: [] });
+    const replay = replayEnrichment(bloquee, MATCHING_CONFIG);
+    expect(rewriteFromReplay(bloquee, replay)).toBeNull();
+  });
+
+  it('conserve la trace des candidats, renotee sous la configuration appliquee', () => {
+    const replay = replayEnrichment(row(), MATCHING_CONFIG);
+    const rewritten = rewriteFromReplay(row(), replay);
+    expect(rewritten?.candidates).toHaveLength(1);
+    expect(rewritten?.candidates[0]?.latitude).toBe(47.2214);
   });
 });

@@ -105,6 +105,15 @@ export interface EnrichmentRow {
    */
   candidates: ReviewCandidate[];
   status: 'ok' | 'not_found' | 'ambiguous' | 'blocked';
+  /**
+   * Qui a tranché : l'appariement, ou un humain en revue ?
+   *
+   * Rien ne distinguait les deux, `enrich` et `review` écrivant la même
+   * forme. Or un verdict de machine se recalcule à volonté depuis les
+   * candidats enregistrés, tandis qu'une décision humaine est la seule
+   * donnée de cette base que rien ne permet de reconstituer.
+   */
+  decided_by: 'matcher' | 'human';
   enriched_at: string;
 }
 
@@ -125,6 +134,7 @@ function emptyRow(prospectId: string, status: EnrichmentRow['status']): Enrichme
     maps_url: null,
     candidates: [],
     status,
+    decided_by: 'matcher',
     enriched_at: new Date().toISOString(),
   };
 }
