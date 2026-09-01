@@ -620,7 +620,7 @@ export function significantTokens(name: string, generic: readonly string[]): str
 export function tokenContainment(a: string, b: string, generic: readonly string[]): number {
   const tokens = significantTokens(a, generic);
   if (tokens.length === 0) return 0;
-  const target = new Set(b.split(' '));
+  const target = new Set(normalizeCompanyName(b).split(' '));
   const found = tokens.filter((token) => target.has(token)).length;
   return found / tokens.length;
 }
@@ -677,10 +677,11 @@ export function bestNameMatch(
 
   for (const variant of variants) {
     const score = Math.max(
-      jaroWinkler(variant, target),
-      jaroWinkler(despace(variant), despace(target)),
+      wholeStringScore(variant, target),
+      wholeStringScore(despace(variant), despace(target)),
       tokenContainment(variant, target, generic),
       tokenContainment(target, variant, generic),
+      bestTokenScore(variant, target, generic),
     );
     if (score > best.score) best = { score, variant };
   }
@@ -826,8 +827,11 @@ describe('selectMatch', () => {
   });
 
   it('renvoie ambiguous entre les deux seuils', () => {
-    const tiede = candidate({ name: 'Allardin Chauffage', category: 'Chauffagiste' });
-    const outcome = selectMatch(subject, [tiede], plombier, MATCHING_CONFIG);
+    // Le bon nom, la bonne catégorie, mais à 200 m : confiance 0,833, sous le
+    // seuil haut. C'est exactement le cas qu'un humain doit trancher — deux
+    // établissements du même artisan, ou deux artisans homonymes du quartier ?
+    const loin = candidate({ latitude: 47.2231, longitude: -1.5601 });
+    const outcome = selectMatch(subject, [loin], plombier, MATCHING_CONFIG);
     expect(outcome.kind).toBe('ambiguous');
   });
 
@@ -846,14 +850,21 @@ describe('selectMatch', () => {
   });
 
   it('classe les candidats ambigus du plus probable au moins probable', () => {
+    // Deux candidats dans la bande ambiguë, à 200 m et 267 m : confiances
+    // 0,833 et 0,778. Le plus proche doit sortir en tête.
     const outcome = selectMatch(
       subject,
-      [candidate({ name: 'Allardin Chauffage', category: 'Chauffagiste' }), candidate({ name: 'Allard' })],
+      [
+        candidate({ placeId: 'loin', latitude: 47.2237, longitude: -1.5601 }),
+        candidate({ placeId: 'proche', latitude: 47.2231, longitude: -1.5601 }),
+      ],
       plombier,
       MATCHING_CONFIG,
     );
     if (outcome.kind !== 'ambiguous') throw new Error('inattendu');
+    expect(outcome.scored).toHaveLength(2);
     const [first, second] = outcome.scored;
+    expect(first?.candidate.placeId).toBe('proche');
     expect(first?.score.confidence).toBeGreaterThanOrEqual(second?.score.confidence ?? 0);
   });
 
@@ -861,6 +872,18 @@ describe('selectMatch', () => {
     const outcome = selectMatch(
       subject,
       [candidate({ name: 'Boulangerie Dupont', category: 'Boulangerie' })],
+      plombier,
+      MATCHING_CONFIG,
+    );
+    expect(outcome.kind).toBe('not_found');
+  });
+
+  it('écarte un homonyme voisin dont le nom ne fait que prolonger le sien', () => {
+    // « Allardin » prolonge « Allard » : la mesure jeton à jeton refuse la
+    // paire, et la proximité seule ne suffit pas à franchir le seuil bas.
+    const outcome = selectMatch(
+      subject,
+      [candidate({ name: 'Allardin Chauffage' })],
       plombier,
       MATCHING_CONFIG,
     );
