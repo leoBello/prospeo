@@ -6,6 +6,7 @@ import {
   significantTokens,
   tokenContainment,
 } from './name-match.js';
+import { getTrade } from './trades.js';
 
 describe('jaroWinkler', () => {
   it('vaut 1 pour deux chaînes identiques', () => {
@@ -247,5 +248,81 @@ describe('bestNameMatch — identité complète contre patronyme noyé', () => {
     // porte un mot que la variante n a pas.
     const match = bestNameMatch(nameVariants('SARL MARTIN', null), 'Martin Dépannage', generic);
     expect(match.score).toBe(0.8);
+  });
+});
+
+describe('bestNameMatch — un mot commun n est pas une identité', () => {
+  const generic = ['plomberie', 'plombier', 'chauffage', 'depannage'];
+
+  it('refuse de donner le nom entier pour un seul mot banal partagé', () => {
+    // LE défaut le plus dangereux trouvé par la calibration, parce qu il
+    // fabrique des fusions AUTOMATIQUES fausses. Mesuré : « ACTIF SERVICES »
+    // face à « Boulangerie Services » valait 1,00 — une boulangerie, score de
+    // nom parfait — parce que la mesure jeton à jeton prend le maximum sur
+    // les paires et qu un « services » commun suffisait. Avec une catégorie
+    // qui concorde et une adresse proche, cela fusionnait tout seul.
+    //
+    // Un faux appariement ne se voit pas dans les statistiques : il se voit
+    // au téléphone, et l appel est perdu.
+    const variants = nameVariants('ACTIF SERVICES (PEDRO SERVICES)', null);
+    expect(bestNameMatch(variants, 'Boulangerie Services', generic).score).toBeLessThan(0.55);
+    expect(bestNameMatch(variants, 'Dupont Services', generic).score).toBeLessThan(0.55);
+  });
+
+  it('ne fusionne pas deux enseignes que seul un mot banal rapproche', () => {
+    // Le meme defaut par l autre chemin, celui des mesures de chaine entiere :
+    // « NANTES HABITAT » face a « RENNES HABITAT » atteignait 0,877 et
+    // « MARTIN RENOVATION » face a « DURAND RENOVATION » 0,859 — au-dela du
+    // seuil de fusion des que la categorie concorde et que l adresse est
+    // proche. Deux villes, deux artisans, une seule fusion automatique fausse.
+    for (const [source, fiche] of [
+      ['NANTES HABITAT', 'RENNES HABITAT'],
+      ['MARTIN RENOVATION', 'DURAND RENOVATION'],
+      ['AB SERVICES', 'CD SERVICES'],
+    ] as const) {
+      const score = bestNameMatch(nameVariants(source, null), fiche, generic).score;
+      // Le seuil qui compte est celui de la fusion : nom x 0,65 + 0,25 de
+      // proximite maximale + 0,10 de categorie doit rester sous 0,85.
+      expect(0.65 * score + 0.35).toBeLessThan(0.85);
+    }
+  });
+
+  it('retient toujours la bonne fiche quand tous les mots concordent', () => {
+    // Le garde-fou du test précédent : « PEDRO SERVICES » face à
+    // « Pedro services » doit rester une fusion. Ce n est pas un mot commun,
+    // ce sont TOUS les mots.
+    const variants = nameVariants('ACTIF SERVICES (PEDRO SERVICES)', null);
+    expect(bestNameMatch(variants, 'Pedro services', generic).score).toBe(1);
+  });
+
+  it('ne fait pas d un patronyme et d un escape game le même nom', () => {
+    // Mesuré : « ERIC ESCAPIN » ~ « Leave in Time - Escape Game Nantes »
+    // valait 0,91, parce que jaroWinkler("escapin","escape") vaut 0,910 et
+    // qu un seul jeton emportait tout le score.
+    const match = bestNameMatch(nameVariants('ERIC ESCAPIN', null), 'Leave in Time - Escape Game Nantes', generic);
+    expect(match.score).toBeLessThan(0.55);
+  });
+
+  it('garde « H20 » face à « H2O Plomberie », l enseigne courte que la mesure vise', () => {
+    // La restriction ne doit pas emporter le cas que `bestTokenScore`
+    // documente explicitement : une enseigne d un seul mot, noyée dans un nom
+    // candidat plus long.
+    const match = bestNameMatch(nameVariants('ERIC ESCAPIN', 'H20'), 'H2O Plomberie', generic);
+    expect(match.score).toBeGreaterThan(0.8);
+  });
+});
+
+describe('configuration des métiers', () => {
+  it('tient « dépannage » pour un mot de métier du plombier aussi', () => {
+    // Trouvé sur le lot : « OUEST DEPANNAGE PLOMBERIE » obtenait 1,00 face à
+    // « AMS Services - Spécialiste en Dépannage Plomberie… » sur le seul mot
+    // « dépannage ». Il figurait dans les mots-clés du serrurier et pas dans
+    // ceux du plombier, alors qu il qualifie exactement autant les deux.
+    const plombier = getTrade('plombier');
+    if (plombier === undefined) throw new Error('métier plombier absent');
+    expect(plombier.keywords).toContain('depannage');
+    // En queue de liste : `keywords[0]` sert à composer les noms de domaine,
+    // où l on veut « plomberie » et non « depannage ».
+    expect(plombier.keywords[0]).toBe('plomberie');
   });
 });

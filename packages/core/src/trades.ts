@@ -13,7 +13,13 @@ export const TRADES: readonly Trade[] = [
     label: 'Plombier',
     nafCodes: ['43.22A'],
     mapsQueries: ['plombier', 'plomberie'],
-    keywords: ['plomberie', 'plombier', 'chauffagiste', 'sanitaire', 'chauffage'],
+    // « depannage » qualifie exactement autant un plombier qu'un serrurier,
+    // et il figurait pourtant dans les seuls mots-clés du second. Mesuré sur
+    // le lot de calibration : « OUEST DEPANNAGE PLOMBERIE » obtenait 1,00
+    // face à « AMS Services - Spécialiste en Dépannage Plomberie… » sur ce
+    // seul mot. Il reste en QUEUE de liste : `keywords[0]` compose les noms
+    // de domaine proposés, où l'on veut « plomberie ».
+    keywords: ['plomberie', 'plombier', 'chauffagiste', 'sanitaire', 'chauffage', 'depannage'],
     categoryLabels: ['plombier', 'plomberie', 'chauffagiste'],
   },
   {

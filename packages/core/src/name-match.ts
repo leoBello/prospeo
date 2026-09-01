@@ -123,6 +123,35 @@ export function significantTokens(name: string, generic: readonly string[]): str
  */
 const SINGLE_TOKEN_CAP = 0.8;
 
+/**
+ * Proportion des mots non génériques de `a` retrouvés dans `b`, **jetons
+ * courts compris**.
+ *
+ * Elle ne remplace pas `tokenContainment` : elle la borne. La différence est
+ * le sort des jetons de moins de trois lettres. `significantTokens` les
+ * écarte — « du », « et », « 44 » n'identifient rien — mais ils portent
+ * parfois toute la distinction : « AB SERVICES » face à « CD SERVICES » se
+ * réduisait des deux côtés au seul « services », donnant une couverture
+ * parfaite et, avec une catégorie concordante, une fusion automatique entre
+ * deux entreprises différentes.
+ *
+ * Compter ces jetons au dénominateur sans exiger qu'ils identifient quoi que
+ * ce soit règle le cas : ils ne peuvent plus être ignorés, seulement
+ * retrouvés ou manquants. La mesure peut être un peu sévère — « MARTIN DU
+ * BOIS » face à « Martin Bois » rend 2/3 — mais elle se trompe du bon côté :
+ * un appariement manqué coûte une minute de revue, un faux appariement coûte
+ * l'appel.
+ */
+export function tokenCoverage(a: string, b: string, generic: readonly string[]): number {
+  const banned = new Set(generic.map((word) => normalizeCompanyName(word)));
+  const tokens = normalizeCompanyName(a)
+    .split(' ')
+    .filter((token) => token !== '' && !banned.has(token));
+  if (tokens.length === 0) return 0;
+  const target = new Set(normalizeCompanyName(b).split(' '));
+  return tokens.filter((token) => target.has(token)).length / tokens.length;
+}
+
 export function tokenContainment(a: string, b: string, generic: readonly string[]): number {
   const tokens = significantTokens(a, generic);
   if (tokens.length === 0) return 0;
@@ -340,6 +369,25 @@ function sameLetters(a: string, b: string): boolean {
 function bestTokenScore(a: string, b: string, generic: readonly string[]): number {
   const aTokens = significantTokens(a, generic);
   const bTokens = significantTokens(b, generic);
+
+  // La mesure ne vaut que pour une enseigne d'UN SEUL mot — ce que sa
+  // documentation dit depuis toujours : « rattrape une enseigne courte noyée
+  // dans un nom candidat plus long ». Elle prend le maximum sur les paires de
+  // jetons, donc appliquée à un nom qui en compte plusieurs, un unique mot
+  // banal partagé emporte le score du nom ENTIER.
+  //
+  // Ce n'est pas théorique : mesuré sur le lot de calibration, « ACTIF
+  // SERVICES » face à « Boulangerie Services » valait 1,00 — une boulangerie,
+  // score de nom parfait, sur le seul « services ». Avec une catégorie qui
+  // concorde et une adresse proche, cela franchissait le seuil et fusionnait
+  // tout seul. C'est la pire panne possible de cet étage : un faux
+  // appariement ne se voit pas dans les statistiques, il se voit au téléphone.
+  //
+  // Un nom de plusieurs mots a déjà sa mesure, `tokenContainment`, qui rend
+  // la PROPORTION de jetons retrouvés — 0,5 pour un « services » sur deux —
+  // au lieu du maximum. C'est elle qui doit décider dans ce cas.
+  if (aTokens.length !== 1) return 0;
+
   let best = 0;
   for (const aToken of aTokens) {
     for (const bToken of bTokens) {
@@ -415,14 +463,36 @@ export function bestNameMatch(
     const cap = (value: number): number =>
       singleToken ? Math.min(value, SINGLE_TOKEN_CAP) : value;
 
+    // Proportion des mots distinctifs de la variante réellement retrouvés.
+    // Elle sert de PLAFOND aux mesures de chaîne entière, qui sans elle
+    // récompensent un long suffixe partagé sans regarder si la partie qui
+    // distingue concorde. Mesuré : « NANTES HABITAT » face à « RENNES
+    // HABITAT » atteignait 0,877 et fusionnait automatiquement — deux
+    // entreprises de deux villes — et « MARTIN RENOVATION » face à « DURAND
+    // RENOVATION » 0,859, deux artisans sans rapport.
+    //
+    // Le compromis est assumé : une faute de frappe portant sur tout le nom
+    // n'atteindra plus le seuil de fusion et partira en revue. C'est le sens
+    // de l'échange — un appariement manqué coûte une minute d'humain, un
+    // faux appariement coûte l'appel.
+    const coverage = tokenCoverage(variant, target, generic);
+    const grounded = (value: number): number => Math.min(value, coverage);
+
+    // Deux mesures échappent au plafond de couverture, et pour la même
+    // raison : elles servent les cas où la couverture est légitimement nulle.
+    // `bestTokenScore` rattrape l'enseigne d'un seul mot que le candidat
+    // écrit autrement — « h20 » n'est pas dans « h2o plomberie ».
+    // `agglutinatedContainment` rattrape l'enseigne recollée — « rgservices »
+    // n'est dans aucun jeton de « plombier nantes rg services ». Les
+    // plafonner par la couverture les annulerait toutes les deux.
     const score = Math.max(
       identical || exactlyAgglutinated ? 1 : 0,
-      bothSingleWords ? 0 : cap(wholeStringScore(variantCore, targetCore)),
-      bothSingleWords ? 0 : cap(wholeStringScore(despace(variantCore), despace(targetCore))),
       cap(agglutinatedContainment(variantCore, targetCore)),
-      tokenContainment(variant, target, generic),
-      tokenContainment(target, variant, generic),
       bestTokenScore(variant, target, generic),
+      bothSingleWords ? 0 : cap(grounded(wholeStringScore(variantCore, targetCore))),
+      bothSingleWords ? 0 : cap(grounded(wholeStringScore(despace(variantCore), despace(targetCore)))),
+      grounded(tokenContainment(variant, target, generic)),
+      grounded(tokenContainment(target, variant, generic)),
     );
     if (score > best.score) best = { score, variant };
   }
