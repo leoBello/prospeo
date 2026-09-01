@@ -281,7 +281,7 @@ export type Database = {
           is_https: boolean | null
           is_parked: boolean | null
           last_social_post_at: string | null
-          probed_at: string
+          probed_at: string | null
           probed_url: string | null
           prospect_id: string
         }
@@ -295,7 +295,7 @@ export type Database = {
           is_https?: boolean | null
           is_parked?: boolean | null
           last_social_post_at?: string | null
-          probed_at?: string
+          probed_at?: string | null
           probed_url?: string | null
           prospect_id: string
         }
@@ -309,7 +309,7 @@ export type Database = {
           is_https?: boolean | null
           is_parked?: boolean | null
           last_social_post_at?: string | null
-          probed_at?: string
+          probed_at?: string | null
           probed_url?: string | null
           prospect_id?: string
         }

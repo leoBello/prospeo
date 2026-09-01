@@ -1,9 +1,18 @@
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { getTrade } from '@prospeo/core';
 import { loadConfig } from './config.js';
 import { createClient } from './supabase.js';
 import { buildScoreRow } from './stages/classify-score.js';
 import { makeUpsertProspect, runDiscover } from './stages/discover.js';
 import { probeUrl } from './stages/probe.js';
+
+// `.env` vit a la racine du depot. Ni tsx ni Node ne le chargent tout seuls :
+// sans cette ligne, la procedure documentee (« copier .env.example en .env »)
+// echoue sur une erreur de configuration incomprehensible, et le collector ne
+// marche que pour qui a exporte les variables dans son shell.
+const ENV_FILE = fileURLToPath(new URL('../../../.env', import.meta.url));
+if (existsSync(ENV_FILE)) process.loadEnvFile(ENV_FILE);
 
 const USAGE = `
 prospeo <commande> [options]
@@ -16,6 +25,25 @@ Commandes
 Options
   --limit <n>   Plafond d'enregistrements traités
 `;
+
+/** Taille de page des lectures Supabase (PostgREST plafonne a max_rows = 1000). */
+const PAGE_SIZE = 500;
+
+/**
+ * Une page de la lecture de `score`. Extrait dans une fonction pour que le
+ * littéral passé à `select()` reste un littéral : supabase-js infère le type de
+ * la ligne à partir de ce littéral, et toute concaténation l'élargirait en
+ * `string`, faisant retomber l'inférence sur `GenericStringError`.
+ */
+function fetchScorePage(client: ReturnType<typeof createClient>, from: number) {
+  return client
+    .from('prospect')
+    .select(
+      'id, denomination, date_creation, effectif_code, prospect_enrichment(declared_url, social_urls, phone_e164, rating, review_count), web_presence(category, probed_url, http_status, is_https, final_url, is_parked, has_viewport_meta, last_social_post_at)',
+    )
+    .order('id')
+    .range(from, from + PAGE_SIZE - 1);
+}
 
 /** Commandes reconnues. Les étages sont branchés par les tâches 9 à 11. */
 const COMMANDS = ['discover', 'probe', 'score'] as const;
@@ -86,14 +114,25 @@ async function main(argv: string[]): Promise<number> {
     case 'probe': {
       const config = loadConfig(process.env);
       const client = createClient(config);
-      const { data, error } = await client
-        .from('prospect_enrichment')
-        .select('prospect_id, declared_url')
-        .not('declared_url', 'is', null);
-      if (error) throw new Error(error.message);
+      // PostgREST plafonne les reponses (max_rows = 1000). Sans pagination, un
+      // run au-dela de ce seuil traiterait une tranche arbitraire et afficherait
+      // un compte-rendu de succes complet : la troncature serait invisible.
+      // L'ordre explicite rend les pages deterministes.
+      const rows: { prospect_id: string; declared_url: string | null }[] = [];
+      for (let from = 0; ; from += PAGE_SIZE) {
+        const { data, error } = await client
+          .from('prospect_enrichment')
+          .select('prospect_id, declared_url')
+          .not('declared_url', 'is', null)
+          .order('prospect_id')
+          .range(from, from + PAGE_SIZE - 1);
+        if (error) throw new Error(error.message);
+        rows.push(...(data ?? []));
+        if ((data ?? []).length < PAGE_SIZE) break;
+      }
 
       let done = 0;
-      for (const row of data ?? []) {
+      for (const row of rows) {
         // Un échec isolé ne doit pas avorter le run : même discipline que
         // `discover`, l'écriture est unitaire et l'erreur est journalisée.
         try {
@@ -125,15 +164,19 @@ async function main(argv: string[]): Promise<number> {
     case 'score': {
       const config = loadConfig(process.env);
       const client = createClient(config);
-      const { data, error } = await client
-        .from('prospect')
-        .select(
-          // Un seul littéral (et non une concaténation `+`) : supabase-js infère
-          // le type de la ligne à partir du type littéral de la chaîne passée à
-          // `select()` ; une concaténation élargit ce type en `string` et fait
-          // retomber l'inférence sur `GenericStringError`.
-          'id, denomination, date_creation, effectif_code, prospect_enrichment(declared_url, social_urls, phone_e164, rating, review_count), web_presence(category, probed_url, http_status, is_https, final_url, is_parked, has_viewport_meta, last_social_post_at)',
-        );
+      // Meme raison que pour `probe` : sans pagination explicite, au-dela de
+      // max_rows le rapport annoncerait un succes sur une tranche arbitraire.
+      const data: Awaited<ReturnType<typeof fetchScorePage>>['data'] = [];
+      let error: { message: string } | null = null;
+      for (let from = 0; ; from += PAGE_SIZE) {
+        const page = await fetchScorePage(client, from);
+        if (page.error) {
+          error = page.error;
+          break;
+        }
+        data.push(...(page.data ?? []));
+        if ((page.data ?? []).length < PAGE_SIZE) break;
+      }
       if (error) throw new Error(error.message);
 
       let scored = 0;
@@ -186,7 +229,11 @@ async function main(argv: string[]): Promise<number> {
         const { error: presenceError } = await client
           .from('web_presence')
           .upsert(
-            { prospect_id: row.prospectId, category: row.category, probed_at: new Date().toISOString() },
+            // Pas de `probed_at` : `score` n'a rien sondé. L'écrire écraserait
+            // l'horodatage réel posé par `probe` — donc le seul moyen de savoir
+            // qu'une sonde est périmée — et, à l'insertion, affirmerait une
+            // sonde qui n'a jamais eu lieu.
+            { prospect_id: row.prospectId, category: row.category },
             { onConflict: 'prospect_id' },
           );
         if (presenceError) {

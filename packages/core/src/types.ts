@@ -2,11 +2,11 @@ export interface Trade {
   slug: string;
   label: string;
   /** Codes NAF au format API, avec point : '43.22A'. */
-  nafCodes: string[];
+  readonly nafCodes: readonly string[];
   /** Requêtes utilisées par l'enrichissement Google Maps (plan n°2). */
-  mapsQueries: string[];
+  readonly mapsQueries: readonly string[];
   /** Mots-clés de cohérence métier, utilisés à l'appariement. */
-  keywords: string[];
+  readonly keywords: readonly string[];
 }
 
 export interface RawEstablishment {

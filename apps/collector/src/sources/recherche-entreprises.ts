@@ -31,7 +31,10 @@ interface Entreprise {
 }
 
 function str(value: unknown): string | null {
-  return typeof value === 'string' && value.trim() !== '' ? value : null;
+  // Renvoyer la valeur TRIMMEE : tester `trim()` puis renvoyer la valeur brute
+  // laisserait passer un SIRET entoure d'espaces, ce qui casserait la cle
+  // d'unicite sur laquelle repose l'idempotence de `discover`.
+  return typeof value === 'string' && value.trim() !== '' ? value.trim() : null;
 }
 
 function num(value: unknown): number | null {
