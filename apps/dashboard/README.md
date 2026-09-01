@@ -61,11 +61,29 @@ Au 1ᵉʳ septembre 2026, 114 prospects sur 139 n'ont ni score, ni présence web
 sondée. Les quatre satellites (`prospect_score`, `web_presence`,
 `prospect_enrichment`, `prospect_pipeline`) restent donc `null` dans
 `ProspectView`, et ce `null` remonte jusqu'à l'écran : « pas encore scoré »
-et non « 0 », « sans objet » et non « 0 % ».
+et non « 0 ».
 
 Aucun code de ce paquet ne doit remplacer un satellite absent par un objet
 vide ou par des zéros. C'est la règle la plus facile à casser par
 commodité, et la seule dont la violation ne produit aucune erreur.
+
+Ces 114 prospects n'apparaissent dans aucune file de travail d'« Aujourd'hui » :
+une ligne sans score n'offre aucune action, et les faire parcourir aux flèches
+coûterait douze arrêts pour rien. Ce qui compte d'eux est leur *nombre*, porté
+par l'indicateur « qualifiés » qui met l'écart 25 / 139 sous les yeux. Leur
+parcours relèvera de l'écran Exploration.
+
+## Le taux de réponse n'existe pas
+
+Le §9.2 inscrit un taux de réponse dans la bande d'indicateurs. Il n'est pas
+calculable : `interaction` enregistre le canal d'un échange (`appel`,
+`whatsapp`, `email`, `note`) mais jamais son sens, et rien ne distingue donc un
+appel passé d'un appel reçu. Le numérateur n'est pas difficile à obtenir, il
+est hors d'atteinte du schéma.
+
+La tuile a été remplacée par « qualifiés », mesurable et utile aujourd'hui.
+Rétablir la mesure demande une colonne de direction sur `interaction` — porté
+au §14 ter du spec du socle.
 
 ## Ce que la base se contredit
 

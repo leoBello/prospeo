@@ -34,9 +34,7 @@ export function TodayScreen({ prospects, currentRulesetVersion, now, onSignOut }
    */
   const ids = useMemo(
     () =>
-      [...today.followUps.items, ...today.newHighScore.items, ...today.awaiting.items].map(
-        (row) => row.prospect.id,
-      ),
+      [...today.followUps.items, ...today.newHighScore.items].map((row) => row.prospect.id),
     [today],
   );
 
@@ -89,15 +87,6 @@ export function TodayScreen({ prospects, currentRulesetVersion, now, onSignOut }
             titleKey="today.section.newHighScore"
             emptyKey="today.empty.newHighScore"
             list={today.newHighScore}
-            selectedId={selectedId}
-            currentRulesetVersion={currentRulesetVersion}
-            onSelect={select}
-          />
-          <WorkListSection
-            titleKey="today.section.awaiting"
-            emptyKey="today.empty.awaiting"
-            hintKey="today.section.awaiting.hint"
-            list={today.awaiting}
             selectedId={selectedId}
             currentRulesetVersion={currentRulesetVersion}
             onSelect={select}

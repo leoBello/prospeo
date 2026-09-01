@@ -41,22 +41,14 @@ export const en: Record<keyof typeof fr, string> = {
   'today.kpi.inBase': 'In database',
   'today.kpi.contacted': 'Contacted',
   'today.kpi.interested': 'Interested',
-  'today.kpi.responseRate': 'Response rate',
-  'today.kpi.unavailable': 'not applicable',
-  'today.kpi.unavailable.noPipeline': 'no prospect has been contacted yet',
-  'today.kpi.unavailable.notModelled':
-    'the schema does not tell an incoming exchange from an outgoing one',
+  'today.kpi.qualified': 'Scored',
 
   'today.section.followUps': 'Follow-ups due',
   'today.section.newHighScore': 'New high-scoring prospects',
-  'today.section.awaiting': 'Awaiting qualification',
-  'today.section.awaiting.hint':
-    'No enrichment, no web presence, no score. These prospects exist; they have not been judged yet.',
 
   'today.empty.followUps':
     'No follow-up: the pipeline table holds no rows yet. Nothing writes to it so far.',
   'today.empty.newHighScore': 'No scored prospect yet.',
-  'today.empty.awaiting': 'Every prospect in the database has been qualified.',
 
   'today.reason.followUp.today': 'follow-up due today',
   'today.reason.followUp.late': 'follow-up {days} days overdue',
@@ -65,9 +57,6 @@ export const en: Record<keyof typeof fr, string> = {
   'today.reason.followUp.future_one': 'follow-up due tomorrow',
   'today.reason.followUp.undated': 'follow-up with no date set',
 
-  'today.reason.missing.enrichment': 'not enriched yet',
-  'today.reason.missing.presence': 'web presence not probed yet',
-  'today.reason.missing.score': 'not scored yet',
   'today.reason.separator': ' · ',
 
   'score.absent': 'not scored yet',

@@ -51,13 +51,17 @@ function rendre(prospects: ProspectView[]) {
 }
 
 describe('TodayScreen', () => {
-  it('montre les prospects non qualifies au lieu de les faire disparaitre', () => {
-    // Sur la base réelle, 114 prospects sur 139 n'ont ni enrichissement, ni
-    // présence web, ni score. Un écran bâti sur les deux seules listes du
-    // §9.2 serait vide à 80 % sans jamais dire pourquoi.
+  it('rend l ecart entre prospects decouverts et prospects juges lisible sans lister ces derniers', () => {
+    // Sur la base reelle, 114 prospects sur 139 n'ont aucun score. Ils n'ont
+    // pas de ligne — aucune action n'est possible dessus — mais l'ecart doit
+    // sauter aux yeux, sans quoi l'ecran laisse croire que la base compte
+    // deux entreprises.
     rendre([vue('a'), vue('b', { score: score(30) })]);
-    expect(screen.getByText('En attente de qualification')).toBeDefined();
-    expect(screen.getByText(/pas encore enrichi/)).toBeDefined();
+    const bande = screen.getByText('Qualifiés').closest('div');
+    expect(bande?.textContent).toContain('1');
+    expect(screen.getByText('En base').closest('div')?.textContent).toContain('2');
+    // Le prospect sans score n'apparait dans aucune file de travail.
+    expect(screen.queryByText('ENTREPRISE a')).toBeNull();
   });
 
   it('dit pourquoi la file de relances est vide, plutot que de rester muette', () => {
@@ -65,10 +69,13 @@ describe('TodayScreen', () => {
     expect(screen.getByText(/la table de suivi ne contient encore aucune ligne/)).toBeDefined();
   });
 
-  it('affiche le taux de reponse comme indisponible et non comme zero pour cent', () => {
+  it('n affiche aucun taux, le schema ne permettant pas d en calculer un', () => {
+    // `interaction` enregistre le canal d'un echange, jamais son sens : le
+    // numerateur d'un taux de reponse n'existe pas. Mieux vaut un compteur
+    // vrai qu'une moyenne inventee ou une tuile inerte a demeure.
     rendre([vue('a')]);
-    expect(screen.getByText('sans objet')).toBeDefined();
-    expect(screen.queryByText('0 %')).toBeNull();
+    expect(screen.queryByText(/%/)).toBeNull();
+    expect(screen.queryByText(/taux de réponse/i)).toBeNull();
   });
 
   it('ouvre le panneau a la premiere fleche et y parcourt les prospects', async () => {
@@ -104,13 +111,30 @@ describe('TodayScreen', () => {
     expect(screen.getByText('ENTREPRISE a')).toBeDefined();
   });
 
-  it('traverse la frontiere entre deux listes sans reprendre la souris', async () => {
+  it('traverse la frontiere entre les deux listes sans reprendre la souris', async () => {
+    // Une relance due, puis un prospect neuf : deux sections distinctes, un
+    // seul parcours. Buter en fin de section obligerait a reprendre la souris
+    // a chaque titre.
     const user = userEvent.setup();
-    rendre([vue('note', { score: score(90) }), vue('attente')]);
+    rendre([
+      vue('neuf', { score: score(90) }),
+      vue('relance', {
+        score: score(50),
+        pipeline: {
+          status: 'relance',
+          nextActionAt: '2026-08-30T10:00:00',
+          updatedAt: '2026-08-30T10:00:00Z',
+        },
+      }),
+    ]);
 
-    await user.keyboard('{ArrowDown}{ArrowDown}');
+    await user.keyboard('{ArrowDown}');
     expect(within(screen.getByRole('complementary')).getByRole('heading', { level: 2 }).textContent)
-      .toBe('ENTREPRISE attente');
+      .toBe('ENTREPRISE relance');
+
+    await user.keyboard('{ArrowDown}');
+    expect(within(screen.getByRole('complementary')).getByRole('heading', { level: 2 }).textContent)
+      .toBe('ENTREPRISE neuf');
   });
 
   it('situe le prospect dans la file, pour qu on sache ou l on en est', async () => {

@@ -7,7 +7,6 @@ import styles from './WorkListSection.module.css';
 interface Props {
   titleKey: TranslationKey;
   emptyKey: TranslationKey;
-  hintKey?: TranslationKey;
   list: WorkList;
   selectedId: string | null;
   currentRulesetVersion: string;
@@ -24,7 +23,6 @@ interface Props {
 export function WorkListSection({
   titleKey,
   emptyKey,
-  hintKey,
   list,
   selectedId,
   currentRulesetVersion,
@@ -39,8 +37,6 @@ export function WorkListSection({
         <h2 className={styles.title}>{t(titleKey)}</h2>
         <span className={styles.count}>{t('unit.prospects', { count: list.totalCount })}</span>
       </div>
-
-      {hintKey !== undefined ? <p className={styles.hint}>{t(hintKey)}</p> : null}
 
       {list.items.length === 0 ? (
         // L'état vide dit pourquoi il est vide. « Aucune relance » sans

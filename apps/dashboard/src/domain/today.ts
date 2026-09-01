@@ -63,21 +63,6 @@ export function followUpReason(nextActionAt: string | null, now: Date): FollowUp
 }
 
 /**
- * Les étages de qualification qui manquent encore, dans l'ordre du pipeline.
- *
- * C'est la raison d'être de la troisième liste. Sans elle, 114 prospects sur
- * 139 n'apparaîtraient nulle part : ni relance, ni score, donc invisibles —
- * et l'écran laisserait croire que la base compte vingt-cinq entreprises.
- */
-export function qualificationGaps(prospect: ProspectView): TranslationKey[] {
-  const manques: TranslationKey[] = [];
-  if (prospect.enrichment === null) manques.push('today.reason.missing.enrichment');
-  if (prospect.presence === null) manques.push('today.reason.missing.presence');
-  if (prospect.score === null) manques.push('today.reason.missing.score');
-  return manques;
-}
-
-/**
  * Les signaux qui justifient un score, du plus lourd au plus léger.
  *
  * La présence web ouvre toujours la liste, quel que soit son poids : c'est le
@@ -94,33 +79,6 @@ export function highlightLines(breakdown: ScoreLine[], max = MAX_REASON_LINES): 
   return [...presence, ...autres].slice(0, max);
 }
 
-export type Measure =
-  | { known: true; value: number }
-  | { known: false; reason: TranslationKey };
-
-/**
- * Taux de réponse — indisponible aujourd'hui, et pour deux raisons distinctes.
- *
- * La première est conjoncturelle : sans prospect contacté, le dénominateur est
- * nul. « 0 % » se lirait comme un échec commercial là où il n'y a simplement
- * pas encore eu de prospection.
- *
- * La seconde est structurelle : `interaction` porte un type d'échange
- * (appel / whatsapp / email / note) mais pas son sens. Rien dans le schéma ne
- * distingue un appel passé d'un appel reçu, donc le numérateur n'est pas
- * mesurable — d'où `replied: null`, qui est une absence de mesure et non un
- * zéro de mesure.
- */
-export function responseRate(input: { contacted: number; replied: number | null }): Measure {
-  if (input.replied === null) {
-    return { known: false, reason: 'today.kpi.unavailable.notModelled' };
-  }
-  if (input.contacted <= 0) {
-    return { known: false, reason: 'today.kpi.unavailable.noPipeline' };
-  }
-  return { known: true, value: input.replied / input.contacted };
-}
-
 /**
  * Statuts qui prouvent qu'un échange a réellement eu lieu.
  *
@@ -133,41 +91,44 @@ const STATUTS_CONTACTES = new Set(['contacte', 'relance', 'interesse', 'gagne', 
 
 export interface Kpis {
   inBase: number;
+  /**
+   * Prospects portant un `prospect_score`.
+   *
+   * Cet indicateur remplace le taux de réponse du §9.2, qui n'est pas
+   * mesurable : `interaction` enregistre le canal d'un échange, jamais son
+   * sens, et le numérateur d'un taux de réponse n'existe donc pas dans le
+   * schéma. Une tuile inerte à demeure valait moins que le seul chiffre qui
+   * dise où en est vraiment la base : 25 sur 139 au 1er septembre 2026.
+   */
+  qualified: number;
   contacted: number;
   interested: number;
-  responseRate: Measure;
 }
 
 /**
- * La bande d'indicateurs du §9.2, dérivée du même instantané que les listes.
+ * La bande d'indicateurs du §9.2.
  *
- * Les trois premiers comptent des lignes réelles. Le quatrième reste
- * indisponible : voir `responseRate`. La spec annonçait que ces chiffres
- * seraient proches de zéro les premières semaines ; ils y sont, et l'écran le
- * dit plutôt que de le maquiller.
+ * Dérivée du même instantané que les listes, donc toujours cohérente avec
+ * elles. La spec annonçait que ces chiffres seraient proches de zéro les
+ * premières semaines ; ils y sont, et l'écran l'affiche plutôt que de le
+ * maquiller.
  */
 export function computeKpis(prospects: ProspectView[]): Kpis {
+  let qualified = 0;
   let contacted = 0;
   let interested = 0;
   for (const p of prospects) {
+    if (p.score !== null) qualified += 1;
     if (p.pipeline === null) continue;
     if (STATUTS_CONTACTES.has(p.pipeline.status)) contacted += 1;
     if (p.pipeline.status === 'interesse') interested += 1;
   }
-  return {
-    inBase: prospects.length,
-    contacted,
-    interested,
-    // `replied: null` et non `0` : le schéma ne permet pas de compter les
-    // réponses, ce qui n'est pas la même chose que n'en avoir reçu aucune.
-    responseRate: responseRate({ contacted, replied: null }),
-  };
+  return { inBase: prospects.length, qualified, contacted, interested };
 }
 
 export interface TodayLists {
   followUps: WorkList;
   newHighScore: WorkList;
-  awaiting: WorkList;
 }
 
 function liste(rows: WorkRow[]): WorkList {
@@ -179,19 +140,18 @@ function estClos(prospect: ProspectView): boolean {
 }
 
 /**
- * Compose les trois listes de l'écran « Aujourd'hui ».
+ * Compose les deux listes de travail du §9.2.
  *
- * Les deux premières sont celles du §9.2. La troisième ne figure pas dans la
- * spec et la complète pour une raison factuelle : sur la base réelle, les
- * quatre cinquièmes des prospects n'ont aucun score, et un écran bâti sur les
- * deux seules premières listes serait vide à 80 % sans jamais dire pourquoi.
- * Montrer ces prospects avec leur étape manquante rend l'état d'avancement du
- * pipeline lisible depuis l'écran d'ouverture.
+ * Les prospects sans score n'y figurent pas. Ils sont pourtant les quatre
+ * cinquièmes de la base, et ce n'est pas un oubli : une ligne sans score
+ * n'offre aucune action, et douze d'entre elles en tête d'écran coûteraient
+ * douze arrêts aux flèches pour rien. Ce qui compte de ces prospects, c'est
+ * leur *nombre* — porté par l'indicateur « qualifiés », qui met l'écart 25 /
+ * 139 sous les yeux. Leur parcours relèvera de l'écran Exploration.
  */
 export function buildToday(prospects: ProspectView[], now: Date): TodayLists {
   const followUps: Array<WorkRow & { echeance: number | null }> = [];
   const newHighScore: WorkRow[] = [];
-  const awaiting: WorkRow[] = [];
 
   for (const prospect of prospects) {
     if (estClos(prospect)) continue;
@@ -220,14 +180,6 @@ export function buildToday(prospects: ProspectView[], now: Date): TodayLists {
 
     if (prospect.score !== null && jamaisEngage) {
       newHighScore.push({ prospect, reason: reasonForScore(prospect) });
-      continue;
-    }
-
-    if (prospect.score === null && jamaisEngage) {
-      awaiting.push({
-        prospect,
-        reason: qualificationGaps(prospect).map((key) => ({ kind: 'key', key })),
-      });
     }
   }
 
@@ -239,15 +191,9 @@ export function buildToday(prospects: ProspectView[], now: Date): TodayLists {
 
   newHighScore.sort((a, b) => (b.prospect.score?.total ?? 0) - (a.prospect.score?.total ?? 0));
 
-  awaiting.sort(
-    (a, b) =>
-      new Date(a.prospect.discoveredAt).getTime() - new Date(b.prospect.discoveredAt).getTime(),
-  );
-
   return {
     followUps: liste(followUps.map(({ prospect, reason }) => ({ prospect, reason }))),
     newHighScore: liste(newHighScore),
-    awaiting: liste(awaiting),
   };
 }
 

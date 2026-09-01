@@ -30,28 +30,9 @@
   font-variant-numeric: tabular-nums;
 }
 
-/*
- * Un indicateur sans valeur ne mime pas un chiffre : plus petit, en italique
- * et dans la couleur secondaire, il se lit comme une absence et non comme un
- * resultat.
- */
-.valueUnavailable {
-  font-size: var(--text-md);
-  font-weight: 400;
-  font-style: italic;
-  color: var(--color-text-muted);
-  line-height: 1.3;
-}
-
 .label {
   font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--color-text-muted);
-}
-
-.reason {
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-  line-height: 1.4;
 }

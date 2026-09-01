@@ -40,22 +40,14 @@ export const fr = {
   'today.kpi.inBase': 'En base',
   'today.kpi.contacted': 'Contactés',
   'today.kpi.interested': 'Intéressés',
-  'today.kpi.responseRate': 'Taux de réponse',
-  'today.kpi.unavailable': 'sans objet',
-  'today.kpi.unavailable.noPipeline': 'aucun prospect n’a encore été contacté',
-  'today.kpi.unavailable.notModelled':
-    'le schéma ne distingue pas un échange reçu d’un échange émis',
+  'today.kpi.qualified': 'Qualifiés',
 
   'today.section.followUps': 'Relances dues',
   'today.section.newHighScore': 'Nouveaux prospects à fort score',
-  'today.section.awaiting': 'En attente de qualification',
-  'today.section.awaiting.hint':
-    'Ni enrichissement, ni présence web, ni score. Ces prospects existent, ils ne sont pas encore jugés.',
 
   'today.empty.followUps':
     'Aucune relance : la table de suivi ne contient encore aucune ligne. Aucun écrivain ne l’alimente à ce jour.',
   'today.empty.newHighScore': 'Aucun prospect scoré pour le moment.',
-  'today.empty.awaiting': 'Tous les prospects de la base ont été qualifiés.',
 
   'today.reason.followUp.today': 'relance prévue aujourd’hui',
   'today.reason.followUp.late': 'relance en retard de {days} j',
@@ -64,9 +56,6 @@ export const fr = {
   'today.reason.followUp.future_one': 'relance prévue demain',
   'today.reason.followUp.undated': 'relance sans date prévue',
 
-  'today.reason.missing.enrichment': 'pas encore enrichi',
-  'today.reason.missing.presence': 'présence web pas encore sondée',
-  'today.reason.missing.score': 'pas encore scoré',
   'today.reason.separator': ' · ',
 
   'score.absent': 'pas encore scoré',

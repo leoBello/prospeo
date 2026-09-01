@@ -465,6 +465,45 @@ bruit.
 
 ---
 
+## 14 ter. À porter au-delà du spec n°3 (issu de la construction du dashboard)
+
+**Le `breakdown` du barème stocke des libellés cuits, pas des faits.**
+`ScoreLine` porte `label: 'Créée il y a 13 ans'`, rédigé en français par
+`packages/core` au moment du calcul. Deux conséquences. La première est visible
+aujourd'hui : le dashboard affiche ces libellés tels quels, donc en français
+dans son écran anglais, alors que le §9.5 exige que toute chaîne d'interface
+passe par les fichiers de traduction. La seconde est plus lourde : le libellé
+fige aussi la valeur au moment du calcul, si bien qu'un `breakdown` relu six
+mois plus tard affirmera « Créée il y a 13 ans » sans qu'on sache de quand
+date l'affirmation.
+
+La correction n'appartient pas au dashboard. Traduire côté front supposerait
+d'y réimplémenter la fabrication des libellés du barème, qui dériverait à la
+première évolution des règles — et le barème est versionné précisément parce
+qu'il évolue. Il faut que `ScoreLine` porte le code et ses paramètres
+(`{ code: 'age', params: { years: 13 } }`), le libellé étant alors composé à
+l'affichage, dans la langue et à la date de lecture. C'est une évolution du
+format de la colonne `prospect_score.breakdown`, donc une migration et une
+reprise de `computeScore`.
+
+**`interaction` n'enregistre pas le sens d'un échange.** La table porte un
+`kind` (`appel` / `whatsapp` / `email` / `note`) mais rien qui distingue un
+appel passé d'un appel reçu. Le « taux de réponse » que le §9.2 inscrit dans
+la bande d'indicateurs n'a donc pas de numérateur : il n'est pas difficile à
+calculer, il est hors d'atteinte du schéma. Le dashboard l'a remplacé par un
+compteur de prospects qualifiés, mesurable et utile immédiatement. Rétablir la
+mesure demande une colonne de direction sur `interaction`, ou deux valeurs
+d'énumération par canal.
+
+**`web_presence.probed_at` est nul sur toutes les lignes existantes.** Vingt-
+cinq lignes portent une catégorie sans aucune date de sondage. Soit `probe`
+n'a pas tourné et `classify` a créé ces lignes seul, soit l'étage ne renseigne
+pas la colonne. La fenêtre de fraîcheur de `probe` (§9.1 bis du spec n°2) est
+inapplicable tant que ce champ reste vide, et tout contrôle de cohérence fondé
+sur cette date serait inerte.
+
+---
+
 ## 15. Points à trancher à l'implémentation
 
 - Ville de départ pour le premier lot.

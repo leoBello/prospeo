@@ -1,14 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ProspectView } from './prospect.js';
-import {
-  MAX_ROWS_PER_LIST,
-  buildToday,
-  computeKpis,
-  followUpReason,
-  highlightLines,
-  qualificationGaps,
-  responseRate,
-} from './today.js';
+import { MAX_ROWS_PER_LIST, buildToday, computeKpis, followUpReason, highlightLines } from './today.js';
 
 const AUJOURDHUI = new Date('2026-09-01T09:00:00');
 
@@ -71,63 +63,6 @@ describe('followUpReason', () => {
   });
 });
 
-describe('qualificationGaps', () => {
-  it('enumere les etapes manquantes dans l ordre du pipeline', () => {
-    expect(qualificationGaps(vue({ id: 'a' }))).toEqual([
-      'today.reason.missing.enrichment',
-      'today.reason.missing.presence',
-      'today.reason.missing.score',
-    ]);
-  });
-
-  it('ne signale que ce qui manque reellement', () => {
-    const partiel = vue({
-      id: 'b',
-      enrichment: {
-        status: 'not_found',
-        phoneE164: null,
-        phoneKind: null,
-        rating: null,
-        reviewCount: null,
-        declaredUrl: null,
-        matchedName: null,
-        matchConfidence: null,
-        enrichedAt: '2026-09-01T00:00:00Z',
-      },
-    });
-    expect(qualificationGaps(partiel)).toEqual([
-      'today.reason.missing.presence',
-      'today.reason.missing.score',
-    ]);
-  });
-
-  it('ne rend rien pour un prospect entierement qualifie', () => {
-    const complet = vue({
-      id: 'c',
-      enrichment: {
-        status: 'ok',
-        phoneE164: null,
-        phoneKind: null,
-        rating: null,
-        reviewCount: null,
-        declaredUrl: null,
-        matchedName: null,
-        matchConfidence: null,
-        enrichedAt: '2026-09-01T00:00:00Z',
-      },
-      presence: {
-        category: 'none',
-        finalUrl: null,
-        httpStatus: null,
-        domainAvailable: null,
-        probedAt: '2026-09-01T00:00:00Z',
-      },
-      score: scoreDe(45),
-    });
-    expect(qualificationGaps(complet)).toEqual([]);
-  });
-});
-
 describe('highlightLines', () => {
   it('ouvre toujours par la presence web, qui est le motif de qualification', () => {
     const lignes = highlightLines(
@@ -165,26 +100,6 @@ describe('highlightLines', () => {
   });
 });
 
-describe('responseRate', () => {
-  it('refuse de rendre zero pour cent quand personne n a ete contacte', () => {
-    // 0 / 0 n'est pas 0 %. Afficher « 0 % » ferait lire un échec commercial là
-    // où il n'y a tout simplement pas encore de prospection.
-    const mesure = responseRate({ contacted: 0, replied: 0 });
-    expect(mesure.known).toBe(false);
-  });
-
-  it('rend le taux quand le denominateur existe', () => {
-    const mesure = responseRate({ contacted: 20, replied: 5 });
-    expect(mesure).toEqual({ known: true, value: 0.25 });
-  });
-
-  it('reste indisponible quand le nombre de reponses n est pas mesurable', () => {
-    // `interaction` ne distingue pas un échange reçu d'un échange émis : le
-    // numérateur n'existe pas dans le schéma actuel.
-    expect(responseRate({ contacted: 20, replied: null }).known).toBe(false);
-  });
-});
-
 describe('computeKpis', () => {
   const pipeline = (status: NonNullable<ProspectView['pipeline']>['status']) => ({
     status,
@@ -207,11 +122,22 @@ describe('computeKpis', () => {
     expect(kpis.contacted).toBe(1);
   });
 
-  it('rend le taux de reponse indisponible tant que la table de suivi est vide', () => {
+  it('compte comme qualifie tout prospect portant un score, quel qu en soit le total', () => {
+    // Y compris un score de zero : c'est un jugement rendu, pas une absence de
+    // jugement. C'est la distinction meme que cet indicateur sert a mesurer.
+    const kpis = computeKpis([
+      vue({ id: 'nul', score: scoreDe(0) }),
+      vue({ id: 'haut', score: scoreDe(90) }),
+      vue({ id: 'sans' }),
+    ]);
+    expect(kpis.qualified).toBe(2);
+    expect(kpis.inBase).toBe(3);
+  });
+
+  it('laisse les compteurs de suivi a zero tant que la table est vide', () => {
     const kpis = computeKpis([vue({ id: 'a' })]);
     expect(kpis.contacted).toBe(0);
     expect(kpis.interested).toBe(0);
-    expect(kpis.responseRate.known).toBe(false);
   });
 });
 
@@ -227,12 +153,17 @@ describe('buildToday', () => {
     expect(today.newHighScore.items.map((r) => r.prospect.id)).toEqual(['s2', 's1']);
   });
 
-  it('ne range pas un prospect sans score parmi les prospects a fort score', () => {
-    // 114 prospects sur 139 sont dans ce cas : les faire tomber à zéro les
-    // placerait en bas d'une liste où ils n'ont rien à faire.
+  it('n inscrit un prospect sans score dans aucune file de travail', () => {
+    // 114 prospects sur 139 sont dans ce cas. Les faire tomber a zero les
+    // placerait en bas d'une liste ou ils n'ont rien a faire ; leur donner une
+    // file a eux couterait douze arrets aux fleches pour des lignes sur
+    // lesquelles aucune action n'est possible. Leur nombre est porte par
+    // l'indicateur « qualifies », pas par des lignes.
     const today = buildToday([...enAttente, ...scores], AUJOURDHUI);
-    expect(today.newHighScore.items.map((r) => r.prospect.id)).not.toContain('x1');
-    expect(today.awaiting.items.map((r) => r.prospect.id)).toEqual(['x1', 'x2']);
+    const affiches = [...today.followUps.items, ...today.newHighScore.items].map(
+      (r) => r.prospect.id,
+    );
+    expect(affiches).toEqual(['s2', 's1']);
   });
 
   it('ne retient comme relance due que ce qui est echu, jamais une echeance a venir', () => {
@@ -287,22 +218,23 @@ describe('buildToday', () => {
   });
 
   it('annonce le nombre reel meme lorsqu il depasse ce qui tient dans la liste', () => {
-    // Sans quoi « En attente · 10 » cacherait 104 prospects derrière une liste
-    // tronquée, et l'écran mentirait sur l'état de la base.
-    const beaucoup = Array.from({ length: MAX_ROWS_PER_LIST + 4 }, (_, i) => vue({ id: `p${i}` }));
+    // Sans quoi « Nouveaux prospects · 12 » cacherait les suivants derriere une
+    // liste tronquee, et l'ecran mentirait sur l'etat de la base.
+    const beaucoup = Array.from({ length: MAX_ROWS_PER_LIST + 4 }, (_, i) =>
+      vue({ id: `p${i}`, score: scoreDe(90 - i) }),
+    );
     const today = buildToday(beaucoup, AUJOURDHUI);
-    expect(today.awaiting.items).toHaveLength(MAX_ROWS_PER_LIST);
-    expect(today.awaiting.totalCount).toBe(MAX_ROWS_PER_LIST + 4);
+    expect(today.newHighScore.items).toHaveLength(MAX_ROWS_PER_LIST);
+    expect(today.newHighScore.totalCount).toBe(MAX_ROWS_PER_LIST + 4);
   });
 
-  it('porte une raison sur chaque ligne des trois listes', () => {
+  it('porte une raison sur chaque ligne des deux listes', () => {
     const rows = [
       vue({ id: 'r', pipeline: { status: 'relance', nextActionAt: '2026-08-30T10:00:00', updatedAt: '2026-08-30T10:00:00Z' } }),
       vue({ id: 's', score: scoreDe(60) }),
-      vue({ id: 'a' }),
     ];
     const today = buildToday(rows, AUJOURDHUI);
-    for (const liste of [today.followUps, today.newHighScore, today.awaiting]) {
+    for (const liste of [today.followUps, today.newHighScore]) {
       for (const ligne of liste.items) {
         expect(ligne.reason.length).toBeGreaterThan(0);
       }

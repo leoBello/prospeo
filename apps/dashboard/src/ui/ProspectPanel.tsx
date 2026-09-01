@@ -162,6 +162,19 @@ export function ProspectPanel({ prospect, position, currentRulesetVersion, onClo
                 absentKey="value.notCollected"
               />
               <Field
+                labelKey="field.matchConfidence"
+                // Affichée parce que `matchedName` ne vaut que ce qu'elle
+                // vaut : sous le seuil haut, la fiche Google rattachée est un
+                // pari, et c'est au téléphone qu'un faux appariement se paie
+                // — l'interlocuteur appelé par le nom d'une autre entreprise.
+                value={
+                  enrichment.matchConfidence === null
+                    ? null
+                    : `${Math.round(enrichment.matchConfidence * 100)} %`
+                }
+                absentKey="value.notCollected"
+              />
+              <Field
                 labelKey="field.declaredUrl"
                 value={enrichment.declaredUrl}
                 absentKey="value.notCollected"

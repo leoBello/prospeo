@@ -3,49 +3,37 @@ import type { TranslationKey } from '../i18n/translate.js';
 import { useT } from './preferences.js';
 import styles from './KpiBand.module.css';
 
-/**
- * Un indicateur, et le cas où il n'a pas de valeur.
- *
- * `unavailable` n'est pas un zéro déguisé : il affiche « sans objet » et la
- * raison. La spec annonçait des indicateurs proches de zéro les premières
- * semaines (§9.2) ; ils y sont, et un « 0 % » de taux de réponse se lirait
- * comme un échec commercial là où il n'y a simplement pas encore eu de
- * prospection.
- */
-function Kpi({
-  labelKey,
-  value,
-  unavailableReason,
-}: {
-  labelKey: TranslationKey;
-  value: string;
-  unavailableReason?: TranslationKey;
-}) {
+function Kpi({ labelKey, value }: { labelKey: TranslationKey; value: number }) {
   const t = useT();
-  const indisponible = unavailableReason !== undefined;
-
   return (
     <div className={styles.kpi}>
-      <b className={indisponible ? styles.valueUnavailable : styles.value}>
-        {indisponible ? t('today.kpi.unavailable') : value}
-      </b>
+      <b className={styles.value}>{value}</b>
       <span className={styles.label}>{t(labelKey)}</span>
-      {indisponible ? <span className={styles.reason}>{t(unavailableReason)}</span> : null}
     </div>
   );
 }
 
+/**
+ * La bande d'indicateurs du §9.2.
+ *
+ * Quatre compteurs de lignes réelles, et aucune moyenne. Le taux de réponse
+ * qu'annonçait la spec n'y figure pas : `interaction` enregistre le canal d'un
+ * échange, jamais son sens, et le numérateur d'un tel taux n'existe donc pas
+ * dans le schéma. « Qualifiés » l'a remplacé — c'est le chiffre qui dit
+ * réellement où en est la base, et il met sous les yeux l'écart entre les 139
+ * prospects découverts et les 25 que le pipeline a jugés.
+ *
+ * Les deux derniers resteront à zéro tant que rien n'écrira dans
+ * `prospect_pipeline`. La spec l'avait prévu, et l'écran l'affiche plutôt que
+ * de le maquiller.
+ */
 export function KpiBand({ kpis }: { kpis: Kpis }) {
   return (
     <div className={styles.band}>
-      <Kpi labelKey="today.kpi.inBase" value={String(kpis.inBase)} />
-      <Kpi labelKey="today.kpi.contacted" value={String(kpis.contacted)} />
-      <Kpi labelKey="today.kpi.interested" value={String(kpis.interested)} />
-      <Kpi
-        labelKey="today.kpi.responseRate"
-        value={kpis.responseRate.known ? `${Math.round(kpis.responseRate.value * 100)} %` : ''}
-        {...(kpis.responseRate.known ? {} : { unavailableReason: kpis.responseRate.reason })}
-      />
+      <Kpi labelKey="today.kpi.inBase" value={kpis.inBase} />
+      <Kpi labelKey="today.kpi.qualified" value={kpis.qualified} />
+      <Kpi labelKey="today.kpi.contacted" value={kpis.contacted} />
+      <Kpi labelKey="today.kpi.interested" value={kpis.interested} />
     </div>
   );
 }
