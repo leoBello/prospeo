@@ -9,7 +9,13 @@ import { createGoogleMapsSource } from './sources/google-maps.js';
 import { fetchStatusBySiret } from './sources/recherche-entreprises.js';
 import { planScoreWrite, type ScoreRowInput } from './stages/classify-score.js';
 import { makeUpsertProspect, runDiscover } from './stages/discover.js';
-import { checkDomainAvailability, rdapStatus } from './stages/domains.js';
+import {
+  checkDomainAvailability,
+  domainProposalApplies,
+  domainStaleCutoff,
+  rdapStatus,
+  DOMAIN_PROPOSAL_CATEGORIES,
+} from './stages/domains.js';
 import { runEnrich, type EnrichProspect, type ReviewCandidate } from './stages/enrich.js';
 import { probeUrl, shouldProbe } from './stages/probe.js';
 import { reconcileExitCode, runReconcile, type ReconcileProspect } from './stages/reconcile.js';
@@ -336,6 +342,17 @@ async function main(argv: string[]): Promise<number> {
         // premier, et relancer avant de l'avoir traitée ne peut que la durcir.
         return 2;
       }
+      if (report.stoppedByEmptySearches) {
+        process.stderr.write(
+          `Arrêt : ${report.emptySearches} prospects d'affilée sans le moindre candidat. ` +
+            'La lecture de Google Maps est probablement cassée — un sélecteur renommé ' +
+            "rend un tableau vide sans lever d'erreur, et chaque prospect ressort alors " +
+            'introuvable à tort.\n' +
+            "Vérifier les sélecteurs de `sources/google-maps.ts` sur une recherche réelle, " +
+            'puis rejouer ces lignes avec `enrich --retry-not-found`.\n',
+        );
+        return 1;
+      }
       // Une écriture perdue casse le point de reprise du run : le sortir en 0
       // ferait passer « 300 prospects scrapés, rien d'écrit » pour un succès.
       if (report.writeFailed > 0) return 1;
@@ -597,6 +614,7 @@ async function main(argv: string[]): Promise<number> {
       let pendingProbe = 0;
       let eraseFailed = 0;
       let scoreFailed = 0;
+      let presenceFailed = 0;
 
       // `--limit` borne ce que la commande traite reellement, et pas seulement
       // ce qu elle annonce : le valider sans l appliquer serait pire que
@@ -675,17 +693,43 @@ async function main(argv: string[]): Promise<number> {
         // L'erreur doit etre verifiee : sans cela une categorie non persistee
         // passe inapercue ET le compteur `scored` s'incremente quand meme,
         // le rapport affirmant un succes qui n'a pas eu lieu.
+        // Pas de `probed_at` : `score` n'a rien sondé. L'écrire écraserait
+        // l'horodatage réel posé par `probe` — donc le seul moyen de savoir
+        // qu'une sonde est périmée — et, à l'insertion, affirmerait une
+        // sonde qui n'a jamais eu lieu.
+        const presenceWrite: {
+          prospect_id: string;
+          category: typeof row.category;
+          domain_available?: boolean | null;
+          domain_candidates?: string[];
+          domain_checked_at?: string | null;
+        } = {
+          prospect_id: row.prospectId,
+          category: row.category,
+        };
+        // La catégorie qu'on écrit ici peut rendre caduque la proposition de
+        // domaine posée par un run antérieur de `domains`. Un prospect classé
+        // `none` en septembre, à qui l'on avait trouvé un domaine libre, puis
+        // reclassé `has_site` parce qu'une sonde a fini par joindre son site,
+        // gardait sinon les deux affirmations côte à côte sur la même ligne —
+        // et c'est la proposition de domaine, pas la catégorie, qui partait
+        // dans le message. On l'efface dans le même mouvement que l'écriture
+        // qui la rend fausse, plutôt que d'espérer un passage de nettoyage.
+        if (!domainProposalApplies(row.category)) {
+          presenceWrite.domain_available = null;
+          presenceWrite.domain_candidates = [];
+          // L'horodatage part avec le verdict : le laisser ferait passer pour
+          // « vérifié récemment » une ligne dont on vient d'effacer le
+          // résultat, et `domains` ne la reprendrait pas si le prospect
+          // redevenait éligible.
+          presenceWrite.domain_checked_at = null;
+        }
+
         const { error: presenceError } = await client
           .from('web_presence')
-          .upsert(
-            // Pas de `probed_at` : `score` n'a rien sondé. L'écrire écraserait
-            // l'horodatage réel posé par `probe` — donc le seul moyen de savoir
-            // qu'une sonde est périmée — et, à l'insertion, affirmerait une
-            // sonde qui n'a jamais eu lieu.
-            { prospect_id: row.prospectId, category: row.category },
-            { onConflict: 'prospect_id' },
-          );
+          .upsert(presenceWrite, { onConflict: 'prospect_id' });
         if (presenceError) {
+          presenceFailed += 1;
           process.stderr.write(
             `score: echec d'ecriture de la categorie sur ${row.prospectId} — ${presenceError.message}\n`,
           );
@@ -721,7 +765,17 @@ async function main(argv: string[]): Promise<number> {
           `score : ${eraseFailed} effacements en échec, catégorie possiblement périmée\n`,
         );
       }
-      return 0;
+      if (scoreFailed > 0 || presenceFailed > 0) {
+        process.stderr.write(
+          `score : ${presenceFailed} catégories et ${scoreFailed} scores non écrits\n`,
+        );
+      }
+      // `score` sortait en 0 quoi qu'il arrive, alors qu'il comptait déjà ses
+      // échecs sans jamais s'en servir : une base entière pouvait rester sans
+      // score et le run s'annoncer réussi. C'est le même trou que celui bouché
+      // ailleurs, resté ouvert ici parce que le compteur existait — la
+      // présence d'un compteur ressemble à un traitement.
+      return eraseFailed > 0 || scoreFailed > 0 || presenceFailed > 0 ? 1 : 0;
     }
     case 'reconcile': {
       // `--dry-run` exécute le premier temps — décider — et s'arrête avant la
@@ -846,6 +900,13 @@ async function main(argv: string[]): Promise<number> {
 
       // Seuls les prospects sans domaine propre : proposer un nom à qui en a
       // déjà un n'a aucun sens.
+      //
+      // Et on rejoue les vérifications périmées, pas seulement les absentes.
+      // Le filtre `domain_checked_at is null` seul ne revenait jamais sur une
+      // ligne déjà vue : un « ce domaine est libre » constaté une fois valait
+      // ensuite pour toujours, alors que le registre, lui, continue de vivre.
+      const staleCutoff = domainStaleCutoff(new Date());
+
       const rows: {
         prospect_id: string;
         denomination: string;
@@ -856,8 +917,8 @@ async function main(argv: string[]): Promise<number> {
         const { data, error } = await client
           .from('web_presence')
           .select('prospect_id, prospect(denomination, denomination_usuelle, trade_slug)')
-          .in('category', ['none', 'social_only', 'directory_only'])
-          .is('domain_checked_at', null)
+          .in('category', [...DOMAIN_PROPOSAL_CATEGORIES])
+          .or(`domain_checked_at.is.null,domain_checked_at.lt.${staleCutoff}`)
           .order('prospect_id')
           .range(from, from + PAGE_SIZE - 1);
         if (error) throw new Error(error.message);

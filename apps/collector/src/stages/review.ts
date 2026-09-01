@@ -55,10 +55,29 @@ export function applyReviewDecision(
     enriched_at: enrichedAt,
   };
 
-  if (decision.kind === 'reject') return base;
+  // Les candidats survivent à TOUTE décision, y compris au rejet.
+  //
+  // Ils ne servent plus à trancher une fois la décision prise — c'est
+  // `status` qui fait foi — mais ils sont la seule trace de ce que
+  // l'appariement a proposé, avec la confiance qu'il accordait à chaque
+  // fiche. Or c'est exactement la matière dont la calibration a besoin :
+  // « le matcher offrait ces cinq fiches à 0.62, 0.58… et un humain a dit
+  // qu'aucune n'était la bonne » est l'exemple négatif qui dit si
+  // `lowThreshold` est trop bas. Les effacer au rejet faisait détruire par
+  // l'acte de calibrer la donnée même qui sert à calibrer, et sans retour
+  // possible : rejouer la revue supposerait de rescraper Google.
+  //
+  // Sur une ligne acceptée, `matched_name` et `maps_url` désignent le
+  // candidat retenu ; les autres sont donc les négatifs de ce même
+  // arbitrage. Sur une ligne rejetée, aucun n'est désigné, et c'est
+  // précisément l'information. Rien ne devient ambigu : la file de revue
+  // filtre sur `status = 'ambiguous'`, pas sur la présence de candidats.
+  const kept = [...candidates];
+
+  if (decision.kind === 'reject') return { ...base, candidates: kept };
 
   if (decision.kind === 'skip') {
-    return { ...base, status: 'ambiguous', candidates: [...candidates] };
+    return { ...base, status: 'ambiguous', candidates: kept };
   }
 
   const chosen = candidates[decision.index];
@@ -71,6 +90,7 @@ export function applyReviewDecision(
   const phone = normalizePhone(chosen.phone);
   return {
     ...base,
+    candidates: kept,
     status: 'ok',
     matched_name: chosen.name,
     match_confidence: chosen.confidence,

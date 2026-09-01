@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { checkDomainAvailability, RDAP_MIN_INTERVAL_MS, rdapDelayMs } from './domains.js';
+import {
+  checkDomainAvailability,
+  domainProposalApplies,
+  domainStaleCutoff,
+  isDomainCheckStale,
+  DOMAIN_PROPOSAL_CATEGORIES,
+  RDAP_MIN_INTERVAL_MS,
+  rdapDelayMs,
+} from './domains.js';
 
 const nxdomain = async (): Promise<string[]> => {
   throw new Error('NXDOMAIN');
@@ -52,5 +60,61 @@ describe('rdapDelayMs', () => {
   it('ne dépasse jamais l\'intervalle, même si l\'horloge recule', () => {
     // Une horloge qui recule ne doit pas figer le run pendant des minutes.
     expect(rdapDelayMs(5_000, 1_000)).toBe(RDAP_MIN_INTERVAL_MS);
+  });
+});
+
+describe('domainProposalApplies', () => {
+  it('ne propose un domaine qu a qui n en a pas deja un', () => {
+    expect(domainProposalApplies('none')).toBe(true);
+    expect(domainProposalApplies('social_only')).toBe(true);
+    expect(domainProposalApplies('directory_only')).toBe(true);
+    // `dead_site` est ecarte comme `has_site` : un site mort a un domaine,
+    // deja depose. Le sujet y est de le raviver, pas d en enregistrer un second.
+    expect(domainProposalApplies('dead_site')).toBe(false);
+    expect(domainProposalApplies('has_site')).toBe(false);
+  });
+
+  it('ne propose rien tant que la categorie est inconnue', () => {
+    // `null` veut dire que personne n a encore classe ce prospect. Proposer
+    // sur cette base reviendrait a affirmer qu il n a pas de site.
+    expect(domainProposalApplies(null)).toBe(false);
+  });
+
+  it('couvre exactement les categories du filtre de lecture', () => {
+    // Le predicat de `score` et le filtre SQL de `domains` doivent bouger
+    // ensemble : une categorie ajoutee d un cote sans l autre laisserait
+    // ecrire ou conserver une proposition qui ne devrait pas exister.
+    expect(DOMAIN_PROPOSAL_CATEGORIES.every(domainProposalApplies)).toBe(true);
+  });
+});
+
+describe('isDomainCheckStale', () => {
+  const now = new Date('2026-09-01T12:00:00.000Z');
+
+  it('considere perimee une verification jamais faite', () => {
+    expect(isDomainCheckStale(null, now)).toBe(true);
+  });
+
+  it('garde une verification recente', () => {
+    expect(isDomainCheckStale('2026-08-25T12:00:00.000Z', now)).toBe(false);
+  });
+
+  it('rejoue une verification plus vieille que la fenetre', () => {
+    // Un domaine libre en juin peut avoir ete depose depuis. Affirmer « j ai
+    // verifie, il est libre » se fait alors dementir en trente secondes.
+    expect(isDomainCheckStale('2026-06-01T12:00:00.000Z', now)).toBe(true);
+  });
+
+  it('rejoue une date illisible', () => {
+    // Ne pas savoir quand on a verifie revient a ne pas avoir verifie.
+    expect(isDomainCheckStale('hier matin', now)).toBe(true);
+  });
+
+  it('borne la fenetre a trente jours pile', () => {
+    const cutoff = domainStaleCutoff(now);
+    expect(cutoff).toBe('2026-08-02T12:00:00.000Z');
+    // Juste avant la borne : perime. Juste apres : conserve.
+    expect(isDomainCheckStale('2026-08-02T11:59:59.000Z', now)).toBe(true);
+    expect(isDomainCheckStale('2026-08-02T12:00:01.000Z', now)).toBe(false);
   });
 });
