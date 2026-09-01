@@ -390,6 +390,22 @@ quelle.
 Sans elle, la calibration se ferait sur des statistiques agrégées plutôt que
 sur des cas — c'est-à-dire à l'aveugle.
 
+**Les candidats survivent à toute décision, rejet compris.** Ils ne servent
+plus à trancher une fois la décision prise — `status` fait foi — mais ils
+sont la seule trace de ce que l'appariement a proposé, avec la confiance
+qu'il accordait à chaque fiche. C'est exactement la matière dont la
+calibration a besoin : « le matcher offrait ces cinq fiches à 0,62 et 0,58,
+un humain a dit qu'aucune n'était la bonne » est l'exemple négatif qui dit si
+`lowThreshold` est trop bas. Les effacer au rejet faisait détruire par l'acte
+de calibrer la donnée même qui sert à calibrer, et sans retour possible :
+rejouer la revue supposerait de rescraper Google.
+
+Sur une ligne acceptée, `matched_name` désigne le candidat retenu ; les
+autres sont les négatifs du même arbitrage. Sur une ligne rejetée, aucun
+n'est désigné, et c'est précisément l'information. La présence de candidats
+ne dit donc rien du statut et n'est jamais à lire comme telle — la file de
+revue filtre sur `status`.
+
 ---
 
 ## 7. La réconciliation — `collector reconcile`
@@ -432,6 +448,24 @@ disponibilité sans la garantir.
 
 Ce que cela change : « j'ai vérifié, `plomberie-martin.fr` est libre » est un
 argument, « vous devriez prendre un domaine » n'en est pas un.
+
+**Une vérification se périme.** Contrairement à une date de création, la
+disponibilité d'un domaine n'est pas une observation figée : c'est un état du
+registre, qui change sans prévenir. Un verdict pris une fois et conservé à
+vie finit par affirmer « j'ai vérifié, il est libre » sur un domaine déposé
+depuis — l'argument le plus facile à démentir qui soit. La vérification est
+donc rejouée au-delà de **trente jours** : assez long pour que le coût RDAP
+reste marginal, assez court pour qu'aucun argument ne parte sur une
+vérification de plusieurs mois.
+
+**Une proposition se retire.** La catégorie du prospect peut changer après
+coup — une sonde finit par joindre son site, et le voilà `has_site`. La
+proposition de domaine posée quand il était `none` devient alors fausse, et
+les deux affirmations cohabitent sur la même ligne : cet artisan a un site,
+et un domaine l'attend. C'est la seconde qui part dans le message. `score`
+efface donc la proposition dans le même mouvement que l'écriture de la
+catégorie qui la rend caduque, plutôt que de compter sur un passage de
+nettoyage ultérieur.
 
 ---
 
@@ -537,8 +571,29 @@ Rappel du socle : régénérer les types après chaque `db:push`.
 | Candidats multiples ou confiance intermédiaire | `ambiguous`, aucune écriture de fusion |
 | Captcha ou interstitiel | arrêt du run, `blocked`, code de sortie non nul |
 | Page Maps au format inattendu | prospect ignoré et journalisé, le run continue |
+| Sélecteurs Maps rompus | arrêt du run au bout de 15 prospects sans le moindre candidat, code de sortie non nul |
 | RDAP indisponible | disponibilité laissée à `null`, jamais supposée |
 | SIRET absent à la réconciliation | traité comme perte de diffusion |
+
+**Le disjoncteur de recherches vides** mérite d'être motivé, parce que c'est
+la seule panne entièrement muette de cet étage. Si Google renomme une classe,
+tous les sélecteurs rendent `null`, la recherche rend un tableau vide sans
+lever d'erreur, et chaque prospect ressort `not_found` : le run traite ses
+420 lignes, écrit 420 verdicts faux, annonce « 420 introuvables » et sort en
+succès. Aucun test hors ligne ne peut le détecter ; seul le run est en
+position de s'en apercevoir.
+
+Le compteur porte sur les recherches **vides**, non sur les `not_found`, et
+c'est cette distinction qui rend le seuil utilisable : un `not_found`
+légitime naît de fiches trouvées puis écartées par l'appariement — le chemin
+de lecture a donc fonctionné, et ce prospect remet le compteur à zéro. Seule
+l'absence totale de candidat sur toutes les requêtes d'un prospect porte la
+signature d'un sélecteur cassé.
+
+Les lignes déjà écrites avant l'arrêt restent fausses ; c'est assumé, on ne
+peut pas savoir qu'une recherche vide est fausse avant d'en avoir vu la
+série. Elles sont rattrapables par `enrich --retry-not-found`, et le message
+d'arrêt le dit.
 
 ---
 
@@ -550,6 +605,19 @@ Rappel du socle : régénérer les types après chaque `db:push`.
 - **Analyse des pages Maps :** fixtures HTML versionnées, aucun accès réseau
   en test. Les sélecteurs DOM sont la partie fragile ; les figer rend leur
   rupture visible.
+
+  Les fixtures sont servies sous une vraie URL Google, par interception de
+  requête dans un navigateur réel, et non injectées par `setContent`. L'URL
+  n'est pas décorative : c'est d'elle que viennent les coordonnées qui
+  alimentent le filtre de distance, et c'est sa réécriture tardive qui
+  distingue une fiche unique d'une liste vide. Une fixture servie hors URL ne
+  testerait pas la moitié de ce qui compte.
+
+  **Ce que ces tests ne peuvent pas faire :** détecter que Google a renommé
+  une classe. Une fixture fige le HTML d'hier ; elle protège contre nos
+  régressions, pas contre celles de Google. Le garde-fou correspondant est
+  au §12 — le disjoncteur de recherches vides — et les deux sont
+  complémentaires, pas interchangeables.
 - **`reconcile` et `domains` :** clients d'API et résolveurs simulés.
 - **`review` :** la fonction de décision est testée ; la coquille interactive
   ne l'est pas et reste mince pour cette raison.
