@@ -1,0 +1,55 @@
+.wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+
+/*
+ * La piste fait toujours la même largeur, remplie ou non.
+ *
+ * C'est ce qui rend deux lignes comparables d'un coup d'œil : une piste dont
+ * la longueur suivrait le score ne se comparerait qu'en mesurant.
+ */
+.track {
+  display: inline-flex;
+  gap: 1px;
+  width: 56px;
+  height: 6px;
+  flex: none;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--color-seg-empty);
+}
+
+.segment {
+  height: 100%;
+  display: block;
+}
+
+.total {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-accent);
+  min-width: 22px;
+  text-align: right;
+}
+
+/*
+ * L'absence de score n'est pas grisée au point de disparaître : elle est
+ * l'information principale pour quatre prospects sur cinq.
+ */
+.absent {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-style: italic;
+  white-space: nowrap;
+}
+
+.stale {
+  font-size: var(--text-xs);
+  color: var(--color-warning);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-sm);
+  padding: 0 var(--space-1);
+}
