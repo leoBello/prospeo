@@ -179,8 +179,23 @@ export function nameVariants(denomination: string, denominationUsuelle: string |
   }
   if (denominationUsuelle !== null) raw.push(denominationUsuelle);
 
-  // Chaque segment séparé par une barre oblique est un nom à part entière.
-  const split = raw.flatMap((value) => value.split('/'));
+  // Chaque segment séparé est un nom à part entière. Sirene emploie trois
+  // séparateurs, pas un seul, et n'en traiter qu'un agglutine des identités
+  // distinctes en une chaîne qui ne ressemble à aucune fiche Google :
+  //
+  // - la barre oblique ;
+  // - le tiret ENTOURÉ D'ESPACES — « AQUATIO - VINCENT COMBE » sépare
+  //   l'enseigne du gérant. L'espace est la condition : couper sur tous les
+  //   tirets scinderait « CHAUFFE-EAU » en deux moitiés de mot, et ferait de
+  //   chacune une identité ;
+  // - la virgule — une parenthèse énumère volontiers plusieurs enseignes,
+  //   « (NANTES CHAUFFE-EAU, PLOMBERIE ALADIN, BERNARD FRANCK) », qui sont
+  //   trois noms sous lesquels l'entreprise peut être connue de Maps.
+  //
+  // Le coût de l'oubli n'était pas l'échec franc : c'était de pousser
+  // l'appariement à compenser par des mesures d'inclusion trop permissives,
+  // qui rattrapaient ces cas au prix de fusions fausses ailleurs.
+  const split = raw.flatMap((value) => value.split(/\/|\s+-\s+|,/));
 
   const seen = new Set<string>();
   for (const value of split) {
@@ -249,24 +264,58 @@ function agglutinatedContainment(a: string, b: string): number {
   return containsOnBoundaries(a, b) || containsOnBoundaries(b, a) ? 1 : 0;
 }
 
-/** `needle`, sans ses espaces, couvre-t-il des jetons entiers de `haystack` ? */
+/**
+ * `needle`, sans ses espaces, recolle-t-il PLUSIEURS jetons entiers de
+ * `haystack` ?
+ *
+ * « Plusieurs » est la condition décisive, et elle n'est pas un détail de
+ * mise au point. Cette mesure échappe au plafond de couverture pour rattraper
+ * les enseignes que Sirene agglutine — « rgservices » recouvre « rg » ET
+ * « services », deux jetons : quelque chose a bien été recollé, et c'est cela
+ * qui fait preuve.
+ *
+ * Recouvrir un SEUL jeton ne recolle rien du tout. C'est une simple inclusion,
+ * déjà mesurée par `tokenContainment`, et soumise à juste titre au plafond du
+ * patronyme unique. L'exempter revenait à rouvrir en grand la porte que ce
+ * plafond ferme : mesuré sur Nantes, « MORGAN AUFFRET » — plombier —
+ * fusionnait automatiquement avec la fiche « Morgan », un magasin de
+ * vêtements à 113 mètres, sur un nom noté 1,00 quand toutes les mesures
+ * honnêtes disaient 0,50.
+ *
+ * La forme visée est la plus répandue de l'artisanat français : l'immense
+ * majorité des prospects sont enregistrés « Prénom NOM », et Google connaît
+ * souvent le seul patronyme. Sans cette condition, chacun d'eux devenait un
+ * appariement automatique avec n'importe quel homonyme du quartier.
+ */
 function containsOnBoundaries(needle: string, haystack: string): boolean {
   const text = despace(needle);
   if (text.length < MIN_CONTAINMENT_LENGTH) return false;
 
   const tokens = haystack.split(' ').filter((token) => token !== '');
-  const starts = new Set<number>();
+  // Un seul jeton en face : il n'y a rien à recoller, donc rien à rattraper.
+  if (tokens.length < 2) return false;
+
+  const starts = new Map<number, number>();
   const ends = new Set<number>();
   let offset = 0;
-  for (const token of tokens) {
-    starts.add(offset);
+  tokens.forEach((token, index) => {
+    starts.set(offset, index);
     offset += token.length;
     ends.add(offset);
-  }
+  });
 
   const flat = tokens.join('');
   for (let at = flat.indexOf(text); at !== -1; at = flat.indexOf(text, at + 1)) {
-    if (starts.has(at) && ends.has(at + text.length)) return true;
+    const startIndex = starts.get(at);
+    if (startIndex === undefined || !ends.has(at + text.length)) continue;
+    // Combien de jetons entiers sont couverts ? Un seul ne prouve rien.
+    let covered = 0;
+    let span = 0;
+    for (let index = startIndex; index < tokens.length && span < text.length; index += 1) {
+      span += (tokens[index] ?? '').length;
+      covered += 1;
+    }
+    if (covered >= 2) return true;
   }
   return false;
 }
@@ -492,6 +541,14 @@ export function bestNameMatch(
       bothSingleWords ? 0 : cap(grounded(wholeStringScore(variantCore, targetCore))),
       bothSingleWords ? 0 : cap(grounded(wholeStringScore(despace(variantCore), despace(targetCore)))),
       grounded(tokenContainment(variant, target, generic)),
+      // Les deux sens sont plafonnés par la couverture, et il a fallu
+      // l'éprouver : lever la borne sur ce sens-ci rattrapait bien « SAULE
+      // PLOMBERIE » face à « LES ATELIERS DE SAULE », mais rendait du même
+      // coup 0,80 à « JEAN DUPONT » face à « Dupont » — donc 0,87 et une
+      // fusion automatique dès que la catégorie concorde et l'adresse est
+      // proche. Les deux situations sont structurellement identiques : un
+      // seul jeton distinctif partagé. Rien dans le nom ne les sépare, et
+      // c'est la catégorie et la distance qui doivent trancher.
       grounded(tokenContainment(target, variant, generic)),
     );
     if (score > best.score) best = { score, variant };

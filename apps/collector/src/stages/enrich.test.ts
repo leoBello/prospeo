@@ -52,8 +52,8 @@ describe('buildEnrichmentRow', () => {
    * Candidat volontairement ambigu : même patronyme et même adresse, mais une
    * catégorie Google qui ne recoupe pas le métier.
    *
-   * Mesuré sous les poids v2 : confiance 0,7588 — nom 0,80 (plafond
-   * patronyme unique), soit 0,52, plus 0,2388 de proximité, plus 0 de
+   * Mesuré sous le réglage v3 : confiance 0,7666 — nom 0,80 (plafond
+   * patronyme unique), soit 0,52, plus 0,2466 de proximité, plus 0 de
    * catégorie. C'est entre `lowThreshold` (0,55) et `highThreshold` (0,85),
    * donc `ambiguous`.
    */
