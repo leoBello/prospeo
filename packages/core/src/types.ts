@@ -1,3 +1,28 @@
+/**
+ * Une prestation que le métier recouvre, écrite à la main.
+ *
+ * C'est un fait vérifié sur le MÉTIER, jamais sur l'entreprise — et c'est
+ * toute la différence. La base ne sait rien de ce que fait tel plombier en
+ * particulier : elle connaît son SIRET, son code NAF et son adresse, rien de
+ * plus. Laisser le modèle rédiger des prestations reviendrait donc à lui
+ * faire deviner l'activité réelle d'une entreprise, et à publier cette
+ * supposition sur un site portant son nom.
+ *
+ * D'où la liste close : le modèle SÉLECTIONNE et ORDONNE, il n'écrit pas.
+ * `label` et `description` sortent d'ici et vont à l'écran sans passer par
+ * lui. Ce que le schéma `zod` accepte est exactement l'ensemble des `code`
+ * ci-dessous, si bien qu'une prestation inventée n'est pas rattrapée à la
+ * relecture : elle fait échouer la validation.
+ */
+export interface Prestation {
+  /** Identifiant stable, seul jeton que le modèle manipule. */
+  readonly code: string;
+  /** Titre affiché sur le site. */
+  readonly label: string;
+  /** Une phrase, volontairement descriptive et sans promesse de délai. */
+  readonly description: string;
+}
+
 export interface Trade {
   slug: string;
   label: string;
@@ -21,6 +46,14 @@ export interface Trade {
    * comme un serrurier.
    */
   readonly categoryLabels: readonly string[];
+  /**
+   * Prestations proposables pour ce métier, liste close.
+   *
+   * Ajouter un métier au projet impose d'écrire la sienne : sans elle, le
+   * schéma de rédaction n'a pas d'énumération à contraindre et la génération
+   * échoue — bruyamment, ce qui est le comportement voulu.
+   */
+  readonly prestations: readonly Prestation[];
 }
 
 export interface RawEstablishment {

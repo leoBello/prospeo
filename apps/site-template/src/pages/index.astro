@@ -1,0 +1,21 @@
+---
+import Site from '../components/Site.astro';
+import { chargerContenu } from '../content/load';
+import Layout from '../layouts/Layout.astro';
+import brut from '../content/site.json';
+
+/*
+ * L'unique page du site.
+ *
+ * `chargerContenu` valide le fichier contre le schéma de `packages/core` et
+ * LÈVE en cas d'écart — ce qui, à cet endroit, fait échouer le build. C'est
+ * voulu : mieux vaut un build rouge qu'une page déployée au téléphone
+ * manquant, dont l'URL partirait dans un email et que l'artisan découvrirait
+ * lui-même.
+ */
+const contenu = chargerContenu(brut);
+---
+
+<Layout contenu={contenu}>
+  <Site contenu={contenu} />
+</Layout>

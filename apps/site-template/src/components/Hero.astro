@@ -1,0 +1,111 @@
+---
+import type { SiteContent } from '@prospeo/core';
+import { nombreFr, t } from '../content/ui';
+
+interface Props {
+  contenu: SiteContent;
+}
+const { faits, redaction } = Astro.props.contenu;
+
+/*
+ * Le sous-titre change selon qu'on connaît ou non l'année de création.
+ *
+ * « Plombier à Nantes depuis 2009 » est le meilleur argument que la base
+ * puisse fournir : une ancienneté vérifiée, tirée de Sirene, qui ne se périme
+ * pas. Quand `date_creation` manque, la phrase se raccourcit — elle ne se
+ * remplit pas d'un « depuis de nombreuses années » qui n'engagerait personne.
+ */
+const sousTitre =
+  faits.anneeCreation === null
+    ? t('hero.trade', { metier: faits.metier.label, ville: faits.adresse.ville })
+    : t('hero.tradeSince', {
+        metier: faits.metier.label,
+        ville: faits.adresse.ville,
+        annee: faits.anneeCreation,
+      });
+---
+
+<header class="hero">
+  <div class="contenu">
+    <p class="metier">{sousTitre}</p>
+    <h1>{faits.nomAffiche}</h1>
+    <p class="accroche">{redaction.accroche}</p>
+
+    {
+      faits.noteGoogle !== null && (
+        <p class="note">
+          <span class="etoiles" aria-hidden="true">★</span>
+          <span>{t('rating.value', { note: nombreFr(faits.noteGoogle) })}</span>
+        </p>
+      )
+    }
+
+    <a
+      class="bouton"
+      href={`tel:${faits.telephone.e164}`}
+      aria-label={t('cta.callAria', {
+        nom: faits.nomAffiche,
+        telephone: faits.telephone.affichage,
+      })}
+    >
+      <span>{t('cta.call')}</span>
+      <span class="numero">{faits.telephone.affichage}</span>
+    </a>
+
+    <p class="presentation">{redaction.presentation}</p>
+  </div>
+</header>
+
+<style>
+  .hero {
+    background: var(--fond-doux);
+    padding-block: 2.5rem 3rem;
+    border-bottom: 1px solid var(--trait);
+  }
+  .metier {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  h1 {
+    /* `clamp` plutôt qu'une requête média : le titre est le nom de
+       l'entreprise, dont la longueur varie du simple au quadruple d'un
+       prospect à l'autre. Une taille fixe déborderait sur les plus longs. */
+    font-size: clamp(2rem, 8vw, 3rem);
+    margin-block: 0.4rem 0.9rem;
+    text-wrap: balance;
+  }
+  .accroche {
+    font-size: 1.2rem;
+    color: var(--encre-douce);
+    max-width: 36ch;
+    text-wrap: pretty;
+  }
+  .note {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 1rem;
+    font-size: 0.95rem;
+    color: var(--encre-douce);
+  }
+  .etoiles {
+    color: var(--accent);
+    font-size: 1.1rem;
+  }
+  .bouton {
+    margin-top: 1.75rem;
+  }
+  .numero {
+    font-variant-numeric: tabular-nums;
+    opacity: 0.9;
+  }
+  .presentation {
+    margin-top: 2rem;
+    max-width: 62ch;
+    color: var(--encre-douce);
+    text-wrap: pretty;
+  }
+</style>

@@ -1,0 +1,59 @@
+---
+import type { SiteContent } from '@prospeo/core';
+import { t } from '../content/ui';
+import '../styles/theme.css';
+
+interface Props {
+  contenu: SiteContent;
+}
+
+const { contenu } = Astro.props;
+const { faits, redaction } = contenu;
+
+// Le titre est composé ici plutôt que dans le gabarit : il part aussi dans
+// `og:title`, et deux compositions séparées finiraient par diverger.
+const sousTitre =
+  faits.anneeCreation === null
+    ? t('hero.trade', { metier: faits.metier.label, ville: faits.adresse.ville })
+    : t('hero.tradeSince', {
+        metier: faits.metier.label,
+        ville: faits.adresse.ville,
+        annee: faits.anneeCreation,
+      });
+const titre = `${faits.nomAffiche} — ${sousTitre}`;
+---
+
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{titre}</title>
+    <meta name="description" content={redaction.accroche} />
+
+    {/*
+      Pas de balise `robots` permissive, et c'est délibéré : le site porte le
+      nom d'une entreprise réelle qui n'a rien demandé (D5). Tant qu'elle n'a
+      pas accepté, il n'a aucune raison d'être indexé — il doit être joignable
+      par l'artisan à qui l'on envoie l'URL, pas trouvable par ses clients ni
+      par ses concurrents. L'indexation viendra avec la vente, pas avant.
+    */}
+    <meta name="robots" content="noindex, nofollow" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={titre} />
+    <meta property="og:description" content={redaction.accroche} />
+    <meta name="theme-color" content="#12212e" />
+
+    {/*
+      Aucune police distante. Deux raisons, et la première suffirait : une
+      requête vers un tiers ralentit le premier rendu sur mobile, là où se
+      trouvent les clients de l'artisan (D2). La seconde est de conformité —
+      charger une police depuis un serveur tiers transmet l'adresse IP du
+      visiteur à ce tiers, sur un site que personne n'a commandé.
+    */}
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

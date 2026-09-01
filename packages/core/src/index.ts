@@ -9,3 +9,6 @@ export * from './scoring.js';
 export * from './matching.js';
 export * from './naf.js';
 export * from './domain-name.js';
+export * from './site-facts.js';
+export * from './site-content.js';
+export * from './site-coherence.js';

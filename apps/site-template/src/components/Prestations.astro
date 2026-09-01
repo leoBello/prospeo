@@ -1,0 +1,74 @@
+---
+import type { Prestation } from '@prospeo/core';
+import { t } from '../content/ui';
+
+interface Props {
+  prestations: Prestation[];
+}
+const { prestations } = Astro.props;
+
+/*
+ * Les prestations viennent de `trades.ts`, jamais du modèle.
+ *
+ * Le fichier de contenu ne porte que des `code` ; `label` et `description`
+ * arrivent ici depuis le code et vont à l'écran sans être passés par une
+ * génération. C'est la seule construction qui rend IMPOSSIBLE — et non
+ * seulement improbable — qu'un site annonce une prestation que l'artisan ne
+ * fournit pas.
+ *
+ * Le modèle n'a qu'un degré de liberté : l'ordre. Il compte, puisque la
+ * première carte est celle qu'on lit.
+ */
+---
+
+<section class="prestations" aria-labelledby="titre-prestations">
+  <div class="contenu">
+    <h2 id="titre-prestations">{t('section.services')}</h2>
+    <ul class="grille">
+      {
+        prestations.map((prestation) => (
+          <li class="carte">
+            <h3>{prestation.label}</h3>
+            <p>{prestation.description}</p>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</section>
+
+<style>
+  .prestations {
+    padding-block: 3rem;
+  }
+  h2 {
+    font-size: 1.6rem;
+    margin-bottom: 1.5rem;
+  }
+  .grille {
+    display: grid;
+    /* `auto-fit` + `minmax` : une colonne sur téléphone, deux ou trois sur
+       écran large, sans requête média et sans dépendre du nombre de
+       prestations retenues — qui varie de trois à cinq. */
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 1rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .carte {
+    background: var(--fond-doux);
+    border: 1px solid var(--trait);
+    border-radius: var(--rayon);
+    padding: 1.25rem;
+  }
+  .carte h3 {
+    font-size: 1.1rem;
+    margin-bottom: 0.35rem;
+  }
+  .carte p {
+    font-size: 0.95rem;
+    color: var(--encre-douce);
+    text-wrap: pretty;
+  }
+</style>

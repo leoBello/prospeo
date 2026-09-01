@@ -1,0 +1,22 @@
+{
+  "name": "@prospeo/site-template",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "test": "vitest run",
+    "typecheck": "astro check --minimumSeverity error"
+  },
+  "dependencies": {
+    "@prospeo/core": "workspace:*",
+    "astro": "^7.2.9"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11"
+  }
+}

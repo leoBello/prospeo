@@ -1,4 +1,96 @@
-import type { Trade } from './types.js';
+import type { Prestation, Trade } from './types.js';
+
+/**
+ * Prestations du plombier.
+ *
+ * Chaque description est écrite pour tenir sur n'importe quelle entreprise du
+ * métier, parce qu'elle sera publiée sans que personne n'ait vérifié
+ * l'activité réelle de celle-ci. On y décrit donc un CHAMP D'INTERVENTION, et
+ * jamais une promesse : ni délai (« en 30 minutes »), ni disponibilité
+ * (« 24h/24 »), ni qualification (« certifié RGE »), ni garantie. Ces quatre
+ * familles-là sont exactement ce qu'un artisan se fait reprocher au téléphone
+ * quand c'est faux, et la base ne sait rien d'aucune des quatre.
+ *
+ * Cinq à sept entrées suffisent : le schéma en fait choisir trois à cinq, et
+ * une liste plus longue ne ferait qu'élargir la surface à relire.
+ */
+const PRESTATIONS_PLOMBIER: readonly Prestation[] = [
+  {
+    code: 'depannage',
+    label: 'Dépannage',
+    description: 'Fuite, robinet qui coule, panne d’eau chaude, engorgement.',
+  },
+  {
+    code: 'chauffe-eau',
+    label: 'Chauffe-eau et ballon',
+    description: 'Remplacement, entretien et réparation de chauffe-eau.',
+  },
+  {
+    code: 'sanitaire',
+    label: 'Sanitaire',
+    description: 'Pose et remplacement de lavabo, WC, douche et robinetterie.',
+  },
+  {
+    code: 'chauffage',
+    label: 'Chauffage',
+    description: 'Installation et entretien de radiateurs et de chaudières.',
+  },
+  {
+    code: 'salle-de-bain',
+    label: 'Salle de bain',
+    description: 'Rénovation complète, de la dépose à la mise en eau.',
+  },
+  {
+    code: 'canalisation',
+    label: 'Canalisations',
+    description: 'Débouchage, recherche de fuite et remplacement de tuyauterie.',
+  },
+];
+
+/**
+ * Prestations du serrurier.
+ *
+ * Écrites avant que la base ne contienne le moindre serrurier — c'est
+ * précisément l'objet de D1 : le métier est un champ de contenu, pas une
+ * structure. Le jour où `discover --trade serrurier` tourne, la chaîne de
+ * vente fonctionne sans qu'une ligne du site change.
+ *
+ * L'interdiction de promettre vaut ici plus encore qu'ailleurs : l'ouverture
+ * de porte est le terrain des arnaques au dépannage, et une accroche sur le
+ * délai ou le prix rangerait le site du mauvais côté.
+ */
+const PRESTATIONS_SERRURIER: readonly Prestation[] = [
+  {
+    code: 'ouverture-porte',
+    label: 'Ouverture de porte',
+    description: 'Porte claquée ou clé perdue, ouverture sans dégât quand c’est possible.',
+  },
+  {
+    code: 'changement-serrure',
+    label: 'Changement de serrure',
+    description: 'Remplacement de cylindre ou de serrure complète, toutes marques.',
+  },
+  {
+    code: 'blindage',
+    label: 'Blindage de porte',
+    description: 'Pose de blocs-portes et de blindages sur porte existante.',
+  },
+  {
+    code: 'cle',
+    label: 'Clés',
+    description: 'Reproduction de clés et remise en état de cylindre.',
+  },
+  {
+    code: 'rideau-metallique',
+    label: 'Rideaux métalliques',
+    description: 'Dépannage et remplacement de rideaux et grilles de commerce.',
+  },
+  {
+    code: 'metallerie',
+    label: 'Métallerie',
+    description: 'Garde-corps, grilles de défense et ouvrages métalliques sur mesure.',
+  },
+];
 
 /**
  * Ajouter un métier consiste à ajouter un objet ici.
@@ -21,6 +113,7 @@ export const TRADES: readonly Trade[] = [
     // de domaine proposés, où l'on veut « plomberie ».
     keywords: ['plomberie', 'plombier', 'chauffagiste', 'sanitaire', 'chauffage', 'depannage'],
     categoryLabels: ['plombier', 'plomberie', 'chauffagiste'],
+    prestations: PRESTATIONS_PLOMBIER,
   },
   {
     slug: 'serrurier',
@@ -29,6 +122,7 @@ export const TRADES: readonly Trade[] = [
     mapsQueries: ['serrurier', 'serrurerie'],
     keywords: ['serrurerie', 'serrurier', 'blindage', 'metallerie', 'depannage'],
     categoryLabels: ['serrurier', 'serrurerie', 'metallerie'],
+    prestations: PRESTATIONS_SERRURIER,
   },
 ];
 

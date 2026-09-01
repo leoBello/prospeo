@@ -1,0 +1,130 @@
+/*
+ * Le socle visuel du gabarit.
+ *
+ * Trois contraintes ont dicté ces valeurs, et aucune n'est esthétique :
+ *
+ * 1. **Mobile d'abord.** Les clients d'un plombier le cherchent sur un
+ *    téléphone, souvent dans l'urgence. Tout est donc dimensionné pour un
+ *    écran de 360 px, et l'appel est atteignable au pouce en permanence.
+ * 2. **Aucune requête distante.** Ni police, ni icône, ni feuille externe.
+ *    Avec `inlineStylesheets: 'always'`, la page entière tient dans une seule
+ *    réponse HTTP : le premier rendu ne dépend d'aucun tiers.
+ * 3. **Neutre en métier (D1).** Rien ici ne parle de plomberie. Un serrurier
+ *    tournera sur ces mêmes règles sans qu'une ligne change.
+ *
+ * Thème clair uniquement, et c'est un choix assumé plutôt qu'un oubli : un
+ * thème sombre doublerait la surface à vérifier à l'œil sur vingt-deux sites
+ * qu'on ne relira pas un par un. `color-scheme: light` l'annonce au
+ * navigateur, faute de quoi certains inversent les couleurs d'eux-mêmes et
+ * défont le contraste calculé ci-dessous.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* Encre profonde, légèrement bleutée : lisible, sobre, et pas le noir pur
+     qui fatigue sur écran clair. */
+  --encre: #12212e;
+  --encre-douce: #4a5c6a;
+  --fond: #ffffff;
+  --fond-doux: #f4f2ee;
+  --trait: #e0dcd4;
+
+  /* Un seul accent, chaud. Le bleu aurait rangé le site du côté des services
+     et des logiciels ; l'ocre évoque l'artisanat sans caricature. Contraste
+     mesuré sur blanc : 4,6:1, donc conforme AA pour le texte normal. */
+  --accent: #9a5b18;
+  --accent-fond: #fdf6ed;
+
+  --rayon: 10px;
+  --largeur: 62rem;
+
+  /* Pile système : rapide, familière, et rendue correctement partout. Une
+     police distante coûterait un aller-retour réseau sur le chemin critique. */
+  --police:
+    system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--police);
+  /* 17px : un cran au-dessus du défaut. La cible n'a pas vingt ans. */
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--encre);
+  background: var(--fond);
+  -webkit-text-size-adjust: 100%;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+  margin: 0;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+}
+
+/* Conteneur commun. `min()` plutôt qu'une requête média : la marge de 20 px
+   tient sur un écran de 320 px comme sur un écran large. */
+.contenu {
+  width: min(var(--largeur), 100% - 2.5rem);
+  margin-inline: auto;
+}
+
+/*
+ * Réserve sous la page, de la hauteur de la barre d'appel fixe.
+ *
+ * Sans elle, la barre recouvre la fin des mentions légales — c'est-à-dire
+ * exactement le bloc qui dit que le site est une démonstration. La variable
+ * `--barre` est déclarée ici pour que les deux valeurs ne puissent pas
+ * diverger.
+ */
+:root {
+  --barre: 4.75rem;
+}
+
+/* Respect du réglage système : aucune animation n'est essentielle ici. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Cible tactile minimale de 44 px, recommandation d'accessibilité, et bon
+   sens sur un site dont l'action principale est un appel passé à une main. */
+.bouton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--rayon);
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  font-size: 1.05rem;
+  text-decoration: none;
+}
+
+.bouton:focus-visible {
+  outline: 3px solid var(--encre);
+  outline-offset: 2px;
+}

@@ -1,0 +1,107 @@
+---
+import type { SiteContent } from '@prospeo/core';
+import { EDITEUR, t } from '../content/ui';
+
+interface Props {
+  contenu: SiteContent;
+}
+const { faits } = Astro.props.contenu;
+
+/*
+ * §11 conformité, appliqué à un site que personne n'a commandé.
+ *
+ * L'éditeur du site, c'est NOUS — pas l'artisan. Lui en attribuer l'édition
+ * serait faux, et le rendrait responsable d'un contenu qu'il n'a pas écrit.
+ * Le bloc nomme donc les deux séparément : l'éditeur d'un côté, l'entreprise
+ * représentée de l'autre, avec son SIRET qui l'identifie sans ambiguïté.
+ *
+ * L'adresse de contact n'est pas décorative : c'est le mécanisme d'opposition.
+ * Un artisan qui ne veut pas de cette page doit pouvoir en demander le retrait
+ * depuis la page elle-même, sans avoir à retrouver qui l'a publiée. La
+ * demande alimente le statut `ne_pas_contacter`, que D5 fait suivre d'une
+ * dépublication immédiate.
+ *
+ * À FAIRE (tâche 3) : `publish` doit refuser de créer un dépôt tant que
+ * `EDITEUR` porte sa valeur d'attente. Un site sans éditeur identifiable ne
+ * doit pas pouvoir atteindre le réseau — et le vérifier au moment de publier
+ * vaut mieux qu'ici, où l'on ne ferait qu'échouer un build local.
+ */
+---
+
+<footer class="legales" aria-labelledby="titre-legales">
+  <div class="contenu">
+    <h2 id="titre-legales">{t('section.legal')}</h2>
+
+    <dl>
+      <div class="ligne">
+        <dt>{t('legal.publisher')}</dt>
+        <dd>{EDITEUR.nom}</dd>
+      </div>
+      <div class="ligne">
+        <dt>{t('legal.company')}</dt>
+        <dd>{faits.raisonSociale}</dd>
+      </div>
+      <div class="ligne">
+        <dt>{t('legal.siret')}</dt>
+        <dd>{faits.siret}</dd>
+      </div>
+    </dl>
+
+    <p class="avis">{t('legal.notice', { contact: EDITEUR.contact })}</p>
+    <p class="sources">{t('legal.sources')}</p>
+  </div>
+</footer>
+
+<style>
+  .legales {
+    padding-block: 3rem;
+    /* Réserve la hauteur de la barre d'appel fixe, sans quoi elle recouvre
+       la fin de ce bloc — c'est-à-dire le passage qui déclare la
+       démonstration. Le média ci-dessous la reprend là où la barre
+       disparaît. */
+    padding-bottom: calc(3rem + var(--barre));
+    font-size: 0.9rem;
+    color: var(--encre-douce);
+  }
+  h2 {
+    font-size: 1.1rem;
+    color: var(--encre);
+    margin-bottom: 1.25rem;
+  }
+  dl {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0 0 1.5rem;
+  }
+  .ligne {
+    display: grid;
+    gap: 0.1rem;
+  }
+  dt {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  dd {
+    margin: 0;
+    color: var(--encre);
+  }
+  .avis,
+  .sources {
+    max-width: 68ch;
+    text-wrap: pretty;
+  }
+  .sources {
+    margin-top: 0.75rem;
+    font-size: 0.82rem;
+  }
+  @media (min-width: 40rem) {
+    dl {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .legales {
+      padding-bottom: 3rem;
+    }
+  }
+</style>

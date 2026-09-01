@@ -1,0 +1,35 @@
+---
+import type { SiteContent } from '@prospeo/core';
+import { prestationsRetenues } from '../content/load';
+import Bandeau from './Bandeau.astro';
+import BarreAppel from './BarreAppel.astro';
+import Contact from './Contact.astro';
+import Hero from './Hero.astro';
+import MentionsLegales from './MentionsLegales.astro';
+import Prestations from './Prestations.astro';
+
+interface Props {
+  contenu: SiteContent;
+}
+const { contenu } = Astro.props;
+
+/*
+ * Le corps du site, isolé de la page.
+ *
+ * `index.astro` ne fait que charger le fichier de contenu et l'envoyer ici.
+ * La séparation existe pour que les tests puissent rendre le site entier avec
+ * un contenu arbitraire — un contenu sans note Google, sans lien Maps, sans
+ * année de création — et vérifier que les sections correspondantes
+ * DISPARAISSENT au lieu d'afficher une phrase creuse. Ce comportement-là ne
+ * se vérifie pas à la lecture du code ; il se mesure sur le HTML produit.
+ */
+---
+
+<Bandeau entreprise={contenu.faits.nomAffiche} />
+<Hero contenu={contenu} />
+<main>
+  <Prestations prestations={prestationsRetenues(contenu)} />
+  <Contact contenu={contenu} />
+</main>
+<MentionsLegales contenu={contenu} />
+<BarreAppel contenu={contenu} />

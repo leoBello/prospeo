@@ -1,0 +1,104 @@
+---
+import type { SiteContent } from '@prospeo/core';
+import { t } from '../content/ui';
+
+interface Props {
+  contenu: SiteContent;
+}
+const { faits } = Astro.props.contenu;
+
+// La ligne postale est composée ici, avec une espace insécable : « 44300 » et
+// « Nantes » ne doivent jamais se retrouver sur deux lignes. La composer dans
+// le gabarit imposerait d'y écrire une entité HTML, c'est-à-dire du contenu
+// hors du fichier de contenu.
+const lignePostale = `${faits.adresse.codePostal} ${faits.adresse.ville}`;
+---
+
+<section class="contact" aria-labelledby="titre-contact">
+  <div class="contenu">
+    <h2 id="titre-contact">{t('section.contact')}</h2>
+
+    <dl class="liste">
+      <div class="ligne">
+        <dt>{t('contact.phone')}</dt>
+        <dd>
+          <a class="lien-fort" href={`tel:${faits.telephone.e164}`}>
+            {faits.telephone.affichage}
+          </a>
+        </dd>
+      </div>
+
+      <div class="ligne">
+        <dt>{t('contact.address')}</dt>
+        <dd>
+          {/*
+            `address` porte la sémantique des coordonnées de contact ; le
+            `<br>` sépare la voie de la ligne postale sans imposer un retour
+            à la ligne dans les données elles-mêmes.
+          */}
+          <address>
+            {faits.adresse.rue}<br />{lignePostale}
+          </address>
+          {
+            faits.lienMaps !== null && (
+              <a class="lien-maps" href={faits.lienMaps} rel="noopener noreferrer" target="_blank">
+                {t('contact.maps')}
+              </a>
+            )
+          }
+        </dd>
+      </div>
+    </dl>
+  </div>
+</section>
+
+<style>
+  .contact {
+    background: var(--fond-doux);
+    border-block: 1px solid var(--trait);
+    padding-block: 3rem;
+  }
+  h2 {
+    font-size: 1.6rem;
+    margin-bottom: 1.5rem;
+  }
+  .liste {
+    display: grid;
+    gap: 1.5rem;
+    margin: 0;
+  }
+  .ligne {
+    display: grid;
+    gap: 0.25rem;
+  }
+  dt {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--encre-douce);
+  }
+  dd {
+    margin: 0;
+  }
+  .lien-fort {
+    font-size: 1.35rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-decoration: none;
+  }
+  address {
+    font-style: normal;
+  }
+  .lien-maps {
+    display: inline-block;
+    margin-top: 0.4rem;
+    font-size: 0.95rem;
+    color: var(--accent);
+  }
+  @media (min-width: 40rem) {
+    .liste {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+</style>
