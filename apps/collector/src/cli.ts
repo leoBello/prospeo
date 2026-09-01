@@ -5,10 +5,12 @@ import { getTrade, MATCHING_CONFIG, nafMatchesTrade } from '@prospeo/core';
 import { loadConfig } from './config.js';
 import { createClient } from './supabase.js';
 import { createGoogleMapsSource } from './sources/google-maps.js';
+import { fetchStatusBySiret } from './sources/recherche-entreprises.js';
 import { planScoreWrite } from './stages/classify-score.js';
 import { makeUpsertProspect, runDiscover } from './stages/discover.js';
 import { runEnrich, type EnrichProspect, type ReviewCandidate } from './stages/enrich.js';
 import { probeUrl, shouldProbe } from './stages/probe.js';
+import { runReconcile, type ReconcileProspect } from './stages/reconcile.js';
 import { applyReviewDecision, type ReviewDecision } from './stages/review.js';
 
 // `.env` vit a la racine du depot. Ni tsx ni Node ne le chargent tout seuls :
@@ -27,6 +29,7 @@ Commandes
   review                                       Tranche les appariements douteux
   probe                                        Sonde les URL déclarées
   score                                        Classe et note les prospects
+  reconcile                                    Revérifie l'état Sirene des prospects
 
 Options
   --limit <n>          Plafond d'enregistrements traités
@@ -66,14 +69,14 @@ function fetchScorePage(client: ReturnType<typeof createClient>, from: number) {
   return client
     .from('prospect')
     .select(
-      'id, denomination, date_creation, effectif_code, prospect_enrichment(declared_url, social_urls, phone_e164, rating, review_count), web_presence(category, probed_url, http_status, is_https, final_url, is_parked, has_viewport_meta, last_social_post_at)',
+      'id, denomination, date_creation, effectif_code, is_closed, prospect_enrichment(declared_url, social_urls, phone_e164, rating, review_count), web_presence(category, probed_url, http_status, is_https, final_url, is_parked, has_viewport_meta, last_social_post_at)',
     )
     .order('id')
     .range(from, from + PAGE_SIZE - 1);
 }
 
 /** Commandes reconnues. Les étages sont branchés par les tâches 9 à 11. */
-const COMMANDS = ['discover', 'enrich', 'review', 'probe', 'score'] as const;
+const COMMANDS = ['discover', 'enrich', 'review', 'probe', 'score', 'reconcile'] as const;
 
 function flag(argv: string[], name: string): string | undefined {
   const index = argv.indexOf(`--${name}`);
@@ -532,9 +535,9 @@ async function main(argv: string[]): Promise<number> {
           dateCreation: (p.date_creation as string | null) ?? null,
           phoneRaw: (enrichment?.phone_e164 as string | null) ?? null,
           denomination: p.denomination as string,
-          // Toujours false : `discover` filtre déjà `etat_administratif !== 'A'`,
-          // aucun établissement cessé n'entre en base.
-          isClosed: false,
+          // Renseigné par `reconcile`. La valeur codée en dur d'origine
+          // rendait le disqualifiant du barème inatteignable.
+          isClosed: p.is_closed === true,
         });
 
         if (write.kind === 'erase') {
@@ -612,6 +615,54 @@ async function main(argv: string[]): Promise<number> {
           `score : ${eraseFailed} effacements en échec, catégorie possiblement périmée\n`,
         );
       }
+      return 0;
+    }
+    case 'reconcile': {
+      const config = loadConfig(process.env);
+      const client = createClient(config);
+
+      // Lecture paginée comme partout ailleurs, et sans prédicat de fraîcheur :
+      // `reconciled_at` dit quand un prospect a été vérifié, il ne sert pas à
+      // en exclure. Ne revérifier qu'une partie de la base laisserait le reste
+      // indéfiniment hors contrôle.
+      const prospects: ReconcileProspect[] = [];
+      for (let from = 0; ; from += PAGE_SIZE) {
+        const { data, error } = await client
+          .from('prospect')
+          .select('id, siret')
+          .order('id')
+          .range(from, from + PAGE_SIZE - 1);
+        if (error) throw new Error(error.message);
+        prospects.push(...(data ?? []).map((row) => ({ id: row.id, siret: row.siret })));
+        if ((data ?? []).length < PAGE_SIZE) break;
+      }
+
+      const report = await runReconcile({
+        prospects,
+        fetchStatus: fetchStatusBySiret,
+        remove: async (id) => {
+          // Les dépendances partent en cascade : c'est la définition même de
+          // « ne pas conserver ».
+          const { error } = await client.from('prospect').delete().eq('id', id);
+          if (error) throw new Error(error.message);
+        },
+        close: async (id) => {
+          const { error } = await client.from('prospect').update({ is_closed: true }).eq('id', id);
+          if (error) throw new Error(error.message);
+        },
+        touch: async (id) => {
+          const { error } = await client
+            .from('prospect')
+            .update({ reconciled_at: new Date().toISOString() })
+            .eq('id', id);
+          if (error) throw new Error(error.message);
+        },
+      });
+
+      process.stdout.write(
+        `reconcile : ${report.kept} conservés, ${report.closed} cessés, ` +
+          `${report.deleted} supprimés, ${report.failed} en échec\n`,
+      );
       return 0;
     }
     default:

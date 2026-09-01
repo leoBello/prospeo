@@ -1,5 +1,6 @@
 import { request } from 'undici';
 import type { RawEstablishment, Trade } from '@prospeo/core';
+import type { SireneStatus } from '../stages/reconcile.js';
 
 const BASE_URL = 'https://recherche-entreprises.api.gouv.fr/search';
 /** Plafond imposé par l'API. */
@@ -154,4 +155,29 @@ export async function* searchEstablishments(
     for (const row of mapSearchResponse(json, options.trade)) yield row;
     page += 1;
   }
+}
+
+/**
+ * État courant d'un établissement, interrogé par son SIRET.
+ *
+ * L'API ne renvoie tout simplement pas les établissements non diffusibles :
+ * une réponse vide se lit `absent`, et l'appelant en tire les conséquences.
+ */
+export async function fetchStatusBySiret(siret: string): Promise<SireneStatus> {
+  const response = await fetch(`${BASE_URL}?q=${encodeURIComponent(siret)}&per_page=25&page=1`);
+  if (!response.ok) throw new Error(`API Sirene : HTTP ${response.status}`);
+
+  const body = (await response.json()) as { results?: unknown[] };
+  for (const result of body.results ?? []) {
+    const company = result as Record<string, unknown>;
+    const establishments = (company.matching_etablissements ?? []) as Record<string, unknown>[];
+    const found = establishments.find((etab) => etab.siret === siret);
+    if (found === undefined) continue;
+
+    if (company.statut_diffusion !== 'O' || found.statut_diffusion_etablissement !== 'O') {
+      return { kind: 'undiffusible' };
+    }
+    return found.etat_administratif === 'A' ? { kind: 'active' } : { kind: 'closed' };
+  }
+  return { kind: 'absent' };
 }

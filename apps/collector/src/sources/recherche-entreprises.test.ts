@@ -1,8 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { getTrade } from '@prospeo/core';
-import { mapSearchResponse, searchEstablishments } from './recherche-entreprises.js';
+import {
+  fetchStatusBySiret,
+  mapSearchResponse,
+  searchEstablishments,
+} from './recherche-entreprises.js';
 
 const fixture = JSON.parse(
   readFileSync(fileURLToPath(new URL('./fixtures/search-43-22A.json', import.meta.url)), 'utf8'),
@@ -177,5 +181,91 @@ describe('searchEstablishments', () => {
 
     expect(seenUrl).toContain('activite_principale=43.22A');
     expect(seenUrl).not.toContain('4322A&');
+  });
+});
+
+/** Réponse minimale de l'API pour un SIRET donné. */
+function entreprise(
+  siret: string,
+  options: {
+    statutDiffusion?: string;
+    statutDiffusionEtablissement?: string;
+    etatAdministratif?: string;
+  } = {},
+): unknown {
+  return {
+    results: [
+      {
+        siren: siret.slice(0, 9),
+        statut_diffusion: options.statutDiffusion ?? 'O',
+        matching_etablissements: [
+          {
+            siret,
+            statut_diffusion_etablissement: options.statutDiffusionEtablissement ?? 'O',
+            etat_administratif: options.etatAdministratif ?? 'A',
+          },
+        ],
+      },
+    ],
+  };
+}
+
+describe('fetchStatusBySiret', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function stub(body: unknown, ok = true, status = 200): ReturnType<typeof vi.fn> {
+    const fetchMock = vi.fn(async () => ({ ok, status, json: async () => body }));
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  }
+
+  it('interroge l API sur le SIRET demandé', async () => {
+    const fetchMock = stub(entreprise('11111111100017'));
+    await fetchStatusBySiret('11111111100017');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('q=11111111100017');
+  });
+
+  it('rend actif un établissement ouvert et diffusible', async () => {
+    stub(entreprise('11111111100017'));
+    expect(await fetchStatusBySiret('11111111100017')).toEqual({ kind: 'active' });
+  });
+
+  it('rend cessé un établissement fermé', async () => {
+    // L API code la cessation d un ETABLISSEMENT par « F », et non par le
+    // « C » qu elle emploie au niveau de l entreprise.
+    stub(entreprise('11111111100017', { etatAdministratif: 'F' }));
+    expect(await fetchStatusBySiret('11111111100017')).toEqual({ kind: 'closed' });
+  });
+
+  it('rend non diffusible quand l entreprise ne l est plus', async () => {
+    stub(entreprise('11111111100017', { statutDiffusion: 'P' }));
+    expect(await fetchStatusBySiret('11111111100017')).toEqual({ kind: 'undiffusible' });
+  });
+
+  it('rend non diffusible quand l établissement ne l est plus', async () => {
+    stub(entreprise('11111111100017', { statutDiffusionEtablissement: 'N' }));
+    expect(await fetchStatusBySiret('11111111100017')).toEqual({ kind: 'undiffusible' });
+  });
+
+  it('rend absent sur une réponse sans résultat', async () => {
+    stub({ results: [] });
+    expect(await fetchStatusBySiret('11111111100017')).toEqual({ kind: 'absent' });
+  });
+
+  it('rend absent quand aucun établissement ne porte le SIRET', async () => {
+    // Une recherche plein texte peut ramener des homonymes : seul le SIRET
+    // exact fait foi.
+    stub(entreprise('22222222200028'));
+    expect(await fetchStatusBySiret('11111111100017')).toEqual({ kind: 'absent' });
+  });
+
+  it('lève sur une réponse HTTP en erreur', async () => {
+    // Une erreur ne doit jamais se confondre avec une absence : elle
+    // provoquerait une suppression irréversible.
+    stub(null, false, 503);
+    await expect(fetchStatusBySiret('11111111100017')).rejects.toThrow('503');
   });
 });

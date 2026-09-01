@@ -94,12 +94,14 @@ export type Database = {
           discovered_at: string
           effectif_code: string | null
           id: string
+          is_closed: boolean
           is_entrepreneur_individuel: boolean
           is_head_office: boolean
           latitude: number | null
           longitude: number | null
           naf_code: string | null
           postal_code: string
+          reconciled_at: string | null
           siren: string
           siret: string
           trade_slug: string
@@ -114,12 +116,14 @@ export type Database = {
           discovered_at?: string
           effectif_code?: string | null
           id?: string
+          is_closed?: boolean
           is_entrepreneur_individuel?: boolean
           is_head_office?: boolean
           latitude?: number | null
           longitude?: number | null
           naf_code?: string | null
           postal_code: string
+          reconciled_at?: string | null
           siren: string
           siret: string
           trade_slug: string
@@ -134,12 +138,14 @@ export type Database = {
           discovered_at?: string
           effectif_code?: string | null
           id?: string
+          is_closed?: boolean
           is_entrepreneur_individuel?: boolean
           is_head_office?: boolean
           latitude?: number | null
           longitude?: number | null
           naf_code?: string | null
           postal_code?: string
+          reconciled_at?: string | null
           siren?: string
           siret?: string
           trade_slug?: string
