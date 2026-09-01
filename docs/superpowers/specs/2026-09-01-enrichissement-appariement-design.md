@@ -268,6 +268,24 @@ laisser au nom la moindre chance de trancher. Passer à 300 m avec une
 contribution dégradée conserve le rôle de filtre en déplaçant la décision
 vers le signal qui la mérite.
 
+**Un prospect sans coordonnées ne peut jamais être fusionné automatiquement,
+et c'est voulu.** Sirene ne géocode pas tous les établissements. Quand la
+position manque, la proximité ne vaut ni bonus ni malus — elle vaut zéro,
+faute de preuve — si bien que la confiance plafonne à 0,75 : nom parfait et
+catégorie parfaite réunis restent sous le seuil haut de 0,85. Le prospect part
+donc en file de validation manuelle.
+
+Ce n'est pas une limite subie mais la conséquence assumée du barème. Sans
+position, rien ne distingue deux homonymes exerçant le même métier dans deux
+villes différentes, et c'est précisément le cas où une fusion automatique
+erronée coûte le plus cher. La file manuelle est la bonne réponse à une
+absence de preuve ; en faire une fusion reviendrait à traiter l'absence de
+preuve comme une preuve.
+
+Conséquence pratique à surveiller au jalon : la proportion d'établissements
+non géocodés fixe un plancher de travail manuel. Sur le premier lot de 25,
+elle est nulle — les 25 portent des coordonnées.
+
 ### 5.5 Cohérence de catégorie
 
 Le libellé de catégorie Google est comparé aux `keywords` du métier. Signal
