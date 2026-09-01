@@ -1,0 +1,109 @@
+---
+import { t } from '../content/ui';
+
+/*
+ * Les questions fréquentes — niveau 2, et zéro JavaScript.
+ *
+ * **`<details>` natif plutôt qu'un accordéon écrit à la main.** Le navigateur
+ * fournit déjà l'ouverture, la fermeture, le rôle ARIA, le pilotage au clavier
+ * et la recherche dans la page — cette dernière ouvre même le bon panneau. Un
+ * accordéon en JavaScript coûterait une trentaine de lignes pour reproduire
+ * tout cela, moins bien. C'est la section la plus riche de la page en
+ * interaction, et c'est celle qui n'embarque rien.
+ *
+ * **Les réponses ne promettent rien.** « Devis gratuit sous 24 h » est la
+ * phrase que porte toute vitrine d'artisan, et c'est exactement pourquoi elle
+ * ne peut pas figurer ici : la base ne sait ni si cet artisan facture ses
+ * déplacements, ni sous quel délai il répond. Le prompt interdit ces
+ * affirmations au modèle ; il serait absurde que le gabarit les écrive à sa
+ * place, où aucune vérification ne les attraperait.
+ *
+ * La première question est ouverte : un accordéon entièrement replié se lit
+ * comme une liste de titres, et le visiteur ne sait pas qu'il peut cliquer.
+ */
+const questions = [
+  { q: t('faq.q1'), a: t('faq.a1'), ouverte: true },
+  { q: t('faq.q2'), a: t('faq.a2'), ouverte: false },
+  { q: t('faq.q3'), a: t('faq.a3'), ouverte: false },
+];
+---
+
+<section class="section section--surface" id="faq" aria-labelledby="titre-faq">
+  <div class="contenu">
+    <p class="oeil">{t('faq.eyebrow')}</p>
+    <h2 class="titre-section" id="titre-faq">{t('faq.title')}</h2>
+
+    <div class="liste corps-section">
+      {
+        questions.map((entree) => (
+          <details class="entree" open={entree.ouverte}>
+            <summary>
+              <span>{entree.q}</span>
+              <span class="signe" aria-hidden="true" />
+            </summary>
+            <p>{entree.a}</p>
+          </details>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<style>
+  .liste {
+    max-width: 52rem;
+    border-top: 1px solid var(--trait);
+  }
+  .entree {
+    border-bottom: 1px solid var(--trait);
+  }
+  summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding-block: 1.05rem;
+    cursor: pointer;
+    font-family: var(--police-titre);
+    font-weight: 600;
+    font-size: 1.05rem;
+    /* Le triangle par défaut est retiré au profit du signe ci-dessous, qui
+       suit la couleur d'accent de la palette. `::-webkit-details-marker` est
+       nécessaire pour Safari, qui ignore `list-style`. */
+    list-style: none;
+  }
+  summary::-webkit-details-marker {
+    display: none;
+  }
+  /* Le signe est dessiné en CSS plutôt qu'écrit en texte : un « + » dans le
+     gabarit serait une chaîne visible codée en dur, que le test
+     d'externalisation refuse — à juste titre, puisqu'elle échapperait à la
+     relecture. */
+  .signe {
+    position: relative;
+    flex: none;
+    width: 0.85rem;
+    height: 0.85rem;
+  }
+  .signe::before,
+  .signe::after {
+    content: '';
+    position: absolute;
+    inset: 50% 0 auto 0;
+    height: 1.5px;
+    background: var(--accent);
+    transition: transform 0.25s ease;
+  }
+  .signe::after {
+    transform: rotate(90deg);
+  }
+  .entree[open] .signe::after {
+    transform: rotate(0deg);
+  }
+  .entree p {
+    padding-bottom: 1.15rem;
+    max-width: 62ch;
+    color: var(--encre-douce);
+    text-wrap: pretty;
+  }
+</style>

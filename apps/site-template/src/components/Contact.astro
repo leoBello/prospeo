@@ -1,104 +1,168 @@
 ---
 import type { ContenuPublie } from '../content/contrat';
 import { t } from '../content/ui';
+import Icone from './Icone.astro';
 
 interface Props {
   contenu: ContenuPublie;
 }
 const { faits } = Astro.props.contenu;
 
-// La ligne postale est composée ici, avec une espace insécable : « 44300 » et
-// « Nantes » ne doivent jamais se retrouver sur deux lignes. La composer dans
-// le gabarit imposerait d'y écrire une entité HTML, c'est-à-dire du contenu
-// hors du fichier de contenu.
-const lignePostale = `${faits.adresse.codePostal} ${faits.adresse.ville}`;
+// La ligne postale est composée ici : « 44300 » et « Nantes » ne doivent
+// jamais se retrouver sur deux lignes. La composer dans le gabarit imposerait
+// d'y écrire une entité HTML, c'est-à-dire du contenu hors du fichier de
+// contenu.
+const lignePostale = `${faits.adresse.codePostal} ${faits.adresse.ville}`;
+
+/*
+ * Contact — le téléphone, et rien d'autre (D8).
+ *
+ * **Pas de formulaire, et l'absence est expliquée.** Nous n'avons pas
+ * l'adresse e-mail de l'artisan : un formulaire sur le site d'une entreprise
+ * réelle avalerait une vraie demande client, qui ne serait lue par personne.
+ * C'est un dommage concret causé à quelqu'un qui n'a rien demandé — et c'est
+ * le client final qui le paierait, pas nous.
+ *
+ * L'expliquer en une ligne plutôt que de laisser un trou : le formulaire est
+ * la première chose qu'un artisan cherche sur « son » site, et son absence
+ * inexpliquée passerait pour un travail inachevé.
+ *
+ * **Pas d'horaires non plus.** La base n'en contient pas, et « ouvert du lundi
+ * au vendredi » est exactement le genre d'invention qui se retourne contre
+ * l'artisan au premier client qui se déplace un samedi.
+ */
 ---
 
-<section class="contact" aria-labelledby="titre-contact">
+<section class="section" id="contact" aria-labelledby="titre-contact">
   <div class="contenu">
-    <h2 id="titre-contact">{t('section.contact')}</h2>
+    <p class="oeil">{t('contact.eyebrow')}</p>
+    <h2 class="titre-section" id="titre-contact">{t('section.contact')}</h2>
 
-    <dl class="liste">
-      <div class="ligne">
-        <dt>{t('contact.phone')}</dt>
-        <dd>
-          <a class="lien-fort" href={`tel:${faits.telephone.e164}`}>
-            {faits.telephone.affichage}
-          </a>
-        </dd>
-      </div>
+    <div class="bloc corps-section">
+      <dl class="coordonnees">
+        <div class="ligne">
+          <dt>{t('contact.phone')}</dt>
+          <dd>
+            <a class="numero" href={`tel:${faits.telephone.e164}`}>
+              {faits.telephone.affichage}
+            </a>
+          </dd>
+        </div>
 
-      <div class="ligne">
-        <dt>{t('contact.address')}</dt>
-        <dd>
-          {/*
-            `address` porte la sémantique des coordonnées de contact ; le
-            `<br>` sépare la voie de la ligne postale sans imposer un retour
-            à la ligne dans les données elles-mêmes.
-          */}
-          <address>
-            {faits.adresse.rue}<br />{lignePostale}
-          </address>
-          {
-            faits.lienMaps !== null && (
-              <a class="lien-maps" href={faits.lienMaps} rel="noopener noreferrer" target="_blank">
-                {t('contact.maps')}
-              </a>
-            )
-          }
-        </dd>
-      </div>
-    </dl>
+        <div class="ligne">
+          <dt>{t('contact.address')}</dt>
+          <dd>
+            {/*
+              `address` porte la sémantique des coordonnées de contact ; le
+              `<br>` sépare la voie de la ligne postale sans imposer un retour
+              à la ligne dans les données elles-mêmes.
+            */}
+            <address>
+              {faits.adresse.rue}<br />{lignePostale}
+            </address>
+            {
+              faits.lienMaps !== null && (
+                <a
+                  class="lien"
+                  href={faits.lienMaps}
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
+                  {t('contact.maps')}
+                </a>
+              )
+            }
+          </dd>
+        </div>
+      </dl>
+
+      {/*
+        Le numéro est écrit SUR le bouton plutôt que dans un libellé caché.
+        Le texte visible devient alors le nom accessible, et les deux ne
+        peuvent plus diverger — c'est le défaut que Lighthouse a relevé sur le
+        bouton du héros.
+      */}
+      <a class="bouton grand" href={`tel:${faits.telephone.e164}`}>
+        <Icone nom="telephone" />
+        <span>{t('cta.call')}</span>
+        <span class="numero">{faits.telephone.affichage}</span>
+      </a>
+    </div>
+
+    <p class="sans-formulaire">{t('contact.noForm')}</p>
   </div>
 </section>
 
 <style>
-  .contact {
-    background: var(--fond-doux);
-    border-block: 1px solid var(--trait);
-    padding-block: 3rem;
+  .bloc {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: start;
+    justify-content: space-between;
+    gap: 1.75rem;
   }
-  h2 {
-    font-size: 1.6rem;
-    margin-bottom: 1.5rem;
-  }
-  .liste {
+  .coordonnees {
     display: grid;
-    gap: 1.5rem;
+    gap: 1.4rem;
     margin: 0;
   }
   .ligne {
     display: grid;
-    gap: 0.25rem;
+    gap: 0.28rem;
   }
   dt {
-    font-size: 0.8rem;
+    font-family: var(--police-titre);
+    font-size: 0.72rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.11em;
     color: var(--encre-douce);
   }
   dd {
     margin: 0;
   }
-  .lien-fort {
-    font-size: 1.35rem;
+  /* Restreint à la liste : sans le préfixe, cette règle atteindrait aussi le
+     numéro du bouton, qui hériterait de ses 1,6 rem et déborderait. Deux
+     éléments portent la même classe pour de bonnes raisons — l'un est un
+     titre, l'autre une étiquette de bouton. */
+  .coordonnees .numero {
+    font-family: var(--police-titre);
+    font-size: 1.6rem;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
+    letter-spacing: var(--serrage-titre);
     text-decoration: none;
   }
   address {
     font-style: normal;
   }
-  .lien-maps {
+  .lien {
     display: inline-block;
     margin-top: 0.4rem;
-    font-size: 0.95rem;
+    font-size: 0.92rem;
     color: var(--accent);
   }
+  .grand {
+    font-size: 1.05rem;
+    padding: 0.95rem 1.7rem;
+  }
+  .grand .numero {
+    font-variant-numeric: tabular-nums;
+    opacity: 0.92;
+  }
+  .sans-formulaire {
+    margin-top: 2.25rem;
+    padding-left: 0.95rem;
+    border-left: 2px solid var(--accent);
+    max-width: 60ch;
+    font-size: 0.92rem;
+    color: var(--encre-douce);
+    text-wrap: pretty;
+  }
   @media (min-width: 40rem) {
-    .liste {
+    .coordonnees {
       grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 2.5rem;
     }
   }
 </style>

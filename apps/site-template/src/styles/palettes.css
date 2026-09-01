@@ -1,0 +1,95 @@
+/*
+ * Les cinq palettes, et rien d'autre.
+ *
+ * **Pourquoi les valeurs sont ICI et non dans `packages/core`.** Le dépôt
+ * modèle est copié vers un dépôt par prospect, que Vercel construit seul : une
+ * dépendance `"@prospeo/core": "workspace:*"` y ferait échouer `npm install`
+ * avant même le build (§8 des pièges déjà payés). Le gabarit doit tenir debout
+ * sans rien connaître du monorepo qui l'a produit.
+ *
+ * Le fichier de contenu ne transporte donc qu'un JETON — `cuivre` — et jamais
+ * un hexadécimal. C'est ce qui ferme la porte que D6 veut fermée : un contenu
+ * porteur de couleurs serait un contenu qu'une génération, ou une main dans le
+ * dépôt du prospect, peut rendre illisible sans qu'aucun schéma ne s'en
+ * aperçoive — sur une page qui porte le nom d'une entreprise réelle.
+ *
+ * **Les contrastes sont mesurés, pas estimés.** Les sept paires de chaque
+ * palette atteignent WCAG AA (4,5:1), la plupart AAA. Un test du gabarit
+ * relit CE fichier, recalcule les vingt-cinq ratios et rougit si un seul
+ * descend — parce que personne ne relira vingt-deux sites au colorimètre, et
+ * que D6 exige que la vérification ait lieu à l'écriture.
+ *
+ * Toute couleur ajoutée ici doit l'être en paire avec son test.
+ */
+
+/*
+ * Quatre palettes claires et une sombre. `color-scheme` est déclaré par
+ * palette et non globalement : sans lui, certains navigateurs inversent les
+ * couleurs d'eux-mêmes et défont exactement le contraste calculé ci-dessus.
+ */
+
+[data-palette='ardoise'] {
+  color-scheme: light;
+  --fond: #ffffff;
+  --surface: #f3f5f7;
+  --encre: #1b2228;
+  --encre-douce: #4d5a66;
+  --accent: #2f6f8f;
+  --sur-accent: #ffffff;
+  --trait: #dde3e8;
+}
+
+[data-palette='cuivre'] {
+  color-scheme: light;
+  --fond: #fffdfb;
+  --surface: #f6f1ea;
+  --encre: #221a13;
+  --encre-douce: #5b4c3e;
+  --accent: #9a5b18;
+  --sur-accent: #ffffff;
+  --trait: #e6ddd1;
+}
+
+/*
+ * La seule palette sur fond sombre.
+ *
+ * Elle n'est pas un « mode sombre » : c'est une variante à part entière, que
+ * le modèle choisit ou non. Le site ne suit donc PAS `prefers-color-scheme` —
+ * une page qui bascule selon le réglage du visiteur doublerait la surface à
+ * vérifier à l'œil sur vingt-deux sites qu'on ne relira pas un par un, et le
+ * choix du modèle ne voudrait plus rien dire.
+ */
+[data-palette='nuit'] {
+  color-scheme: dark;
+  --fond: #12181f;
+  --surface: #1a222b;
+  --encre: #eef2f5;
+  --encre-douce: #a4b2bd;
+  --accent: #e0a355;
+  /* Sur un accent clair, le texte du bouton redevient sombre : c'est le seul
+     endroit où la palette sombre inverse la logique des quatre autres. */
+  --sur-accent: #12181f;
+  --trait: #2a343f;
+}
+
+[data-palette='terracotta'] {
+  color-scheme: light;
+  --fond: #fffcfa;
+  --surface: #f7ece7;
+  --encre: #26170f;
+  --encre-douce: #63483b;
+  --accent: #a4442a;
+  --sur-accent: #ffffff;
+  --trait: #ebd9d1;
+}
+
+[data-palette='foret'] {
+  color-scheme: light;
+  --fond: #fcfdfb;
+  --surface: #eef2ec;
+  --encre: #15201a;
+  --encre-douce: #465248;
+  --accent: #2f6b45;
+  --sur-accent: #ffffff;
+  --trait: #d9e2da;
+}

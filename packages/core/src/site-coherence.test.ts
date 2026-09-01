@@ -12,6 +12,7 @@ const BASE: SiteContent = {
     anneeCreation: 2009,
     noteGoogle: 4.6,
     lienMaps: null,
+    coordonnees: { lat: 47.2603579, lon: -1.5721302 },
     raisonSociale: 'SOULEYMANE DOSSO (DOS SERVICES)',
     siret: '51000900400035',
   },

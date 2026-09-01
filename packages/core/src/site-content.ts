@@ -153,6 +153,12 @@ const faitsSchema = z
     // collecte, et un site l'afficherait sans sourciller.
     noteGoogle: z.number().min(0).max(5).nullable(),
     lienMaps: z.string().url().nullable(),
+    // Bornées au domaine terrestre : une longitude de 191 vient d'une erreur
+    // de collecte, et rendrait une carte vide sans que rien ne le signale.
+    coordonnees: z
+      .object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180) })
+      .strict()
+      .nullable(),
     raisonSociale: z.string().min(1),
     siret: z.string().regex(/^\d{14}$/),
   })

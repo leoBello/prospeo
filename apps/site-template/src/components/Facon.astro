@@ -1,0 +1,130 @@
+---
+import { Image } from 'astro:assets';
+import { imageEtape } from '../content/images';
+import { t } from '../content/ui';
+
+/*
+ * « Notre façon de faire » — contenu illustratif, niveau 2 de D7.
+ *
+ * Ce bloc est IDENTIQUE sur les vingt-deux sites, et il n'affirme rien de
+ * particulier sur l'entreprise : il décrit comment se déroule une intervention
+ * chez n'importe quel artisan qu'on joint au téléphone. C'est précisément ce
+ * qui le rend acceptable — l'utilisateur a tranché que du contenu illustratif
+ * inventé pouvait figurer, à condition qu'il n'avance rien de spécifique.
+ *
+ * Chaque phrase a donc été relue contre la liste des interdits : aucune ne
+ * parle de délai, de tarif, d'effectif ni de qualification. « Le même
+ * interlocuteur du premier appel à la fin » n'est pas une promesse
+ * commerciale : c'est ce qu'implique le fait, vérifié, qu'un numéro unique
+ * figure sur la page.
+ *
+ * Il ne dégrade jamais : rien ici ne dépend de la base.
+ */
+
+const etapes = [
+  {
+    code: 'etape-01',
+    titre: t('method.step1.title'),
+    texte: t('method.step1.text'),
+    alt: t('method.step1.alt'),
+  },
+  {
+    code: 'etape-02',
+    titre: t('method.step2.title'),
+    texte: t('method.step2.text'),
+    alt: t('method.step2.alt'),
+  },
+  {
+    code: 'etape-03',
+    titre: t('method.step3.title'),
+    texte: t('method.step3.text'),
+    alt: t('method.step3.alt'),
+  },
+];
+---
+
+<section class="section section--surface" id="facon" aria-labelledby="titre-facon">
+  <div class="contenu">
+    <p class="oeil">{t('method.eyebrow')}</p>
+    <h2 class="titre-section" id="titre-facon">{t('method.title')}</h2>
+    <p class="chapo-section">{t('method.intro')}</p>
+
+    {/*
+      Une liste ORDONNÉE, et c'est une information et non un choix graphique :
+      ces trois temps se suivent réellement, et le rang porte du sens. Un
+      lecteur d'écran annonce « 1 sur 3 » sans qu'on ait à l'écrire.
+    */}
+    <ol class="etapes corps-section">
+      {
+        etapes.map((etape, index) => (
+          <li class="etape apparition">
+            <div class="vignette">
+              <Image
+                src={imageEtape(etape.code)}
+                alt={etape.alt}
+                widths={[320, 560, 900]}
+                sizes="(min-width: 52rem) 21rem, 100vw"
+                loading="lazy"
+              />
+            </div>
+            <p class="rang">{t('method.step', { rang: index + 1 })}</p>
+            <h3>{etape.titre}</h3>
+            <p class="texte">{etape.texte}</p>
+          </li>
+        ))
+      }
+    </ol>
+  </div>
+</section>
+
+<style>
+  .etapes {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.75rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    /* Le compteur natif est neutralisé : le rang est déjà écrit dans la
+       ligne « Étape 1 », qui passe par `ui.ts`. Deux numérotations
+       concurrentes se contrediraient dès qu'une étape serait ajoutée. */
+    counter-reset: none;
+  }
+  .vignette {
+    border-radius: var(--rayon);
+    overflow: hidden;
+    margin-bottom: 1rem;
+    /* Un format constant : trois images de proportions différentes
+       décaleraient les trois titres, et la rangée perdrait sa ligne de base
+       commune sur écran large. */
+    aspect-ratio: 4 / 3;
+  }
+  .vignette :global(img) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .rang {
+    font-family: var(--police-titre);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  h3 {
+    font-size: 1.2rem;
+    margin-block: 0.35rem 0.4rem;
+  }
+  .texte {
+    color: var(--encre-douce);
+    font-size: 0.96rem;
+    text-wrap: pretty;
+  }
+  @media (min-width: 52rem) {
+    .etapes {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1.5rem;
+    }
+  }
+</style>

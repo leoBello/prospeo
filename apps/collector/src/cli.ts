@@ -288,7 +288,7 @@ async function fetchSiteCandidates(
     let query = client
       .from('prospect')
       .select(
-        'id, siret, denomination, denomination_usuelle, trade_slug, address, postal_code, city, date_creation, is_closed, prospect_enrichment(status, matched_name, phone_e164, rating, maps_url), web_presence(category), prospect_score(total)',
+        'id, siret, denomination, denomination_usuelle, trade_slug, address, postal_code, city, date_creation, latitude, longitude, is_closed, prospect_enrichment(status, matched_name, phone_e164, rating, maps_url), web_presence(category), prospect_score(total)',
       )
       .order('id')
       .range(from, from + PAGE_SIZE - 1);
@@ -322,6 +322,8 @@ async function fetchSiteCandidates(
         postalCode: row.postal_code,
         city: row.city,
         dateCreation: row.date_creation,
+        latitude: row.latitude,
+        longitude: row.longitude,
         enrichment:
           enr === null
             ? null
@@ -393,6 +395,10 @@ async function fetchPitchCandidates(
           postalCode: row.postal_code,
           city: row.city,
           dateCreation: row.date_creation,
+          // Le message de vente n'a pas de carte : ces deux champs ne servent
+          // qu'à satisfaire le contrat partagé avec `assembleFacts`.
+          latitude: null,
+          longitude: null,
           enrichment:
             enr === null
               ? null

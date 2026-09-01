@@ -317,3 +317,114 @@ Des seuils, pas des impressions.
 - L'envoi des messages (D6 du chantier n°4).
 - Le passage à l'échelle des 21 prospects restants — il suit ce chantier,
   puisqu'il n'a d'intérêt qu'une fois le gabarit digne d'être montré.
+
+---
+
+## 10. Ce que la réalisation a appris — 2 septembre 2026
+
+Chantier exécuté. Cette section est **factuelle** : elle ne rouvre aucune
+décision, elle enregistre ce que le réel a corrigé du plan.
+
+### 10.1 Deux erreurs de ce document
+
+**Le §3 mélange deux populations.** Ses chiffres sont exacts sur les 139 lignes
+de la base. Mais le gabarit ne sert pas les 139 : `assembleFacts` exige un
+téléphone, et ils sont **37**. Sur cette population-là :
+
+| Donnée | §3 (sur 139) | Réel (sur 37 éligibles) |
+|---|---|---|
+| note Google ≥ 4 | 30 → « s'efface pour 109 » | **26 / 37**, soit 70 % |
+| lien Maps | 39 → « conditionnel » | **37 / 37** |
+
+La section avis est donc le cas **courant**, pas l'exception. La dégradation
+reste construite et testée — onze pages sur trente-sept n'ont pas de note —
+mais elle a cessé d'être le principe d'organisation de la mise en page : la
+note passe en gros chiffre plutôt qu'en ligne discrète.
+
+**Le §7 invoque un test qui n'existait pas.** « `npm install && npm run build`
+réussit hors du monorepo — le test existant le prouve » : il n'y en avait
+aucun. L'autonomie ne tenait que par la vigilance, depuis le commit `fa445fa`
+du chantier n°4. Elle est désormais sous test
+(`apps/site-template/src/autonomie.test.ts`), ce qui n'était pas un luxe : ce
+chantier a ajouté six dépendances, dont `sharp` qu'Astro 7 n'embarque plus.
+
+### 10.2 Trois écarts assumés
+
+**`client:visible` n'existe pas pour un composant `.astro`.** La directive
+suppose une île d'un framework d'interface, et le gabarit n'en embarque aucun.
+En ajouter un pour une carte statique coûterait l'hydratation que D1 refuse
+déjà à Framer Motion. Un `IntersectionObserver` et un `import()` dynamique
+donnent le même effet en deux lignes, et Vite isole Leaflet dans son propre
+paquet.
+
+**L'AVIF n'est produit que pour le héros.** `<Image>` ignore silencieusement
+une propriété `formats` — seul `<Picture>` la lit. Mesuré : le héros passe de
+211 à 122 Ko contre six secondes de build. Les neuf autres images sont sous la
+ligne de flottaison et chargées paresseusement ; leur encoder un AVIF coûterait
+le même temps, payé vingt-deux fois, pour des octets que personne n'attend.
+
+**Les images de héros vivent dans `trades.ts`, pas dans `site-theme.ts`.** Le
+sketch de D6 les y plaçait. Une palette ne dit rien du travail ; une
+photographie, si — un chantier de plomberie ouvrant le site d'un serrurier
+serait un mensonge visuel. Les placer à côté des prestations donne en outre la
+bonne obligation : ajouter un métier impose de fournir ses images.
+
+### 10.3 Quatre défauts que seul l'œil a trouvés
+
+Aucun n'aurait fait rougir une suite. Les quatre auraient tenu sur les
+vingt-deux sites.
+
+1. **La carte ne s'affichait pas du tout.** L'import dynamique de la feuille
+   Leaflet répondait 404 — `inlineStylesheets: 'always'` inline toutes les
+   feuilles, aucun fichier n'est écrit, le préchargement échoue, et
+   l'exception faisait échouer la promesse entière.
+2. **Le bandeau de démonstration était invisible en palette `nuit`.** Il posait
+   `color: #fff` sur `background: var(--encre)`, or l'encre de `nuit` est
+   presque blanche. Défaut de conformité (§11) et non de style : ce bandeau est
+   ce qui empêche la page de passer pour le vrai site de l'artisan.
+3. **Cinq étoiles pour un 4,6.** `Math.round(4.6)` vaut 5. On ne lit pas les
+   deux — on lit les étoiles.
+4. **Les images d'étapes étaient à contre-emploi** : des garages en désordre
+   sous un titre qui parle de sérieux. Les textes alternatifs de la banque se
+   sont révélés faux sur **trois des huit héros**. Les dix-sept images ont été
+   regardées une par une, et les `sujet` de `trades.ts` — qui partent dans le
+   prompt — décrivent ce qu'elles montrent réellement.
+
+### 10.4 Les seuils du §7, mesurés
+
+| Seuil | Valeur | |
+|---|---|---|
+| Lighthouse performance | **96** | ✅ |
+| Lighthouse accessibilité | **100** | ✅ |
+| Lighthouse bonnes pratiques | **100** | ✅ |
+| Poids du premier affichage | ~320 Ko mobile, ~470 Ko bureau | ✅ |
+| Page entière en ligne | 260 Ko mobile, 348 Ko bureau | ✅ |
+| Build | 9,5 s en local | ✅ |
+| `prefers-reduced-motion` | rien n'est instancié, sous test | ✅ |
+| Fiche dépouillée | page complète, vue à l'œil en `nuit` | ✅ |
+| `noindex, nofollow` | présent, sous test | ✅ |
+| Chaînes en dur dans les `.astro` | aucune, test étendu aux `<script>` | ✅ |
+| `pnpm -r test` / `typecheck` | **679 verts** (645 au départ) | ✅ |
+| Page en ligne vue à l'œil | oui, mobile et bureau, 0 erreur console | ✅ |
+
+Le score SEO est de **63**, et son unique échec est `is-crawlable` : c'est le
+`noindex` de D2. Il doit rester bas.
+
+### 10.5 Ce qui reste ouvert
+
+**Il n'existe aucun outil pour synchroniser `apps/site-template` vers le dépôt
+modèle GitHub.** Cela a été fait à la main au chantier n°4, et de nouveau ici
+par un script jetable. Tant que le gabarit ne bouge pas, la question ne se pose
+plus : les nouveaux dépôts sont copiés du modèle, désormais à jour. Elle se
+reposera à la première correction du gabarit, et il faudra alors la porter dans
+les dépôts déjà créés — `publish` n'écrit que `site.json`.
+
+**La diversité réelle des variantes n'est pas mesurée.** Le prompt demande au
+modèle de ne pas prendre systématiquement le premier de chaque liste, et le
+seul appel réel a produit `cuivre` + `humanist` + `plomberie-01`, ce qui n'est
+le premier d'aucune des trois. Un seul tirage ne prouve rien : à vérifier sur
+le lot des 21.
+
+**Le gabarit du serrurier n'existe toujours pas** (D9), et ses huit images non
+plus — seuls leurs identifiants sont déclarés dans `trades.ts`. Le jour où un
+serrurier entre en base, il faudra curer ses images avant de pouvoir publier.

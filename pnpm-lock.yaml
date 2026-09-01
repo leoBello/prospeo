@@ -97,9 +97,30 @@ importers:
 
   apps/site-template:
     dependencies:
+      '@fontsource-variable/archivo':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource-variable/newsreader':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource-variable/outfit':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource-variable/source-sans-3':
+        specifier: ^5.3.0
+        version: 5.3.0
       astro:
         specifier: ^7.2.9
         version: 7.2.9(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.4.0)(tsx@4.23.13)(yaml@2.9.0)
+      gsap:
+        specifier: ^3.15.0
+        version: 3.15.0
+      leaflet:
+        specifier: ^1.9.4
+        version: 1.9.4
+      sharp:
+        specifier: ^0.35.4
+        version: 0.35.4(@types/node@26.4.0)
       zod:
         specifier: ^3.23.8
         version: 3.25.76
@@ -107,6 +128,9 @@ importers:
       '@astrojs/check':
         specifier: ^0.9.10
         version: 0.9.10(prettier@3.9.6)(typescript@5.9.3)
+      '@types/leaflet':
+        specifier: ^1.9.22
+        version: 1.9.22
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
@@ -748,6 +772,18 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@fontsource-variable/archivo@5.3.0':
+    resolution: {integrity: sha512-HogK8FJelrD1o7TlZlkIVtHgc20bO5PZRWE7mUeUTdMN055alznQV6/00J00IBeu8FQAH4s3zW9UJNvKExXf+g==}
+
+  '@fontsource-variable/newsreader@5.3.0':
+    resolution: {integrity: sha512-rrzYi43qMpbzwuFtf9OkWH8sxAPVPcQQQEwXpPtwaKYeJ8yVg5aLs5kawmo1f2Q1t1M38TLmEKCkGVDsYwgdFw==}
+
+  '@fontsource-variable/outfit@5.3.0':
+    resolution: {integrity: sha512-fPb5XnYK0k7SbR++HEmm4+ZqDszmLKQ+sPRUr8oQ/KNC0vy6r6hazJFe8iYozv4cqlHbvJ/JECkJWrfDodUMVQ==}
+
+  '@fontsource-variable/source-sans-3@5.3.0':
+    resolution: {integrity: sha512-dpi0GZk7EQe2tYpg6Q0Fx0OmUgnuGu+0rHPgtXqtKhglYmJuP7jZ12Mu1uN+NfRaJRY1Emn8AQJEWzmoZ4wa9g==}
+
   '@img/colour@1.1.0':
     resolution: {integrity: sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==}
     engines: {node: '>=18'}
@@ -1366,8 +1402,14 @@ packages:
   '@types/estree@1.0.9':
     resolution: {integrity: sha512-GhdPgy1el4/ImP05X05Uw4cw2/M93BCUmnEvWZNStlCzEKME4Fkk+YpoA5OiHNQmoS7Cafb8Xa3Pya8m1Qrzeg==}
 
+  '@types/geojson@7946.0.16':
+    resolution: {integrity: sha512-6C8nqWur3j98U6+lXDfTUWIfgvZU+EumvpHKcYjujKH7woYyLj2sUmff0tRhrqM7BohUw7Pz3ZB1jj2gW9Fvmg==}
+
   '@types/hast@3.0.5':
     resolution: {integrity: sha512-rp/ezSWaD1m44dPKICGhiskI13nVr7qTloFwDa/IYkhhf5nzwP+zIQcIJh3WIFSBOy/H1PzB40jPjMDksN4F+g==}
+
+  '@types/leaflet@1.9.22':
+    resolution: {integrity: sha512-h3lhECYEKDasG7LFHu+GiHqAvsgLuQvlJvVZzJDGONo3sEL+wUOqSFLnwkZlK0qVxnxbuGFW8iBlJNYs5wgndA==}
 
   '@types/mdast@4.0.4':
     resolution: {integrity: sha512-kGaNbPh1k7AFzgpud/gMdvIm5xuECykRR+JnWKQno9TAXVa6WIVCGTPvYGekIDL4uwCZQSYbUxNBSb1aUo79oA==}
@@ -1929,6 +1971,9 @@ packages:
     resolution: {integrity: sha512-ZUKRh6/kUFoAiTAtTYPZJ3hw9wNxx+BIBOijnlG9PnrJsCcSjs1wyyD6vJpaYtgnzDrKYRSqf3OO6Rfa93xsRg==}
     engines: {node: '>= 0.4'}
 
+  gsap@3.15.0:
+    resolution: {integrity: sha512-dMW4CWBTUK1AEEDeZc1g4xpPGIrSf9fJF960qbTZmN/QwZIWY5wgliS6JWl9/25fpTGJrMRtSjGtOmPnfjZB+A==}
+
   h3@1.15.11:
     resolution: {integrity: sha512-L3THSe2MPeBwgIZVSH5zLdBBU90TOxarvhK9d04IDY2AmVS8j2Jz2LIWtwsGOU3lu2I5jCN7FNvVfY2+XyF+mg==}
 
@@ -2039,6 +2084,9 @@ packages:
   kleur@4.1.5:
     resolution: {integrity: sha512-o+NO+8WrRiQEE4/7nwRJhN1HWpVmJm511pBHUxPLtp0BUISzlBplORYSmTclCnJvQq2tKu/sgl3xVpkc7ZWuQQ==}
     engines: {node: '>=6'}
+
+  leaflet@1.9.4:
+    resolution: {integrity: sha512-nxS1ynzJOmOlHp+iL3FyWqK89GtNL8U8rvlMOsQdTTssxZwCXh8N2NB3GDQOL+YR3XnWyZAxwQixURb+FA74PA==}
 
   lightningcss-android-arm64@1.33.0:
     resolution: {integrity: sha512-gEpRTalKdosp4Bb8qWtc2iOgE5SeIHlpS1up9bFq2wAyYhl1UdTObYiHe98zEM9SQvSoqQZ1IQD0JNpg3Ml5pg==}
@@ -3552,8 +3600,15 @@ snapshots:
   '@esbuild/win32-x64@0.28.2':
     optional: true
 
-  '@img/colour@1.1.0':
-    optional: true
+  '@fontsource-variable/archivo@5.3.0': {}
+
+  '@fontsource-variable/newsreader@5.3.0': {}
+
+  '@fontsource-variable/outfit@5.3.0': {}
+
+  '@fontsource-variable/source-sans-3@5.3.0': {}
+
+  '@img/colour@1.1.0': {}
 
   '@img/sharp-darwin-arm64@0.35.4':
     optionalDependencies:
@@ -3997,9 +4052,15 @@ snapshots:
 
   '@types/estree@1.0.9': {}
 
+  '@types/geojson@7946.0.16': {}
+
   '@types/hast@3.0.5':
     dependencies:
       '@types/unist': 3.0.3
+
+  '@types/leaflet@1.9.22':
+    dependencies:
+      '@types/geojson': 7946.0.16
 
   '@types/mdast@4.0.4':
     dependencies:
@@ -4671,6 +4732,8 @@ snapshots:
 
   gopd@1.2.0: {}
 
+  gsap@3.15.0: {}
+
   h3@1.15.11:
     dependencies:
       cookie-es: 1.2.3
@@ -4801,6 +4864,8 @@ snapshots:
   jsonc-parser@3.3.1: {}
 
   kleur@4.1.5: {}
+
+  leaflet@1.9.4: {}
 
   lightningcss-android-arm64@1.33.0:
     optional: true
@@ -5197,7 +5262,6 @@ snapshots:
       '@img/sharp-win32-ia32': 0.35.4
       '@img/sharp-win32-x64': 0.35.4
       '@types/node': 26.4.0
-    optional: true
 
   shiki@4.4.3:
     dependencies:

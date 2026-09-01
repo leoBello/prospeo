@@ -54,6 +54,21 @@ export interface SiteFacts {
    */
   noteGoogle: number | null;
   lienMaps: string | null;
+  /**
+   * Le point sur la carte, ou rien.
+   *
+   * Les deux valeurs vont ensemble et ne se séparent jamais : une latitude
+   * sans longitude ne situe rien, et poser 0 à la place placerait le marqueur
+   * dans le golfe de Guinée sur la vitrine d'un plombier nantais — un défaut
+   * qu'aucun build ne signale et que personne ne regarde avant l'artisan.
+   *
+   * Le seul fait dont la couverture soit TOTALE : 139 lignes sur 139 au
+   * 2 septembre 2026, les 37 éligibles comprises. La section « zone
+   * d'intervention » est donc la seule qui ne disparaisse jamais en pratique
+   * — mais elle sait disparaître, parce qu'une ville future pourrait entrer
+   * en base sans géocodage.
+   */
+  coordonnees: { lat: number; lon: number } | null;
   /** Dénomination Sirene brute, réservée aux mentions légales. */
   raisonSociale: string;
   siret: string;
@@ -75,6 +90,7 @@ export const SITE_FACT_KEYS = [
   'anneeCreation',
   'noteGoogle',
   'lienMaps',
+  'coordonnees',
   'raisonSociale',
   'siret',
 ] as const;
@@ -90,6 +106,8 @@ export interface SiteFactsInput {
   city: string;
   /** Date ISO `YYYY-MM-DD`. */
   dateCreation: string | null;
+  latitude: number | null;
+  longitude: number | null;
   enrichment: {
     status: 'ok' | 'not_found' | 'ambiguous' | 'blocked';
     matchedName: string | null;
@@ -231,6 +249,22 @@ function noteAffichable(rating: number | null): number | null {
   return rating >= NOTE_MINIMALE_AFFICHABLE ? rating : null;
 }
 
+/**
+ * Le point, ou `null` — jamais un point à moitié vrai.
+ *
+ * Les bornes ne sont pas décoratives : la colonne est alimentée par du
+ * scraping, et une longitude de 191 est une erreur de collecte, pas un lieu.
+ * Leaflet l'accepterait sans broncher et rendrait une carte vide, ce qui est
+ * exactement la classe de panne silencieuse que ce projet refuse.
+ */
+function coordonnees(input: SiteFactsInput): SiteFacts['coordonnees'] {
+  const { latitude: lat, longitude: lon } = input;
+  if (lat === null || lon === null) return null;
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+  return { lat, lon };
+}
+
 export function assembleFacts(input: SiteFactsInput): SiteFacts | null {
   const trade = getTrade(input.tradeSlug);
   if (trade === undefined) return null;
@@ -253,6 +287,7 @@ export function assembleFacts(input: SiteFactsInput): SiteFacts | null {
     anneeCreation: anneeCreation !== null && Number.isFinite(anneeCreation) ? anneeCreation : null,
     noteGoogle: noteAffichable(input.enrichment?.rating ?? null),
     lienMaps: input.enrichment?.mapsUrl ?? null,
+    coordonnees: coordonnees(input),
     raisonSociale: input.denomination,
     siret: input.siret,
   };
