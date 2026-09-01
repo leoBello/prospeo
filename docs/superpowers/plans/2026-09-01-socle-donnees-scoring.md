@@ -2121,12 +2121,27 @@ et le corps du `switch` :
         process.stderr.write(`Métier inconnu : ${slug}\n`);
         return 1;
       }
-      const limitRaw = flag(argv, 'limit');
+      // `--limit` est valide explicitement : `Number.parseInt('abc')` rend NaN,
+      // et `seen >= NaN` est toujours faux — la garde ne se declencherait jamais
+      // et la collecte partirait sans limite sur l'API publique.
+      let limit: number | undefined;
+      if (argv.includes('--limit')) {
+        const limitRaw = flag(argv, 'limit');
+        const parsed = limitRaw === undefined ? Number.NaN : Number(limitRaw);
+        if (!Number.isInteger(parsed) || parsed <= 0) {
+          process.stderr.write(
+            `--limit attend un entier positif, recu : ${limitRaw ?? '(rien)'}\n`,
+          );
+          return 1;
+        }
+        limit = parsed;
+      }
+
       const client = createClient(config);
       const report = await runDiscover({
         trade,
         postalCode,
-        limit: limitRaw === undefined ? undefined : Number.parseInt(limitRaw, 10),
+        limit,
         upsertProspect: makeUpsertProspect(client),
       });
       process.stdout.write(
@@ -2259,22 +2274,37 @@ Expected: FAIL — `Failed to resolve import "./probe.js"`
 
 `apps/collector/src/stages/probe.ts` :
 ```ts
-import { request } from 'undici';
 import { normalizeCompanyName, type ProbeResult } from '@prospeo/core';
 
 const PARKED_MARKERS = [
-  'domaine est à vendre', 'domain is for sale', 'this domain',
-  'en construction', 'under construction', 'coming soon',
-  'parked domain', 'site en cours de création',
+  'ce domaine est à vendre',
+  'domaine à vendre',
+  'this domain is for sale',
+  'domain for sale',
+  'parked domain',
+  'site en construction',
+  'page en construction',
+  'site en cours de construction',
+  'site en cours de création',
+  'under construction',
+  'coming soon',
 ];
 
 export function hasViewport(html: string): boolean {
   return /<meta[^>]+name\s*=\s*["']?viewport["']?/i.test(html);
 }
 
+/**
+ * Une page parquée l'annonce dans son titre ou tout en haut du document.
+ * On ne cherche donc pas dans la page entière : « nous intervenons sur les
+ * chantiers en construction » est une phrase banale chez un plombier, et la
+ * chercher partout classerait une entreprise bien vivante comme site mort.
+ */
 export function detectParked(html: string): boolean {
-  const text = html.toLowerCase();
-  return PARKED_MARKERS.some((marker) => text.includes(marker));
+  const lower = html.toLowerCase();
+  const title = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(lower)?.[1] ?? '';
+  const haystack = `${title} ${lower.slice(0, 3000)}`;
+  return PARKED_MARKERS.some((marker) => haystack.includes(marker));
 }
 
 export interface FetchedPage {
@@ -2284,15 +2314,26 @@ export interface FetchedPage {
 }
 
 async function defaultFetch(url: string): Promise<FetchedPage> {
-  const response = await request(url, {
-    method: 'GET',
-    maxRedirections: 5,
-    headersTimeout: 10_000,
-    bodyTimeout: 10_000,
-    headers: { 'user-agent': 'Mozilla/5.0 (compatible; ProspeoBot/1.0)' },
-  });
-  const body = await response.body.text();
-  return { status: response.statusCode, finalUrl: url, body: body.slice(0, 200_000) };
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10_000);
+  try {
+    const response = await fetch(url, {
+      redirect: 'follow',
+      signal: controller.signal,
+      headers: { 'user-agent': 'Mozilla/5.0 (compatible; ProspeoBot/1.0)' },
+    });
+    const body = await response.text();
+    // `response.url` porte la destination réelle APRÈS redirections, ce que
+    // l'URL demandée ne dit pas. Un site qui redirige http vers https est sain ;
+    // renvoyer l'URL demandée le ferait passer pour un site sans HTTPS.
+    return {
+      status: response.status,
+      finalUrl: response.url === '' ? url : response.url,
+      body: body.slice(0, 200_000),
+    };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** Ne lève jamais : une URL injoignable est un résultat, pas une erreur. */
@@ -2352,25 +2393,30 @@ Ajouter au `switch` de `apps/collector/src/cli.ts` :
 
       let done = 0;
       for (const row of data ?? []) {
-        const result = await probeUrl(row.declared_url as string);
-        const { error: writeError } = await client.from('web_presence').upsert(
-          {
-            prospect_id: row.prospect_id,
-            probed_url: result.url,
-            http_status: result.httpStatus,
-            is_https: result.isHttps,
-            final_url: result.finalUrl,
-            is_parked: result.isParked,
-            has_viewport_meta: result.hasViewportMeta,
-            probed_at: new Date().toISOString(),
-          },
-          { onConflict: 'prospect_id' },
-        );
-        if (writeError) {
-          process.stderr.write(`probe: échec sur ${row.prospect_id} — ${writeError.message}\n`);
-          continue;
+        // Un echec isole ne doit pas avorter le run : meme discipline que
+        // `discover`, l'ecriture est unitaire et l'erreur est journalisee.
+        try {
+          const result = await probeUrl(row.declared_url as string);
+          const { error: writeError } = await client.from('web_presence').upsert(
+            {
+              prospect_id: row.prospect_id,
+              probed_url: result.url,
+              http_status: result.httpStatus,
+              is_https: result.isHttps,
+              final_url: result.finalUrl,
+              is_parked: result.isParked,
+              has_viewport_meta: result.hasViewportMeta,
+              probed_at: new Date().toISOString(),
+            },
+            { onConflict: 'prospect_id' },
+          );
+          if (writeError) throw new Error(writeError.message);
+          done += 1;
+        } catch (error) {
+          process.stderr.write(
+            `probe: échec sur ${row.prospect_id} — ${error instanceof Error ? error.message : String(error)}\n`,
+          );
         }
-        done += 1;
       }
       process.stdout.write(`probe : ${done} URL sondées\n`);
       return 0;
