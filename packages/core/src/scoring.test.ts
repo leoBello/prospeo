@@ -18,8 +18,8 @@ const base: ScoreInput = {
 
 describe('computeScore', () => {
   it('expose la version du bareme', () => {
-    expect(SCORING_RULESET.version).toBe('v1');
-    expect(computeScore(base, NOW).rulesetVersion).toBe('v1');
+    expect(SCORING_RULESET.version).toBe('v2');
+    expect(computeScore(base, NOW).rulesetVersion).toBe('v2');
   });
 
   it('attribue les points de presence web', () => {
@@ -63,8 +63,22 @@ describe('computeScore', () => {
     expect(r.breakdown.find((l) => l.code === 'reviews_volume')?.points).toBe(10);
   });
 
-  it('ignore une bonne note avec trop peu d avis', () => {
-    const r = computeScore({ ...base, rating: 4.9, reviewCount: 3 }, NOW);
+  it('recompense une bonne note sans exiger de nombre d avis', () => {
+    // Google ne publie plus le nombre d avis : l exiger rendait la regle
+    // inatteignable, et la note — extraite a grand peine par le scraper puis
+    // preservee a travers la revue manuelle — ne rapportait jamais un point.
+    const r = computeScore({ ...base, rating: 4.9, reviewCount: null }, NOW);
+    expect(r.breakdown.find((l) => l.code === 'reputation')?.points).toBe(25);
+    expect(r.breakdown.find((l) => l.code === 'reputation')?.label).toBe('4.9 ★');
+  });
+
+  it('mentionne le nombre d avis au libelle quand il existe', () => {
+    const r = computeScore({ ...base, rating: 4.9, reviewCount: 128 }, NOW);
+    expect(r.breakdown.find((l) => l.code === 'reputation')?.label).toBe('4.9 ★ sur 128 avis');
+  });
+
+  it('ignore une note insuffisante', () => {
+    const r = computeScore({ ...base, rating: 3.2, reviewCount: null }, NOW);
     expect(r.breakdown.find((l) => l.code === 'reputation')).toBeUndefined();
   });
 

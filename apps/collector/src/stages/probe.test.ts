@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectParked, domainCandidates, hasViewport, probeUrl } from './probe.js';
+import { detectParked, hasViewport, probeUrl, shouldProbe } from './probe.js';
 
 describe('hasViewport', () => {
   it('detecte la balise viewport', () => {
@@ -81,20 +81,30 @@ describe('probeUrl', () => {
   });
 });
 
-describe('domainCandidates', () => {
-  it('propose des variantes en .fr a partir de la raison sociale', () => {
-    expect(domainCandidates('SARL PLOMBERIE MARTIN')).toEqual([
-      'plomberie-martin.fr',
-      'plomberiemartin.fr',
-      'martin-plomberie.fr',
-    ]);
+describe('shouldProbe', () => {
+  const now = new Date('2026-09-01T12:00:00Z');
+
+  it('sonde une URL jamais sondée', () => {
+    expect(shouldProbe(null, now, false)).toBe(true);
   });
 
-  it('renvoie une liste vide pour un nom d un seul mot', () => {
-    expect(domainCandidates('MARTIN')).toEqual(['martin.fr']);
+  it('ne resonde pas dans la fenêtre de fraîcheur', () => {
+    expect(shouldProbe('2026-08-28T12:00:00Z', now, false)).toBe(false);
   });
 
-  it('tolere un nom vide', () => {
-    expect(domainCandidates('SARL')).toEqual([]);
+  it('resonde au-delà de la fenêtre', () => {
+    expect(shouldProbe('2026-08-20T12:00:00Z', now, false)).toBe(true);
+  });
+
+  it('resonde toujours sous --force', () => {
+    expect(shouldProbe('2026-08-31T12:00:00Z', now, true)).toBe(true);
+  });
+
+  it('sonde quand l horodatage est illisible plutôt que de le supposer frais', () => {
+    expect(shouldProbe('pas une date', now, false)).toBe(true);
+  });
+
+  it('sonde quand l horodatage est dans le futur plutôt que de le croire frais', () => {
+    expect(shouldProbe('2026-09-15T12:00:00Z', now, false)).toBe(true);
   });
 });

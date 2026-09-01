@@ -1,0 +1,47 @@
+<!--
+  Panneau d'une fiche Google Maps, réduit à ce que le code lit réellement.
+
+  Trois traits vérifiés le 1er septembre 2026, tous coûteux s'ils changent :
+
+  - la note vit dans `.F7nice` ici, et dans `.MW4etd` sur une carte de
+    résultat. Le sélecteur des cartes n'existe pas sur cet écran.
+  - le nombre d'avis N'EST PLUS AFFICHÉ. `.F7nice` ne contient que la note et
+    l'image des étoiles. Aucun sélecteur ne peut le fournir.
+  - l'adresse et le téléphone se lisent dans l'`aria-label`, préfixé d'un
+    libellé — « Adresse: … », « Numéro de téléphone: … » — qui doit être
+    retiré sans quoi il part tel quel dans le message envoyé à l'artisan.
+
+  L'adresse porte volontairement un deux-points en son sein (« ZA de la
+  Distribution : Lot 12 »). Un préfixe générique coupé au premier deux-points
+  la tronquerait ; l'ancrage sur les libellés réels ne la touche pas.
+-->
+<div role="main" aria-label="Plomberie Allard">
+  <h1 class="DUwDvf lfPIob">Plomberie Allard</h1>
+  <div class="F7nice">
+    <span aria-hidden="true">4,8</span>
+    <span role="img" aria-label="4,8 étoiles"></span>
+  </div>
+  <button class="DkEaL" jsaction="pane.rating.category">Plombier</button>
+  <button
+    class="CsEnBe"
+    data-item-id="address"
+    aria-label="Adresse: ZA de la Distribution : Lot 12, 44200 Nantes, France"
+  >
+    <div class="Io6YTe">ZA de la Distribution : Lot 12, 44200 Nantes, France</div>
+  </button>
+  <a
+    class="CsEnBe"
+    data-item-id="authority"
+    href="https://plomberie-allard.fr/"
+    aria-label="Site Web: plomberie-allard.fr"
+  >
+    <div class="Io6YTe">plomberie-allard.fr</div>
+  </a>
+  <button
+    class="CsEnBe"
+    data-item-id="phone:tel:+33285522600"
+    aria-label="Numéro de téléphone: +33 2 85 52 26 00"
+  >
+    <div class="Io6YTe">02 85 52 26 00</div>
+  </button>
+</div>

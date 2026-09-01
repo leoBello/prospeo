@@ -1,4 +1,4 @@
-import { normalizeCompanyName, type ProbeResult } from '@prospeo/core';
+import type { ProbeResult } from '@prospeo/core';
 
 const PARKED_MARKERS = [
   'ce domaine est à vendre',
@@ -89,15 +89,28 @@ export async function probeUrl(
   }
 }
 
-/**
- * Variantes de nom de domaine à tester. Heuristique assumée : l'absence
- * d'enregistrement DNS suggère fortement la disponibilité sans la garantir.
- */
-export function domainCandidates(denomination: string): string[] {
-  const words = normalizeCompanyName(denomination).split(' ').filter((w) => w.length > 1);
-  if (words.length === 0) return [];
-  if (words.length === 1) return [`${words[0]}.fr`];
+/** Fenêtre au-delà de laquelle une sonde est considérée périmée. */
+export const PROBE_FRESHNESS_DAYS = 7;
 
-  const [first, second] = words as [string, string];
-  return [`${first}-${second}.fr`, `${first}${second}.fr`, `${second}-${first}.fr`];
+/**
+ * Resonder est voulu — un site meurt entre deux runs, c'est précisément ce
+ * qu'on cherche. Mais tout resonder à chaque passage retéléchargerait une
+ * centaine de sites pour reconstater l'évidence dès que `enrich` aura rempli
+ * `declared_url`.
+ *
+ * Un horodatage illisible fait sonder : supposer une sonde fraîche sur une
+ * donnée qu'on ne sait pas lire reviendrait à inventer une observation.
+ *
+ * Un horodatage dans le futur fait sonder pour la même raison : il donne un
+ * `ageDays` négatif, donc toujours sous la fenêtre de fraîcheur, ce qui
+ * figerait le prospect comme « fraîchement sondé » jusqu'à ce que l'horloge
+ * réelle rattrape cette date. Une date impossible ne vaut pas mieux qu'une
+ * date absente.
+ */
+export function shouldProbe(probedAt: string | null, now: Date, force: boolean): boolean {
+  if (force || probedAt === null) return true;
+  const previous = new Date(probedAt).getTime();
+  if (Number.isNaN(previous)) return true;
+  const ageDays = (now.getTime() - previous) / 86_400_000;
+  return ageDays < 0 || ageDays >= PROBE_FRESHNESS_DAYS;
 }

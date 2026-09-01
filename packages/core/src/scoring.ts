@@ -14,10 +14,33 @@ const PRESENCE_POINTS: Record<WebPresenceCategory, number> = {
 };
 
 export const SCORING_RULESET = {
-  version: 'v1',
+  version: 'v2',
   presence: PRESENCE_POINTS,
-  reputation: { minRating: 4, minReviews: 10, points: 25 },
+  /**
+   * La note seule, sans condition sur le nombre d'avis.
+   *
+   * En v1 cette règle exigeait les deux, ce qui la rendait inatteignable :
+   * Google ne publie plus le nombre d'avis (§4.5 du spec), le scraper écrit
+   * donc `null` en dur, et la note — que ce chantier a spécifiquement
+   * bataillé pour extraire, puis pour préserver à travers la revue manuelle —
+   * ne rapportait structurellement jamais un point.
+   */
+  reputation: { minRating: 4, points: 25 },
+  /**
+   * INERTE tant que Google ne republie pas le nombre d'avis.
+   *
+   * Conservée plutôt que supprimée : le barème est versionné, la donnée peut
+   * revenir, et une règle inerte qui dit pourquoi vaut mieux qu'une règle
+   * disparue dont personne ne saura qu'elle a existé.
+   */
   reviewsVolume: { minReviews: 30, points: 10 },
+  /**
+   * INERTE faute d'écrivain : aucun étage ne renseigne
+   * `web_presence.last_social_post_at`. Le §5.2 du socle la prévoyait à la
+   * charge de `probe`, qui devait lire la date du dernier contenu public
+   * d'une page Facebook ; cette source n'a pas été construite. Conservée pour
+   * la même raison que ci-dessus.
+   */
   socialFresh: { maxAgeDays: 90, points: 15 },
   staff: { minHeadcount: 3, points: 10 },
   age: { minYears: 3, maxYears: 20, points: 10 },
@@ -69,15 +92,14 @@ export function computeScore(input: ScoreInput, now: Date = new Date()): ScoreRe
     },
   ];
 
-  if (
-    input.rating !== null &&
-    input.reviewCount !== null &&
-    input.rating >= R.reputation.minRating &&
-    input.reviewCount >= R.reputation.minReviews
-  ) {
+  if (input.rating !== null && input.rating >= R.reputation.minRating) {
+    // Le libellé mentionne le nombre d'avis quand il existe, sans en dépendre :
+    // il n'est plus publié par Google, mais le barème est versionné et la
+    // donnée peut revenir.
+    const suffixe = input.reviewCount === null ? '' : ` sur ${input.reviewCount} avis`;
     lines.push({
       code: 'reputation',
-      label: `${input.rating.toFixed(1)} ★ sur ${input.reviewCount} avis`,
+      label: `${input.rating.toFixed(1)} ★${suffixe}`,
       points: R.reputation.points,
       group: 'vitalite',
     });

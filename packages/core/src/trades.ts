@@ -14,6 +14,7 @@ export const TRADES: readonly Trade[] = [
     nafCodes: ['43.22A'],
     mapsQueries: ['plombier', 'plomberie'],
     keywords: ['plomberie', 'plombier', 'chauffagiste', 'sanitaire', 'chauffage'],
+    categoryLabels: ['plombier', 'plomberie', 'chauffagiste'],
   },
   {
     slug: 'serrurier',
@@ -21,6 +22,7 @@ export const TRADES: readonly Trade[] = [
     nafCodes: ['43.32B'],
     mapsQueries: ['serrurier', 'serrurerie'],
     keywords: ['serrurerie', 'serrurier', 'blindage', 'metallerie', 'depannage'],
+    categoryLabels: ['serrurier', 'serrurerie', 'metallerie'],
   },
 ];
 

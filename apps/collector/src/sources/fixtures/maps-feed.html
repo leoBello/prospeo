@@ -1,0 +1,104 @@
+<!--
+  Liste de résultats Google Maps, réduite à ce que le code lit réellement.
+
+  Structure calquée sur la recherche vérifiée le 1er septembre 2026. Deux
+  traits sont reproduits à dessein parce que ce sont eux qui ont cassé :
+
+  - le flux contient NEUF enfants pour HUIT fiches. Le neuvième est un
+    élément de mise en page sans lien ; partir des conteneurs plutôt que des
+    liens lui faisait consommer une place du quota de candidats.
+  - le nom et la note sont DANS le lien, pas à côté : `readCards` les cherche
+    avec le lien pour racine.
+
+  La sixième carte a un nom vide, comme un élément attaché au DOM mais pas
+  encore peuplé. Elle vérifie que le vide devient `null` et non chaîne vide.
+-->
+<div role="feed" aria-label="Résultats pour plombier Nantes">
+  <div class="Nv2PK">
+    <a
+      class="hfpxzc"
+      href="https://www.google.com/maps/place/Plomberie+Allard/@47.2118,-1.5534,17z/data=!3m1!4b1!4m6!3m5!1s0x1234:0xabcd!8m2!3d47.2118!4d-1.5534!19sChIJAllard"
+      aria-label="Plomberie Allard"
+    >
+      <div class="qBF1Pd fontHeadlineSmall">Plomberie Allard</div>
+      <span class="MW4etd">4,8</span>
+    </a>
+  </div>
+  <div class="Nv2PK">
+    <a
+      class="hfpxzc"
+      href="https://www.google.com/maps/place/RG+Services/@47.2200,-1.5600,17z/data=!4m6!3m5!8m2!3d47.2200!4d-1.5600!19sChIJRGServices"
+      aria-label="RG Services"
+    >
+      <div class="qBF1Pd fontHeadlineSmall">RG Services</div>
+      <span class="MW4etd">4,2</span>
+    </a>
+  </div>
+  <div class="Nv2PK">
+    <a
+      class="hfpxzc"
+      href="https://www.google.com/maps/place/Ouest+D%C3%A9pannage+Plomberie/@47.2050,-1.5700,17z/data=!4m6!3m5!8m2!3d47.2050!4d-1.5700!19sChIJOuest"
+      aria-label="Ouest Dépannage Plomberie"
+    >
+      <div class="qBF1Pd fontHeadlineSmall">Ouest Dépannage Plomberie</div>
+      <span class="MW4etd">5,0</span>
+    </a>
+  </div>
+  <div class="Nv2PK">
+    <a
+      class="hfpxzc"
+      href="https://www.google.com/maps/place/H20+Plomberie/@47.2000,-1.5500,17z/data=!4m6!3m5!8m2!3d47.2000!4d-1.5500!19sChIJH20"
+      aria-label="H20 Plomberie"
+    >
+      <div class="qBF1Pd fontHeadlineSmall">H20 Plomberie</div>
+      <span class="MW4etd">3,9</span>
+    </a>
+  </div>
+  <div class="Nv2PK">
+    <a
+      class="hfpxzc"
+      href="https://www.google.com/maps/place/AE+Habitat/@47.1900,-1.5400,17z/data=!4m6!3m5!8m2!3d47.1900!4d-1.5400!19sChIJAEHabitat"
+      aria-label="AE Habitat"
+    >
+      <div class="qBF1Pd fontHeadlineSmall">AE Habitat</div>
+      <!-- Pas de note : une fiche récente peut n'en avoir aucune. -->
+    </a>
+  </div>
+  <div class="Nv2PK">
+    <a
+      class="hfpxzc"
+      href="https://www.google.com/maps/place/Fiche+Non+Peupl%C3%A9e/@47.1800,-1.5300,17z/data=!4m6!3m5!8m2!3d47.1800!4d-1.5300!19sChIJVide"
+      aria-label="Fiche non peuplée"
+    >
+      <div class="qBF1Pd fontHeadlineSmall">   </div>
+      <span class="MW4etd">4,1</span>
+    </a>
+  </div>
+  <div class="Nv2PK">
+    <a
+      class="hfpxzc"
+      href="https://www.google.com/maps/place/Martin+D%C3%A9pannage/@47.1700,-1.5200,17z/data=!4m6!3m5!8m2!3d47.1700!4d-1.5200!19sChIJMartin"
+      aria-label="Martin Dépannage"
+    >
+      <div class="qBF1Pd fontHeadlineSmall">Martin Dépannage</div>
+      <span class="MW4etd">4,5</span>
+    </a>
+  </div>
+  <div class="Nv2PK">
+    <a
+      class="hfpxzc"
+      href="https://www.google.com/maps/place/SOS+Plombier+44/@47.1600,-1.5100,17z/data=!4m6!3m5!8m2!3d47.1600!4d-1.5100!19sChIJSOS"
+      aria-label="SOS Plombier 44"
+    >
+      <div class="qBF1Pd fontHeadlineSmall">SOS Plombier 44</div>
+      <span class="MW4etd">4,0</span>
+    </a>
+  </div>
+  <!--
+    Neuvième enfant, sans lien : bandeau publicitaire ou séparateur de
+    section. C'est lui qui distingue « huit fiches » de « neuf conteneurs ».
+  -->
+  <div class="TFQHme">
+    <div class="qBF1Pd fontHeadlineSmall">Annonces liées à votre recherche</div>
+  </div>
+</div>

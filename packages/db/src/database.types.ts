@@ -94,12 +94,14 @@ export type Database = {
           discovered_at: string
           effectif_code: string | null
           id: string
+          is_closed: boolean
           is_entrepreneur_individuel: boolean
           is_head_office: boolean
           latitude: number | null
           longitude: number | null
           naf_code: string | null
           postal_code: string
+          reconciled_at: string | null
           siren: string
           siret: string
           trade_slug: string
@@ -114,12 +116,14 @@ export type Database = {
           discovered_at?: string
           effectif_code?: string | null
           id?: string
+          is_closed?: boolean
           is_entrepreneur_individuel?: boolean
           is_head_office?: boolean
           latitude?: number | null
           longitude?: number | null
           naf_code?: string | null
           postal_code: string
+          reconciled_at?: string | null
           siren: string
           siret: string
           trade_slug: string
@@ -134,12 +138,14 @@ export type Database = {
           discovered_at?: string
           effectif_code?: string | null
           id?: string
+          is_closed?: boolean
           is_entrepreneur_individuel?: boolean
           is_head_office?: boolean
           latitude?: number | null
           longitude?: number | null
           naf_code?: string | null
           postal_code?: string
+          reconciled_at?: string | null
           siren?: string
           siret?: string
           trade_slug?: string
@@ -149,6 +155,7 @@ export type Database = {
       }
       prospect_enrichment: {
         Row: {
+          candidates: Json
           declared_url: string | null
           enriched_at: string
           maps_url: string | null
@@ -166,6 +173,7 @@ export type Database = {
           status: Database["public"]["Enums"]["enrichment_status"]
         }
         Insert: {
+          candidates?: Json
           declared_url?: string | null
           enriched_at?: string
           maps_url?: string | null
@@ -183,6 +191,7 @@ export type Database = {
           status: Database["public"]["Enums"]["enrichment_status"]
         }
         Update: {
+          candidates?: Json
           declared_url?: string | null
           enriched_at?: string
           maps_url?: string | null
@@ -275,6 +284,7 @@ export type Database = {
           category: Database["public"]["Enums"]["web_presence_category"] | null
           domain_available: boolean | null
           domain_candidates: Json
+          domain_checked_at: string | null
           final_url: string | null
           has_viewport_meta: boolean | null
           http_status: number | null
@@ -289,6 +299,7 @@ export type Database = {
           category?: Database["public"]["Enums"]["web_presence_category"] | null
           domain_available?: boolean | null
           domain_candidates?: Json
+          domain_checked_at?: string | null
           final_url?: string | null
           has_viewport_meta?: boolean | null
           http_status?: number | null
@@ -303,6 +314,7 @@ export type Database = {
           category?: Database["public"]["Enums"]["web_presence_category"] | null
           domain_available?: boolean | null
           domain_candidates?: Json
+          domain_checked_at?: string | null
           final_url?: string | null
           has_viewport_meta?: boolean | null
           http_status?: number | null
