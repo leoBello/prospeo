@@ -56,12 +56,12 @@ const { editeur, faits } = Astro.props.contenu;
 
 <style>
   .legales {
-    padding-block: 3rem;
-    /* Réserve la hauteur de la barre d'appel fixe, sans quoi elle recouvre
-       la fin de ce bloc — c'est-à-dire le passage qui déclare la
-       démonstration. Le média ci-dessous la reprend là où la barre
-       disparaît. */
-    padding-bottom: calc(3rem + var(--barre));
+    /* La réserve pour la barre d'appel fixe a disparu avec elle : l'appel est
+       désormais porté par l'en-tête collant, qui ne recouvre rien. Ce bloc
+       reprend donc le rythme commun des sections. */
+    padding-block: var(--pas) 3rem;
+    background: var(--surface);
+    border-top: 1px solid var(--trait);
     font-size: 0.9rem;
     color: var(--encre-douce);
   }
@@ -101,9 +101,6 @@ const { editeur, faits } = Astro.props.contenu;
   @media (min-width: 40rem) {
     dl {
       grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-    .legales {
-      padding-bottom: 3rem;
     }
   }
 </style>

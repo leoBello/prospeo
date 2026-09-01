@@ -106,16 +106,23 @@ const PRESTATIONS_SERRURIER: readonly Prestation[] = [
  * photographie sous le même bandeau cassent ce motif en une seconde. Croisées
  * aux cinq palettes et aux trois appariements de polices, elles donnent 120
  * variantes pour 37 prospects éligibles — mesuré en base le 2 septembre 2026.
+ *
+ * **Les `sujet` décrivent ce que l'image montre RÉELLEMENT.** Ils ont été
+ * écrits après avoir regardé les huit fichiers, et non d'après le texte
+ * alternatif de la banque d'images — lequel s'est révélé faux sur trois des
+ * huit (une « main en gros plan » qui est une conduite le long d'un mur). Un
+ * sujet inexact ferait choisir le modèle sur une description mensongère,
+ * c'est-à-dire au hasard, et D6 ne serait plus qu'un tirage déguisé.
  */
 const HEROS_PLOMBIER: readonly HeroImage[] = [
-  { code: 'plomberie-01', sujet: 'soudure au chalumeau sur un tube de cuivre, plan serré' },
-  { code: 'plomberie-02', sujet: 'salle d’eau en chantier, carrelage encore nu' },
-  { code: 'plomberie-03', sujet: 'outils de plomberie rangés sur un établi' },
-  { code: 'plomberie-04', sujet: 'mitigeur neuf posé sur un plan de vasque' },
-  { code: 'plomberie-05', sujet: 'chauffe-eau et ses raccords, en attente de mise en service' },
-  { code: 'plomberie-06', sujet: 'faisceau de canalisations en cuivre le long d’un mur' },
-  { code: 'plomberie-07', sujet: 'douche terminée, lumière rasante sur la robinetterie' },
-  { code: 'plomberie-08', sujet: 'mains gantées serrant un raccord, aucun visage' },
+  { code: 'plomberie-01', sujet: 'bec de cuivre courbé, une goutte au bord, fond ocre uni, très serré' },
+  { code: 'plomberie-02', sujet: 'salle d’eau terminée, carrelage pierre, miroir rond, meuble bois' },
+  { code: 'plomberie-03', sujet: 'outils, serre-joint et boulons sur un établi, en noir et blanc' },
+  { code: 'plomberie-04', sujet: 'mitigeur inox brossé sur une vasque blanche, fond très clair' },
+  { code: 'plomberie-05', sujet: 'faisceau dense de tubes de cuivre et de gaines sur une machine' },
+  { code: 'plomberie-06', sujet: 'deux tubes de cuivre neufs dans une cloison ouverte, bois apparent' },
+  { code: 'plomberie-07', sujet: 'salle de bain claire, baignoire îlot, lumière du matin en diagonale' },
+  { code: 'plomberie-08', sujet: 'conduite rouge le long d’un mur de béton brut, lumière rasante' },
 ] as const;
 
 /**

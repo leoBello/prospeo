@@ -1,49 +1,28 @@
+@import './palettes.css';
+@import './typos.css';
+
 /*
- * Le socle visuel du gabarit.
+ * Le socle visuel du gabarit — parti « Atelier ».
  *
  * Trois contraintes ont dicté ces valeurs, et aucune n'est esthétique :
  *
  * 1. **Mobile d'abord.** Les clients d'un plombier le cherchent sur un
- *    téléphone, souvent dans l'urgence. Tout est donc dimensionné pour un
- *    écran de 360 px, et l'appel est atteignable au pouce en permanence.
- * 2. **Aucune requête distante.** Ni police, ni icône, ni feuille externe.
- *    Avec `inlineStylesheets: 'always'`, la page entière tient dans une seule
- *    réponse HTTP : le premier rendu ne dépend d'aucun tiers.
+ *    téléphone, souvent dans l'urgence. Tout est dimensionné pour un écran de
+ *    360 px, et l'appel est atteignable au pouce en permanence — par
+ *    l'en-tête collant, qui ne quitte jamais l'écran.
+ * 2. **Aucune requête vers un tiers.** Ni police, ni icône, ni feuille
+ *    externe, ni script de CDN (D1, D5). Les seules requêtes sortantes de la
+ *    page sont les tuiles de la carte, et seulement si l'on descend jusqu'à
+ *    elle.
  * 3. **Neutre en métier (D1).** Rien ici ne parle de plomberie. Un serrurier
- *    tournera sur ces mêmes règles sans qu'une ligne change.
+ *    tourne sur ces mêmes règles sans qu'une ligne change.
  *
- * Thème clair uniquement, et c'est un choix assumé plutôt qu'un oubli : un
- * thème sombre doublerait la surface à vérifier à l'œil sur vingt-deux sites
- * qu'on ne relira pas un par un. `color-scheme: light` l'annonce au
- * navigateur, faute de quoi certains inversent les couleurs d'eux-mêmes et
- * défont le contraste calculé ci-dessous.
+ * **Les couleurs et les polices ne sont PAS ici.** Elles viennent de
+ * `palettes.css` et `typos.css`, sélectionnées par les attributs
+ * `data-palette` et `data-typo` posés sur `<html>` d'après le fichier de
+ * contenu. Ce fichier ne connaît que des variables : il doit rendre
+ * correctement les cinq palettes sans qu'aucune ne soit privilégiée.
  */
-
-:root {
-  color-scheme: light;
-
-  /* Encre profonde, légèrement bleutée : lisible, sobre, et pas le noir pur
-     qui fatigue sur écran clair. */
-  --encre: #12212e;
-  --encre-douce: #4a5c6a;
-  --fond: #ffffff;
-  --fond-doux: #f4f2ee;
-  --trait: #e0dcd4;
-
-  /* Un seul accent, chaud. Le bleu aurait rangé le site du côté des services
-     et des logiciels ; l'ocre évoque l'artisanat sans caricature. Contraste
-     mesuré sur blanc : 4,6:1, donc conforme AA pour le texte normal. */
-  --accent: #9a5b18;
-  --accent-fond: #fdf6ed;
-
-  --rayon: 10px;
-  --largeur: 62rem;
-
-  /* Pile système : rapide, familière, et rendue correctement partout. Une
-     police distante coûterait un aller-retour réseau sur le chemin critique. */
-  --police:
-    system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-}
 
 *,
 *::before,
@@ -53,24 +32,32 @@
 
 body {
   margin: 0;
-  font-family: var(--police);
+  font-family: var(--police-texte);
   /* 17px : un cran au-dessus du défaut. La cible n'a pas vingt ans. */
   font-size: 17px;
-  line-height: 1.6;
+  line-height: 1.62;
   color: var(--encre);
   background: var(--fond);
   -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
 }
 
 h1,
 h2,
 h3 {
-  line-height: 1.2;
-  letter-spacing: -0.015em;
+  font-family: var(--police-titre);
+  font-weight: 700;
+  line-height: 1.14;
+  letter-spacing: var(--serrage-titre);
+  text-wrap: balance;
   margin: 0;
 }
 
-p {
+p,
+ul,
+ol,
+dl,
+figure {
   margin: 0;
 }
 
@@ -78,53 +65,167 @@ a {
   color: inherit;
 }
 
-/* Conteneur commun. `min()` plutôt qu'une requête média : la marge de 20 px
-   tient sur un écran de 320 px comme sur un écran large. */
-.contenu {
-  width: min(var(--largeur), 100% - 2.5rem);
-  margin-inline: auto;
+img {
+  max-width: 100%;
+  display: block;
+}
+
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 /*
- * Réserve sous la page, de la hauteur de la barre d'appel fixe.
- *
- * Sans elle, la barre recouvre la fin des mentions légales — c'est-à-dire
- * exactement le bloc qui dit que le site est une démonstration. La variable
- * `--barre` est déclarée ici pour que les deux valeurs ne puissent pas
- * diverger.
+ * Conteneur commun. `min()` plutôt qu'une requête média : la marge tient sur
+ * un écran de 320 px comme sur un écran large.
  */
-:root {
-  --barre: 4.75rem;
+.contenu {
+  width: min(var(--largeur), 100% - 2.75rem);
+  margin-inline: auto;
 }
 
-/* Respect du réglage système : aucune animation n'est essentielle ici. */
+:root {
+  --largeur: 68rem;
+  /* Angles peu arrondis : le parti évoque le plan et l'outil, pas
+     l'application mobile. Un seul rayon, employé partout. */
+  --rayon: 4px;
+  --pas: clamp(3rem, 7vw, 5.5rem);
+}
+
+/* Rythme vertical unique. Les sections n'ont pas à le redéclarer, et ne
+   doivent pas : deux valeurs concurrentes produisent des blancs inégaux que
+   personne ne diagnostique. */
+.section {
+  padding-block: var(--pas);
+}
+
+.section--surface {
+  background: var(--surface);
+  border-block: 1px solid var(--trait);
+}
+
+.oeil {
+  font-family: var(--police-titre);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.titre-section {
+  font-size: clamp(1.7rem, 4vw, 2.4rem);
+  margin-top: 0.55rem;
+}
+
+.chapo-section {
+  margin-top: 0.7rem;
+  max-width: 46ch;
+  color: var(--encre-douce);
+  text-wrap: pretty;
+}
+
+/* Le corps d'une section, sous son titre. */
+.corps-section {
+  margin-top: 2.2rem;
+}
+
+/*
+ * Cible tactile minimale de 44 px — recommandation d'accessibilité, et bon
+ * sens sur un site dont l'action principale est un appel passé à une main.
+ */
+.bouton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  min-height: 44px;
+  padding: 0.8rem 1.4rem;
+  border-radius: var(--rayon);
+  background: var(--accent);
+  color: var(--sur-accent);
+  font-family: var(--police-titre);
+  font-weight: 600;
+  font-size: 1.02rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.bouton--fantome {
+  background: transparent;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+}
+
+.bouton .numero {
+  font-variant-numeric: tabular-nums;
+}
+
+.icone {
+  width: 1.05em;
+  height: 1.05em;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/*
+ * L'état de départ des apparitions.
+ *
+ * Il est posé PAR JAVASCRIPT et jamais par cette feuille, et c'est une
+ * décision de sûreté et non de style. Une règle CSS `opacity: 0` en attente
+ * d'un script laisserait une page BLANCHE si le script ne s'exécute jamais —
+ * paquet non chargé, erreur d'exécution, navigateur ancien. Sur le site d'une
+ * entreprise réelle dont l'URL vient de partir dans un email, c'est le pire
+ * mode de panne possible.
+ *
+ * La classe ci-dessous ne fait donc que DÉSIGNER les éléments à animer. Sans
+ * JavaScript, elle n'a aucun effet visuel, et la page se lit entièrement.
+ */
+.apparition,
+.apparition-hero {
+  /* `will-change` seulement pendant l'animation : le poser en permanence
+     force une couche de composition par carte, ce qui coûte plus qu'il ne
+     rapporte sur un téléphone d'entrée de gamme. */
+  will-change: auto;
+}
+
+/*
+ * Respect du réglage système, en défense de dernier rang.
+ *
+ * L'interrupteur réel est dans le script : sous `prefers-reduced-motion`,
+ * aucune animation n'est INSTANCIÉE. Cette règle-ci couvre ce que GSAP ne
+ * pilote pas — transitions de survol, défilement doux — et le cas où le
+ * réglage change après le chargement.
+ */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
-/* Cible tactile minimale de 44 px, recommandation d'accessibilité, et bon
-   sens sur un site dont l'action principale est un appel passé à une main. */
-.bouton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  min-height: 44px;
-  padding: 0.75rem 1.5rem;
-  border-radius: var(--rayon);
+/* Lien d'évitement : la première tabulation doit mener au contenu, pas aux
+   quatre ancres de l'en-tête. */
+.evitement {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
   background: var(--accent);
-  color: #fff;
-  font-weight: 600;
-  font-size: 1.05rem;
-  text-decoration: none;
+  color: var(--sur-accent);
+  padding: 0.75rem 1.25rem;
+  border-radius: 0 0 var(--rayon) 0;
 }
 
-.bouton:focus-visible {
-  outline: 3px solid var(--encre);
-  outline-offset: 2px;
+.evitement:focus {
+  left: 0;
 }

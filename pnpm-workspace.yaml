@@ -1,5 +1,18 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# pnpm bloque par defaut les scripts d'installation des dependances — une
+# protection contre un paquet malveillant qui s'executerait au `install`.
+#
+# `sharp` en a legitimement besoin : il resout et pose son binaire natif a
+# l'installation, et Astro refuse d'optimiser la moindre image sans lui. Sans
+# cette autorisation, `astro build` echoue sur « Could not find Sharp », et le
+# gabarit ne rend aucune de ses dix-sept images.
+#
+# Ce reglage ne vaut QUE pour ce monorepo. Les 22 depots generes s'installent
+# avec npm chez Vercel, qui n'a pas ce garde-fou : `sharp` s'y construit sans
+# que rien n'ait a etre declare.
 allowBuilds:
   esbuild: true
+  sharp: true

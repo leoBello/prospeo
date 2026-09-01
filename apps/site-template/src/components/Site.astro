@@ -1,11 +1,18 @@
 ---
 import type { ContenuPublie } from '../content/contrat';
+import { t } from '../content/ui';
+import Avis from './Avis.astro';
 import Bandeau from './Bandeau.astro';
-import BarreAppel from './BarreAppel.astro';
+import Confiance from './Confiance.astro';
 import Contact from './Contact.astro';
+import EnTete from './EnTete.astro';
+import Facon from './Facon.astro';
+import Faq from './Faq.astro';
+import Galerie from './Galerie.astro';
 import Hero from './Hero.astro';
 import MentionsLegales from './MentionsLegales.astro';
 import Prestations from './Prestations.astro';
+import Zone from './Zone.astro';
 
 interface Props {
   contenu: ContenuPublie;
@@ -15,20 +22,56 @@ const { contenu } = Astro.props;
 /*
  * Le corps du site, isolé de la page.
  *
- * `index.astro` ne fait que charger le fichier de contenu et l'envoyer ici.
- * La séparation existe pour que les tests puissent rendre le site entier avec
- * un contenu arbitraire — un contenu sans note Google, sans lien Maps, sans
- * année de création — et vérifier que les sections correspondantes
- * DISPARAISSENT au lieu d'afficher une phrase creuse. Ce comportement-là ne
- * se vérifie pas à la lecture du code ; il se mesure sur le HTML produit.
+ * `index.astro` ne fait que charger le fichier de contenu et l'envoyer ici. La
+ * séparation existe pour que les tests puissent rendre le site entier avec un
+ * contenu arbitraire — sans note Google, sans lien Maps, sans année, sans
+ * coordonnées — et vérifier que les sections correspondantes DISPARAISSENT au
+ * lieu d'afficher une phrase creuse ou un cadre vide. Ce comportement ne se
+ * vérifie pas à la lecture du code ; il se mesure sur le HTML produit.
+ *
+ * **L'ordre des onze sections est un argumentaire, pas un empilement.** On
+ * ouvre sur l'image et le nom, on donne aussitôt les trois faits vérifiés,
+ * puis ce que l'artisan fait, puis comment ça se passe, puis des images, puis
+ * la preuve extérieure — la note — puis où il est, puis les objections, puis
+ * comment l'appeler. Les mentions ferment, comme il se doit.
  */
 ---
 
+{/*
+  Le lien d'évitement, avant tout le reste.
+
+  L'en-tête porte quatre ancres : sans ce lien, la première tabulation d'un
+  visiteur au clavier les traverse toutes avant d'atteindre le contenu, sur
+  chacune des pages.
+*/}
+<a class="evitement" href="#contenu">{t('nav.skip')}</a>
+
 <Bandeau entreprise={contenu.faits.nomAffiche} />
-<Hero contenu={contenu} />
-<main>
+<EnTete contenu={contenu} />
+
+<main id="contenu">
+  <Hero contenu={contenu} />
+  <Confiance contenu={contenu} />
   <Prestations prestations={contenu.redaction.prestations} />
+  <Facon />
+  <Galerie />
+  <Avis contenu={contenu} />
+  <Zone contenu={contenu} />
+  <Faq />
   <Contact contenu={contenu} />
 </main>
+
 <MentionsLegales contenu={contenu} />
-<BarreAppel contenu={contenu} />
+
+<script>
+  /*
+   * L'initialisation des animations vit dans son propre module.
+   *
+   * Le laisser en ligne ici mêlerait cent lignes de logique d'animation au
+   * gabarit, et priverait `animation.ts` de la relecture qu'un fichier
+   * TypeScript reçoit — `astro check` ne type pas le corps des balises
+   * `<script>` avec la même rigueur.
+   */
+  import { initAnimations } from '../scripts/animation';
+  initAnimations();
+</script>

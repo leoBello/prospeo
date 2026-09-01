@@ -1,0 +1,146 @@
+---
+import type { ContenuPublie } from '../content/contrat';
+import { nombreFr, t } from '../content/ui';
+import Icone from './Icone.astro';
+
+interface Props {
+  contenu: ContenuPublie;
+}
+const { faits } = Astro.props.contenu;
+
+/*
+ * La VRAIE note Google, ou rien.
+ *
+ * D7 interdit les faux avis nominatifs, et pas seulement par prudence : un
+ * faux témoignage attribué à une entreprise identifiable est une pratique
+ * commerciale trompeuse au sens de l'article L121-2 du code de la
+ * consommation, et l'entreprise en question n'a rien demandé. Ce qu'on met à
+ * la place vaut mieux — la note publique de sa fiche, avec le lien pour la
+ * vérifier. C'est plus fort qu'un témoignage inventé, et c'est vrai.
+ *
+ * **La section entière disparaît sans note.** Le §5 du plan la donnait pour
+ * rare ; la mesure du 2 septembre 2026 dit l'inverse. Sur les 37 prospects
+ * éligibles, 26 portent une note affichable — la section est donc le cas
+ * COURANT, et son absence concerne 11 pages. Elle reste construite comme un
+ * bloc autonome et non comme un supplément : quand elle tombe, la section
+ * suivante prend sa place sans laisser de blanc.
+ *
+ * Ce qui ne s'affiche PAS : le nombre d'avis. `review_count` vaut null sur les
+ * 139 lignes de la base — Google ne le publie plus. « 4,6/5 sur 12 avis »
+ * inventerait le 12.
+ */
+
+// `assembleFacts` a déjà filtré les notes sous le seuil : ce composant ne
+// décide de rien, il affiche ce que la base a laissé passer.
+const note = faits.noteGoogle;
+
+/*
+ * `floor` et non `round`, et ce n'est pas un détail d'arrondi.
+ *
+ * `Math.round(4.6)` vaut 5 : la page allumait cinq étoiles sur cinq à côté du
+ * chiffre « 4,6 ». Personne ne lit les deux — on lit les étoiles, et on
+ * comprend « note parfaite ». Sur une page dont l'argument entier est de ne
+ * rien avancer que la base ne porte, c'est précisément le détail à ne pas
+ * laisser : il surévalue l'artisan à son insu, sur un site publié à son nom.
+ *
+ * `floor` n'allume que les étoiles entièrement acquises. 4,6 en donne quatre,
+ * et la cinquième reste en contour — ce qui est la lecture honnête, et celle
+ * que Google fait lui-même.
+ */
+const etoilesPleines = note === null ? 0 : Math.floor(note);
+---
+
+{
+  note !== null && (
+    <section class="section section--surface" id="avis" aria-labelledby="titre-avis">
+      <div class="contenu">
+        <p class="oeil">{t('reviews.eyebrow')}</p>
+        <h2 class="titre-section" id="titre-avis">
+          {t('reviews.title')}
+        </h2>
+
+        <div class="bloc corps-section apparition">
+          <p class="chiffre">
+            <span class="valeur">{nombreFr(note)}</span>
+            <span class="sur">{t('reviews.outOf')}</span>
+          </p>
+
+          <div>
+            {/*
+              Les étoiles sont décoratives et le rôle `img` porte le libellé :
+              cinq icônes annoncées une par une donneraient « étoile étoile
+              étoile… » à un lecteur d'écran, sans jamais dire la note.
+            */}
+            <p class="etoiles" role="img" aria-label={t('reviews.starsAria', { note: nombreFr(note) })}>
+              {[1, 2, 3, 4, 5].map((rang) => (
+                <Icone nom="etoile" classe={rang <= etoilesPleines ? 'icone pleine' : 'icone vide'} />
+              ))}
+            </p>
+            <p class="source">{t('reviews.source')}</p>
+            {faits.lienMaps !== null && (
+              <a class="lien" href={faits.lienMaps} rel="noopener noreferrer" target="_blank">
+                {t('reviews.link')}
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+<style>
+  .bloc {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1.1rem 1.9rem;
+  }
+  .chiffre {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+  }
+  .valeur {
+    font-family: var(--police-titre);
+    font-weight: 700;
+    font-size: clamp(3.2rem, 11vw, 4.6rem);
+    line-height: 0.9;
+    letter-spacing: -0.045em;
+    font-variant-numeric: tabular-nums;
+  }
+  .sur {
+    font-size: 0.95rem;
+    color: var(--encre-douce);
+  }
+  .etoiles {
+    display: flex;
+    gap: 0.15rem;
+  }
+  .etoiles :global(.icone) {
+    width: 1.15rem;
+    height: 1.15rem;
+    stroke: var(--accent);
+  }
+  .etoiles :global(.pleine) {
+    fill: var(--accent);
+  }
+  /* L'étoile vide garde son contour : un simple aplat effacé la rendrait
+     invisible sur la surface, et la note se lirait « quatre étoiles sur
+     quatre ». */
+  .etoiles :global(.vide) {
+    fill: none;
+    opacity: 0.45;
+  }
+  .source {
+    margin-top: 0.5rem;
+    font-size: 0.92rem;
+    color: var(--encre-douce);
+  }
+  .lien {
+    display: inline-block;
+    margin-top: 0.35rem;
+    font-size: 0.92rem;
+    color: var(--accent);
+  }
+</style>

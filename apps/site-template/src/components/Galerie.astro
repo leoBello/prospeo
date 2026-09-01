@@ -1,0 +1,88 @@
+---
+import { Image } from 'astro:assets';
+import { GALERIE_DISPONIBLE, imageGalerie } from '../content/images';
+import { t } from '../content/ui';
+
+/*
+ * « En images » — six photographies, niveau 2 de D7.
+ *
+ * **La légende n'est pas une politesse, c'est ce qui rend la section
+ * acceptable.** Six photographies sous le titre « en images » se lisent comme
+ * un portfolio, c'est-à-dire comme une affirmation : ces chantiers seraient
+ * ceux de l'entreprise. La base n'en sait rien, et D7 range cette affirmation
+ * au niveau 3, celui des interdits — au même rang qu'un faux avis. Une ligne
+ * de légende sépare illustrer de prétendre, et elle est écrite dans `ui.ts`
+ * où la relecture la voit.
+ *
+ * Pas de visionneuse en plein écran. Le plan en prévoyait une ; elle
+ * demanderait du JavaScript, un piège de focus et une gestion de la touche
+ * Échap pour agrandir des images de banque que personne n'a envie de voir en
+ * grand. Le poids et la surface d'accessibilité ne se justifient pas.
+ *
+ * La liste vient du DOSSIER et non d'un compte écrit ici : ajouter une
+ * septième image la fait apparaître, en retirer une ne casse rien.
+ */
+const vues = GALERIE_DISPONIBLE;
+---
+
+<section class="section" id="galerie" aria-labelledby="titre-galerie">
+  <div class="contenu">
+    <p class="oeil">{t('gallery.eyebrow')}</p>
+    <h2 class="titre-section" id="titre-galerie">{t('gallery.title')}</h2>
+    <p class="chapo-section">{t('gallery.intro')}</p>
+
+    <ul class="grille corps-section">
+      {
+        vues.map((code, index) => (
+          <li class="vue apparition">
+            <Image
+              src={imageGalerie(code)}
+              alt={t('gallery.alt', { rang: index + 1, total: vues.length })}
+              widths={[280, 460, 900]}
+              sizes="(min-width: 52rem) 21rem, 45vw"
+              loading="lazy"
+            />
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</section>
+
+<style>
+  .grille {
+    display: grid;
+    /* Deux colonnes sur téléphone, trois au-delà. Une seule colonne ferait
+       défiler six images pleine largeur, soit la moitié de la page pour du
+       contenu qui n'est qu'illustratif. */
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .vue {
+    aspect-ratio: 1;
+    overflow: hidden;
+    border-radius: var(--rayon);
+    background: var(--surface);
+  }
+  .vue :global(img) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    /* Un très léger agrandissement au survol, sans ombre ni décollement : le
+       parti tient sur des filets fins, pas sur du relief. La transition est
+       neutralisée par la règle `prefers-reduced-motion` du thème. */
+    transition: transform 0.5s ease;
+  }
+  .vue:hover :global(img) {
+    transform: scale(1.04);
+  }
+  @media (min-width: 52rem) {
+    .grille {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.65rem;
+    }
+  }
+</style>

@@ -1,0 +1,219 @@
+---
+import type { ContenuPublie } from '../content/contrat';
+import { t } from '../content/ui';
+
+interface Props {
+  contenu: ContenuPublie;
+}
+const { faits } = Astro.props.contenu;
+
+/*
+ * La carte — Leaflet et tuiles OpenStreetMap (D4).
+ *
+ * Google Maps Embed réclame une clé d'API publique, facture, et pose des
+ * cookies tiers — donc une bannière de consentement sur chacun des vingt-deux
+ * sites. Leaflet + OSM : pas de clé, pas de cookie marketing, gratuit, et les
+ * 139 prospects ont leurs coordonnées en base.
+ *
+ * **Chargée seulement si l'on descend jusqu'ici.** Le plan disait
+ * `client:visible` ; cette directive n'existe que pour les îles d'un framework
+ * d'interface, et le gabarit n'en embarque aucun — en ajouter un pour une
+ * carte statique coûterait l'hydratation que D1 refuse déjà à Framer Motion.
+ * Le même effet s'obtient en deux lignes : un `IntersectionObserver`, puis un
+ * `import()` dynamique que Vite isole dans son propre paquet. Les 148 Ko de
+ * Leaflet ne sont donc téléchargés qu'à l'approche de la section, et jamais
+ * par un visiteur qui ne la voit pas. Sa feuille de style, elle, fait
+ * exception — voir le script.
+ *
+ * **Le fond de carte est le seul tiers que la page contacte.** Tout le reste —
+ * polices, images, scripts — est servi depuis le dépôt. C'est aussi pourquoi
+ * il ne se charge pas d'emblée : tant que personne ne descend, aucune requête
+ * ne part vers OpenStreetMap.
+ */
+
+// Sans coordonnées, pas de carte : un fond de carte centré sur `0,0` afficherait
+// le golfe de Guinée sous le titre « où nous trouver ». Mesuré le 2 septembre
+// 2026 : les 139 lignes en ont, donc ce repli ne sert aujourd'hui personne — il
+// sert la ville suivante, qui pourrait entrer en base sans géocodage.
+const point = faits.coordonnees;
+const etiquette = t('area.marker', { nom: faits.nomAffiche, rue: faits.adresse.rue });
+---
+
+{
+  point !== null && (
+    <section class="section" id="zone" aria-labelledby="titre-zone">
+      <div class="contenu">
+        <p class="oeil">{t('area.eyebrow')}</p>
+        <h2 class="titre-section" id="titre-zone">
+          {t('area.title')}
+        </h2>
+        <p class="chapo-section">{t('area.intro', { ville: faits.adresse.ville })}</p>
+
+        {/*
+          `role="application"` n'est PAS posé, volontairement : il ferait taire
+          les raccourcis de navigation du lecteur d'écran sur une carte dont
+          rien d'essentiel ne dépend. L'adresse figure en toutes lettres dans
+          la section contact, qui est la version accessible de cette carte.
+        */}
+        <div
+          class="carte corps-section"
+          id="carte"
+          data-lat={point.lat}
+          data-lon={point.lon}
+          data-etiquette={etiquette}
+          role="img"
+          aria-label={t('area.mapAria', {
+            nom: faits.nomAffiche,
+            ville: faits.adresse.ville,
+          })}
+        />
+      </div>
+    </section>
+  )
+}
+
+<script>
+  /*
+   * L'initialisation de la carte, chargée à la demande.
+   *
+   * Le module Leaflet est importé DANS le rappel de l'observateur : c'est ce
+   * qui fait de lui un paquet séparé, absent du chemin critique. Un import
+   * statique en tête de fichier annulerait tout l'intérêt de l'observateur.
+   *
+   * Sa FEUILLE DE STYLE, en revanche, est importée statiquement — et cette
+   * asymétrie a été payée une fois.
+   *
+   * Défaut trouvé à l'œil, et invisible autrement. En import dynamique, Vite
+   * émet la CSS dans un paquet séparé — mais `inlineStylesheets: 'always'` fait
+   * inliner toutes les feuilles dans le HTML, si bien qu'aucun fichier n'est
+   * écrit et que le préchargement répond 404. L'exception faisait échouer la
+   * promesse entière : PAS DE CARTE DU TOUT, sur les vingt-deux sites, sans
+   * qu'aucun test ne le voie et sans que le build ne bronche.
+   *
+   * L'import statique la fait inliner avec le reste du style de la page :
+   * quelques kilo-octets sur le chemin critique, contre une carte qui marche.
+   * Le paquet Leaflet lui-même — 148 Ko, l'essentiel du poids — reste
+   * dynamique et n'est chargé qu'à l'approche de la section.
+   */
+  import 'leaflet/dist/leaflet.css';
+
+  const conteneur = document.getElementById('carte');
+
+  if (conteneur !== null) {
+    const lat = Number(conteneur.dataset.lat);
+    const lon = Number(conteneur.dataset.lon);
+    const etiquette = conteneur.dataset.etiquette ?? '';
+
+    const dessiner = async (): Promise<void> => {
+      /*
+       * L'ESM est désigné par son chemin exact.
+       *
+       * `leaflet@1.9.4` ne déclare ni `exports` ni `module` dans son
+       * `package.json` : un `import('leaflet')` retomberait sur le paquet UMD,
+       * dont l'interopérabilité place l'espace de noms tantôt à la racine,
+       * tantôt sous `.default`, selon l'outil qui l'empaquette. Viser le
+       * fichier ESM donne de vrais exports nommés, et le même comportement au
+       * build qu'au développement.
+       */
+      const L = await import('leaflet/dist/leaflet-src.esm.js');
+
+      const carte = L.map(conteneur, {
+        center: [lat, lon],
+        zoom: 15,
+        /*
+         * La molette ne zoome pas.
+         *
+         * Une carte qui capture le défilement au milieu d'une page piège le
+         * visiteur : il fait défiler la page, la carte zoome, et il ne
+         * comprend pas pourquoi il ne descend plus. Les commandes + et − et le
+         * pincement restent disponibles.
+         */
+        scrollWheelZoom: false,
+        // Rien à explorer au-delà : la carte situe une adresse, elle ne sert
+        // pas à naviguer dans l'agglomération.
+        attributionControl: true,
+      });
+
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      }).addTo(carte);
+
+      /*
+       * Un marqueur dessiné en CSS, et non l'icône par défaut de Leaflet.
+       *
+       * L'icône par défaut est un PNG que Leaflet résout par une URL relative
+       * à sa propre feuille de style. Sous un empaqueteur, ce chemin casse, et
+       * le symptôme est un marqueur invisible sur une carte par ailleurs
+       * correcte — le genre de panne qu'on ne voit pas dans un journal de
+       * build et qu'on découvre sur la page déployée. Un `divIcon` n'a aucun
+       * fichier à résoudre, et il prend la couleur d'accent de la palette.
+       */
+      const icone = L.divIcon({
+        className: 'marqueur',
+        html: '<span class="marqueur-point"></span>',
+        iconSize: [22, 22],
+        iconAnchor: [11, 11],
+      });
+
+      // `alt` porte l'adresse : sans lui, un lecteur d'écran annonce
+      // « Marker », qui est le défaut de Leaflet et ne dit rien.
+      L.marker([lat, lon], { icon: icone, alt: etiquette, title: etiquette }).addTo(carte);
+    };
+
+    /*
+     * `rootMargin` de 200 px : le chargement commence un écran avant que la
+     * section n'entre dans le champ, si bien que les tuiles sont là quand on
+     * arrive. Déclencher pile à l'entrée montrerait un rectangle gris pendant
+     * une seconde.
+     */
+    const observateur = new IntersectionObserver(
+      (entrees) => {
+        for (const entree of entrees) {
+          if (!entree.isIntersecting) continue;
+          observateur.disconnect();
+          void dessiner();
+        }
+      },
+      { rootMargin: '200px' },
+    );
+    observateur.observe(conteneur);
+  }
+</script>
+
+<style>
+  .carte {
+    height: clamp(17rem, 45vw, 24rem);
+    border: 1px solid var(--trait);
+    border-radius: var(--rayon);
+    background: var(--surface);
+    /* Sous la tuile, tant qu'elle n'est pas là : un rectangle de la couleur de
+       surface se lit comme un cadre en attente, un rectangle blanc comme un
+       trou. */
+    overflow: hidden;
+    z-index: 0;
+  }
+
+  /* Le marqueur et l'habillage de Leaflet sont rendus hors de ce composant :
+     `:global` est nécessaire, sans quoi le style scopé d'Astro ne les
+     atteindrait jamais. */
+  .carte :global(.marqueur-point) {
+    display: block;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 3px solid var(--fond);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  .carte :global(.leaflet-container) {
+    height: 100%;
+    width: 100%;
+    background: var(--surface);
+    font-family: var(--police-texte);
+  }
+  .carte :global(.leaflet-control-attribution) {
+    font-size: 0.68rem;
+  }
+</style>

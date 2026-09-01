@@ -1,6 +1,6 @@
 {
   "version": {
-    "schema": "v1",
+    "schema": "v2",
     "promptVersion": "manuel-v0",
     "model": "aucun — rédigé à la main"
   },
@@ -10,16 +10,26 @@
   },
   "faits": {
     "nomAffiche": "Dos-Services",
-    "metier": { "slug": "plombier", "label": "Plombier" },
+    "metier": {
+      "slug": "plombier",
+      "label": "Plombier"
+    },
     "adresse": {
       "rue": "37 Rue Jacques Cartier",
       "codePostal": "44300",
       "ville": "Nantes"
     },
-    "telephone": { "e164": "+33602002360", "affichage": "06 02 00 23 60" },
+    "telephone": {
+      "e164": "+33602002360",
+      "affichage": "06 02 00 23 60"
+    },
     "anneeCreation": 2009,
     "noteGoogle": 4.6,
     "lienMaps": "https://www.google.com/maps/place/Dos-Services/@47.2603579,-1.5721302,17z",
+    "coordonnees": {
+      "lat": 47.2603579,
+      "lon": -1.5721302
+    },
     "raisonSociale": "SOULEYMANE DOSSO (DOS SERVICES)",
     "siret": "51000900400035"
   },
@@ -47,6 +57,11 @@
         "label": "Salle de bain",
         "description": "Rénovation complète, de la dépose à la mise en eau."
       }
-    ]
+    ],
+    "theme": {
+      "palette": "cuivre",
+      "typo": "grotesk-serif",
+      "heros": "plomberie-06"
+    }
   }
 }

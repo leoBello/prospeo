@@ -1,0 +1,123 @@
+---
+import type { ContenuPublie } from '../content/contrat';
+import { t } from '../content/ui';
+import Icone from './Icone.astro';
+
+interface Props {
+  contenu: ContenuPublie;
+}
+const { faits } = Astro.props.contenu;
+
+/*
+ * L'en-tête collant, qui porte l'appel.
+ *
+ * **Il remplace la barre d'appel fixée en bas de l'écran** du chantier n°4, et
+ * ce n'est pas un remaniement esthétique. Les deux faisaient le même travail —
+ * rendre l'appel atteignable au pouce à tout moment — mais la barre du bas
+ * amputait la fenêtre en permanence, et se superposait à la fin des mentions
+ * légales, c'est-à-dire au bloc qui déclare la démonstration. Un seul élément
+ * collant vaut mieux que deux, et celui du haut porte aussi le nom et les
+ * ancres.
+ *
+ * Le bouton d'appel ne disparaît à AUCUNE largeur. C'est l'action unique du
+ * site : sur téléphone comme sur écran large, elle reste à un pouce.
+ *
+ * Les ancres, elles, disparaissent sous 52rem : quatre libellés et un bouton
+ * ne tiennent pas sur 360 px sans que l'un des deux devienne illisible. Rien
+ * n'est perdu — la page est courte et se parcourt au défilement, et les
+ * sections gardent leur `id` pour les liens profonds.
+ */
+---
+
+<header class="entete">
+  <div class="contenu barre">
+    <span class="marque">{faits.nomAffiche}</span>
+
+    <nav class="ancres" aria-label={t('nav.aria')}>
+      <a href="#prestations">{t('nav.services')}</a>
+      <a href="#facon">{t('nav.method')}</a>
+      <a href="#zone">{t('nav.area')}</a>
+      <a href="#contact">{t('nav.contact')}</a>
+    </nav>
+
+    <a
+      class="bouton appel"
+      href={`tel:${faits.telephone.e164}`}
+      aria-label={t('cta.callAria', {
+        nom: faits.nomAffiche,
+        telephone: faits.telephone.affichage,
+      })}
+    >
+      <Icone nom="telephone" />
+      <span class="numero">{faits.telephone.affichage}</span>
+    </a>
+  </div>
+</header>
+
+<style>
+  .entete {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    /* `color-mix` sur la variable de fond : l'en-tête reste translucide quelle
+       que soit la palette, sans qu'aucune couleur ne soit écrite ici. Avec un
+       blanc en dur, la palette `nuit` aurait montré une barre claire au-dessus
+       d'une page sombre. */
+    background: color-mix(in srgb, var(--fond) 86%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--trait);
+  }
+  .barre {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-block: 0.6rem;
+  }
+  .marque {
+    font-family: var(--police-titre);
+    font-weight: 700;
+    font-size: 1.05rem;
+    letter-spacing: var(--serrage-titre);
+    /* Le nom d'entreprise varie du simple au quadruple d'un prospect à
+       l'autre. Sans cette coupe, un nom long pousse le bouton d'appel hors de
+       l'écran — sur le seul élément qui doit rester atteignable. */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ancres {
+    display: none;
+    gap: 1.6rem;
+    font-size: 0.95rem;
+    color: var(--encre-douce);
+  }
+  .ancres a {
+    text-decoration: none;
+    padding-block: 0.25rem;
+    border-bottom: 1px solid transparent;
+  }
+  .ancres a:hover {
+    color: var(--encre);
+    border-bottom-color: var(--accent);
+  }
+  .appel {
+    /* Compact dans l'en-tête : le grand bouton est dans le héros. */
+    min-height: 40px;
+    padding: 0.5rem 0.9rem;
+    font-size: 0.95rem;
+  }
+  /* Sous 26rem, le numéro complet et le nom ne tiennent pas ensemble. Le
+     bouton garde son icône, qui reste une cible de 40 px, et le numéro
+     s'efface — l'action reste possible, seul son libellé disparaît. */
+  @media (max-width: 26rem) {
+    .appel .numero {
+      display: none;
+    }
+  }
+  @media (min-width: 52rem) {
+    .ancres {
+      display: flex;
+    }
+  }
+</style>

@@ -17,6 +17,8 @@ const DOS_SERVICES: SiteFactsInput = {
   postalCode: '44300',
   city: 'NANTES',
   dateCreation: '2009-02-16',
+  latitude: 47.2603579,
+  longitude: -1.5721302,
   enrichment: {
     status: 'ok',
     matchedName: 'Dos-Services',
@@ -184,5 +186,34 @@ describe('assembleFacts', () => {
     // modèle n'aurait plus rien où puiser et comblerait le trou. Échouer ici
     // est le seul comportement sûr.
     expect(assembleFacts({ ...DOS_SERVICES, tradeSlug: 'couvreur' })).toBeNull();
+  });
+});
+
+describe('les coordonnées', () => {
+  it('les rend telles quelles, parce que la carte en dépend', () => {
+    // La section « zone d'intervention » porte une carte, et une carte sans
+    // point est un rectangle gris. Mesuré le 2 septembre 2026 : les 139
+    // prospects ont leur latitude ET leur longitude, les 37 éligibles
+    // comprises. C'est le seul fait dont la couverture soit totale.
+    const facts = assembleFacts(DOS_SERVICES);
+    expect(facts?.coordonnees).toEqual({ lat: 47.2603579, lon: -1.5721302 });
+  });
+
+  it('rend null dès qu’une des deux manque, plutôt qu’un point à moitié faux', () => {
+    // Une latitude sans longitude ne situe rien. Poser 0 à la place placerait
+    // le marqueur dans le golfe de Guinée, sur la vitrine d'un plombier
+    // nantais — un défaut que le build ne signale pas et que personne ne
+    // regarde avant l'artisan. La section disparaît, comme la note.
+    expect(assembleFacts({ ...DOS_SERVICES, longitude: null })?.coordonnees).toBeNull();
+    expect(assembleFacts({ ...DOS_SERVICES, latitude: null })?.coordonnees).toBeNull();
+  });
+
+  it('refuse une coordonnée hors du domaine terrestre', () => {
+    // La colonne est alimentée par du scraping : une longitude de 191 est une
+    // erreur de collecte, pas un lieu. Leaflet l'accepterait sans broncher et
+    // afficherait une carte vide, ce qui est exactement le genre de panne
+    // silencieuse que ce projet refuse.
+    expect(assembleFacts({ ...DOS_SERVICES, longitude: 191 })?.coordonnees).toBeNull();
+    expect(assembleFacts({ ...DOS_SERVICES, latitude: -91 })?.coordonnees).toBeNull();
   });
 });

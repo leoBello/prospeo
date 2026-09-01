@@ -15,6 +15,8 @@ const entree: PitchFactsInput = {
     postalCode: '44300',
     city: 'NANTES',
     dateCreation: '2009-04-01',
+    latitude: 47.2603579,
+    longitude: -1.5721302,
     enrichment: {
       status: 'ok',
       matchedName: 'Dos-Services',
