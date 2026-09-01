@@ -74,7 +74,8 @@ prospeo/
 │   └── collector/    CLI Node/TypeScript, Playwright
 ├── packages/
 │   ├── core/         types, classification, scoring, appariement — logique pure, sans I/O
-│   └── db/           schéma Supabase, migrations, types générés
+│   └── db/           types générés depuis la base (`pnpm db:types`)
+└── supabase/migrations/  migrations SQL, appliquées par `pnpm db:push`
 └── docs/superpowers/specs/
 ```
 
@@ -343,7 +344,7 @@ Raison du choix de la densité : l'usage réel consiste à trier des centaines d
 
 **Outillage :** le skill `ui-ux-pro-max` est à mobiliser à l'étape de construction du dashboard (étape 4 de la livraison), pour le détail des composants et de la grille. Il n'apporte rien au stade de la conception.
 
-### 9.6 Internationalisation
+### 9.5 Internationalisation
 
 Le terme « i18n » recouvre **deux sujets distincts** dans ce projet. Ils sont notés ensemble ici pour éviter la confusion.
 
@@ -359,7 +360,7 @@ Précision importante : **les messages de prospection produits par le LLM ne rel
 
 C'est le mécanisme retenu pour la personnalisation par LLM : le template GitHub place tout son contenu textuel dans des fichiers i18n, et l'adaptation à chaque prospect se limite à réécrire ces fichiers, sans toucher aux images Unsplash ni au code. Rappelé ici pour mémoire ; conçu dans le spec n°2.
 
-### 9.5 Pipeline
+### 9.6 Pipeline
 
 États : `à contacter` → `contacté` → `relance` → `intéressé` → `gagné` / `perdu`, plus `ne pas contacter`.
 
@@ -429,6 +430,37 @@ Principe : **aucun étage ne peut corrompre la base sur un échec partiel.** Éc
 7. Disponibilité du domaine, générateur de message, export
 
 L'étape 3 constitue le premier jalon à valeur autonome : des prospects classés et exploitables avant toute exposition au scraping.
+
+---
+
+## 14 bis. À porter au spec n°2 (issu de la revue finale de branche)
+
+**Rétention des établissements qui perdent leur droit de diffusion.** Les filtres
+`statut_diffusion` et `etat_administratif` ne s'appliquent qu'à l'ingestion. Si
+un établissement cesse ou devient non diffusible après coup, l'API cesse de le
+renvoyer — l'upsert ne se déclenche donc jamais et la ligne obsolète reste en
+base indéfiniment. « Jamais ingéré » n'équivaut pas à « non conservé », et
+l'obligation porte sur la conservation. Prévoir une réconciliation périodique.
+
+**Le trou des scores périmés s'ouvrira dès l'arrivée de `enrich`.** Quand
+`buildScoreRow` renvoie `null`, l'étage `score` compte le prospect en attente et
+passe — en laissant en place le `prospect_score` et la catégorie calculés au
+passage précédent, sans marqueur d'obsolescence. Aujourd'hui c'est inerte, car
+`pending` vaut toujours 0. Le premier run de `enrich` renseignera `declared_url`
+sur des prospects déjà notés et déclenchera le cas. À inscrire dans les critères
+d'acceptation de la tâche d'enrichissement.
+
+**La pagination est une contrainte de projet, pas un détail d'étage.** PostgREST
+plafonne les réponses à `max_rows` (1000). Toute lecture du dashboard doit
+paginer explicitement, faute de quoi elle affichera une tranche arbitraire en la
+présentant comme complète.
+
+**Le code NAF sert à interroger, jamais à valider.** L'API filtre
+`activite_principale` au niveau de l'entreprise et `code_postal` au niveau de
+l'établissement : un établissement retenu ne porte donc pas nécessairement le NAF
+du métier visé. Le code stocke `nafCode` mais ne le confronte jamais à
+`trade.nafCodes`. À vérifier avant que l'appariement du spec n°2 n'hérite de ce
+bruit.
 
 ---
 
