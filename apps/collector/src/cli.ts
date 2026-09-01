@@ -19,6 +19,11 @@ import {
 import { runEnrich, type EnrichProspect, type ReviewCandidate } from './stages/enrich.js';
 import { probeUrl, shouldProbe } from './stages/probe.js';
 import { reconcileExitCode, runReconcile, type ReconcileProspect } from './stages/reconcile.js';
+import {
+  replayEnrichment,
+  summarizeReplays,
+  type StoredEnrichment,
+} from './stages/calibrate.js';
 import { applyReviewDecision, type ReviewDecision } from './stages/review.js';
 
 // `.env` vit a la racine du depot. Ni tsx ni Node ne le chargent tout seuls :
@@ -35,6 +40,7 @@ Commandes
   discover --trade <slug> --postal-code <cp>   Ingère les établissements Sirene
   enrich --trade <slug>                        Apparie les fiches Google Maps
   review                                       Tranche les appariements douteux
+  calibrate [--trade <slug>]                   Rejoue l'appariement hors ligne
   probe                                        Sonde les URL déclarées
   score                                        Classe et note les prospects
   reconcile                                    Revérifie l'état Sirene des prospects
@@ -56,6 +62,18 @@ Options
                        plus jamais ; un nombre exact oblige à avoir regardé.
                        La suppression est irréversible et emporte
                        enrichissements, scores et historique.
+
+Calibrer les seuils d'appariement
+  calibrate ne sort PAS sur le réseau, hormis la lecture de la base : il
+  rejoue l'appariement sur les candidats déjà enregistrés, sous les valeurs
+  actuelles de MATCHING_CONFIG, et montre ce que la base deviendrait. Il
+  n'écrit rien. La boucle de travail est donc : modifier les cinq nombres
+  dans packages/core/src/matching.ts, relancer calibrate, regarder les
+  verdicts qui bougent. Aucune requête Google dans cette boucle.
+
+  Une fois les nombres arrêtés : incrémenter MATCHING_CONFIG.version, puis
+  rejouer la population concernée avec enrich --retry-not-found. Les lignes
+  déjà ok ou ambiguous ne sont jamais reprises automatiquement.
 
 Supprimer des prospects, en deux temps
   1. prospeo reconcile --dry-run
@@ -105,7 +123,16 @@ function fetchScorePage(client: ReturnType<typeof createClient>, from: number) {
 }
 
 /** Commandes reconnues. Les étages sont branchés par les tâches 9 à 11. */
-const COMMANDS = ['discover', 'enrich', 'review', 'probe', 'score', 'reconcile', 'domains'] as const;
+const COMMANDS = [
+  'discover',
+  'enrich',
+  'review',
+  'calibrate',
+  'probe',
+  'score',
+  'reconcile',
+  'domains',
+] as const;
 
 function flag(argv: string[], name: string): string | undefined {
   const index = argv.indexOf(`--${name}`);
@@ -431,14 +458,32 @@ async function main(argv: string[]): Promise<number> {
 
             const candidates = (row.candidates ?? []) as ReviewCandidate[];
             candidates.forEach((c, index) => {
+              // Les candidats éliminés sont désormais écrits eux aussi, et ils
+              // apparaissent donc ici. C'est voulu : un candidat écarté d'un
+              // cheveu par le rayon est exactement ce qu'un humain doit
+              // pouvoir repêcher, et son repêchage est la réponse à la
+              // troisième question de la calibration. Le marqueur dit
+              // pourquoi la machine ne le proposait pas.
+              const ecarte =
+                c.rejectedFor === 'distance'
+                  ? '  ✗ écarté : hors rayon'
+                  : c.rejectedFor === 'confiance'
+                    ? '  ✗ écarté : sous le seuil bas'
+                    : '';
               process.stdout.write(
-                `\n  [${index + 1}] ${c.name}  (confiance ${c.confidence.toFixed(2)})\n`,
+                `\n  [${index + 1}] ${c.name}  (confiance ${c.confidence.toFixed(2)})${ecarte}\n`,
               );
               for (const line of c.lines ?? []) process.stdout.write(`      ${line.label}\n`);
               if (c.phone !== null) process.stdout.write(`      tél. ${c.phone}\n`);
               if (c.website !== null) process.stdout.write(`      ${c.website}\n`);
               if (c.rating !== null) process.stdout.write(`      note ${c.rating}\n`);
             });
+            if (candidates.some((c) => c.rejectedFor != null)) {
+              process.stdout.write(
+                '\n  (les fiches marquées ✗ restent choisissables : les retenir est\n' +
+                  '   précisément ce qui dit que le réglage est trop serré)\n',
+              );
+            }
 
             const answer = (
               await rl.question('\n  Numéro à retenir, [a]ucun, [p]lus tard : ')
@@ -493,6 +538,127 @@ async function main(argv: string[]): Promise<number> {
       // Une décision humaine perdue est la plus chère de toutes : l'opérateur
       // a tranché, et rien ne le lui redemandera s'il ne le sait pas.
       return reviewFailed > 0 ? 1 : 0;
+    }
+    case 'calibrate': {
+      const limit = parseLimit(argv);
+      if (limit === 'invalide') return 1;
+
+      const slug = flag(argv, 'trade');
+      if (slug !== undefined && getTrade(slug) === undefined) {
+        process.stderr.write(`Métier inconnu : ${slug}\n`);
+        return 1;
+      }
+
+      const config = loadConfig(process.env);
+      const client = createClient(config);
+
+      const rows: Record<string, unknown>[] = [];
+      for (let from = 0; ; from += PAGE_SIZE) {
+        const { data, error } = await client
+          .from('prospect_enrichment')
+          .select(
+            'prospect_id, status, matched_name, candidates, prospect(denomination, denomination_usuelle, latitude, longitude, trade_slug)',
+          )
+          .order('prospect_id')
+          .range(from, from + PAGE_SIZE - 1);
+        if (error) throw new Error(error.message);
+        rows.push(...((data ?? []) as unknown as Record<string, unknown>[]));
+        if ((data ?? []).length < PAGE_SIZE) break;
+      }
+
+      const subjects: StoredEnrichment[] = [];
+      let sansMetier = 0;
+      for (const row of rows) {
+        const p = (Array.isArray(row.prospect) ? row.prospect[0] : row.prospect) as
+          | Record<string, unknown>
+          | null;
+        if (p === null || p === undefined) continue;
+        const tradeSlug = p.trade_slug as string | null;
+        if (slug !== undefined && tradeSlug !== slug) continue;
+        const trade = tradeSlug === null ? undefined : getTrade(tradeSlug);
+        if (trade === undefined) {
+          // Sans métier, ni la catégorie ni les jetons génériques ne se
+          // calculent : rejouer rendrait un score qui n'est comparable à
+          // rien. On le dit plutôt que de le compter comme un rejeu.
+          sansMetier += 1;
+          continue;
+        }
+        subjects.push({
+          prospectId: row.prospect_id as string,
+          denomination: (p.denomination as string | null) ?? '(sans dénomination)',
+          denominationUsuelle: p.denomination_usuelle as string | null,
+          latitude: p.latitude as number | null,
+          longitude: p.longitude as number | null,
+          trade,
+          status: row.status as StoredEnrichment['status'],
+          matchedName: row.matched_name as string | null,
+          candidates: (row.candidates ?? []) as ReviewCandidate[],
+        });
+      }
+
+      const c = MATCHING_CONFIG;
+      process.stdout.write(
+        `calibrate — configuration ${c.version} en vigueur, rejeu hors ligne\n` +
+          `  poids : nom ${c.nameWeight}, distance ${c.distanceWeight}, catégorie ${c.categoryWeight}\n` +
+          `  rayon : ${c.maxDistanceM} m — seuils : ${c.lowThreshold} (revue) / ${c.highThreshold} (fusion)\n`,
+      );
+
+      const replays = subjects.slice(0, limit).map((subject) => replayEnrichment(subject, c));
+
+      for (const replay of replays) {
+        process.stdout.write(`\n${'─'.repeat(60)}\n`);
+        if (replay.replayed === null) {
+          process.stdout.write(`${replay.denomination}  [${replay.stored.status}]\n`);
+          process.stdout.write(`  non rejouable : ${replay.unreplayable}\n`);
+          continue;
+        }
+        const verdict =
+          replay.stored.status === replay.replayed.status
+            ? replay.stored.status
+            : `${replay.stored.status} → ${replay.replayed.status}`;
+        process.stdout.write(
+          `${replay.denomination}  [${verdict}]${replay.changed ? '  ⚠ verdict changé' : ''}\n`,
+        );
+        if (replay.changed && replay.stored.matchedName !== replay.replayed.matchedName) {
+          process.stdout.write(
+            `  fiche retenue : ${replay.stored.matchedName ?? 'aucune'} → ` +
+              `${replay.replayed.matchedName ?? 'aucune'}\n`,
+          );
+        }
+        for (const scored of replay.replayed.scored) {
+          const mark =
+            scored.rejectedFor === 'distance'
+              ? '✗ hors rayon'
+              : scored.rejectedFor === 'confiance'
+                ? '✗ sous le seuil bas'
+                : '✓ retenu';
+          process.stdout.write(
+            `\n  ${mark}  ${scored.candidate.name}  ${scored.score.confidence.toFixed(3)}\n`,
+          );
+          for (const line of scored.score.lines) process.stdout.write(`      ${line.label}\n`);
+        }
+      }
+
+      const summary = summarizeReplays(replays);
+      process.stdout.write(
+        `\ncalibrate : ${summary.replayed} lignes rejouées, ${summary.changed} verdicts changés, ` +
+          `${summary.unreplayable} non rejouables\n` +
+          `  verdicts : ${summary.byStatus.ok} fusionnés, ${summary.byStatus.ambiguous} à trancher, ` +
+          `${summary.byStatus.not_found} introuvables\n` +
+          `  éliminations : ${summary.eliminated.distance} par le rayon, ` +
+          `${summary.eliminated.confiance} sous le seuil bas\n`,
+      );
+      if (sansMetier > 0) {
+        process.stdout.write(`  ${sansMetier} lignes ignorées : métier inconnu de la configuration\n`);
+      }
+      if (summary.unreplayable > 0) {
+        process.stdout.write(
+          '  Les lignes non rejouables datent d’avant l’enregistrement complet des\n' +
+            '  candidats. Un `enrich --retry-not-found` les reconstruit pour les introuvables ;\n' +
+            '  une ligne `ok` ou `ambiguous` doit être supprimée à la main pour être reprise.\n',
+        );
+      }
+      return 0;
     }
     case 'probe': {
       const limit = parseLimit(argv);

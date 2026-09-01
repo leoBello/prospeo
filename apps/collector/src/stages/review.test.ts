@@ -14,8 +14,13 @@ const candidates: ReviewCandidate[] = [
     mapsUrl: 'https://maps.google.com/1',
     rating: 4.6,
     placeId: 'ChIJabc',
+    latitude: 47.2214,
+    longitude: -1.5602,
+    category: 'Plombier',
+    reviewCount: 31,
     confidence: 0.78,
     lines: [],
+    rejectedFor: null,
   },
   {
     name: 'Allardin Chauffage',
@@ -25,8 +30,13 @@ const candidates: ReviewCandidate[] = [
     mapsUrl: 'https://maps.google.com/2',
     rating: null,
     placeId: null,
+    latitude: null,
+    longitude: null,
+    category: null,
+    reviewCount: null,
     confidence: 0.61,
     lines: [],
+    rejectedFor: null,
   },
 ];
 

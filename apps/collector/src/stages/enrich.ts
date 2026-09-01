@@ -21,7 +21,7 @@ import { BlockedError, type MapsSource } from '../sources/google-maps.js';
  */
 type ReviewLine = { code: string; label: string; points: number };
 
-/** Ce qu'on garde d'un candidat écarté, pour que la revue puisse trancher. */
+/** Ce qu'on garde d'un candidat examiné, pour la revue et pour la calibration. */
 export type ReviewCandidate = {
   name: string;
   address: string | null;
@@ -38,8 +38,29 @@ export type ReviewCandidate = {
    */
   rating: number | null;
   placeId: string | null;
+  /**
+   * Coordonnées, catégorie, nombre d'avis : les entrées brutes du calcul.
+   *
+   * Elles n'ont aucun usage à l'affichage — personne ne tranche une revue sur
+   * une latitude. Elles sont là pour que le calcul se **rejoue hors ligne**
+   * sous d'autres seuils : sans elles, on ne stockerait que le verdict d'une
+   * configuration, et réviser un seuil obligerait à rescraper Google. Avec
+   * elles, un seul run sert à toutes les itérations de la calibration.
+   */
+  latitude: number | null;
+  longitude: number | null;
+  category: string | null;
+  reviewCount: number | null;
   confidence: number;
   lines: ReviewLine[];
+  /**
+   * Motif d'élimination sous la configuration du run, `null` si retenu.
+   *
+   * Absent des lignes écrites avant l'enregistrement complet : le lire
+   * suppose donc de traiter `undefined` comme « inconnu », et non comme
+   * « retenu ».
+   */
+  rejectedFor: 'distance' | 'confiance' | null;
 };
 
 export interface EnrichProspect {
@@ -71,13 +92,15 @@ export interface EnrichmentRow {
   place_id: string | null;
   maps_url: string | null;
   /**
-   * Candidats proposés par l'appariement.
+   * Tout ce que l'appariement a examiné pour ce prospect.
    *
-   * `enrich` ne les remplit que sur `ambiguous`, seul cas où ils servent
-   * encore à trancher. La revue, elle, les conserve sur toutes ses
-   * décisions — y compris le rejet : ce sont les exemples étiquetés dont la
-   * calibration des seuils a besoin. La présence de candidats ne dit donc
-   * rien du statut, et n'est jamais à lire comme telle.
+   * Rempli sur **tous** les statuts, éliminés compris et motif à l'appui, et
+   * conservé par la revue sur toutes ses décisions — y compris le rejet.
+   * Ce sont les exemples étiquetés dont la calibration des seuils a besoin :
+   * ne les garder que sur `ambiguous` laissait deux de ses trois questions
+   * sans réponse possible, et faisait repayer chaque révision de seuil en
+   * requêtes Google. La présence de candidats ne dit donc rien du statut, et
+   * n'est jamais à lire comme telle.
    */
   candidates: ReviewCandidate[];
   status: 'ok' | 'not_found' | 'ambiguous' | 'blocked';
@@ -114,8 +137,13 @@ function forReview(scored: ScoredCandidate): ReviewCandidate {
     mapsUrl: scored.candidate.mapsUrl,
     rating: scored.candidate.rating,
     placeId: scored.candidate.placeId,
+    latitude: scored.candidate.latitude,
+    longitude: scored.candidate.longitude,
+    category: scored.candidate.category,
+    reviewCount: scored.candidate.reviewCount,
     confidence: scored.score.confidence,
     lines: scored.score.lines,
+    rejectedFor: scored.rejectedFor,
   };
 }
 
@@ -133,18 +161,29 @@ export function buildEnrichmentRow(
   };
   const outcome = selectMatch(subject, candidates, trade, config);
 
-  if (outcome.kind === 'not_found') return emptyRow(prospect.id, 'not_found');
+  // La trace est la même quel que soit le verdict : c'est ce qui permet de
+  // rejuger les trois questions du jalon de calibration — fusion abusive,
+  // évidence partie en revue, bon candidat éliminé par la distance — sur les
+  // seules lignes de la base, sans rien redemander à Google.
+  const examined = outcome.scored.map(forReview);
+
+  if (outcome.kind === 'not_found') {
+    const row = emptyRow(prospect.id, 'not_found');
+    row.candidates = examined;
+    return row;
+  }
 
   if (outcome.kind === 'ambiguous') {
     // Aucune donnée de fiche n'est écrite. Un téléphone non validé serait
     // indiscernable d'un téléphone confirmé, et finirait composé.
     const row = emptyRow(prospect.id, 'ambiguous');
-    row.candidates = outcome.scored.map(forReview);
+    row.candidates = examined;
     return row;
   }
 
   const phone = normalizePhone(outcome.candidate.phone);
   const row = emptyRow(prospect.id, 'ok');
+  row.candidates = examined;
   row.matched_name = outcome.candidate.name;
   row.match_confidence = outcome.score.confidence;
   row.phone_e164 = phone?.e164 ?? null;
@@ -277,6 +316,22 @@ async function searchAndBuild(
 ): Promise<{ row: EnrichmentRow; sawCandidate: boolean }> {
   let row: EnrichmentRow | null = null;
   let sawCandidate = false;
+
+  // Les fiches vues par TOUTES les requêtes, et pas seulement par celle qui
+  // a tranché. Une requête qui n'a rien retenu a tout de même pu croiser la
+  // bonne fiche et l'écarter d'un cheveu : c'est exactement le candidat que
+  // la calibration voudra réexaminer en desserrant un seuil, et il
+  // disparaissait quand seule la dernière ligne construite survivait.
+  // Déduplication sur l'identité du lieu — deux requêtes rendent volontiers
+  // la même fiche, et le score ne dépend pas de la requête qui l'a trouvée.
+  const seen = new Map<string, ReviewCandidate>();
+  const remember = (candidates: readonly ReviewCandidate[]): void => {
+    for (const found of candidates) {
+      const key = found.placeId ?? found.mapsUrl;
+      if (!seen.has(key)) seen.set(key, found);
+    }
+  };
+
   for (const query of queriesFor(prospect, options.trade)) {
     const candidates: MapsCandidate[] = await options.source.search(query);
     // Une requête sans aucun candidat n'a rien à apparier : inutile de la
@@ -284,11 +339,17 @@ async function searchAndBuild(
     if (candidates.length === 0) continue;
     sawCandidate = true;
     row = buildEnrichmentRow(prospect, candidates, options.trade, options.config);
-    if (row.status !== 'not_found') return { row, sawCandidate };
+    remember(row.candidates);
+    if (row.status !== 'not_found') break;
   }
+
   // Toutes les requêtes ont rendu `not_found` : on garde la dernière ligne
   // construite, ou une ligne vide si aucune n'a rendu le moindre candidat.
-  return { row: row ?? emptyRow(prospect.id, 'not_found'), sawCandidate };
+  // Le VERDICT reste celui de la requête qui a tranché — seule la trace est
+  // élargie, et elle n'entre dans aucune décision de cet étage.
+  const settled = row ?? emptyRow(prospect.id, 'not_found');
+  settled.candidates = [...seen.values()].sort((a, b) => b.confidence - a.confidence);
+  return { row: settled, sawCandidate };
 }
 
 export async function runEnrich(options: RunEnrichOptions): Promise<EnrichReport> {

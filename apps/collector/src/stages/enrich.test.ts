@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MATCHING_CONFIG, getTrade, type MapsCandidate } from '@prospeo/core';
-import { buildEnrichmentRow, runEnrich, type EnrichProspect } from './enrich.js';
+import {
+  buildEnrichmentRow,
+  runEnrich,
+  type EnrichmentRow,
+  type EnrichProspect,
+} from './enrich.js';
 import { BlockedError } from '../sources/google-maps.js';
 
 const trade = getTrade('plombier');
@@ -335,5 +340,75 @@ describe('runEnrich, disjoncteur de recherches vides', () => {
     expect(report.stoppedByEmptySearches).toBe(false);
     expect(report.processed).toBe(40);
     expect(report.ok).toBe(2);
+  });
+});
+
+describe('enrich — la trace que la calibration consommera', () => {
+  function source(results: MapsCandidate[][]) {
+    let call = 0;
+    return {
+      search: vi.fn(async () => results[call++] ?? []),
+      close: vi.fn(async () => undefined),
+    };
+  }
+
+  it('conserve les candidats même quand la fusion est automatique', () => {
+    // « Ce cas fusionné était-il faux ? » est la première des trois questions
+    // du jalon de calibration. Elle ne se pose pas si la ligne ne garde que
+    // le gagnant : il faut voir face à quoi il a gagné.
+    const row = buildEnrichmentRow(
+      prospect,
+      [candidate(), candidate({ placeId: 'zzz', name: 'Boulangerie Dupont', category: 'Boulangerie' })],
+      trade,
+      MATCHING_CONFIG,
+    );
+    expect(row.status).toBe('ok');
+    expect(row.candidates).toHaveLength(2);
+    expect(row.candidates.filter((c) => c.rejectedFor === null)).toHaveLength(1);
+  });
+
+  it('conserve les candidats écartés d un not_found, avec leur motif', () => {
+    // « Un vrai candidat a-t-il été éliminé par la distance ? » — troisième
+    // question du jalon, et la seule à laquelle la ligne ne répondait pas du
+    // tout : l éliminé disparaissait avant d être écrit.
+    const loin = candidate({ latitude: 47.26, longitude: -1.5601 });
+    const row = buildEnrichmentRow(prospect, [loin], trade, MATCHING_CONFIG);
+    expect(row.status).toBe('not_found');
+    expect(row.candidates).toHaveLength(1);
+    expect(row.candidates[0]?.rejectedFor).toBe('distance');
+  });
+
+  it('garde de quoi rejouer le calcul hors ligne', () => {
+    // Coordonnées et catégorie ne servent pas à l affichage de la revue :
+    // elles servent à recalculer distance et catégorie sous d autres seuils,
+    // sans repasser par Google. Les omettre rendrait la trace inerte.
+    const row = buildEnrichmentRow(prospect, [candidate()], trade, MATCHING_CONFIG);
+    const stored = row.candidates[0];
+    expect(stored?.latitude).toBe(47.2214);
+    expect(stored?.longitude).toBe(-1.5602);
+    expect(stored?.category).toBe('Plombier');
+    expect(stored?.reviewCount).toBe(31);
+  });
+
+  it('réunit les candidats de toutes les requêtes jouées, sans doublon', async () => {
+    // La première requête n a rien retenu, la seconde tranche. Sans réunion,
+    // la fiche écartée par la première disparaîtrait — or c est précisément
+    // une candidate à réexaminer quand on desserre un seuil.
+    const written: EnrichmentRow[] = [];
+    await runEnrich({
+      prospects: [prospect],
+      trade,
+      config: MATCHING_CONFIG,
+      source: source([
+        [candidate({ placeId: 'ecarte', name: 'Boulangerie Dupont', category: 'Boulangerie' })],
+        [candidate({ placeId: 'ecarte', name: 'Boulangerie Dupont', category: 'Boulangerie' }), candidate()],
+      ]),
+      upsert: async (row) => {
+        written.push(row);
+      },
+      dailyRemaining: 10,
+    });
+    expect(written).toHaveLength(1);
+    expect(written[0]?.candidates.map((c) => c.placeId).sort()).toEqual(['abc', 'ecarte']);
   });
 });

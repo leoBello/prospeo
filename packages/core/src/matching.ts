@@ -48,15 +48,35 @@ export interface MatchScore {
   lines: MatchLine[];
 }
 
+/**
+ * Pourquoi un candidat n'a pas participé à la décision.
+ *
+ * `'distance'` : au-delà de `maxDistanceM`, donc écarté quel que soit son nom.
+ * `'confiance'` : sous `lowThreshold`, donc trop faible pour valoir un doute.
+ */
+export type Elimination = 'distance' | 'confiance';
+
 export interface ScoredCandidate {
   candidate: MapsCandidate;
   score: MatchScore;
+  /** `null` quand le candidat a participé à la décision. */
+  rejectedFor: Elimination | null;
 }
 
+/**
+ * Le verdict, et **tout** ce qui a été examiné pour l'atteindre.
+ *
+ * `scored` porte les candidats éliminés autant que les retenus, chacun avec
+ * son motif. C'est ce qui rend les seuils calibrables : « ce candidat-ci
+ * était le bon, et c'est la distance qui l'a écarté » ne se constate pas sur
+ * une liste d'où les éliminés ont disparu. Sans cette trace, tout changement
+ * de seuil se repaierait en requêtes Google, puisque la pièce à conviction
+ * aurait été jetée avant d'être écrite.
+ */
 export type MatchOutcome =
-  | { kind: 'ok'; candidate: MapsCandidate; score: MatchScore }
+  | { kind: 'ok'; candidate: MapsCandidate; score: MatchScore; scored: ScoredCandidate[] }
   | { kind: 'ambiguous'; scored: ScoredCandidate[] }
-  | { kind: 'not_found' };
+  | { kind: 'not_found'; scored: ScoredCandidate[] };
 
 export interface MatchingConfig {
   version: string;
@@ -216,20 +236,32 @@ export function selectMatch(
   for (const candidate of candidates) {
     const score = scoreCandidate(subject, candidate, trade, config);
     // Au-delà de la distance maximale, deux homonymes sont deux entreprises.
-    if (score.distanceM !== null && score.distanceM > config.maxDistanceM) continue;
-    if (score.confidence < config.lowThreshold) continue;
-    scored.push({ candidate, score });
+    // Le candidat est marqué, pas jeté : la décision l'ignore, la trace le
+    // garde. L'ordre des deux motifs est significatif — la distance prime,
+    // parce qu'elle disqualifie indépendamment de la confiance atteinte.
+    const rejectedFor: Elimination | null =
+      score.distanceM !== null && score.distanceM > config.maxDistanceM
+        ? 'distance'
+        : score.confidence < config.lowThreshold
+          ? 'confiance'
+          : null;
+    scored.push({ candidate, score, rejectedFor });
   }
 
-  if (scored.length === 0) return { kind: 'not_found' };
-
+  // Tri sur la liste entière, éliminés compris : la trace se lit du plus
+  // probable au moins probable, et l'ordre relatif des retenus est le même
+  // qu'avant puisque le tri est stable sur une même clé.
   scored.sort((a, b) => b.score.confidence - a.score.confidence);
-  const confident = scored.filter((s) => s.score.confidence >= config.highThreshold);
+  const retained = scored.filter((s) => s.rejectedFor === null);
+
+  if (retained.length === 0) return { kind: 'not_found', scored };
+
+  const confident = retained.filter((s) => s.score.confidence >= config.highThreshold);
 
   if (confident.length === 1) {
     const only = confident[0];
-    if (only === undefined) return { kind: 'not_found' };
-    return { kind: 'ok', candidate: only.candidate, score: only.score };
+    if (only === undefined) return { kind: 'not_found', scored };
+    return { kind: 'ok', candidate: only.candidate, score: only.score, scored };
   }
 
   return { kind: 'ambiguous', scored };
