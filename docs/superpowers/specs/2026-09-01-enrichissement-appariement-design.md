@@ -140,6 +140,34 @@ Le champ « site web » est le mécanisme central de la classification : chez
 les artisans il contient très souvent une URL Facebook, ce qui rend la
 détection `social_only` gratuite.
 
+### 4.5 Ce que la source rend reellement — verifie le 1er septembre 2026
+
+La verification des selecteurs sur une recherche reelle a corrige une
+hypothese du §4.3.
+
+**Le nombre d'avis n'est plus publie par Google Maps.** Ni sur les cartes de
+resultat, ni sur le panneau d'une fiche : l'entete ne porte que la note et
+l'image des etoiles, et le seul `aria-label` chiffre du flux est
+« 4,8 etoiles ». Aucun selecteur ne peut donc le fournir.
+
+Consequence sur le bareme : la ligne « nombre d'avis » de la section Vitalite
+ne se declenchera jamais. Elle est **laissee en place et inerte** plutot que
+retiree — le bareme est versionne et sera recalibre au jalon de calibration,
+et Google peut retablir l'affichage. Les points concernes sont simplement
+jamais attribues, ce qui resserre l'echelle reelle des scores sans fausser
+leur ordre.
+
+Ce qui reste disponible et verifie : nom, adresse, coordonnees, categorie,
+telephone, site declare, note. C'est-a-dire tout ce dont l'appariement et la
+classification de presence web ont besoin.
+
+**`place_id` n'est renseigne que dans le cas d'une liste de resultats.**
+Quand la recherche ne designe qu'une entreprise, l'URL de la fiche ne porte
+pas le segment `!19s` d'ou il est extrait. Sans consequence : le SIRET reste
+la cle de deduplication, `place_id` n'est qu'un confort.
+
+---
+
 ### 4.4 Anti-bot et résilience
 
 Reprise du §4.2 du socle, sans modification : navigateur unique, contexte
