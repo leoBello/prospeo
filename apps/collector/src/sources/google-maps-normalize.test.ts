@@ -20,10 +20,8 @@ describe('parseRating', () => {
     expect(parseRating('47')).toBeNull();
   });
 
-  it('ignore le signe négatif : la regex ne capture que les chiffres', () => {
-    // `\d+(?:\.\d+)?` ne capture pas le signe : "-1" est lu comme "1",
-    // qui reste dans l échelle [0, 5] et n est donc pas rejeté.
-    expect(parseRating('-1')).toBe(1);
+  it('rejette une note negative au lieu de la tronquer', () => {
+    expect(parseRating('-1')).toBeNull();
   });
 
   it('rend null sur une entrée vide ou illisible', () => {

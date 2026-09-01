@@ -21,7 +21,10 @@ export interface RawMapsPlace {
 /** Note Google, de 0 à 5, virgule décimale française admise. */
 export function parseRating(text: string | null): number | null {
   if (text === null) return null;
-  const found = text.replace(',', '.').match(/\d+(?:\.\d+)?/);
+  // Le signe est capture : sans lui, « -1 » rendrait 1 au lieu d'etre rejete,
+  // c'est-a-dire qu'une valeur hors echelle serait silencieusement tronquee
+  // en une note plausible.
+  const found = text.replace(',', '.').match(/-?\d+(?:\.\d+)?/);
   if (found === null) return null;
   const value = Number(found[0]);
   // Hors échelle : mieux vaut ne rien savoir qu'affirmer une note fausse.
