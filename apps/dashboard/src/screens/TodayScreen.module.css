@@ -1,0 +1,21 @@
+.intro {
+  margin-bottom: var(--space-4);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--text-xl);
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.hint {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}

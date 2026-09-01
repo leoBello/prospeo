@@ -1,0 +1,81 @@
+.page {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: var(--space-5);
+}
+
+.card {
+  width: 100%;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-5);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--text-xl);
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  margin: var(--space-1) 0 var(--space-5);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.label {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-1);
+}
+
+.input {
+  /* 16 px : en dessous, Safari mobile zoome sur le champ à la mise au point
+     et ne dézoome jamais ensuite. */
+  font: inherit;
+  font-size: 16px;
+  color: var(--color-text);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.error {
+  margin: 0 0 var(--space-3);
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+}
+
+.submit {
+  /* 44 px de haut : cible tactile minimale. */
+  min-height: 44px;
+  background: var(--color-accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  transition: opacity 180ms ease;
+}
+
+.submit:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.submit:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+
+.note {
+  margin: var(--space-4) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}

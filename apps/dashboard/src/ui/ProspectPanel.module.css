@@ -1,0 +1,146 @@
+.panel {
+  width: 380px;
+  flex: none;
+  border-left: 1px solid var(--color-border);
+  background: var(--color-surface);
+  overflow-y: auto;
+  padding: var(--space-4);
+  z-index: var(--z-panel);
+}
+
+.placeholder {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.name {
+  margin: 0;
+  font-size: var(--text-lg);
+  letter-spacing: -0.01em;
+}
+
+.position {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.close {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  /* 32 px : la cible tactile de 44 px vaut pour le mobile, cet ecran est un
+     outil de bureau dense. Le bouton reste doublonne par la touche Echap. */
+  width: 32px;
+  height: 32px;
+  font-size: 18px;
+  line-height: 1;
+  transition: color 160ms ease, border-color 160ms ease;
+}
+
+.close:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+}
+
+.section {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.sectionTitle {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.fields {
+  margin: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.field {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.fieldLabel {
+  color: var(--color-text-muted);
+  flex: none;
+}
+
+.fieldValue {
+  margin: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+/*
+ * L'absence est mise en italique et non en gris pale : elle doit se lire, pas
+ * s'effacer. C'est l'etat de quatre prospects sur cinq.
+ */
+.absent {
+  font-style: italic;
+  color: var(--color-text-muted);
+}
+
+.status {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.scoreGroup {
+  margin-bottom: var(--space-3);
+}
+
+.scoreGroupTitle {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.scoreLine {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  padding: 2px 0;
+}
+
+.positif {
+  color: var(--color-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.negatif {
+  color: var(--color-danger);
+  font-variant-numeric: tabular-nums;
+}
+
+.scoreTotal {
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid var(--color-text-muted);
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}

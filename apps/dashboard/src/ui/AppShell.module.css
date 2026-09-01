@@ -1,0 +1,81 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  flex: none;
+}
+
+.brand {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.nav {
+  display: flex;
+  gap: var(--space-3);
+  flex: 1;
+}
+
+.navItem {
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  background: none;
+  border: none;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+}
+
+.navItemActive {
+  background: color-mix(in srgb, var(--color-accent) 16%, transparent);
+  color: var(--color-accent);
+}
+
+.action {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+  transition: color 160ms ease, border-color 160ms ease;
+}
+
+.action:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+}
+
+/*
+ * La liste ne disparait jamais (§9.1). Le panneau s'ouvre a cote d'elle et
+ * non par-dessus : c'est le contexte du classement qui reste visible pendant
+ * qu'on inspecte un prospect.
+ */
+.body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.list {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: var(--space-4);
+}
+
+@media (max-width: 900px) {
+  /* Sous cette largeur, deux colonnes rendent chacune illisible : le panneau
+     passe alors au-dessus de la liste, qui reste montee derriere lui. */
+  .body {
+    position: relative;
+  }
+}
