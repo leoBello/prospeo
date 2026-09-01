@@ -98,11 +98,20 @@ export function significantTokens(name: string, generic: readonly string[]): str
     .filter((token) => token.length >= MIN_TOKEN_LENGTH && !banned.has(token));
 }
 
-/** Proportion des jetons significatifs de `a` présents dans `b`. */
+/**
+ * Proportion des jetons significatifs de `a` présents dans `b`.
+ *
+ * `b` est normalisé de la même façon que `a` avant le découpage : sans cela,
+ * la comparaison serait asymétrique et un jeton de `a` en minuscules ne
+ * retrouverait jamais son équivalent en majuscules dans `b`. `bestNameMatch`
+ * normalise déjà ses deux arguments avant d'appeler cette fonction, donc le
+ * piège ne s'y voit pas — mais `tokenContainment` est exportée et peut être
+ * appelée directement avec des chaînes brutes.
+ */
 export function tokenContainment(a: string, b: string, generic: readonly string[]): number {
   const tokens = significantTokens(a, generic);
   if (tokens.length === 0) return 0;
-  const target = new Set(b.split(' '));
+  const target = new Set(normalizeCompanyName(b).split(' '));
   const found = tokens.filter((token) => target.has(token)).length;
   return found / tokens.length;
 }
@@ -158,11 +167,31 @@ function wholeStringScore(a: string, b: string): number {
 }
 
 /**
+ * Écart de longueur, en caractères, au-delà duquel deux jetons ne sont plus
+ * comparés lettre à lettre (voir `bestTokenScore`).
+ */
+const MAX_TOKEN_LENGTH_DIFF = 1;
+
+/**
  * Meilleure similarité Jaro-Winkler entre jetons significatifs pris un à un.
  *
  * Complète `tokenContainment`, qui exige une égalité stricte entre jetons :
  * ici « h20 » peut se rapprocher de « h2o » même sans être identique,
  * indépendamment des autres mots — génériques ou non — du nom candidat.
+ *
+ * La comparaison n'est admise que si les deux jetons ont des longueurs qui ne
+ * s'écartent pas de plus d'un caractère (`MAX_TOKEN_LENGTH_DIFF`). Une mesure
+ * jeton à jeton sert à rattraper les variantes d'écriture d'un même nom, pas
+ * les noms qui se prolongent. Jaro-Winkler récompense généreusement une
+ * extension de préfixe : « martin » face à « martinez » atteint 0.95, un
+ * score de nom plus haut que « h20 » face à « h2o » — alors que ce sont deux
+ * situations sans rapport. « h2o »/« h20 » est une substitution à longueur
+ * égale, une variante de transcription du même nom. « martin »/« martinez »
+ * est une extension, c'est-à-dire un autre patronyme, comme allard/allardin
+ * ou dupont/dupontel. Deux jetons dont les longueurs s'écartent de deux
+ * caractères ou plus sont des noms différents : s'il s'agissait vraiment de
+ * la même entreprise, la comparaison de chaînes entières ou l'inclusion de
+ * jetons l'auraient déjà rattrapée.
  */
 function bestTokenScore(a: string, b: string, generic: readonly string[]): number {
   const aTokens = significantTokens(a, generic);
@@ -170,6 +199,7 @@ function bestTokenScore(a: string, b: string, generic: readonly string[]): numbe
   let best = 0;
   for (const aToken of aTokens) {
     for (const bToken of bTokens) {
+      if (Math.abs(aToken.length - bToken.length) > MAX_TOKEN_LENGTH_DIFF) continue;
       best = Math.max(best, jaroWinkler(aToken, bToken));
     }
   }

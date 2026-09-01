@@ -54,6 +54,10 @@ describe('tokenContainment', () => {
     // deux entreprises sans rapport s apparient sur un mot de métier.
     expect(tokenContainment('plomberie', 'sos plomberie', ['plomberie'])).toBe(0);
   });
+
+  it('normalise b comme a : la casse ne doit pas casser la comparaison', () => {
+    expect(tokenContainment('MARTIN', 'plomberie MARTIN fils', ['plomberie'])).toBe(1);
+  });
 });
 
 describe('nameVariants', () => {
@@ -109,6 +113,14 @@ describe('bestNameMatch — les cas réels de la base', () => {
 
   it('ne rapproche pas deux entreprises que seul le métier réunit', () => {
     const match = bestNameMatch(nameVariants('SARL ALLARD', null), 'Plomberie Dupont', generic);
+    expect(match.score).toBeLessThan(0.55);
+  });
+
+  it('ne confond pas deux patronymes dont l un prolonge l autre', () => {
+    // jaroWinkler('martin', 'martinez') vaut 0.95 : sans contrainte de
+    // longueur, bestTokenScore ferait de deux plombiers voisins nommés
+    // Martin et Martinez un faux appariement au-dessus du seuil de fusion.
+    const match = bestNameMatch(nameVariants('SARL MARTIN', null), 'MARTINEZ Plomberie', generic);
     expect(match.score).toBeLessThan(0.55);
   });
 
