@@ -33,8 +33,12 @@ Commandes
 
 Options
   --limit <n>          Plafond d'enregistrements traités
-  --force              Resonde même les URL encore fraîches
+  --force              (probe) Resonde même les URL encore fraîches
   --retry-not-found    Rejoue les prospects déjà classés introuvables
+  --force-deletions    (reconcile) Exécute une vague de suppressions que le
+                       garde-fou a refusée. À n'employer qu'après avoir vérifié
+                       que l'API répond correctement : la suppression est
+                       irréversible et part en cascade.
 `;
 
 /** Taille de page des lectures Supabase (PostgREST plafonne a max_rows = 1000). */
@@ -640,6 +644,11 @@ async function main(argv: string[]): Promise<number> {
       const report = await runReconcile({
         prospects,
         fetchStatus: fetchStatusBySiret,
+        // Drapeau distinct du `--force` de `probe`, et non un alias : là-bas il
+        // veut dire « resonde des URL encore fraîches », ici « supprime des
+        // prospects malgré le garde-fou ». Les confondre ferait vider la base à
+        // qui voulait seulement resonder.
+        force: argv.includes('--force-deletions'),
         remove: async (id) => {
           // Les dépendances partent en cascade : c'est la définition même de
           // « ne pas conserver ».
@@ -663,6 +672,17 @@ async function main(argv: string[]): Promise<number> {
         `reconcile : ${report.kept} conservés, ${report.closed} cessés, ` +
           `${report.deleted} supprimés, ${report.failed} en échec\n`,
       );
+      if (report.refusedDeletions > 0) {
+        process.stderr.write(
+          `reconcile : ${report.refusedDeletions} suppressions refusées par le garde-fou.\n`,
+        );
+        // Sortie non nulle : un run qui a renoncé à sa moitié destructrice
+        // n'est pas un succès. Une automatisation doit s'en apercevoir sans
+        // lire stderr, et l'opérateur doit revenir décider — soit que l'API
+        // était en panne, soit que la vague est légitime et se rejoue avec
+        // `--force-deletions`.
+        return 1;
+      }
       return 0;
     }
     default:

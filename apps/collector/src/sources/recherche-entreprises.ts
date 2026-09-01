@@ -162,22 +162,39 @@ export async function* searchEstablishments(
  *
  * L'API ne renvoie tout simplement pas les établissements non diffusibles :
  * une réponse vide se lit `absent`, et l'appelant en tire les conséquences.
+ *
+ * Même expiration de dix secondes que `probeUrl`, et pour la même raison :
+ * `fetch` n'en pose aucune par défaut. Une requête suspendue bloquerait
+ * indéfiniment la boucle séquentielle de `reconcile`, sans erreur ni journal —
+ * le run ne se terminerait jamais et rien ne le signalerait. Une expiration
+ * lève, la boucle compte l'échec, et surtout : un échec ne supprime rien.
  */
 export async function fetchStatusBySiret(siret: string): Promise<SireneStatus> {
-  const response = await fetch(`${BASE_URL}?q=${encodeURIComponent(siret)}&per_page=25&page=1`);
-  if (!response.ok) throw new Error(`API Sirene : HTTP ${response.status}`);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10_000);
+  try {
+    const response = await fetch(`${BASE_URL}?q=${encodeURIComponent(siret)}&per_page=25&page=1`, {
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`API Sirene : HTTP ${response.status}`);
 
-  const body = (await response.json()) as { results?: unknown[] };
-  for (const result of body.results ?? []) {
-    const company = result as Record<string, unknown>;
-    const establishments = (company.matching_etablissements ?? []) as Record<string, unknown>[];
-    const found = establishments.find((etab) => etab.siret === siret);
-    if (found === undefined) continue;
+    // La lecture du corps reste sous l'expiration : une réponse dont les
+    // en-têtes arrivent puis dont le corps ne vient jamais suspendrait la
+    // boucle tout aussi sûrement qu'une connexion muette.
+    const body = (await response.json()) as { results?: unknown[] };
+    for (const result of body.results ?? []) {
+      const company = result as Record<string, unknown>;
+      const establishments = (company.matching_etablissements ?? []) as Record<string, unknown>[];
+      const found = establishments.find((etab) => etab.siret === siret);
+      if (found === undefined) continue;
 
-    if (company.statut_diffusion !== 'O' || found.statut_diffusion_etablissement !== 'O') {
-      return { kind: 'undiffusible' };
+      if (company.statut_diffusion !== 'O' || found.statut_diffusion_etablissement !== 'O') {
+        return { kind: 'undiffusible' };
+      }
+      return found.etat_administratif === 'A' ? { kind: 'active' } : { kind: 'closed' };
     }
-    return found.etat_administratif === 'A' ? { kind: 'active' } : { kind: 'closed' };
+    return { kind: 'absent' };
+  } finally {
+    clearTimeout(timer);
   }
-  return { kind: 'absent' };
 }
