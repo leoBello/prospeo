@@ -2509,10 +2509,11 @@ correspondante dans `USAGE`, et le `case` :
 
       process.stdout.write(
         `enrich ${trade.slug} : ${report.ok} appariés, ${report.ambiguous} à trancher, ` +
-          `${report.notFound} introuvables, ${report.failed} en échec\n`,
+          `${report.notFound} introuvables, ${report.failed} en échec ` +
+          `(${source.navigations} pages Google chargées)\n`,
       );
       if (report.stoppedByCap) {
-        process.stdout.write(`Plafond journalier de ${DAILY_CAP} fiches atteint.\n`);
+        process.stdout.write(`Plafond journalier de ${DAILY_CAP} prospects atteint.\n`);
       }
       if (report.blocked) {
         process.stderr.write('Arrêt : Google a interposé une vérification.\n');
@@ -2531,7 +2532,18 @@ import { getTrade, MATCHING_CONFIG } from '@prospeo/core';
 import { createGoogleMapsSource } from './sources/google-maps.js';
 import { runEnrich, type EnrichProspect } from './stages/enrich.js';
 
-/** Plafond de fiches consultées par jour. Voir §4.2 du socle. */
+/**
+ * Plafond de prospects enrichis par jour.
+ *
+ * Il compte des **prospects**, pas des requêtes envoyées à Google, et l'écart
+ * n'est pas anodin : un prospect coûte une navigation de recherche, plus une
+ * par fiche ouverte — jusqu'à six. C'est pourtant ce compteur-là qu'on
+ * retient, parce que c'est le seul qui survive à un redémarrage : il se relit
+ * depuis la base, alors qu'un compteur de navigations exigerait une table.
+ *
+ * Le volume réellement envoyé à Google est donc rapporté séparément en fin de
+ * run, via `source.navigations`, pour rester visible plutôt que deviné.
+ */
 const DAILY_CAP = 300;
 ```
 
