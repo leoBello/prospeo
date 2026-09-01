@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getTrade } from '@prospeo/core';
-import { createRedacteur } from './anthropic.js';
+import { createPitchRedacteur, createRedacteur } from './anthropic.js';
 import { MODEL } from '../stages/generate.js';
 
 const PLOMBIER = getTrade('plombier')!;
@@ -117,5 +117,34 @@ describe('createRedacteur', () => {
     const { client } = fauxClient({ parsed_output: null, usage: USAGE });
     const r = await createRedacteur({ apiKey: 'k', trade: PLOMBIER, client }).rediger('c', 'f');
     expect(r.redaction).toBeNull();
+  });
+});
+
+describe('createPitchRedacteur', () => {
+  it('contraint la sortie par le schéma du MESSAGE, pas par celui du site', async () => {
+    // Les deux rédacteurs partagent tout — césure du cache, réflexion
+    // adaptative, en-tête de workspace, relevé des jetons — sauf le schéma de
+    // sortie. C'est la seule chose qui les distingue, donc la seule qu'un test
+    // doit tenir : les intervertir produirait un appel qui réussit et une
+    // réponse que l'étage rejetterait ensuite sans dire pourquoi.
+    const { client, appels } = fauxClient({ parsed_output: {}, usage: USAGE });
+    await createPitchRedacteur({ apiKey: 'k', client }).rediger('c', 'f');
+
+    const format = (appels[0]?.output_config as Record<string, any>).format;
+    const schema = JSON.stringify(format);
+    expect(schema).toContain('appel');
+    expect(schema).toContain('sms');
+    // Les prestations du site n'ont rien à faire dans le schéma d'un message.
+    expect(schema).not.toContain('prestations');
+  });
+
+  it('ne demande aucun métier', async () => {
+    // Ce n'est pas un oubli : les consignes du message sont les mêmes pour
+    // tout le monde, d'où une SEULE entrée de cache pour le lot entier — là où
+    // le site en réclame une par métier. Un paramètre `trade` ici laisserait
+    // croire le contraire.
+    const { client } = fauxClient({ parsed_output: {}, usage: USAGE });
+    const r = await createPitchRedacteur({ apiKey: 'k', client }).rediger('c', 'f');
+    expect(r.usage).toEqual({ input: 120, cacheWrite: 0, cacheRead: 1800, output: 240 });
   });
 });

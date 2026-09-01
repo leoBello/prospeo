@@ -1,4 +1,5 @@
 import type { SiteContent } from './site-content.js';
+import type { SiteFacts } from './site-facts.js';
 
 /**
  * Un écart entre ce que la prose affirme et ce que la base sait.
@@ -45,7 +46,7 @@ export function verifierCoherence(
   ];
 
   for (const { champ, texte } of champs) {
-    for (const message of ecartsDe(texte, contenu.faits)) ecarts.push({ champ, message });
+    for (const message of ecartsChiffres(texte, contenu.faits)) ecarts.push({ champ, message });
   }
   return ecarts;
 }
@@ -57,8 +58,15 @@ export function verifierCoherence(
  * fonctionnelle : l'appelant reçoit tous les écarts d'un coup, parce qu'un
  * étage `generate` qui relancerait le modèle sur un seul écart par tour
  * multiplierait les appels payants.
+ *
+ * **Exportée pour `pitch`**, qui confronte la même classe d'affirmations à
+ * la même base de faits. Un message de vente peut inventer une année ou une
+ * note exactement comme une page de présentation, à ceci près que celui qui
+ * le lit est l'artisan lui-même — celui qui repérera l'erreur en premier. La
+ * recopier là-bas laisserait les deux vérifications diverger, et c'est la
+ * plus exposée des deux qui serait restée en arrière.
  */
-function ecartsDe(texte: string, faits: SiteContent['faits']): string[] {
+export function ecartsChiffres(texte: string, faits: SiteFacts): string[] {
   const messages: string[] = [];
 
   // --- Années -------------------------------------------------------------
@@ -116,7 +124,7 @@ function ecartsDe(texte: string, faits: SiteContent['faits']): string[] {
 }
 
 /** `+33602002360` → `0602002360`, la forme sous laquelle un Français l'écrit. */
-function chiffresNationaux(faits: SiteContent['faits']): string {
+function chiffresNationaux(faits: SiteFacts): string {
   const e164 = faits.telephone.e164;
   return e164.startsWith('+33') ? `0${e164.slice(3)}` : e164.replace(/\D/g, '');
 }

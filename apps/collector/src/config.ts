@@ -82,12 +82,30 @@ export interface GenerateConfig {
   anthropicWorkspaceId: string | undefined;
 }
 
-export function loadGenerateConfig(env: Record<string, string | undefined>): GenerateConfig {
-  const v = exiger(env, ['ANTHROPIC_API_KEY'], 'generate');
+/**
+ * Les deux étages qui appellent le modèle lisent les MÊMES variables, et
+ * doivent pourtant se nommer eux-mêmes en échouant.
+ *
+ * C'est la raison d'être des loaders par étage : le message doit dire quelle
+ * commande a échoué, pas seulement laquelle des trois familles de secrets
+ * manque. Un opérateur qui lance `pitch` et lit « étage generate » cherche
+ * d'abord ce qu'il a fait de travers à l'étage précédent.
+ */
+function chargerModele(env: Record<string, string | undefined>, etage: string): GenerateConfig {
+  const v = exiger(env, ['ANTHROPIC_API_KEY'], etage);
   return {
     anthropicApiKey: v['ANTHROPIC_API_KEY'] as string,
     anthropicWorkspaceId: lire(env, 'ANTHROPIC_WORKSPACE_ID'),
   };
+}
+
+export function loadGenerateConfig(env: Record<string, string | undefined>): GenerateConfig {
+  return chargerModele(env, 'generate');
+}
+
+/** Mêmes secrets que `generate` : c'est le même modèle qu'on appelle. */
+export function loadPitchConfig(env: Record<string, string | undefined>): GenerateConfig {
+  return chargerModele(env, 'pitch');
 }
 
 export interface PublishConfig {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   loadDeployConfig,
+  loadPitchConfig,
   loadGenerateConfig,
   loadPublishConfig,
   loadConfig,
@@ -80,5 +81,20 @@ describe('configuration de la chaîne de vente', () => {
     const p = loadPublishConfig({ ...complet, PROSPEO_GITHUB_TEMPLATE_REPO: '' });
     expect(p.githubTemplateRepo).toBeUndefined();
     expect(p.githubOrg).toBe('prospeo');
+  });
+});
+
+describe('loadPitchConfig', () => {
+  it('lit les mêmes secrets que generate', () => {
+    const c = loadPitchConfig({ ANTHROPIC_API_KEY: 'sk-x', ANTHROPIC_WORKSPACE_ID: 'w' });
+    expect(c).toEqual({ anthropicApiKey: 'sk-x', anthropicWorkspaceId: 'w' });
+  });
+
+  it('se nomme lui-même en échouant', () => {
+    // Les deux étages lisent la même variable, mais un opérateur qui lance
+    // `pitch` et lit « étage generate » cherche d'abord ce qu'il a raté à
+    // l'étage précédent. Le message doit désigner la commande qu'on a tapée.
+    expect(() => loadPitchConfig({})).toThrow(/pitch/);
+    expect(() => loadPitchConfig({})).toThrow(/ANTHROPIC_API_KEY/);
   });
 });

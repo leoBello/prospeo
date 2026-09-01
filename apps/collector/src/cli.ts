@@ -7,6 +7,7 @@ import {
   loadConfig,
   loadDeployConfig,
   loadGenerateConfig,
+  loadPitchConfig,
   loadPublishConfig,
 } from './config.js';
 import type { Json } from '@prospeo/db';
@@ -32,8 +33,15 @@ import {
   type StoredEnrichment,
 } from './stages/calibrate.js';
 import { applyReviewDecision, type ReviewDecision } from './stages/review.js';
-import { assembleFacts, type ContenuPublie, type SiteFacts } from '@prospeo/core';
-import { createRedacteur } from './sources/anthropic.js';
+import {
+  assembleFacts,
+  assemblePitchFacts,
+  segmentsSms,
+  type ContenuPublie,
+  type PitchFacts,
+  type SiteFacts,
+} from '@prospeo/core';
+import { createPitchRedacteur, createRedacteur } from './sources/anthropic.js';
 import { createGithubClient } from './sources/github.js';
 import { createVercelClient } from './sources/vercel.js';
 import { runGenerate, type GenerateInput } from './stages/generate.js';
@@ -44,6 +52,7 @@ import {
   type PublishDeps,
   type PublishInput,
 } from './stages/publish.js';
+import { runPitch, PITCH_TRACE, type PitchInput } from './stages/pitch.js';
 import {
   runUnpublish,
   unpublishExitCode,
@@ -74,6 +83,7 @@ Commandes
   publish                                      Crée les dépôts et y écrit le contenu
   deploy                                       Déploie et enregistre les URL
   unpublish [--dry-run]                        Dépublie les refus et les périmés
+  pitch [--force]                              Rédige email, SMS et script d'appel
 
 Options
   --limit <n>          Plafond d'enregistrements traités
@@ -201,6 +211,7 @@ const COMMANDS = [
   'publish',
   'deploy',
   'unpublish',
+  'pitch',
 ] as const;
 
 function flag(argv: string[], name: string): string | undefined {
@@ -330,6 +341,106 @@ async function fetchSiteCandidates(
   }
 
   return lignes.sort((a, b) => b.total - a.total);
+}
+
+/**
+ * Les prospects à qui l'on peut écrire, du meilleur score au moins bon.
+ *
+ * Le filtrage est délégué à `assemblePitchFacts`, qui porte les quatre refus —
+ * le prospect a dit non, il n'a pas de site en ligne, il en a déjà un correct,
+ * ou `assembleFacts` l'écarte déjà. Les refaire ici en dupliquerait la règle,
+ * et les deux divergeraient : la version SQL est celle qu'on relit le moins.
+ *
+ * La jointure sur `prospect_site` n'est pas un filtre serveur mais un
+ * enrichissement : un prospect sans site remonte avec `site: null`, et c'est
+ * `assemblePitchFacts` qui le renvoie. Filtrer côté serveur rendrait le
+ * décompte des écartés impossible à établir.
+ */
+async function fetchPitchCandidates(
+  client: ReturnType<typeof createClient>,
+): Promise<{ id: string; faits: PitchFacts; total: number }[]> {
+  const lignes: { id: string; faits: PitchFacts; total: number }[] = [];
+
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await client
+      .from('prospect')
+      .select(
+        'id, siret, denomination, denomination_usuelle, trade_slug, address, postal_code, city, date_creation, is_closed, prospect_enrichment(status, matched_name, phone_e164, rating, maps_url), web_presence(category, domain_free_name), prospect_score(total), prospect_pipeline(status), prospect_site(deployment_url, unpublished_at)',
+      )
+      .order('id')
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+
+    for (const row of data ?? []) {
+      // Un établissement cessé n'est pas un prospect : lui écrire au nom d'une
+      // entreprise qui n'existe plus serait le pire des envois.
+      if (row.is_closed === true) continue;
+
+      const one = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
+      const enr = one(row.prospect_enrichment);
+      const wp = one(row.web_presence);
+      const sc = one(row.prospect_score);
+      const pl = one(row.prospect_pipeline);
+      const site = one(row.prospect_site);
+
+      const faits = assemblePitchFacts({
+        prospect: {
+          siret: row.siret,
+          denomination: row.denomination,
+          denominationUsuelle: row.denomination_usuelle,
+          tradeSlug: row.trade_slug,
+          address: row.address,
+          postalCode: row.postal_code,
+          city: row.city,
+          dateCreation: row.date_creation,
+          enrichment:
+            enr === null
+              ? null
+              : {
+                  status: enr.status,
+                  matchedName: enr.matched_name,
+                  phoneE164: enr.phone_e164,
+                  rating: enr.rating,
+                  mapsUrl: enr.maps_url,
+                },
+        },
+        site:
+          site === null
+            ? null
+            : {
+                deploymentUrl: site.deployment_url,
+                unpublishedAt: site.unpublished_at === null ? null : new Date(site.unpublished_at),
+              },
+        presenceWeb: wp?.category ?? null,
+        domaineLibre: wp?.domain_free_name ?? null,
+        pipelineStatus: pl?.status ?? null,
+      });
+      if (faits === null) continue;
+
+      lignes.push({ id: row.id, faits, total: sc?.total ?? 0 });
+    }
+    if ((data ?? []).length < PAGE_SIZE) break;
+  }
+
+  return lignes.sort((a, b) => b.total - a.total);
+}
+
+/** Les prospects qui ont déjà au moins un message archivé. */
+async function fetchProspectsDejaRediges(
+  client: ReturnType<typeof createClient>,
+): Promise<Set<string>> {
+  const vus = new Set<string>();
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await client
+      .from('generated_message')
+      .select('prospect_id')
+      .order('prospect_id')
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    for (const r of data ?? []) vus.add(r.prospect_id);
+    if ((data ?? []).length < PAGE_SIZE) break;
+  }
+  return vus;
 }
 
 /** L'état de site déjà enregistré, par prospect. */
@@ -1110,6 +1221,7 @@ async function main(argv: string[]): Promise<number> {
           category: typeof row.category;
           domain_available?: boolean | null;
           domain_candidates?: string[];
+          domain_free_name?: string | null;
           domain_checked_at?: string | null;
         } = {
           prospect_id: row.prospectId,
@@ -1126,6 +1238,11 @@ async function main(argv: string[]): Promise<number> {
         if (!domainProposalApplies(row.category)) {
           presenceWrite.domain_available = null;
           presenceWrite.domain_candidates = [];
+          // Le NOM part avec le verdict. C'est lui que `pitch` citerait — « j'ai
+          // vérifié, plomberie-allard.fr est libre » — et le laisser derrière un
+          // `domain_available` remis à null rendrait l'affirmation atteignable
+          // par une autre lecture que celle du booléen.
+          presenceWrite.domain_free_name = null;
           // L'horodatage part avec le verdict : le laisser ferait passer pour
           // « vérifié récemment » une ligne dont on vient d'effacer le
           // résultat, et `domains` ne la reprendrait pas si le prospect
@@ -1366,10 +1483,17 @@ async function main(argv: string[]): Promise<number> {
         // `false` ne se dit que si TOUS ont été tranchés et pris ; il suffit
         // d'un seul « je ne sais pas » pour que le champ reste `null`.
         let available: boolean | null = candidates.length === 0 ? null : false;
+        // Le NOM du premier candidat libre, et pas seulement le fait qu'il en
+        // existe un. Le booléen seul ne permet d'écrire qu'« un domaine est
+        // libre », ce qu'aucun artisan ne peut vérifier ; le plan veut « j'ai
+        // vérifié, serrurier-untel.fr est libre », et c'est le nom qui porte
+        // l'argument.
+        let libre: string | null = null;
         for (const name of candidates) {
           const verdict = await checkDomainAvailability(name, deps);
           if (verdict === true) {
             available = true;
+            libre = name;
             break;
           }
           if (verdict === null) available = null;
@@ -1386,10 +1510,16 @@ async function main(argv: string[]): Promise<number> {
           prospect_id: string;
           domain_candidates: string[];
           domain_available?: boolean;
+          domain_free_name?: string | null;
           domain_checked_at?: string;
         } = { prospect_id: row.prospect_id, domain_candidates: candidates };
         if (available !== null) {
           write.domain_available = available;
+          // Explicitement remis à null quand plus rien n'est libre : un nom
+          // laissé d'un run précédent survivrait au dépôt du domaine par
+          // quelqu'un d'autre, et c'est exactement le fait périssable que
+          // `DOMAIN_FRESHNESS_DAYS` existe pour borner.
+          write.domain_free_name = libre;
           write.domain_checked_at = new Date().toISOString();
         }
 
@@ -1500,6 +1630,92 @@ async function main(argv: string[]): Promise<number> {
           `${usage.cacheRead} lecture de cache, ${usage.output} sortie\n`,
       );
       return echoue > 0 || rejete > 0 ? 1 : 0;
+    }
+
+    case 'pitch': {
+      const limit = parseLimit(argv);
+      if (limit === 'invalide') return 1;
+      const force = argv.includes('--force');
+
+      const pitchConfig = loadPitchConfig(process.env);
+      const client = createClient(loadConfig(process.env));
+
+      const candidats = await fetchPitchCandidates(client);
+      const dejaRediges = await fetchProspectsDejaRediges(client);
+
+      // Un prospect déjà rédigé n'est pas repris : c'est un étage payant, et un
+      // rejeu distrait coûterait autant que le premier passage.
+      const aFaire = candidats.filter((c) => force || !dejaRediges.has(c.id));
+      const lot = limit === undefined ? aFaire : aFaire.slice(0, limit);
+
+      if (lot.length === 0) {
+        process.stdout.write(
+          `pitch : rien a faire (${candidats.length} prospects joignables, tous deja rediges)\n`,
+        );
+        return 0;
+      }
+
+      // Un seul rédacteur pour tout le lot, et c'est la différence avec
+      // `generate` : les consignes du message ne dépendent d'aucun métier, donc
+      // une seule écriture de cache couvre l'ensemble.
+      const entrees: PitchInput[] = lot.map((c) => ({ prospectId: c.id, faits: c.faits }));
+      const resultat = await runPitch(
+        entrees,
+        createPitchRedacteur({
+          apiKey: pitchConfig.anthropicApiKey,
+          workspaceId: pitchConfig.anthropicWorkspaceId,
+        }),
+      );
+
+      let ecrits = 0;
+      let echoue = resultat.report.failed;
+      for (const m of resultat.messages) {
+        const { error } = await client.from('generated_message').insert({
+          prospect_id: m.prospectId,
+          channel: m.canal,
+          subject: m.objet,
+          content: m.contenu,
+          model: PITCH_TRACE.model,
+          prompt_version: PITCH_TRACE.promptVersion,
+        });
+        if (error) {
+          echoue += 1;
+          process.stderr.write(`pitch: echec d'ecriture sur ${m.prospectId} — ${error.message}\n`);
+          continue;
+        }
+        ecrits += 1;
+      }
+
+      const u = resultat.report.usage;
+      process.stdout.write(
+        `pitch : ${resultat.report.generated} prospects rediges (${ecrits} messages ecrits), ` +
+          `${resultat.report.rejected} rejetes, ${echoue} en echec` +
+          (resultat.report.refusedEditeur > 0
+            ? `, ${resultat.report.refusedEditeur} refuses faute d'editeur renseigne`
+            : '') +
+          `\n  jetons : ${u.input} entree, ${u.cacheWrite} ecriture de cache, ` +
+          `${u.cacheRead} lecture de cache, ${u.output} sortie\n`,
+      );
+
+      // Le décompte des segments est une MESURE, pas un verdict : le schéma a
+      // déjà borné le SMS en caractères. Elle est affichée parce que le plafond
+      // de 306 ne vaut que dans l'alphabet GSM — une seule apostrophe
+      // typographique fait basculer le message en UCS-2, où le même texte tient
+      // en cinq segments au lieu de deux. Celui qui copie le message doit
+      // pouvoir le voir.
+      for (const m of resultat.messages.filter((x) => x.canal === 'sms')) {
+        const mesure = segmentsSms(m.contenu);
+        process.stdout.write(
+          `  SMS ${m.prospectId} : ${mesure.caracteres} caracteres, ${mesure.alphabet}, ` +
+            `${mesure.segments} segment(s)` +
+            (mesure.horsGsm7.length > 0 ? ` — hors GSM : ${mesure.horsGsm7.join(' ')}` : '') +
+            '\n',
+        );
+      }
+
+      return echoue > 0 || resultat.report.rejected > 0 || resultat.report.refusedEditeur > 0
+        ? 1
+        : 0;
     }
 
     case 'publish': {

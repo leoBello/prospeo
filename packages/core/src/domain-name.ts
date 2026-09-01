@@ -1,6 +1,6 @@
 import { nameVariants } from './name-match.js';
 import { normalizeCompanyName } from './normalize.js';
-import type { Trade } from './types.js';
+import type { Trade, WebPresenceCategory } from './types.js';
 
 const TLD = 'fr';
 
@@ -52,3 +52,40 @@ export function domainCandidates(
 
   return [`${base}.${TLD}`, `${metier}-${base}.${TLD}`, `${base}-${metier}.${TLD}`];
 }
+
+/**
+ * Un nom de domaine ne se propose qu'à qui n'en a pas déjà un.
+ *
+ * Ce prédicat gouverne les deux bouts du même invariant, et c'est pour cela
+ * qu'il est ici plutôt que recopié : `domains` l'utilise pour choisir à qui
+ * proposer, `score` pour effacer une proposition devenue fausse, et
+ * `assemblePitchFacts` pour refuser de la citer dans un message.
+ *
+ * Sans le second usage, un état contradictoire restait atteignable et
+ * durable. `domains` proposait « plomberie-allard.fr est libre » à un
+ * prospect classé `none` ; une sonde ultérieure découvrait son site et le
+ * reclassait `has_site` ; la proposition, elle, ne bougeait plus. La même
+ * ligne affirmait alors à la fois que l'artisan a un site et qu'un domaine
+ * l'attend — et c'est la seconde moitié qui partait dans le message.
+ */
+export function domainProposalApplies(category: WebPresenceCategory | null): boolean {
+  return DOMAIN_PROPOSAL_CATEGORIES.includes(category as WebPresenceCategory);
+}
+
+/**
+ * Les catégories concernées, sous la forme que le filtre SQL attend.
+ *
+ * Le prédicat en dérive plutôt que de la recopier : le filtre de lecture de
+ * `domains` et l'effacement de `score` doivent bouger ensemble, faute de quoi
+ * une catégorie ajoutée d'un côté laisserait l'autre écrire ou conserver une
+ * proposition qu'il ne devrait pas.
+ *
+ * `dead_site` en est écarté comme `has_site` : un site mort a un domaine,
+ * déjà déposé par son propriétaire. Le sujet y est de le raviver, pas d'en
+ * enregistrer un second.
+ */
+export const DOMAIN_PROPOSAL_CATEGORIES: readonly WebPresenceCategory[] = [
+  'none',
+  'social_only',
+  'directory_only',
+];

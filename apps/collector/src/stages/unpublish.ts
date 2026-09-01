@@ -13,6 +13,8 @@
  *   seule chose qui garantisse qu'un oubli finisse par se refermer tout seul.
  */
 
+import { estUnRefus } from '@prospeo/core';
+
 /** Délai de péremption d'un site resté sans réponse (D5). */
 export const PEREMPTION_JOURS = 90;
 
@@ -26,8 +28,6 @@ const JOUR_MS = 24 * 3600 * 1000;
  */
 const ECHANGE_VIVANT = new Set(['interesse', 'gagne']);
 
-/** Statuts qui valent refus, et déclenchent un retrait sans délai. */
-const REFUS = new Set(['ne_pas_contacter', 'perdu']);
 
 export interface SiteEnLigne {
   prospectId: string;
@@ -51,7 +51,11 @@ export type UnpublishAction = 'garder' | 'refus' | 'peremption';
  */
 export function decideUnpublish(site: SiteEnLigne, now: Date): UnpublishAction {
   if (site.unpublishedAt !== null) return 'garder';
-  if (REFUS.has(site.pipelineStatus)) return 'refus';
+  // La liste des statuts-refus vit dans `@prospeo/core` et non ici : `pitch`
+  // s'appuie sur la même pour refuser d'écrire un message. Deux copies
+  // finiraient par diverger, et la divergence produirait un argumentaire de
+  // vente rédigé pour un artisan dont on vient de dépublier le site.
+  if (estUnRefus(site.pipelineStatus)) return 'refus';
   if (ECHANGE_VIVANT.has(site.pipelineStatus)) return 'garder';
   if (site.publishedAt === null) return 'garder';
 

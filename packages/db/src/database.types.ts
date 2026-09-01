@@ -23,6 +23,7 @@ export type Database = {
           model: string
           prompt_version: string
           prospect_id: string
+          subject: string | null
         }
         Insert: {
           channel: string
@@ -32,6 +33,7 @@ export type Database = {
           model: string
           prompt_version: string
           prospect_id: string
+          subject?: string | null
         }
         Update: {
           channel?: string
@@ -41,6 +43,7 @@ export type Database = {
           model?: string
           prompt_version?: string
           prospect_id?: string
+          subject?: string | null
         }
         Relationships: [
           {
@@ -344,6 +347,7 @@ export type Database = {
           domain_available: boolean | null
           domain_candidates: Json
           domain_checked_at: string | null
+          domain_free_name: string | null
           final_url: string | null
           has_viewport_meta: boolean | null
           http_status: number | null
@@ -359,6 +363,7 @@ export type Database = {
           domain_available?: boolean | null
           domain_candidates?: Json
           domain_checked_at?: string | null
+          domain_free_name?: string | null
           final_url?: string | null
           has_viewport_meta?: boolean | null
           http_status?: number | null
@@ -374,6 +379,7 @@ export type Database = {
           domain_available?: boolean | null
           domain_candidates?: Json
           domain_checked_at?: string | null
+          domain_free_name?: string | null
           final_url?: string | null
           has_viewport_meta?: boolean | null
           http_status?: number | null
@@ -403,7 +409,7 @@ export type Database = {
     }
     Enums: {
       enrichment_status: "ok" | "not_found" | "ambiguous" | "blocked"
-      interaction_kind: "appel" | "whatsapp" | "email" | "note"
+      interaction_kind: "appel" | "whatsapp" | "email" | "sms" | "note"
       pipeline_status:
         | "a_contacter"
         | "contacte"
@@ -546,7 +552,7 @@ export const Constants = {
   public: {
     Enums: {
       enrichment_status: ["ok", "not_found", "ambiguous", "blocked"],
-      interaction_kind: ["appel", "whatsapp", "email", "note"],
+      interaction_kind: ["appel", "whatsapp", "email", "sms", "note"],
       pipeline_status: [
         "a_contacter",
         "contacte",
