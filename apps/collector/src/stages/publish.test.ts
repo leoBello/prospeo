@@ -190,8 +190,8 @@ function fausseDeps(etats: Record<string, EtatSite> = {}) {
   const ecrits: Record<string, Record<string, unknown>> = {};
   const deps: PublishDeps = {
     github: {
-      async creerDepuisModele(nom) {
-        journal.push(`creer:${nom}`);
+      async creerDepuisModele(templateRepo, nom) {
+        journal.push(`creer:${templateRepo}:${nom}`);
         return { fullName: `org/${nom}`, htmlUrl: `https://github.com/org/${nom}` };
       },
       async shaContenu(depot) {
@@ -215,13 +215,23 @@ function fausseDeps(etats: Record<string, EtatSite> = {}) {
 }
 
 describe('runPublish', () => {
+  it('part du dépôt modèle du métier, et non d’un réglage du run', async () => {
+    // Décision de l'utilisateur : un modèle par métier, declare dans
+    // `trades.ts`, et a terme pilotable depuis une interface de gestion via le
+    // repli `templateRepoDefaut`. Un lot peut donc meler les metiers sans
+    // qu'on ait a le scinder.
+    const { deps, journal } = fausseDeps();
+    await runPublish([UN], deps);
+    expect(journal[0]).toBe('creer:plombier:dos-services-51000900400035');
+  });
+
   it('crée puis écrit, à la première publication', async () => {
     const { deps, journal } = fausseDeps();
     const report = await runPublish([UN], deps);
 
     expect(report).toEqual({ created: 1, updated: 0, skipped: 0, failed: 0, refused: 0 });
     expect(journal).toEqual([
-      'creer:dos-services-51000900400035',
+      'creer:plombier:dos-services-51000900400035',
       'ecrire:dos-services-51000900400035:sans-sha',
       'enregistrer:p1',
     ]);
@@ -300,7 +310,7 @@ describe('runPublish', () => {
     // (spec du socle, §12). Sur vingt-deux prospects, interrompre au premier
     // 403 laisserait les vingt et un autres au point mort sans raison.
     const { deps, journal } = fausseDeps();
-    deps.github.creerDepuisModele = async (nom) => {
+    deps.github.creerDepuisModele = async (_modele, nom) => {
       if (nom.endsWith('51000900400035')) throw new Error('GitHub création : 403 — refusé');
       journal.push(`creer:${nom}`);
       return { fullName: `org/${nom}`, htmlUrl: 'u' };

@@ -54,6 +54,27 @@ export interface Trade {
    * échoue — bruyamment, ce qui est le comportement voulu.
    */
   readonly prestations: readonly Prestation[];
+  /**
+   * Dépôt modèle par défaut de ce métier, dans l'organisation dédiée.
+   *
+   * **Un modèle par métier, et non un modèle unique.** D1 pose que le site est
+   * neutre en métier — et il l'est : le gabarit d'aujourd'hui ne câble aucun
+   * métier, et `prospeo/plombier` comme `prospeo/serrurier` en seraient
+   * aujourd'hui deux copies identiques. Ce que ce champ ouvre, c'est la
+   * possibilité qu'ils DIVERGENT : un serrurier peut vouloir une mise en avant
+   * différente de celle d'un plombier, et rien n'oblige à ce que les deux
+   * restent éternellement le même fichier.
+   *
+   * Le coût de cette liberté doit être dit : N modèles font N endroits où
+   * corriger un défaut du site. Tant que les modèles sont identiques, une
+   * correction doit être reportée dans chacun — c'est exactement ce que D1
+   * évitait avec un modèle unique, et c'est le prix de l'option.
+   *
+   * Facultatif : un métier qui n'en déclare pas retombe sur
+   * `PROSPEO_GITHUB_TEMPLATE_REPO`. C'est ce repli qui permettra à une
+   * interface de gestion de trancher depuis la base sans toucher au code.
+   */
+  readonly templateRepo?: string;
 }
 
 export interface RawEstablishment {

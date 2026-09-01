@@ -39,8 +39,6 @@ export interface GithubOptions {
   token: string;
   /** Organisation dédiée (D4). Le jeton n'a de portée que sur elle. */
   org: string;
-  /** Dépôt modèle, marqué « Template repository » dans ses réglages. */
-  templateRepo: string;
   fetch?: typeof fetch;
 }
 
@@ -50,7 +48,13 @@ export interface DepotCree {
 }
 
 export interface GithubClient {
-  creerDepuisModele(nom: string, description: string): Promise<DepotCree>;
+  /**
+   * `templateRepo` est un ARGUMENT et non une option du client : le modèle
+   * dépend du métier du prospect traité (`Trade.templateRepo`), pas du run.
+   * Un même lot peut donc mêler des plombiers et des serruriers sans qu'on
+   * ait à construire deux clients ni à le scinder.
+   */
+  creerDepuisModele(templateRepo: string, nom: string, description: string): Promise<DepotCree>;
   shaContenu(depot: string): Promise<string | null>;
   ecrireContenu(depot: string, contenu: unknown, sha: string | null): Promise<void>;
 }
@@ -80,9 +84,9 @@ export function createGithubClient(options: GithubOptions): GithubClient {
   };
 
   return {
-    async creerDepuisModele(nom, description) {
+    async creerDepuisModele(templateRepo, nom, description) {
       const reponse = await appeler(
-        `${BASE}/repos/${options.org}/${options.templateRepo}/generate`,
+        `${BASE}/repos/${options.org}/${templateRepo}/generate`,
         {
           method: 'POST',
           headers: entetes(),

@@ -114,6 +114,7 @@ export const TRADES: readonly Trade[] = [
     keywords: ['plomberie', 'plombier', 'chauffagiste', 'sanitaire', 'chauffage', 'depannage'],
     categoryLabels: ['plombier', 'plomberie', 'chauffagiste'],
     prestations: PRESTATIONS_PLOMBIER,
+    templateRepo: 'plombier',
   },
   {
     slug: 'serrurier',
@@ -123,9 +124,33 @@ export const TRADES: readonly Trade[] = [
     keywords: ['serrurerie', 'serrurier', 'blindage', 'metallerie', 'depannage'],
     categoryLabels: ['serrurier', 'serrurerie', 'metallerie'],
     prestations: PRESTATIONS_SERRURIER,
+    templateRepo: 'serrurier',
   },
 ];
 
 export function getTrade(slug: string): Trade | undefined {
   return TRADES.find((trade) => trade.slug === slug);
+}
+
+/**
+ * Le dépôt modèle à employer pour un métier.
+ *
+ * Trois niveaux, du plus précis au plus général :
+ *
+ * 1. ce que le métier déclare dans `trades.ts` ;
+ * 2. à défaut, `PROSPEO_GITHUB_TEMPLATE_REPO` — le repli, qui permettra à une
+ *    interface de gestion de trancher sans toucher au code ;
+ * 3. et si ni l'un ni l'autre, un échec franc : publier depuis un modèle
+ *    inconnu créerait des dépôts au nom d'entreprises réelles à partir d'on ne
+ *    sait quoi.
+ */
+export function templateRepoFor(trade: Trade, defaut: string | undefined): string {
+  const choisi = trade.templateRepo ?? defaut;
+  if (choisi === undefined || choisi.trim() === '') {
+    throw new Error(
+      `Aucun dépôt modèle pour le métier « ${trade.slug} » : renseignez ` +
+        '`templateRepo` dans trades.ts ou PROSPEO_GITHUB_TEMPLATE_REPO dans .env.',
+    );
+  }
+  return choisi;
 }

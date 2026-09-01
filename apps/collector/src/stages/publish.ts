@@ -1,5 +1,11 @@
 import { createHash } from 'node:crypto';
-import { editeurRenseigne, type ContenuPublie, type SiteFacts } from '@prospeo/core';
+import {
+  editeurRenseigne,
+  getTrade,
+  templateRepoFor,
+  type ContenuPublie,
+  type SiteFacts,
+} from '@prospeo/core';
 import type { GithubClient } from '../sources/github.js';
 
 /** Plafond GitHub pour un nom de dépôt. */
@@ -142,6 +148,14 @@ export interface EtatSiteEcrit {
 
 export interface PublishDeps {
   github: GithubClient;
+  /**
+   * Dépôt modèle de repli, employé quand le métier n'en déclare pas.
+   *
+   * Vient de `PROSPEO_GITHUB_TEMPLATE_REPO`. Le métier prime : `trades.ts`
+   * porte un modèle par métier, et c'est ce repli qui permettra à une
+   * interface de gestion de trancher depuis la base sans toucher au code.
+   */
+  templateRepoDefaut?: string | undefined;
   lireEtat(prospectId: string): Promise<EtatSite | null>;
   enregistrer(prospectId: string, etat: EtatSiteEcrit): Promise<void>;
   /** Injectée plutôt que `new Date()` : une date de publication se teste. */
@@ -201,7 +215,14 @@ export async function runPublish(
       let sha: string | null = null;
 
       if (action === 'create') {
+        // Le modèle dépend du MÉTIER du prospect, pas du run : un lot peut
+        // mêler plombiers et serruriers, chacun partant de son propre dépôt.
+        const trade = getTrade(contenu.faits.metier.slug);
+        if (trade === undefined) {
+          throw new Error(`Métier inconnu : « ${contenu.faits.metier.slug} ».`);
+        }
         const cree = await deps.github.creerDepuisModele(
+          templateRepoFor(trade, deps.templateRepoDefaut),
           depot,
           `Site de démonstration — ${contenu.faits.nomAffiche}`,
         );

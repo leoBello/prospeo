@@ -20,12 +20,16 @@ function faussetch(reponses: { status: number; body?: unknown }[]) {
   return { fn: fn as unknown as typeof fetch, appels };
 }
 
-const OPTIONS = { token: 'ghp-test', org: 'prospeo-sites', templateRepo: 'site-artisan-template' };
+const OPTIONS = { token: 'ghp-test', org: 'prospeo' };
 
 describe('createGithubClient', () => {
   it('authentifie et épingle la version de l’API', async () => {
     const { fn, appels } = faussetch([{ status: 200, body: { full_name: 'o/r', html_url: 'u' } }]);
-    await createGithubClient({ ...OPTIONS, fetch: fn }).creerDepuisModele('dos-51000900400035', 'x');
+    await createGithubClient({ ...OPTIONS, fetch: fn }).creerDepuisModele(
+      'plombier',
+      'dos-51000900400035',
+      'x',
+    );
 
     const entetes = appels[0]?.init.headers as Record<string, string>;
     expect(entetes['Authorization']).toBe('Bearer ghp-test');
@@ -38,25 +42,25 @@ describe('createGithubClient', () => {
 
   it('crée le dépôt depuis le modèle, en privé', async () => {
     const { fn, appels } = faussetch([
-      { status: 201, body: { full_name: 'prospeo-sites/dos', html_url: 'https://github.com/x' } },
+      { status: 201, body: { full_name: 'prospeo/dos', html_url: 'https://github.com/x' } },
     ]);
     const r = await createGithubClient({ ...OPTIONS, fetch: fn }).creerDepuisModele(
+      'plombier',
       'dos-51000900400035',
       'Site de démonstration',
     );
 
-    expect(appels[0]?.url).toBe(
-      'https://api.github.com/repos/prospeo-sites/site-artisan-template/generate',
-    );
+    // Le modèle vient du MÉTIER du prospect, pas d'un réglage du run.
+    expect(appels[0]?.url).toBe('https://api.github.com/repos/prospeo/plombier/generate');
     const corps = JSON.parse(String(appels[0]?.init.body));
-    expect(corps.owner).toBe('prospeo-sites');
+    expect(corps.owner).toBe('prospeo');
     expect(corps.name).toBe('dos-51000900400035');
     // Privé : le dépôt porte le nom d'une entreprise réelle et contient notre
     // travail éditorial. Le SITE est public — c'est Vercel qui le sert — mais
     // rien n'oblige à exposer la source, et D5 prévoit de dépublier sur refus.
     // Un dépôt public resterait, lui, indexé et forkable.
     expect(corps.private).toBe(true);
-    expect(r).toEqual({ fullName: 'prospeo-sites/dos', htmlUrl: 'https://github.com/x' });
+    expect(r).toEqual({ fullName: 'prospeo/dos', htmlUrl: 'https://github.com/x' });
   });
 
   it('rend null quand le fichier de contenu n’existe pas encore', async () => {
@@ -76,7 +80,7 @@ describe('createGithubClient', () => {
     );
 
     expect(appels[0]?.url).toBe(
-      `https://api.github.com/repos/prospeo-sites/depot/contents/${CHEMIN_CONTENU}`,
+      `https://api.github.com/repos/prospeo/depot/contents/${CHEMIN_CONTENU}`,
     );
     expect(appels[0]?.init.method).toBe('PUT');
     const corps = JSON.parse(String(appels[0]?.init.body));
@@ -115,7 +119,7 @@ describe('createGithubClient', () => {
     // différentes, et aucune ne se devine d'un « échec de publication ».
     const { fn } = faussetch([{ status: 403, body: { message: 'Resource not accessible' } }]);
     await expect(
-      createGithubClient({ ...OPTIONS, fetch: fn }).creerDepuisModele('d', 'x'),
+      createGithubClient({ ...OPTIONS, fetch: fn }).creerDepuisModele('plombier', 'd', 'x'),
     ).rejects.toThrow(/403.*Resource not accessible/s);
   });
 });
