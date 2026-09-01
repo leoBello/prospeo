@@ -1485,9 +1485,8 @@ const SELECTORS = {
 };
 
 /** Google interpose /sorry/ ou une iframe reCAPTCHA quand il se méfie. */
-async function assertNotBlocked(context: BrowserContext, url: string): Promise<void> {
+function assertNotBlocked(url: string): void {
   if (url.includes('/sorry/') || url.includes('/recaptcha/')) throw new BlockedError(url);
-  void context;
 }
 
 export function createGoogleMapsSource(options: GoogleMapsOptions): MapsSource {
@@ -1511,7 +1510,7 @@ export function createGoogleMapsSource(options: GoogleMapsOptions): MapsSource {
       try {
         const url = `https://www.google.com/maps/search/${encodeURIComponent(query)}?hl=fr`;
         await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
-        await assertNotBlocked(ctx, page.url());
+        assertNotBlocked(page.url());
 
         // Le consentement n'apparaît qu'une fois par profil : le contexte
         // persistant conserve le cookie. Son retour à chaque run signale un
@@ -1587,7 +1586,7 @@ export function createGoogleMapsSource(options: GoogleMapsOptions): MapsSource {
     const page = await ctx.newPage();
     try {
       await page.goto(placeUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 });
-      await assertNotBlocked(ctx, page.url());
+      assertNotBlocked(page.url());
       return await readPlacePanel(page);
     } catch (error) {
       if (error instanceof BlockedError) throw error;
@@ -2508,15 +2507,24 @@ Ajouter `'review'` à `COMMANDS`, la ligne dans `USAGE`, et le `case` :
       const client = createClient(config);
       const rl = createInterface({ input: process.stdin, output: process.stdout });
 
-      const { data, error } = await client
-        .from('prospect_enrichment')
-        .select('prospect_id, candidates, prospect(denomination, denomination_usuelle, address, naf_code, trade_slug)')
-        .eq('status', 'ambiguous')
-        .order('prospect_id');
-      if (error) throw new Error(error.message);
+      // Paginé comme toute lecture du projet : la file ambiguë est courte
+      // aujourd'hui, mais une lecture non paginée présenterait une tranche
+      // arbitraire comme la file complète le jour où elle ne le sera plus.
+      const queue: Record<string, unknown>[] = [];
+      for (let from = 0; ; from += PAGE_SIZE) {
+        const { data, error } = await client
+          .from('prospect_enrichment')
+          .select('prospect_id, candidates, prospect(denomination, denomination_usuelle, address, naf_code, trade_slug)')
+          .eq('status', 'ambiguous')
+          .order('prospect_id')
+          .range(from, from + PAGE_SIZE - 1);
+        if (error) throw new Error(error.message);
+        queue.push(...((data ?? []) as unknown as Record<string, unknown>[]));
+        if ((data ?? []).length < PAGE_SIZE) break;
+      }
 
       let settled = 0;
-      for (const row of data ?? []) {
+      for (const row of queue) {
         const p = (Array.isArray(row.prospect) ? row.prospect[0] : row.prospect) as
           | Record<string, unknown>
           | null;
@@ -2549,7 +2557,7 @@ Ajouter `'review'` à `COMMANDS`, la ligne dans `USAGE`, et le `case` :
 
         if (decision.kind === 'skip') continue;
         try {
-          const updated = applyReviewDecision(row.prospect_id, candidates, decision);
+          const updated = applyReviewDecision(row.prospect_id as string, candidates, decision);
           const { error: writeError } = await client
             .from('prospect_enrichment')
             .upsert(updated, { onConflict: 'prospect_id' });
@@ -3129,11 +3137,17 @@ Ajouter `'domains'` à `COMMANDS`, sa ligne dans `USAGE`, et le `case` :
         if (trade === undefined) continue;
         const candidates = domainCandidates(row.denomination, trade);
 
-        // Le premier candidat libre suffit : c'est celui qu'on proposera.
-        let available: boolean | null = null;
+        // On cherche un candidat libre, pas le verdict du dernier essayé.
+        // `false` ne se dit que si TOUS ont été tranchés et pris ; il suffit
+        // d'un seul « je ne sais pas » pour que le champ reste `null`.
+        let available: boolean | null = candidates.length === 0 ? null : false;
         for (const name of candidates) {
-          available = await checkDomainAvailability(name, deps);
-          if (available === true) break;
+          const verdict = await checkDomainAvailability(name, deps);
+          if (verdict === true) {
+            available = true;
+            break;
+          }
+          if (verdict === null) available = null;
         }
 
         const { error } = await client.from('web_presence').upsert(
