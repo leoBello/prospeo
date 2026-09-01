@@ -1,4 +1,4 @@
-import { normalizeCompanyName, type ProbeResult } from '@prospeo/core';
+import type { ProbeResult } from '@prospeo/core';
 
 const PARKED_MARKERS = [
   'ce domaine est à vendre',
@@ -87,19 +87,6 @@ export async function probeUrl(
       isParked: false,
     };
   }
-}
-
-/**
- * Variantes de nom de domaine à tester. Heuristique assumée : l'absence
- * d'enregistrement DNS suggère fortement la disponibilité sans la garantir.
- */
-export function domainCandidates(denomination: string): string[] {
-  const words = normalizeCompanyName(denomination).split(' ').filter((w) => w.length > 1);
-  if (words.length === 0) return [];
-  if (words.length === 1) return [`${words[0]}.fr`];
-
-  const [first, second] = words as [string, string];
-  return [`${first}-${second}.fr`, `${first}${second}.fr`, `${second}-${first}.fr`];
 }
 
 /** Fenêtre au-delà de laquelle une sonde est considérée périmée. */

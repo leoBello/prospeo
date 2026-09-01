@@ -744,6 +744,7 @@ async function main(argv: string[]): Promise<number> {
       };
 
       let checked = 0;
+      let undecided = 0;
       for (const row of rows) {
         const trade = getTrade(row.trade_slug);
         if (trade === undefined) continue;
@@ -762,25 +763,39 @@ async function main(argv: string[]): Promise<number> {
           if (verdict === null) available = null;
         }
 
-        const { error } = await client.from('web_presence').upsert(
-          {
-            prospect_id: row.prospect_id,
-            domain_available: available,
-            domain_candidates: candidates,
-            domain_checked_at: new Date().toISOString(),
-          },
-          { onConflict: 'prospect_id' },
-        );
+        // L'horodatage n'est posé que si l'on a réellement appris quelque
+        // chose. Le poser sur un verdict `null` — une panne du registre, une
+        // expiration — affirmerait « vérifié » alors qu'on ne sait rien, et le
+        // filtre `domain_checked_at is null` ne rejouerait plus jamais ces
+        // prospects : une indisponibilité passagère les condamnerait
+        // définitivement. C'est la leçon de `probed_at`, qui a déjà coûté une
+        // migration au socle.
+        const write: {
+          prospect_id: string;
+          domain_candidates: string[];
+          domain_available?: boolean;
+          domain_checked_at?: string;
+        } = { prospect_id: row.prospect_id, domain_candidates: candidates };
+        if (available !== null) {
+          write.domain_available = available;
+          write.domain_checked_at = new Date().toISOString();
+        }
+
+        const { error } = await client
+          .from('web_presence')
+          .upsert(write, { onConflict: 'prospect_id' });
         if (error) {
-          process.stderr.write(`domains: échec sur ${row.prospect_id} — ${error.message}
-`);
+          process.stderr.write(`domains: échec sur ${row.prospect_id} — ${error.message}\n`);
           continue;
         }
-        checked += 1;
+        if (available === null) undecided += 1;
+        else checked += 1;
       }
 
-      process.stdout.write(`domains : ${checked} prospects vérifiés
-`);
+      process.stdout.write(
+        `domains : ${checked} prospects vérifiés` +
+          (undecided > 0 ? `, ${undecided} indécis (registre indisponible), à rejouer\n` : '\n'),
+      );
       return 0;
     }
     default:

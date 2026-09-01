@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectParked, domainCandidates, hasViewport, probeUrl, shouldProbe } from './probe.js';
+import { detectParked, hasViewport, probeUrl, shouldProbe } from './probe.js';
 
 describe('hasViewport', () => {
   it('detecte la balise viewport', () => {
@@ -78,24 +78,6 @@ describe('probeUrl', () => {
     }));
     expect(result.isHttps).toBe(true);
     expect(result.finalUrl).toBe('https://plomberie-martin.fr/');
-  });
-});
-
-describe('domainCandidates', () => {
-  it('propose des variantes en .fr a partir de la raison sociale', () => {
-    expect(domainCandidates('SARL PLOMBERIE MARTIN')).toEqual([
-      'plomberie-martin.fr',
-      'plomberiemartin.fr',
-      'martin-plomberie.fr',
-    ]);
-  });
-
-  it('renvoie une liste vide pour un nom d un seul mot', () => {
-    expect(domainCandidates('MARTIN')).toEqual(['martin.fr']);
-  });
-
-  it('tolere un nom vide', () => {
-    expect(domainCandidates('SARL')).toEqual([]);
   });
 });
 
