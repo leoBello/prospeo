@@ -38,10 +38,15 @@ const PAGE_SIZE = 500;
  * Plafond de prospects enrichis par jour.
  *
  * Il compte des **prospects**, pas des requêtes envoyées à Google, et l'écart
- * n'est pas anodin : un prospect coûte une navigation de recherche, plus une
- * par fiche ouverte — jusqu'à six. C'est pourtant ce compteur-là qu'on
- * retient, parce que c'est le seul qui survive à un redémarrage : il se relit
- * depuis la base, alors qu'un compteur de navigations exigerait une table.
+ * est considérable. Un prospect introuvable épuise les trois requêtes de
+ * `queriesFor`, et chacune charge sa page de résultats plus une fiche par
+ * candidat retenu (`maxCandidates`, cinq par défaut) : jusqu'à **dix-huit
+ * navigations** pour un seul prospect, et près de 5 400 pages pour un run
+ * plein — soit une dizaine d'heures au délai anti-bot de 3 à 8 secondes.
+ *
+ * C'est pourtant ce compteur-là qu'on retient, parce que c'est le seul qui
+ * survive à un redémarrage : il se relit depuis la base, alors qu'un compteur
+ * de navigations exigerait une table.
  *
  * Le volume réellement envoyé à Google est donc rapporté séparément en fin de
  * run, via `source.navigations`, pour rester visible plutôt que deviné.
@@ -145,9 +150,10 @@ async function main(argv: string[]): Promise<number> {
       // Même validation que `discover`, et pour la même raison : `Number('abc')`
       // rend NaN, et toute comparaison à NaN est fausse — la garde ne se
       // déclencherait jamais. Ici l'enjeu est plus lourd que là-bas : un
-      // `enrich` sans borne part sur 300 prospects, soit jusqu'à 1800 pages
-      // Google, alors que `--limit` sert justement à éprouver prudemment des
-      // seuils non calibrés.
+      // `enrich` sans borne part sur 300 prospects, soit jusqu'à 5 400 pages
+      // Google et une dizaine d'heures — voir le calcul au commentaire de
+      // `DAILY_CAP` — alors que `--limit` sert justement à éprouver
+      // prudemment des seuils non calibrés.
       let limit: number | undefined;
       if (argv.includes('--limit')) {
         const limitRaw = flag(argv, 'limit');
