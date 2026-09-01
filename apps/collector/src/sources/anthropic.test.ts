@@ -69,20 +69,21 @@ describe('createRedacteur', () => {
     // un invalidateur silencieux dans les consignes.
     const { client } = fauxClient({ parsed_output: {}, usage: USAGE });
     const r = await createRedacteur({ apiKey: 'k', trade: PLOMBIER, client }).rediger('c', 'f');
-    expect(r.usage).toEqual({ input: 120, cacheRead: 1800, output: 240 });
+    expect(r.usage).toEqual({ input: 120, cacheWrite: 0, cacheRead: 1800, output: 240 });
   });
 
-  it('compte l’écriture du cache comme de l’entrée pleine', async () => {
-    // Le premier appel d'un lot PAIE la constitution du cache, à un tarif
-    // supérieur à l'entrée ordinaire. La ranger dans `cacheRead` ferait croire
-    // à une économie là où il y a un surcoût, et le premier appel est
-    // justement celui qu'on regarde pour décider si le cache vaut le coup.
+  it('distingue l’écriture du cache de l’entrée de base', async () => {
+    // Les deux sont facturées différemment — 6,25 $/MTok contre 5 $ sur la
+    // grille Opus 4.8 — et l'écriture ne concerne que le PREMIER appel d'un
+    // lot, celui qu'on regarde justement pour décider si la mise en cache
+    // vaut le coup. Les additionner rendrait le rapport incapable de dire ce
+    // qu'un run a coûté.
     const { client } = fauxClient({
       parsed_output: {},
       usage: { ...USAGE, cache_creation_input_tokens: 1800, cache_read_input_tokens: 0 },
     });
     const r = await createRedacteur({ apiKey: 'k', trade: PLOMBIER, client }).rediger('c', 'f');
-    expect(r.usage).toEqual({ input: 1920, cacheRead: 0, output: 240 });
+    expect(r.usage).toEqual({ input: 120, cacheWrite: 1800, cacheRead: 0, output: 240 });
   });
 
   it('déclare le workspace quand la clé y est rattachée', async () => {

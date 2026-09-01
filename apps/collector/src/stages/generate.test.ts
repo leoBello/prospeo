@@ -44,10 +44,15 @@ describe('consignes', () => {
     // d'ordinaire et sur lesquelles la base ne sait RIEN, sans quoi il les
     // remplira de plausible.
     //
-    // Les cinq familles ci-dessous sont celles que la mesure a montrées
-    // absentes de la base, et celles qu'un artisan se fait reprocher au
-    // téléphone quand elles sont fausses.
-    for (const inconnu of ['horaires', 'délai', 'certification', 'tarif', 'avis']) {
+    // Les familles échantillonnées ci-dessous sont celles que la mesure a
+    // montrées absentes de la base, et celles qu'un artisan se fait reprocher
+    // au téléphone quand elles sont fausses.
+    //
+    // « clientèle » a été ajoutée en v2 après le premier appel réel : le
+    // modèle avait écrit « nous intervenons chez les particuliers », ce que la
+    // base ne sait pas. Ce n'était pas un caprice du modèle, c'était un trou
+    // dans la règle — il n'avait jamais été prévenu de cette absence-là.
+    for (const inconnu of ['horaires', 'délai', 'certification', 'tarif', 'avis', 'clientèle']) {
       expect(texte.toLowerCase()).toContain(inconnu);
     }
   });
@@ -116,7 +121,10 @@ describe('factsMessage', () => {
 });
 
 /** Client bidon : aucun appel réseau, réponses scriptées. */
-function fausseDeps(reponses: unknown[], usage = { input: 1200, cacheRead: 900, output: 300 }) {
+function fausseDeps(
+  reponses: unknown[],
+  usage = { input: 1200, cacheWrite: 0, cacheRead: 900, output: 300 },
+) {
   const appels: { system: string; user: string }[] = [];
   let i = 0;
   const deps: GenerateDeps = {
@@ -194,7 +202,7 @@ describe('runGenerate', () => {
     const { deps } = fausseDeps([REDACTION_VALIDE, REDACTION_VALIDE]);
     const deux = [UN, { ...UN, prospectId: 'p2' }];
     const r = await runGenerate(deux, deps);
-    expect(r.report.usage).toEqual({ input: 2400, cacheRead: 1800, output: 600 });
+    expect(r.report.usage).toEqual({ input: 2400, cacheWrite: 0, cacheRead: 1800, output: 600 });
   });
 
   it('poursuit le lot quand un appel échoue', async () => {

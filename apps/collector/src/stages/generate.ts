@@ -18,7 +18,7 @@ import {
  * six mois doit dire sous quelles règles il a été écrit. Toute modification du
  * texte ci-dessous impose de l'incrémenter.
  */
-export const PROMPT_VERSION = 'v1';
+export const PROMPT_VERSION = 'v2';
 
 /** Modèle retenu par le plan (tâche 2). */
 export const MODEL = 'claude-opus-4-8';
@@ -71,6 +71,9 @@ CE QUE TU NE SAIS PAS, ET QUE TU NE DOIS DONC JAMAIS ÉCRIRE :
     « prix attractifs ») ;
   - le nombre d'avis, de clients ou de chantiers réalisés ;
   - l'effectif, la taille de l'équipe, le nombre de salariés ;
+  - LA CLIENTÈLE : particuliers, professionnels, syndics, collectivités. La
+    base ne sait pas pour qui cette entreprise travaille. Écris ce qu'elle
+    fait, jamais pour qui elle le fait ;
   - la zone d'intervention au-delà de la ville qui te sera donnée (pas de
     « et alentours », pas de rayon en kilomètres, pas de département) ;
   - les garanties, la satisfaction client, et tout superlatif invérifiable
@@ -137,10 +140,26 @@ export function factsMessage(faits: SiteFacts): string {
   return `Voici les seuls faits connus sur cette entreprise.\n\n${lignes.join('\n')}`;
 }
 
-/** Ce que coûte un appel, en jetons. */
+/**
+ * Ce que coûte un appel, en jetons.
+ *
+ * Quatre compteurs et non trois, parce que les quatre sont facturés à des
+ * tarifs différents — mesurés sur la grille Opus 4.8 : 5 $/MTok en entrée,
+ * 6,25 $ pour une écriture de cache (1,25x), 0,50 $ pour une lecture (0,1x),
+ * 25 $ en sortie.
+ *
+ * La première version fusionnait l'écriture du cache avec l'entrée ordinaire.
+ * L'écart est faible sur un appel, mais il porte précisément sur le PREMIER
+ * appel d'un lot — celui qu'on regarde pour décider si la mise en cache vaut
+ * le coup. Sous-estimer le surcoût d'entrée fausse exactement la décision
+ * qu'on cherche à prendre.
+ */
 export interface Usage {
+  /** Entrée facturée au tarif de base. */
   input: number;
-  /** Jetons lus depuis le cache — facturés à tarif réduit. */
+  /** Constitution du cache, facturée 1,25x l'entrée. */
+  cacheWrite: number;
+  /** Lecture depuis le cache, facturée 0,1x l'entrée. */
   cacheRead: number;
   output: number;
 }
@@ -200,13 +219,14 @@ export async function runGenerate(
     generated: 0,
     rejected: 0,
     failed: 0,
-    usage: { input: 0, cacheRead: 0, output: 0 },
+    usage: { input: 0, cacheWrite: 0, cacheRead: 0, output: 0 },
   };
 
   for (const { prospectId, faits, trade } of inputs) {
     try {
       const { redaction, usage } = await deps.rediger(consignes(trade), factsMessage(faits));
       report.usage.input += usage.input;
+      report.usage.cacheWrite += usage.cacheWrite;
       report.usage.cacheRead += usage.cacheRead;
       report.usage.output += usage.output;
 

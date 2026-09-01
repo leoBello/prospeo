@@ -111,11 +111,14 @@ export function createRedacteur(options: RedacteurOptions): GenerateDeps {
 /**
  * Les jetons consommés, dans la forme que le rapport additionne.
  *
- * `cache_read_input_tokens` est relevé à part : c'est le seul moyen de
- * CONSTATER que la mise en cache du préfixe sert, plutôt que de l'espérer. Un
+ * Les trois formes d'entrée sont relevées SÉPARÉMENT parce qu'elles sont
+ * facturées séparément : entrée de base, écriture de cache à 1,25x, lecture
+ * de cache à 0,1x. Les additionner rendrait le rapport incapable de dire ce
+ * qu'un run a réellement coûté, ce que le §4 du plan exige.
+ *
+ * `cache_read_input_tokens` a de surcroît une valeur de diagnostic : un
  * compteur qui reste à zéro d'un appel à l'autre signale un invalidateur
- * silencieux dans les consignes, et le §4 du plan veut que ce qui coûte soit
- * compté et affiché.
+ * silencieux dans les consignes.
  */
 function lireUsage(usage: {
   input_tokens?: number | null;
@@ -124,7 +127,8 @@ function lireUsage(usage: {
   output_tokens?: number | null;
 }): Usage {
   return {
-    input: (usage.input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0),
+    input: usage.input_tokens ?? 0,
+    cacheWrite: usage.cache_creation_input_tokens ?? 0,
     cacheRead: usage.cache_read_input_tokens ?? 0,
     output: usage.output_tokens ?? 0,
   };
