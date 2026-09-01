@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assembleFacts, SITE_FACT_KEYS } from './site-facts.js';
+import { assembleFacts, NOTE_MINIMALE_AFFICHABLE, SITE_FACT_KEYS } from './site-facts.js';
 import type { SiteFactsInput } from './site-facts.js';
 
 /**
@@ -121,6 +121,37 @@ describe('assembleFacts', () => {
     expect(facts?.lienMaps).toBeNull();
     // Le reste tient debout sans eux.
     expect(facts?.nomAffiche).toBe('Dos-Services');
+  });
+
+  it('tait une note que l’artisan n’aurait pas envie de montrer', () => {
+    // Décision prise avec l'utilisateur après la génération d'AQUATIO, dont la
+    // note réelle est 3,4. Le site l'affichait telle quelle sur une vitrine
+    // censée donner envie d'appeler — et le premier réflexe de l'artisan à qui
+    // on montre sa maquette aurait été « pourquoi vous affichez ça ? ».
+    //
+    // Le seuil est celui du barème (`SCORING_RULESET.reputation.minRating`),
+    // pas un nombre neuf : une note qui ne vaut pas de points ne vaut pas
+    // d'être mise en avant, et faire diverger les deux obligerait à expliquer
+    // pourquoi le même chiffre est bon d'un côté et mauvais de l'autre.
+    expect(NOTE_MINIMALE_AFFICHABLE).toBe(4);
+
+    const basse = { ...DOS_SERVICES, enrichment: { ...DOS_SERVICES.enrichment!, rating: 3.4 } };
+    expect(assembleFacts(basse)?.noteGoogle).toBeNull();
+
+    // Pile au seuil : affichée. Le barème lit `>= 4`, on lit pareil.
+    const pile = { ...DOS_SERVICES, enrichment: { ...DOS_SERVICES.enrichment!, rating: 4 } };
+    expect(assembleFacts(pile)?.noteGoogle).toBe(4);
+    expect(assembleFacts(DOS_SERVICES)?.noteGoogle).toBe(4.6);
+  });
+
+  it('applique le seuil AVANT le prompt, et pas à l’affichage', () => {
+    // La différence est tout le sujet. Filtrer dans le gabarit aurait laissé
+    // la note basse atteindre le modèle, qui pouvait alors écrire « nos
+    // clients nous notent 3,4 » dans sa prose — et la prose, elle, n'est pas
+    // filtrée par le gabarit. Ce que `assembleFacts` ne renvoie pas ne peut
+    // atteindre ni le prompt, ni la page.
+    const basse = { ...DOS_SERVICES, enrichment: { ...DOS_SERVICES.enrichment!, rating: 2.6 } };
+    expect(JSON.stringify(assembleFacts(basse))).not.toContain('2.6');
   });
 
   it("dérive l'année de création, et pas l'ancienneté en années", () => {

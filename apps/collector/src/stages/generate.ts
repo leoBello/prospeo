@@ -18,7 +18,7 @@ import {
  * six mois doit dire sous quelles règles il a été écrit. Toute modification du
  * texte ci-dessous impose de l'incrémenter.
  */
-export const PROMPT_VERSION = 'v2';
+export const PROMPT_VERSION = 'v3';
 
 /** Modèle retenu par le plan (tâche 2). */
 export const MODEL = 'claude-opus-4-8';
@@ -83,19 +83,51 @@ N'ÉCRIS AUCUN CHIFFRE qui ne figure pas dans les faits donnés. Une année, une
 note ou un numéro de téléphone que tu inventerais seront détectés et la
 génération sera rejetée.
 
+CE QUE LA PAGE AFFICHE DEJA, ET QUE TU NE DOIS DONC PAS REPETER
+La page est composee dans cet ordre, et tout ce qui suit y figure SANS que tu
+aies a l'ecrire :
+
+  1. une ligne « <Metier> a <Ville> depuis <annee> », composee automatiquement ;
+  2. le nom de l'entreprise, en gros titre ;
+  3. TON ACCROCHE ;
+  4. la note Google, si elle est connue ;
+  5. le bouton d'appel avec le numero ;
+  6. TA PRESENTATION ;
+  7. les prestations que tu as retenues, chacune avec son titre et sa
+     description, en cartes.
+
+Repeter l'un de ces elements dans ton texte donne une page qui se redit deux
+fois en trois centimetres.
+
 CE QUE TU PRODUIS — trois champs, et rien d'autre :
 
 1. accroche
-   Une phrase de ${REDACTION_LIMITS.accroche.min} à ${REDACTION_LIMITS.accroche.max} caractères,
-   affichée sous le nom de l'entreprise. Elle dit le métier et la ville, et ce
-   que l'artisan fait concrètement. Pas de point final.
+   Une phrase de ${REDACTION_LIMITS.accroche.min} a ${REDACTION_LIMITS.accroche.max} caracteres, affichee entre le nom de
+   l'entreprise et la note.
+
+   NE REPETE NI LE METIER NI LA VILLE : ils sont ecrits juste au-dessus. Une
+   accroche qui commence par « Plombier a Nantes » redit mot pour mot la ligne
+   precedente — et elle serait de surcroit IDENTIQUE sur tous les sites du
+   meme metier dans la meme ville, puisque rien d'autre n'y varierait.
+
+   Dis plutot, concretement, ce que l'artisan prend en charge, en t'appuyant
+   sur les prestations que tu as retenues. Pas de point final.
 
 2. presentation
-   Un paragraphe de ${REDACTION_LIMITS.presentation.min} à ${REDACTION_LIMITS.presentation.max} caractères.
-   Il s'adresse au client au vouvoiement. Il reste concret : qui intervient,
-   pour qui, sur quoi. Si l'année de création t'est donnée, tu peux l'employer
-   telle quelle (« depuis 2009 »), jamais convertie en durée — le texte restera
-   en ligne plusieurs années.
+   Un paragraphe de ${REDACTION_LIMITS.presentation.min} a ${REDACTION_LIMITS.presentation.max} caracteres, au vouvoiement.
+
+   N'ENUMERE PAS LES PRESTATIONS : elles sont affichees juste en dessous, avec
+   leur description. Les lister ici fait lire deux fois la meme chose.
+
+   Ce paragraphe sert a SITUER l'entreprise. Les seuls appuis dont tu disposes
+   sont : l'annee de creation quand elle t'est donnee — c'est le fait le plus
+   fort de tous, surtout s'il est ancien —, la ville, et le fait qu'on joigne
+   l'artisan directement au telephone, ce qui est vrai puisque son numero est
+   sur la page. Emploie l'annee TELLE QUELLE (« depuis 2009 »), jamais
+   convertie en duree : le texte restera en ligne plusieurs annees.
+
+   Si ces appuis ne suffisent pas a remplir le paragraphe sans te repeter,
+   fais-le plus court plutot que de le gonfler.
 
 3. prestations
    Entre ${REDACTION_LIMITS.prestations.min} et ${REDACTION_LIMITS.prestations.max} codes CHOISIS dans la liste ci-dessous,

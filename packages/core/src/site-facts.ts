@@ -1,4 +1,5 @@
 import { normalizePhone } from './phone.js';
+import { SCORING_RULESET } from './scoring.js';
 import { getTrade } from './trades.js';
 
 /**
@@ -47,7 +48,10 @@ export interface SiteFacts {
    * du barème, qui figent « Créée il y a 13 ans » sans dire de quand.
    */
   anneeCreation: number | null;
-  /** Note Google, sans jamais le nombre d'avis qui la fonderait. */
+  /**
+   * Note Google, sans jamais le nombre d'avis qui la fonderait, et seulement
+   * si elle atteint `NOTE_MINIMALE_AFFICHABLE`.
+   */
   noteGoogle: number | null;
   lienMaps: string | null;
   /** Dénomination Sirene brute, réservée aux mentions légales. */
@@ -173,6 +177,31 @@ function decoupeAdresse(input: SiteFactsInput): SiteFacts['adresse'] {
   };
 }
 
+/**
+ * En deçà, la note n'est pas affichée.
+ *
+ * Le seuil n'est pas invente : c'est celui que `SCORING_RULESET.reputation`
+ * emploie deja pour recompenser une reputation etablie. Une seule valeur, deux
+ * usages — le bareme decide qu'une note en dessous de 4 ne vaut pas de points,
+ * la vitrine decide qu'elle ne vaut pas d'etre mise en avant. Les faire
+ * diverger obligerait a expliquer pourquoi le meme chiffre est bon d'un cote
+ * et mauvais de l'autre.
+ *
+ * **Ce n'est pas dissimuler.** Aucune vitrine d'artisan n'affiche
+ * spontanement sa note Google, et le lien Maps figure sur la page : la note
+ * reste consultable en un clic. On choisit de ne pas mettre en avant ce qui
+ * dessert l'artisan a qui l'on veut vendre le site — pas de le nier.
+ *
+ * Le seuil s'applique DANS `assembleFacts` plutot que dans le gabarit, et
+ * c'est ce qui compte : le modele ne voit jamais une note basse, donc il ne
+ * peut pas la mentionner dans sa prose. Filtrer a l'affichage aurait laisse
+ * « nos clients nous notent 3,4 » atteindre la page par la bande.
+ *
+ * Mesure au 1er septembre 2026 : sur les 22 cibles, 15 portent une note, dont
+ * `AQUATIO` a 3,4 et `ERDRE CHAUFFAGE` a 2,6.
+ */
+export const NOTE_MINIMALE_AFFICHABLE = SCORING_RULESET.reputation.minRating;
+
 /** `+33602002360` → `06 02 00 23 60`, la forme que l'on lit à voix haute. */
 function affichageTelephone(e164: string): string {
   const national = `0${e164.slice(3)}`;
@@ -197,6 +226,11 @@ function affichageTelephone(e164: string): string {
  * prospects écartés et poursuit son lot, au lieu d'interrompre un run entier
  * sur une ligne incomplète.
  */
+function noteAffichable(rating: number | null): number | null {
+  if (rating === null) return null;
+  return rating >= NOTE_MINIMALE_AFFICHABLE ? rating : null;
+}
+
 export function assembleFacts(input: SiteFactsInput): SiteFacts | null {
   const trade = getTrade(input.tradeSlug);
   if (trade === undefined) return null;
@@ -217,7 +251,7 @@ export function assembleFacts(input: SiteFactsInput): SiteFacts | null {
     adresse: decoupeAdresse(input),
     telephone: { e164: phone.e164, affichage: affichageTelephone(phone.e164) },
     anneeCreation: anneeCreation !== null && Number.isFinite(anneeCreation) ? anneeCreation : null,
-    noteGoogle: input.enrichment?.rating ?? null,
+    noteGoogle: noteAffichable(input.enrichment?.rating ?? null),
     lienMaps: input.enrichment?.mapsUrl ?? null,
     raisonSociale: input.denomination,
     siret: input.siret,

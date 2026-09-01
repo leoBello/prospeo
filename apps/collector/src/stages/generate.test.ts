@@ -82,6 +82,26 @@ describe('consignes', () => {
     expect(consignes(PLOMBIER)).toBe(consignes(PLOMBIER));
   });
 
+  it('décrit au modèle ce que la page affiche déjà', () => {
+    // Trouvé sur trois generations reelles, pas sur une : deux accroches sur
+    // trois etaient RIGOUREUSEMENT identiques — « Plombier a Nantes, depannage
+    // et sanitaire » — et la troisieme en differait d'un mot.
+    //
+    // La faute etait dans la consigne, pas dans le modele. Elle disait « elle
+    // dit le metier et la ville » ; or metier et ville sont les memes pour les
+    // 22 plombiers nantais, et le gabarit les affiche DEJA sur la ligne
+    // au-dessus. On demandait litteralement au modele de produire la meme
+    // phrase, en double.
+    //
+    // Meme cause pour la redondance de la presentation, systematique elle
+    // aussi (3 sur 3) : elle enumerait les prestations que les cartes listent
+    // juste en dessous. Un modele qui ignore la mise en page ne peut pas
+    // deviner ce qui fait doublon.
+    expect(texte).toContain('CE QUE LA PAGE AFFICHE DEJA');
+    expect(texte).toMatch(/NE REPETE NI LE METIER NI LA VILLE/);
+    expect(texte).toMatch(/N'ENUMERE PAS LES PRESTATIONS/);
+  });
+
   it('annonce les bornes de longueur plutôt que de les faire découvrir', () => {
     // Une contrainte de rédaction se donne à l'écriture. Un texte trop long
     // rejeté par le schéma coûte un second appel entier ; tronqué après coup,
