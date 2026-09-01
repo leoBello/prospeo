@@ -16,6 +16,7 @@
 
 - TypeScript en mode `strict`, `noUncheckedIndexedAccess` activé.
 - Environnement vérifié du poste : Node v26.3.0, pnpm 11.24.0. Ne pas épingler d'autres versions.
+- Sous pnpm 11, `pnpm --filter <pkg> start -- <args>` transmet le `--` littéralement à la commande. Écrire `pnpm --filter <pkg> start <args>`, sans séparateur.
 - `packages/core` ne fait **aucune I/O** : ni réseau, ni fichier, ni base. Aucune dépendance runtime hors `zod`.
 - Chaque étage du collector écrit **un prospect à la fois**, jamais par lot.
 - Codes NAF au format API avec point : `43.22A`, jamais `4322A`.
@@ -1512,7 +1513,7 @@ main(process.argv.slice(2))
 Run: `pnpm --filter @prospeo/collector test`
 Expected: PASS — 3 tests
 
-Run: `pnpm --filter @prospeo/collector start -- --help`
+Run: `pnpm --filter @prospeo/collector start --help`
 Expected: l'usage s'affiche, code de sortie 0
 
 - [ ] **Step 8: Commit**
@@ -2117,7 +2118,7 @@ Expected: PASS — 12 tests
 
 Renseigner `.env` à partir de `.env.example`, puis :
 
-Run: `pnpm --filter @prospeo/collector start -- discover --trade plombier --postal-code 44000 --limit 20`
+Run: `pnpm --filter @prospeo/collector start discover --trade plombier --postal-code 44000 --limit 20`
 Expected: `discover plombier 44000 : 20/20 enregistrés`
 
 Relancer la même commande.
@@ -2659,9 +2660,9 @@ Expected: PASS — 27 tests, aucune erreur de type
 - [ ] **Step 6: Vérifier le pipeline complet en réel**
 
 ```bash
-pnpm --filter @prospeo/collector start -- discover --trade plombier --postal-code 44000
-pnpm --filter @prospeo/collector start -- probe
-pnpm --filter @prospeo/collector start -- score
+pnpm --filter @prospeo/collector start discover --trade plombier --postal-code 44000
+pnpm --filter @prospeo/collector start probe
+pnpm --filter @prospeo/collector start score
 ```
 
 Expected: la troisième commande affiche `score : N prospects notés, 0 en attente de sonde`.
