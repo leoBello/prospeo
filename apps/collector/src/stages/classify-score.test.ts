@@ -16,6 +16,7 @@ const base: ScoreRowInput = {
   phoneRaw: null,
   denomination: 'PLOMBERIE MARTIN',
   isClosed: false,
+  enrichmentStatus: 'not_found',
 };
 
 describe('buildScoreRow', () => {
@@ -23,7 +24,7 @@ describe('buildScoreRow', () => {
     const row = buildScoreRow(base, NOW)!;
     expect(row.category).toBe('none');
     expect(row.total).toBe(10); // 35 présence - 25 absence de téléphone
-    expect(row.rulesetVersion).toBe('v1');
+    expect(row.rulesetVersion).toBe('v2');
   });
 
   it('valorise une page Facebook avec mobile et bonne reputation', () => {
@@ -105,6 +106,7 @@ function input(over: Partial<ScoreRowInput> = {}): ScoreRowInput {
     phoneRaw: null,
     denomination: 'PLOMBERIE MARTIN',
     isClosed: false,
+  enrichmentStatus: 'not_found',
     ...over,
   };
 }
@@ -118,14 +120,41 @@ describe('planScoreWrite', () => {
   });
 
   it('demande un effacement quand un domaine propre attend la sonde', () => {
-    // `declaredUrl` sur un domaine propre et `probe` à null : c'est
-    // exactement le cas que `enrich` va créer en masse.
-    const write = planScoreWrite(input({ declaredUrl: 'https://exemple.fr' }));
-    expect(write).toEqual({ kind: 'erase', prospectId: 'p1' });
+    // `declaredUrl` sur un domaine propre et `probe` a null : c'est
+    // exactement le cas que `enrich` va creer en masse.
+    const write = planScoreWrite(input({ declaredUrl: 'https://exemple.fr', enrichmentStatus: 'ok' }));
+    expect(write).toEqual({ kind: 'erase', prospectId: 'p1', reason: 'probe' });
+  });
+
+  it('efface au lieu de noter un prospect jamais enrichi', () => {
+    // Sans ligne d'enrichissement, personne n'a regarde. Le noter « aucune
+    // presence web » a 20 points reproduirait exactement la pathologie que ce
+    // chantier existe pour corriger.
+    const write = planScoreWrite(input({ enrichmentStatus: null }));
+    expect(write).toEqual({ kind: 'erase', prospectId: 'p1', reason: 'enrichment' });
+  });
+
+  it('efface au lieu de noter un prospect dont le run a ete bloque', () => {
+    // Le cas le plus net : le code SAIT qu'il a ete empeche de regarder.
+    const write = planScoreWrite(input({ enrichmentStatus: 'blocked' }));
+    expect(write).toEqual({ kind: 'erase', prospectId: 'p1', reason: 'enrichment' });
+  });
+
+  it('efface au lieu de noter un prospect en attente de revue manuelle', () => {
+    const write = planScoreWrite(input({ enrichmentStatus: 'ambiguous' }));
+    expect(write).toEqual({ kind: 'erase', prospectId: 'p1', reason: 'enrichment' });
+  });
+
+  it('note un prospect reellement introuvable sur Maps', () => {
+    // `not_found` EST une observation : on a cherche, et conclu a l'absence.
+    const write = planScoreWrite(input({ enrichmentStatus: 'not_found' }));
+    expect(write.kind).toBe('score');
   });
 
   it('ne demande pas d effacement pour une URL sociale, classable sans sonde', () => {
-    const write = planScoreWrite(input({ declaredUrl: 'https://facebook.com/plomberie' }));
+    const write = planScoreWrite(
+      input({ declaredUrl: 'https://facebook.com/plomberie', enrichmentStatus: 'ok' }),
+    );
     expect(write.kind).toBe('score');
   });
 });

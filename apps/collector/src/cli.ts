@@ -7,7 +7,7 @@ import { loadConfig } from './config.js';
 import { createClient } from './supabase.js';
 import { createGoogleMapsSource } from './sources/google-maps.js';
 import { fetchStatusBySiret } from './sources/recherche-entreprises.js';
-import { planScoreWrite } from './stages/classify-score.js';
+import { planScoreWrite, type ScoreRowInput } from './stages/classify-score.js';
 import { makeUpsertProspect, runDiscover } from './stages/discover.js';
 import { checkDomainAvailability, rdapStatus } from './stages/domains.js';
 import { runEnrich, type EnrichProspect, type ReviewCandidate } from './stages/enrich.js';
@@ -92,7 +92,7 @@ function fetchScorePage(client: ReturnType<typeof createClient>, from: number) {
   return client
     .from('prospect')
     .select(
-      'id, denomination, date_creation, effectif_code, is_closed, prospect_enrichment(declared_url, social_urls, phone_e164, rating, review_count), web_presence(category, probed_url, http_status, is_https, final_url, is_parked, has_viewport_meta, last_social_post_at)',
+      'id, denomination, date_creation, effectif_code, is_closed, prospect_enrichment(status, declared_url, social_urls, phone_e164, rating, review_count), web_presence(category, probed_url, http_status, is_https, final_url, is_parked, has_viewport_meta, last_social_post_at)',
     )
     .order('id')
     .range(from, from + PAGE_SIZE - 1);
@@ -524,7 +524,11 @@ async function main(argv: string[]): Promise<number> {
       if (error) throw new Error(error.message);
 
       let scored = 0;
-      let pending = 0;
+      // Deux populations distinctes, qui n'appellent pas la même commande :
+      // l'une attend un run de `enrich`, l'autre un run de `probe`. Les
+      // confondre sous un seul « en attente » cacherait laquelle relancer.
+      let pendingEnrichment = 0;
+      let pendingProbe = 0;
       let eraseFailed = 0;
 
       for (const p of data ?? []) {
@@ -561,6 +565,10 @@ async function main(argv: string[]): Promise<number> {
           // Renseigné par `reconcile`. La valeur codée en dur d'origine
           // rendait le disqualifiant du barème inatteignable.
           isClosed: p.is_closed === true,
+          // `null` quand le prospect n'a aucune ligne d'enrichissement, ce qui
+          // veut dire que personne ne l'a encore regardé.
+          enrichmentStatus:
+            (enrichment?.status as ScoreRowInput['enrichmentStatus'] | undefined) ?? null,
         });
 
         if (write.kind === 'erase') {
@@ -587,7 +595,8 @@ async function main(argv: string[]): Promise<number> {
             eraseFailed += 1;
             continue;
           }
-          pending += 1;
+          if (write.reason === 'enrichment') pendingEnrichment += 1;
+          else pendingProbe += 1;
           continue;
         }
 
@@ -630,7 +639,10 @@ async function main(argv: string[]): Promise<number> {
         scored += 1;
       }
 
-      process.stdout.write(`score : ${scored} prospects notés, ${pending} en attente de sonde\n`);
+      process.stdout.write(
+        `score : ${scored} prospects notés, ${pendingEnrichment} en attente d'enrichissement, ` +
+          `${pendingProbe} en attente de sonde\n`,
+      );
       // N'apparaît que si non nul : une ligne « 0 en échec » à chaque run
       // n'apprend rien et noierait le signal les fois où il compte.
       if (eraseFailed > 0) {
