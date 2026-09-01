@@ -1,9 +1,9 @@
 ---
-import type { SiteContent } from '@prospeo/core';
+import type { ContenuPublie } from '../content/contrat';
 import { nombreFr, t } from '../content/ui';
 
 interface Props {
-  contenu: SiteContent;
+  contenu: ContenuPublie;
 }
 const { faits, redaction } = Astro.props.contenu;
 

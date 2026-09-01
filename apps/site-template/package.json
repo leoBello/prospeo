@@ -11,8 +11,8 @@
     "typecheck": "astro check --minimumSeverity error"
   },
   "dependencies": {
-    "@prospeo/core": "workspace:*",
-    "astro": "^7.2.9"
+    "astro": "^7.2.9",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",

@@ -1,6 +1,5 @@
 ---
-import type { SiteContent } from '@prospeo/core';
-import { prestationsRetenues } from '../content/load';
+import type { ContenuPublie } from '../content/contrat';
 import Bandeau from './Bandeau.astro';
 import BarreAppel from './BarreAppel.astro';
 import Contact from './Contact.astro';
@@ -9,7 +8,7 @@ import MentionsLegales from './MentionsLegales.astro';
 import Prestations from './Prestations.astro';
 
 interface Props {
-  contenu: SiteContent;
+  contenu: ContenuPublie;
 }
 const { contenu } = Astro.props;
 
@@ -28,7 +27,7 @@ const { contenu } = Astro.props;
 <Bandeau entreprise={contenu.faits.nomAffiche} />
 <Hero contenu={contenu} />
 <main>
-  <Prestations prestations={prestationsRetenues(contenu)} />
+  <Prestations prestations={contenu.redaction.prestations} />
   <Contact contenu={contenu} />
 </main>
 <MentionsLegales contenu={contenu} />

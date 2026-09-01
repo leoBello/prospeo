@@ -12,3 +12,4 @@ export * from './domain-name.js';
 export * from './site-facts.js';
 export * from './site-content.js';
 export * from './site-coherence.js';
+export * from './site-publie.js';

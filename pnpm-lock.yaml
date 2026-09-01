@@ -94,12 +94,12 @@ importers:
 
   apps/site-template:
     dependencies:
-      '@prospeo/core':
-        specifier: workspace:*
-        version: link:../../packages/core
       astro:
         specifier: ^7.2.9
         version: 7.2.9(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.4.0)(tsx@4.23.13)(yaml@2.9.0)
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
     devDependencies:
       '@astrojs/check':
         specifier: ^0.9.10

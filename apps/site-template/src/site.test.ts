@@ -15,9 +15,9 @@ async function rendu(contenu = CONTENU): Promise<string> {
 }
 
 describe('chargerContenu', () => {
-  it('valide le fichier de contenu contre le schéma de packages/core', () => {
+  it('valide le fichier de contenu contre le contrat du gabarit', () => {
     expect(CONTENU.faits.nomAffiche).toBe('Dos-Services');
-    expect(CONTENU.redaction.prestations).toContain('depannage');
+    expect(CONTENU.redaction.prestations.map((p) => p.code)).toContain('depannage');
   });
 
   it('fait échouer le build plutôt que de publier une page amputée', () => {
@@ -32,11 +32,25 @@ describe('chargerContenu', () => {
     expect(() => chargerContenu({ ...exemple, redaction: undefined })).toThrow();
   });
 
-  it('refuse une prestation absente de la liste close du métier', () => {
+  it('exige un éditeur identifiable', () => {
+    // §11 conformité : un site publié au nom d'un tiers doit nommer son
+    // éditeur réel et offrir un moyen d'en demander le retrait. Sans lui, le
+    // build échoue — la page ne peut pas exister.
+    expect(() => chargerContenu({ ...exemple, editeur: undefined })).toThrow();
+  });
+
+  it('refuse un contenu qui déborde du contrat', () => {
+    // `.strict()` : un champ inconnu signale un fichier écrit par autre chose
+    // que la chaîne, ou par une version qui ne s'entend plus avec celle-ci.
+    expect(() => chargerContenu({ ...exemple, anneesExperience: 20 })).toThrow();
+    // Deux prestations : la section aurait l'air d'un site inachevé.
     expect(() =>
       chargerContenu({
         ...exemple,
-        redaction: { ...exemple.redaction, prestations: ['depannage', 'devis-gratuit', 'sanitaire'] },
+        redaction: {
+          ...exemple.redaction,
+          prestations: exemple.redaction.prestations.slice(0, 2),
+        },
       }),
     ).toThrow();
   });
@@ -69,6 +83,10 @@ describe('le gabarit', () => {
     // rien demandé. Lui attribuer l'édition d'une page qu'il n'a pas
     // commandée serait faux, et le rendrait responsable de son contenu.
     const html = await rendu();
+    expect(html).toContain(CONTENU.editeur.nom);
+    // L'adresse de retrait est le mécanisme d'opposition : sans elle, la
+    // mention légale ne serait qu'une déclaration sans effet.
+    expect(html).toContain(CONTENU.editeur.contact);
     expect(html).toContain(CONTENU.faits.siret);
     expect(html).toContain(CONTENU.faits.raisonSociale);
   });
@@ -79,10 +97,12 @@ describe('le gabarit', () => {
     expect(html).toContain(CONTENU.faits.telephone.affichage);
   });
 
-  it('rend les prestations par leurs libellés de trades.ts, dans l’ordre choisi', async () => {
-    // Le fichier de contenu ne porte que des codes. Les libellés et les
-    // descriptions viennent du code, jamais du modèle : c'est ce qui rend
-    // impossible qu'un site annonce une prestation inventée.
+  it('rend les prestations dans l’ordre choisi par le modèle', async () => {
+    // Les libellés arrivent DÉJÀ RÉSOLUS depuis `trades.ts`, via
+    // `composerContenuPublie` : le modèle n'a choisi que des codes, et il
+    // n'a jamais rédigé un seul de ces textes. La garantie « aucune
+    // prestation inventée » est acquise à la génération ; ici on vérifie
+    // seulement qu'elle arrive intacte à l'écran.
     const html = await rendu();
     expect(html).toContain('Dépannage');
     expect(html).toContain('Chauffe-eau et ballon');

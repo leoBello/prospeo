@@ -1,11 +1,11 @@
 ---
-import type { SiteContent } from '@prospeo/core';
-import { EDITEUR, t } from '../content/ui';
+import type { ContenuPublie } from '../content/contrat';
+import { t } from '../content/ui';
 
 interface Props {
-  contenu: SiteContent;
+  contenu: ContenuPublie;
 }
-const { faits } = Astro.props.contenu;
+const { editeur, faits } = Astro.props.contenu;
 
 /*
  * §11 conformité, appliqué à un site que personne n'a commandé.
@@ -21,10 +21,12 @@ const { faits } = Astro.props.contenu;
  * demande alimente le statut `ne_pas_contacter`, que D5 fait suivre d'une
  * dépublication immédiate.
  *
- * À FAIRE (tâche 3) : `publish` doit refuser de créer un dépôt tant que
- * `EDITEUR` porte sa valeur d'attente. Un site sans éditeur identifiable ne
- * doit pas pouvoir atteindre le réseau — et le vérifier au moment de publier
- * vaut mieux qu'ici, où l'on ne ferait qu'échouer un build local.
+ * L'éditeur arrive par le fichier de contenu, écrit par `publish` depuis la
+ * constante `EDITEUR` de `packages/core`. Le schéma l'EXIGE : un fichier sans
+ * éditeur fait échouer le build, et `publish` (tâche 3) refuse en amont de
+ * créer un dépôt tant que la constante porte sa valeur d'attente. Le contrôle
+ * est là plutôt qu'ici parce qu'un build local rouge se contourne, quand une
+ * publication refusée non.
  */
 ---
 
@@ -35,7 +37,7 @@ const { faits } = Astro.props.contenu;
     <dl>
       <div class="ligne">
         <dt>{t('legal.publisher')}</dt>
-        <dd>{EDITEUR.nom}</dd>
+        <dd>{editeur.nom}</dd>
       </div>
       <div class="ligne">
         <dt>{t('legal.company')}</dt>
@@ -47,7 +49,7 @@ const { faits } = Astro.props.contenu;
       </div>
     </dl>
 
-    <p class="avis">{t('legal.notice', { contact: EDITEUR.contact })}</p>
+    <p class="avis">{t('legal.notice', { contact: editeur.contact })}</p>
     <p class="sources">{t('legal.sources')}</p>
   </div>
 </footer>

@@ -60,34 +60,15 @@ export const ui = {
 
 export type UiKey = keyof typeof ui;
 
-/**
- * L'identité de l'éditeur, à renseigner avant toute publication.
+/*
+ * L'identité de l'éditeur ne vit PAS ici.
  *
- * Elle ne vient pas de `site.json` : ce fichier décrit l'artisan, pas nous, et
- * un éditeur que la génération pourrait récrire ne serait pas une mention
- * légale. Elle ne vient pas non plus d'une variable d'environnement, parce
- * qu'une variable oubliée se remplacerait silencieusement par un repli — et un
- * site publié sans éditeur identifiable est précisément ce que le §11
- * conformité interdit.
- *
- * Elle est donc ici, en clair, dans le dépôt modèle : visible et versionnée.
- *
- * Le garde-fou qui l'accompagne n'est PAS un test de ce paquet, et c'est
- * délibéré. Faire échouer la suite du gabarit signalerait le trou à celui qui
- * développe, quand il faut le signaler à celui qui publie : `editeurRenseigne`
- * est appelée par l'étage `publish` (tâche 3), qui refuse de créer un dépôt
- * tant que ces deux valeurs sont celles d'attente. Un build local rouge se
- * contourne ; une publication refusée, non.
+ * Elle est dans `packages/core` (`EDITEUR`) et voyage dans le fichier de
+ * contenu, sous la clé `editeur`. La raison est mécanique : `publish` doit
+ * pouvoir refuser de créer un dépôt tant qu'elle n'est pas renseignée, et
+ * `publish` ne lit pas les sources du gabarit. La valeur et son garde-fou
+ * doivent être du même côté — sinon le garde-fou n'en est pas un.
  */
-export const EDITEUR = {
-  nom: 'À RENSEIGNER',
-  contact: 'a-renseigner@example.com',
-} as const;
-
-/** Vrai tant que l'éditeur n'a pas été renseigné. Voir le test correspondant. */
-export function editeurRenseigne(): boolean {
-  return !EDITEUR.nom.includes('RENSEIGNER') && !EDITEUR.contact.includes('example.com');
-}
 
 /**
  * Remplace les jetons `{nom}` par les paramètres fournis.
