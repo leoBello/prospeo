@@ -829,11 +829,16 @@ async function main(argv: string[]): Promise<number> {
 
       // Seuls les prospects sans domaine propre : proposer un nom à qui en a
       // déjà un n'a aucun sens.
-      const rows: { prospect_id: string; denomination: string; trade_slug: string }[] = [];
+      const rows: {
+        prospect_id: string;
+        denomination: string;
+        denominationUsuelle: string | null;
+        trade_slug: string;
+      }[] = [];
       for (let from = 0; ; from += PAGE_SIZE) {
         const { data, error } = await client
           .from('web_presence')
-          .select('prospect_id, prospect(denomination, trade_slug)')
+          .select('prospect_id, prospect(denomination, denomination_usuelle, trade_slug)')
           .in('category', ['none', 'social_only', 'directory_only'])
           .is('domain_checked_at', null)
           .order('prospect_id')
@@ -847,6 +852,7 @@ async function main(argv: string[]): Promise<number> {
           rows.push({
             prospect_id: row.prospect_id,
             denomination: p.denomination as string,
+            denominationUsuelle: (p.denomination_usuelle as string | null) ?? null,
             trade_slug: p.trade_slug as string,
           });
         }
@@ -867,7 +873,7 @@ async function main(argv: string[]): Promise<number> {
         if (closed.has(row.prospect_id)) continue;
         const trade = getTrade(row.trade_slug);
         if (trade === undefined) continue;
-        const candidates = domainCandidates(row.denomination, trade);
+        const candidates = domainCandidates(row.denomination, row.denominationUsuelle, trade);
 
         // On cherche un candidat libre, pas le verdict du dernier essayé.
         // `false` ne se dit que si TOUS ont été tranchés et pris ; il suffit
