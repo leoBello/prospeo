@@ -1,13 +1,15 @@
 import { existsSync } from 'node:fs';
+import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
-import { getTrade, MATCHING_CONFIG } from '@prospeo/core';
+import { getTrade, MATCHING_CONFIG, nafMatchesTrade } from '@prospeo/core';
 import { loadConfig } from './config.js';
 import { createClient } from './supabase.js';
 import { createGoogleMapsSource } from './sources/google-maps.js';
 import { planScoreWrite } from './stages/classify-score.js';
 import { makeUpsertProspect, runDiscover } from './stages/discover.js';
-import { runEnrich, type EnrichProspect } from './stages/enrich.js';
+import { runEnrich, type EnrichProspect, type ReviewCandidate } from './stages/enrich.js';
 import { probeUrl, shouldProbe } from './stages/probe.js';
+import { applyReviewDecision, type ReviewDecision } from './stages/review.js';
 
 // `.env` vit a la racine du depot. Ni tsx ni Node ne le chargent tout seuls :
 // sans cette ligne, la procedure documentee (« copier .env.example en .env »)
@@ -22,6 +24,7 @@ prospeo <commande> [options]
 Commandes
   discover --trade <slug> --postal-code <cp>   Ingère les établissements Sirene
   enrich --trade <slug>                        Apparie les fiches Google Maps
+  review                                       Tranche les appariements douteux
   probe                                        Sonde les URL déclarées
   score                                        Classe et note les prospects
 
@@ -70,7 +73,7 @@ function fetchScorePage(client: ReturnType<typeof createClient>, from: number) {
 }
 
 /** Commandes reconnues. Les étages sont branchés par les tâches 9 à 11. */
-const COMMANDS = ['discover', 'enrich', 'probe', 'score'] as const;
+const COMMANDS = ['discover', 'enrich', 'review', 'probe', 'score'] as const;
 
 function flag(argv: string[], name: string): string | undefined {
   const index = argv.indexOf(`--${name}`);
@@ -280,6 +283,101 @@ async function main(argv: string[]): Promise<number> {
       // Une écriture perdue casse le point de reprise du run : le sortir en 0
       // ferait passer « 300 prospects scrapés, rien d'écrit » pour un succès.
       if (report.writeFailed > 0) return 1;
+      return 0;
+    }
+    case 'review': {
+      const config = loadConfig(process.env);
+      const client = createClient(config);
+
+      // Paginé comme toute lecture du projet : la file ambiguë est courte
+      // aujourd'hui, mais une lecture non paginée présenterait une tranche
+      // arbitraire comme la file complète le jour où elle ne le sera plus.
+      const queue: Record<string, unknown>[] = [];
+      for (let from = 0; ; from += PAGE_SIZE) {
+        const { data, error } = await client
+          .from('prospect_enrichment')
+          .select(
+            'prospect_id, candidates, prospect(denomination, denomination_usuelle, address, naf_code, trade_slug)',
+          )
+          .eq('status', 'ambiguous')
+          .order('prospect_id')
+          .range(from, from + PAGE_SIZE - 1);
+        if (error) throw new Error(error.message);
+        queue.push(...((data ?? []) as unknown as Record<string, unknown>[]));
+        if ((data ?? []).length < PAGE_SIZE) break;
+      }
+
+      // L'interface n'est ouverte qu'une fois la file lue : créée avant, elle
+      // maintiendrait stdin actif et le processus resterait suspendu si la
+      // lecture échouait, au lieu de sortir sur son erreur.
+      const rl = createInterface({ input: process.stdin, output: process.stdout });
+
+      let settled = 0;
+      try {
+        for (const row of queue) {
+          const p = (Array.isArray(row.prospect) ? row.prospect[0] : row.prospect) as
+            | Record<string, unknown>
+            | null;
+          if (p === null || p === undefined) continue;
+
+          const trade = getTrade(p.trade_slug as string);
+          const nafOk =
+            trade === undefined ? null : nafMatchesTrade(p.naf_code as string | null, trade);
+
+          process.stdout.write(`\n${'─'.repeat(60)}\n`);
+          process.stdout.write(`${p.denomination as string}\n${p.address as string}\n`);
+          if (nafOk === false) {
+            process.stdout.write(
+              `⚠ NAF ${p.naf_code as string} étranger au métier ${trade?.label ?? ''}\n`,
+            );
+          }
+
+          const candidates = (row.candidates ?? []) as ReviewCandidate[];
+          candidates.forEach((c, index) => {
+            process.stdout.write(
+              `\n  [${index + 1}] ${c.name}  (confiance ${c.confidence.toFixed(2)})\n`,
+            );
+            for (const line of c.lines) process.stdout.write(`      ${line.label}\n`);
+            if (c.phone !== null) process.stdout.write(`      tél. ${c.phone}\n`);
+            if (c.website !== null) process.stdout.write(`      ${c.website}\n`);
+          });
+
+          const answer = (await rl.question('\n  Numéro à retenir, [a]ucun, [p]lus tard : ')).trim();
+          // Toute réponse qui n'est pas un nombre vaut report, jamais erreur :
+          // devant une file de cas douteux, la faute de frappe la plus probable
+          // est une touche parasite, et repasser plus tard est l'interprétation
+          // la moins destructrice. Un indice hors bornes, lui, échoue
+          // bruyamment — `applyReviewDecision` lève et la boucle journalise
+          // sans interrompre la revue.
+          const index = /^\d+$/.test(answer) ? Number(answer) - 1 : null;
+          const decision: ReviewDecision =
+            answer === 'a'
+              ? { kind: 'reject' }
+              : index === null
+                ? { kind: 'skip' }
+                : { kind: 'accept', index };
+
+          if (decision.kind === 'skip') continue;
+          try {
+            const updated = applyReviewDecision(row.prospect_id as string, candidates, decision);
+            const { error: writeError } = await client
+              .from('prospect_enrichment')
+              .upsert(updated, { onConflict: 'prospect_id' });
+            if (writeError) throw new Error(writeError.message);
+            settled += 1;
+          } catch (failure) {
+            process.stderr.write(
+              `review: ${failure instanceof Error ? failure.message : String(failure)}\n`,
+            );
+          }
+        }
+      } finally {
+        // Fermée même si la revue s'interrompt : une interface ouverte tient
+        // stdin, et le processus ne rendrait jamais la main.
+        rl.close();
+      }
+
+      process.stdout.write(`\nreview : ${settled} cas tranchés\n`);
       return 0;
     }
     case 'probe': {
