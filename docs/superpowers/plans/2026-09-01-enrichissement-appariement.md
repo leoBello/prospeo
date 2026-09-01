@@ -616,13 +616,43 @@ export function significantTokens(name: string, generic: readonly string[]): str
     .filter((token) => token.length >= MIN_TOKEN_LENGTH && !banned.has(token));
 }
 
-/** Proportion des jetons significatifs de `a` présents dans `b`. */
+/**
+ * Plafond appliqué quand le nom source ne tient qu'à un seul jeton
+ * significatif.
+ *
+ * Un patronyme n'est pas une identité. Quand tout ce qui distingue une
+ * entreprise se réduit à un nom de famille — « Martin », une fois le métier
+ * retiré — la coïncidence avec un candidat qui porte ce même patronyme est
+ * trop banale pour emporter seule la décision : « Martin » est aussi courant
+ * qu'homonyme, et le cas doit revenir à un humain plutôt que fusionner
+ * automatiquement. 0,80 est une valeur de calibrage, choisie pour rester sous
+ * le seuil de fusion automatique ; elle est destinée à être revue sur données
+ * réelles.
+ */
+const SINGLE_TOKEN_CAP = 0.8;
+
+/**
+ * Plafond appliqué quand le nom source ne tient qu'à un seul jeton
+ * significatif.
+ *
+ * Un patronyme n'est pas une identité. Quand tout ce qui distingue une
+ * entreprise se réduit à un nom de famille — « Martin », une fois le métier
+ * retiré — la coïncidence avec un candidat qui porte ce même patronyme est
+ * trop banale pour emporter seule la décision : « Martin » est aussi courant
+ * qu'homonyme, et le cas doit revenir à un humain plutôt que fusionner
+ * automatiquement. 0,80 est une valeur de calibrage, choisie pour rester sous
+ * le seuil de fusion automatique ; elle est destinée à être revue sur données
+ * réelles.
+ */
+const SINGLE_TOKEN_CAP = 0.8;
+
 export function tokenContainment(a: string, b: string, generic: readonly string[]): number {
   const tokens = significantTokens(a, generic);
   if (tokens.length === 0) return 0;
   const target = new Set(normalizeCompanyName(b).split(' '));
   const found = tokens.filter((token) => target.has(token)).length;
-  return found / tokens.length;
+  const ratio = found / tokens.length;
+  return tokens.length === 1 ? Math.min(ratio, SINGLE_TOKEN_CAP) : ratio;
 }
 
 /**
@@ -712,6 +742,18 @@ const MAX_TOKEN_LENGTH_DIFF = 1;
  * caractères ou plus sont des noms différents : s'il s'agissait vraiment de
  * la même entreprise, la comparaison de chaînes entières ou l'inclusion de
  * jetons l'auraient déjà rattrapée.
+ *
+ * Une égalité stricte entre l'unique jeton significatif de la source et un
+ * jeton du candidat n'est pas une variante d'écriture : c'est exactement ce
+ * que `tokenContainment` mesure déjà, plafond compris (voir
+ * `SINGLE_TOKEN_CAP`). La laisser remonter ici — Jaro-Winkler d'un jeton avec
+ * lui-même vaut toujours 1 — annulerait silencieusement ce plafond par la
+ * porte à côté : « martin » de « SARL MARTIN SERRURERIE » retrouverait son
+ * 1,00 face à « Martin Dépannage » dès que « serrurerie » et « dépannage »
+ * ont tous deux été retirés comme génériques du métier. Cette exclusion ne
+ * change rien pour les jetons qui se ressemblent sans être identiques,
+ * comme « h20 »/« h2o » : c'est précisément le cas que cette fonction sert à
+ * couvrir.
  */
 function bestTokenScore(a: string, b: string, generic: readonly string[]): number {
   const aTokens = significantTokens(a, generic);
@@ -720,6 +762,7 @@ function bestTokenScore(a: string, b: string, generic: readonly string[]): numbe
   for (const aToken of aTokens) {
     for (const bToken of bTokens) {
       if (Math.abs(aToken.length - bToken.length) > MAX_TOKEN_LENGTH_DIFF) continue;
+      if (aTokens.length === 1 && aToken === bToken) continue;
       best = Math.max(best, jaroWinkler(aToken, bToken));
     }
   }
@@ -792,6 +835,13 @@ git commit -m "feat: similarite de noms tolerante aux enseignes et aux patronyme
 **Interfaces :**
 - Consomme : `bestNameMatch`, `nameVariants` (tâche 2) ; le type `Trade`
   depuis `types.ts`.
+
+> **Prerequis de schema :** cette tache ajoute `readonly categoryLabels:
+> readonly string[]` au type `Trade` (`packages/core/src/types.ts`) et le
+> renseigne dans `trades.ts` : `['plombier', 'plomberie', 'chauffagiste']`
+> pour le plombier, `['serrurier', 'serrurerie', 'metallerie']` pour le
+> serrurier. `matchesCategory` lit ce champ et non `keywords`, qui reste
+> reserve au retrait des jetons generiques et a la construction des requetes.
 - Produit : `MapsCandidate`, `MatchLine`, `MatchScore`, `MatchOutcome`,
   `MATCHING_CONFIG`, `haversineMeters`, `scoreCandidate`, `selectMatch`.
   Les tâches 4, 6 et 7 en dépendent.
@@ -1083,12 +1133,20 @@ function genericTokens(trade: Trade): string[] {
   );
 }
 
-/** Le libellé de catégorie Google recoupe-t-il le métier attendu ? */
+/**
+ * Le libellé de catégorie Google recoupe-t-il le métier attendu ?
+ *
+ * Se limite à `categoryLabels`, volontairement plus étroit que `keywords` :
+ * `keywords` contient des mots comme « dépannage », choisis pour être
+ * fréquents dans les noms d'artisans — ce qui en fait le pire discriminant
+ * de catégorie possible, puisqu'il qualifie tout autant l'électroménager,
+ * l'informatique ou l'automobile.
+ */
 function matchesCategory(category: string | null, trade: Trade): boolean {
   if (category === null) return false;
   const normalized = normalizeCompanyName(category);
   if (normalized === '') return false;
-  return [trade.slug, trade.label, ...trade.keywords, ...trade.mapsQueries].some((word) => {
+  return trade.categoryLabels.some((word) => {
     const target = normalizeCompanyName(word);
     return target !== '' && normalized.includes(target);
   });
