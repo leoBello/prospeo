@@ -326,5 +326,10 @@ export function reconcileExitCode(report: ReconcileReport, prospectCount: number
   const decisions = report.decided.keep + report.decided.close + report.decided.delete;
   if (prospectCount > 0 && decisions === 0) return 1;
   if (report.refusedDeletions > 0) return 1;
+  // Un run qui a tout décidé sans rien écrire n'a pas plus vérifié qu'un run
+  // qui n'a rien décidé : les cessations ne sont pas enregistrées, `is_closed`
+  // et `reconciled_at` restent au passage précédent, et le barème continuera
+  // de bien classer des entreprises fermées. La tâche planifiée doit le voir.
+  if (report.failedWrites > 0) return 1;
   return 0;
 }

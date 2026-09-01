@@ -372,6 +372,7 @@ async function main(argv: string[]): Promise<number> {
       const rl = createInterface({ input: process.stdin, output: process.stdout });
 
       let settled = 0;
+      let reviewFailed = 0;
       try {
         // `--limit` borne ce que la commande traite reellement, et pas
         // seulement ce qu elle annonce : le valider sans l appliquer serait
@@ -456,6 +457,7 @@ async function main(argv: string[]): Promise<number> {
             if (writeError) throw new Error(writeError.message);
             settled += 1;
           } catch (failure) {
+            reviewFailed += 1;
             process.stderr.write(
               `review: ${failure instanceof Error ? failure.message : String(failure)}\n`,
             );
@@ -467,8 +469,13 @@ async function main(argv: string[]): Promise<number> {
         rl.close();
       }
 
-      process.stdout.write(`\nreview : ${settled} cas tranchés\n`);
-      return 0;
+      process.stdout.write(
+        `\nreview : ${settled} cas tranchés` +
+          (reviewFailed > 0 ? `, ${reviewFailed} en échec d'écriture\n` : '\n'),
+      );
+      // Une décision humaine perdue est la plus chère de toutes : l'opérateur
+      // a tranché, et rien ne le lui redemandera s'il ne le sait pas.
+      return reviewFailed > 0 ? 1 : 0;
     }
     case 'probe': {
       const limit = parseLimit(argv);
@@ -515,6 +522,7 @@ async function main(argv: string[]): Promise<number> {
       }
 
       let done = 0;
+      let writeFailed = 0;
       let skipped = 0;
       // `--limit` borne ce que la commande traite reellement, et pas seulement
       // ce qu elle annonce : le valider sans l appliquer serait pire que
@@ -545,13 +553,20 @@ async function main(argv: string[]): Promise<number> {
           if (writeError) throw new Error(writeError.message);
           done += 1;
         } catch (error) {
+          writeFailed += 1;
           process.stderr.write(
             `probe: échec sur ${row.prospect_id} — ${error instanceof Error ? error.message : String(error)}\n`,
           );
         }
       }
-      process.stdout.write(`probe : ${done} URL sondées, ${skipped} encore fraîches\n`);
-      return 0;
+      process.stdout.write(
+        `probe : ${done} URL sondées, ${skipped} encore fraîches` +
+          (writeFailed > 0 ? `, ${writeFailed} en échec d'écriture\n` : '\n'),
+      );
+      // Une écriture perdue casse le point de reprise du run : sortir en 0
+      // ferait passer « rien n'a été écrit » pour un succès, et la tâche
+      // planifiée ne verrait jamais la panne.
+      return writeFailed > 0 ? 1 : 0;
     }
     case 'score': {
       const limit = parseLimit(argv);
@@ -581,6 +596,7 @@ async function main(argv: string[]): Promise<number> {
       let pendingEnrichment = 0;
       let pendingProbe = 0;
       let eraseFailed = 0;
+      let scoreFailed = 0;
 
       // `--limit` borne ce que la commande traite reellement, et pas seulement
       // ce qu elle annonce : le valider sans l appliquer serait pire que
@@ -687,6 +703,7 @@ async function main(argv: string[]): Promise<number> {
           { onConflict: 'prospect_id' },
         );
         if (scoreError) {
+          scoreFailed += 1;
           process.stderr.write(`score: échec sur ${row.prospectId} — ${scoreError.message}\n`);
           continue;
         }
@@ -866,6 +883,7 @@ async function main(argv: string[]): Promise<number> {
 
       let checked = 0;
       let undecided = 0;
+      let domainFailed = 0;
       // `--limit` borne ce que la commande traite reellement, et pas seulement
       // ce qu elle annonce : le valider sans l appliquer serait pire que
       // l ignorer.
@@ -910,6 +928,7 @@ async function main(argv: string[]): Promise<number> {
           .from('web_presence')
           .upsert(write, { onConflict: 'prospect_id' });
         if (error) {
+          domainFailed += 1;
           process.stderr.write(`domains: échec sur ${row.prospect_id} — ${error.message}\n`);
           continue;
         }
@@ -919,9 +938,12 @@ async function main(argv: string[]): Promise<number> {
 
       process.stdout.write(
         `domains : ${checked} prospects vérifiés` +
-          (undecided > 0 ? `, ${undecided} indécis (registre indisponible), à rejouer\n` : '\n'),
+          (undecided > 0 ? `, ${undecided} indécis (registre indisponible), à rejouer` : '') +
+          (domainFailed > 0 ? `, ${domainFailed} en échec d'écriture\n` : '\n'),
       );
-      return 0;
+      // Une écriture perdue casse le point de reprise du run : sortir en 0
+      // ferait passer « rien n'a été écrit » pour un succès.
+      return domainFailed > 0 ? 1 : 0;
     }
     default:
       process.stderr.write(`Commande non encore implémentée : ${command}\n`);

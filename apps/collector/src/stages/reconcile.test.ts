@@ -469,3 +469,31 @@ describe('reconcileExitCode', () => {
     expect(reconcileExitCode(ordinaire, 20)).toBe(0);
   });
 });
+
+describe('reconcileExitCode — echecs d ecriture', () => {
+  const rapport = (over: Partial<ReconcileReport> = {}): ReconcileReport => ({
+    decided: { keep: 0, close: 0, delete: 0 },
+    kept: 0,
+    closed: 0,
+    deleted: 0,
+    failedReads: 0,
+    failedWrites: 0,
+    refusedDeletions: 0,
+    ...over,
+  });
+
+  it('sort en 1 quand tout a ete decide mais rien ecrit', () => {
+    // Un run qui a tout decide sans rien ecrire n a pas plus verifie qu un run
+    // qui n a rien decide : les cessations ne sont pas enregistrees, et le
+    // bareme continuera de bien classer des entreprises fermees.
+    expect(
+      reconcileExitCode(rapport({ decided: { keep: 17, close: 3, delete: 0 }, failedWrites: 20 }), 20),
+    ).toBe(1);
+  });
+
+  it('sort en 0 quand tout a ete decide et ecrit', () => {
+    expect(
+      reconcileExitCode(rapport({ decided: { keep: 20, close: 0, delete: 0 }, kept: 20 }), 20),
+    ).toBe(0);
+  });
+});
