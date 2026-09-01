@@ -75,7 +75,8 @@ prospeo/
 ├── packages/
 │   ├── core/         types, classification, scoring, appariement — logique pure, sans I/O
 │   └── db/           types générés depuis la base (`pnpm db:types`)
-└── supabase/migrations/  migrations SQL, appliquées par `pnpm db:push`
+├── supabase/
+│   └── migrations/   migrations SQL, appliquées par `pnpm db:push`
 └── docs/superpowers/specs/
 ```
 
