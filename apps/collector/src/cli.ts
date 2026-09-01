@@ -2,6 +2,7 @@ import { getTrade } from '@prospeo/core';
 import { loadConfig } from './config.js';
 import { createClient } from './supabase.js';
 import { makeUpsertProspect, runDiscover } from './stages/discover.js';
+import { probeUrl } from './stages/probe.js';
 
 const USAGE = `
 prospeo <commande> [options]
@@ -64,6 +65,41 @@ async function main(argv: string[]): Promise<number> {
       process.stdout.write(
         `discover ${trade.slug} ${postalCode} : ${report.upserted}/${report.seen} enregistrés\n`,
       );
+      return 0;
+    }
+    case 'probe': {
+      const client = createClient(config);
+      const { data, error } = await client
+        .from('prospect_enrichment')
+        .select('prospect_id, declared_url')
+        .not('declared_url', 'is', null);
+      if (error) throw new Error(error.message);
+
+      let done = 0;
+      for (const row of data ?? []) {
+        const result = await probeUrl(row.declared_url as string);
+        // `category` reste absent : cet étage tourne avant `classify`, seul à
+        // savoir la catégoriser. La colonne est nullable pour cette raison.
+        const { error: writeError } = await client.from('web_presence').upsert(
+          {
+            prospect_id: row.prospect_id,
+            probed_url: result.url,
+            http_status: result.httpStatus,
+            is_https: result.isHttps,
+            final_url: result.finalUrl,
+            is_parked: result.isParked,
+            has_viewport_meta: result.hasViewportMeta,
+            probed_at: new Date().toISOString(),
+          },
+          { onConflict: 'prospect_id' },
+        );
+        if (writeError) {
+          process.stderr.write(`probe: échec sur ${row.prospect_id} — ${writeError.message}\n`);
+          continue;
+        }
+        done += 1;
+      }
+      process.stdout.write(`probe : ${done} URL sondées\n`);
       return 0;
     }
     default:
