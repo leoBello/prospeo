@@ -26,4 +26,17 @@ describe('normalizePhone', () => {
   it('rejette un numéro français ne commençant pas par 1-9 après le 0', () => {
     expect(normalizePhone('00 12 34 56 78')).toBeNull();
   });
+
+  it('tolère une étiquette avant le numéro', () => {
+    expect(normalizePhone('Tél : 06 12 34 56 78')).toEqual({ e164: '+33612345678', kind: 'mobile' });
+  });
+
+  it('rejette une lettre à l intérieur ou après le numéro', () => {
+    expect(normalizePhone('06X12345678')).toBeNull();
+    expect(normalizePhone('06 12 34 56 78 poste 4')).toBeNull();
+  });
+
+  it('rejette une chaîne sans aucun chiffre', () => {
+    expect(normalizePhone('appeler le patron')).toBeNull();
+  });
 });

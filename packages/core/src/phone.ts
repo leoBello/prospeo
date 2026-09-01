@@ -8,7 +8,15 @@ import type { NormalizedPhone } from './types.js';
 export function normalizePhone(raw: string | null): NormalizedPhone | null {
   if (raw === null) return null;
 
-  let digits = raw.replace(/[^\d+]/g, '');
+  // Une étiquette AVANT le numéro est tolérée (« Tél : 06 … »), fréquente dans
+  // les données scrapées. Une lettre à l'intérieur ou après invalide l'entrée :
+  // un faux numéro se paie par un appel à un inconnu.
+  const start = raw.search(/[\d+]/);
+  if (start === -1) return null;
+  const body = raw.slice(start);
+  if (/\p{L}/u.test(body)) return null;
+
+  let digits = body.replace(/[^\d+]/g, '');
 
   if (digits.startsWith('+33')) digits = `0${digits.slice(3)}`;
   else if (digits.startsWith('0033')) digits = `0${digits.slice(4)}`;

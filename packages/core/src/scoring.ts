@@ -93,13 +93,18 @@ export function computeScore(input: ScoreInput, now: Date = new Date()): ScoreRe
   }
 
   const lastPost = parseDate(input.lastSocialPostAt);
-  if (lastPost !== null && daysBetween(lastPost, now) <= R.socialFresh.maxAgeDays) {
-    lines.push({
-      code: 'social_fresh',
-      label: `Publication il y a ${Math.round(daysBetween(lastPost, now))} j`,
-      points: R.socialFresh.points,
-      group: 'vitalite',
-    });
+  if (lastPost !== null) {
+    // Borne basse indispensable : sans elle une date future satisfait `<= 90`
+    // et produit un libellé absurde (« il y a -12 j »).
+    const postAge = daysBetween(lastPost, now);
+    if (postAge >= 0 && postAge <= R.socialFresh.maxAgeDays) {
+      lines.push({
+        code: 'social_fresh',
+        label: `Publication il y a ${Math.round(postAge)} j`,
+        points: R.socialFresh.points,
+        group: 'vitalite',
+      });
+    }
   }
 
   const headcount = minHeadcount(input.effectifCode);

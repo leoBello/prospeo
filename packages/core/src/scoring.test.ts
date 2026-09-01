@@ -114,6 +114,13 @@ describe('computeScore', () => {
     ).toBe(-30);
   });
 
+  it('ignore une publication datee dans le futur', () => {
+    expect(
+      computeScore({ ...base, lastSocialPostAt: '2026-10-15' }, NOW)
+        .breakdown.find((l) => l.code === 'social_fresh'),
+    ).toBeUndefined();
+  });
+
   it('disqualifie un etablissement ferme, sans autre ligne', () => {
     const r = computeScore({ ...base, category: 'social_only', isClosed: true }, NOW);
     expect(r.total).toBe(0);
