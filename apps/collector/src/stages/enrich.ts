@@ -1,4 +1,5 @@
 import {
+  normalizeCompanyName,
   normalizePhone,
   selectMatch,
   type MapsCandidate,
@@ -247,6 +248,33 @@ export interface RunEnrichOptions {
   dailyRemaining: number;
 }
 
+/**
+ * Ce qui fait qu'une fiche est la même fiche, d'une requête à l'autre.
+ *
+ * **Pas le `placeId` en premier**, contrairement à l'intuition. Maps rend la
+ * même fiche sous deux URL selon d'où on la lit : celle d'une carte de
+ * résultat ne porte pas de segment `!19s` et donne donc `placeId === null`,
+ * celle du panneau de fiche en porte un. Mesuré sur le lot de calibration —
+ * « Plombier Nantes RG Services » compté deux fois, une fois par forme.
+ *
+ * L'enjeu n'est pas l'esthétique du rapport. Deux exemplaires RETENUS d'une
+ * même fiche sont deux candidats au-dessus du seuil haut, et `selectMatch`
+ * refuse de trancher quand ils sont deux : le doublon empêcherait la fusion
+ * qu'il décrit.
+ *
+ * Le nom normalisé et la position sont donc la clé, et le `placeId` ne sert
+ * que de recours quand la position manque. Deux sociétés d'un même immeuble
+ * portent des noms différents et restent distinctes.
+ */
+function placeIdentity(candidate: ReviewCandidate): string {
+  if (candidate.latitude !== null && candidate.longitude !== null) {
+    // Cinq décimales valent le mètre : au-delà, deux lectures de la même
+    // fiche peuvent différer sur le dernier chiffre.
+    return `${normalizeCompanyName(candidate.name)}@${candidate.latitude.toFixed(5)},${candidate.longitude.toFixed(5)}`;
+  }
+  return candidate.placeId ?? candidate.mapsUrl;
+}
+
 /** Requêtes tentées dans l'ordre ; l'enseigne d'abord, c'est elle que Maps connaît. */
 function queriesFor(prospect: EnrichProspect, trade: Trade): string[] {
   const queries: string[] = [];
@@ -327,8 +355,14 @@ async function searchAndBuild(
   const seen = new Map<string, ReviewCandidate>();
   const remember = (candidates: readonly ReviewCandidate[]): void => {
     for (const found of candidates) {
-      const key = found.placeId ?? found.mapsUrl;
-      if (!seen.has(key)) seen.set(key, found);
+      const key = placeIdentity(found);
+      const previous = seen.get(key);
+      // À égalité d'identité, on garde l'exemplaire identifié : le `placeId`
+      // rattache la fiche à un lieu de façon stable, là où l'URL d'une carte
+      // de résultat porte le centre de la vue et rien d'autre.
+      if (previous === undefined || (previous.placeId === null && found.placeId !== null)) {
+        seen.set(key, found);
+      }
     }
   };
 

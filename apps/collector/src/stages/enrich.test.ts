@@ -412,3 +412,83 @@ describe('enrich — la trace que la calibration consommera', () => {
     expect(written[0]?.candidates.map((c) => c.placeId).sort()).toEqual(['abc', 'ecarte']);
   });
 });
+
+describe('enrich — identité d une fiche vue deux fois', () => {
+  function source(results: MapsCandidate[][]) {
+    let call = 0;
+    return {
+      search: vi.fn(async () => results[call++] ?? []),
+      close: vi.fn(async () => undefined),
+    };
+  }
+
+  it('reconnaît la même fiche trouvée avec et sans identifiant de lieu', async () => {
+    // Cas réel du lot de calibration : « Plombier Nantes RG Services » revient
+    // par deux URL, celle de la carte de résultat (sans `!19s`, donc sans
+    // placeId) et celle du panneau de fiche (avec). Une clé fondée d abord
+    // sur le placeId les prend pour deux entreprises.
+    //
+    // L enjeu n est pas cosmétique : deux exemplaires RETENUS d une même
+    // fiche font deux candidats au-dessus du seuil haut, et `selectMatch`
+    // refuse alors de trancher. Le doublon empêcherait la fusion qu il
+    // décrit.
+    // La première requête ne retient rien — c est la condition pour que la
+    // seconde parte, et donc pour que la même fiche soit vue deux fois.
+    const doublon = { name: 'Boulangerie Dupont', category: 'Boulangerie' };
+    const written: EnrichmentRow[] = [];
+    await runEnrich({
+      prospects: [prospect],
+      trade,
+      config: MATCHING_CONFIG,
+      source: source([
+        [
+          candidate({
+            ...doublon,
+            placeId: null,
+            mapsUrl: 'https://maps.google.com/place/@47.2214,-1.5602,17z',
+          }),
+        ],
+        [
+          candidate({
+            ...doublon,
+            placeId: 'ChIJdup',
+            mapsUrl: 'https://maps.google.com/place/data=!19sChIJdup',
+          }),
+          candidate(),
+        ],
+      ]),
+      upsert: async (row) => {
+        written.push(row);
+      },
+      dailyRemaining: 10,
+    });
+    // La boulangerie une seule fois, plus le bon candidat : deux, pas trois.
+    expect(written[0]?.candidates).toHaveLength(2);
+    // On garde l exemplaire identifié : le placeId est ce qui rattache la
+    // fiche à un lieu de façon stable.
+    const boulangerie = written[0]?.candidates.find((c) => c.name === 'Boulangerie Dupont');
+    expect(boulangerie?.placeId).toBe('ChIJdup');
+  });
+
+  it('ne confond pas deux entreprises distinctes à la même adresse', async () => {
+    // Un immeuble abrite deux sociétés : même coordonnées, noms différents.
+    // Les fondre perdrait un candidat réel.
+    const written: EnrichmentRow[] = [];
+    await runEnrich({
+      prospects: [prospect],
+      trade,
+      config: MATCHING_CONFIG,
+      source: source([
+        [
+          candidate({ placeId: null, name: 'Allard Plomberie' }),
+          candidate({ placeId: null, name: 'Durand Chauffage' }),
+        ],
+      ]),
+      upsert: async (row) => {
+        written.push(row);
+      },
+      dailyRemaining: 10,
+    });
+    expect(written[0]?.candidates).toHaveLength(2);
+  });
+});
