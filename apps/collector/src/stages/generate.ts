@@ -1,5 +1,9 @@
 import {
   composerContenuPublie,
+  PALETTES,
+  PALETTES_DECRITES,
+  TYPOS,
+  TYPOS_DECRITES,
   REDACTION_LIMITS,
   siteRedactionSchema,
   SITE_CONTENT_VERSION,
@@ -18,7 +22,7 @@ import {
  * six mois doit dire sous quelles règles il a été écrit. Toute modification du
  * texte ci-dessous impose de l'incrémenter.
  */
-export const PROMPT_VERSION = 'v3';
+export const PROMPT_VERSION = 'v4';
 
 /** Modèle retenu par le plan (tâche 2). */
 export const MODEL = 'claude-opus-4-8';
@@ -48,6 +52,11 @@ export function consignes(trade: Trade): string {
   const prestations = trade.prestations
     .map((p) => `  - ${p.code} : ${p.label} — ${p.description}`)
     .join('\n');
+  // Les trois listes closes du thème (D6), chacune décrite. Un jeton nu ferait
+  // choisir le modèle au hasard ; la description transforme le tirage en choix.
+  const palettes = PALETTES.map((c) => `  - ${c} : ${PALETTES_DECRITES[c]}`).join('\n');
+  const typos = TYPOS.map((c) => `  - ${c} : ${TYPOS_DECRITES[c]}`).join('\n');
+  const heros = trade.heros.map((h) => `  - ${h.code} : ${h.sujet}`).join('\n');
 
   return `Tu rédiges le contenu d'un site vitrine pour un artisan ${trade.label.toLowerCase()} en France.
 
@@ -135,6 +144,36 @@ CE QUE TU PRODUIS — trois champs, et rien d'autre :
    ne rédiges pas leur libellé : tu ne renvoies que les codes.
 
 ${prestations}
+
+4. theme
+   TROIS jetons a CHOISIR dans les trois listes closes ci-dessous. Tu ne
+   decris pas une apparence et tu n'inventes aucune couleur : tu selectionnes,
+   exactement comme pour les prestations.
+
+   Ces listes existent parce que le site est deja dessine. Les couleurs sont
+   verifiees au contraste, les polices sont dans le depot, les images sont
+   deja la. Un jeton hors liste fait echouer la generation.
+
+   palette — le jeu de couleurs de la page :
+${palettes}
+
+   typo — l'appariement de polices :
+${typos}
+
+   heros — la photographie qui ouvre la page, en pleine largeur :
+${heros}
+
+   COMMENT CHOISIR. Accorde les trois a ce que tu viens d'ecrire et au
+   caractere de cette entreprise-ci : son nom, et les prestations que tu as
+   retenues. Une entreprise dont tu as mis le depannage en tete n'appelle pas
+   la meme ouverture qu'une entreprise dont tu as mis la renovation de salle
+   de bain.
+
+   NE PRENDS PAS SYSTEMATIQUEMENT LE PREMIER DE CHAQUE LISTE. Ces sites sont
+   envoyes a des artisans du meme metier dans la meme ville, parfois la meme
+   semaine. Deux pages identiques recues par deux voisins detruisent
+   l'argumentaire — qui est « voici VOTRE site », pas « voici un site ».
+   L'ordre des listes n'exprime aucune preference.
 
 TON
 Sobre et factuel. Un artisan qui lit ce texte doit s'y reconnaître, et un

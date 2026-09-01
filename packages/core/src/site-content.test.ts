@@ -6,6 +6,7 @@ import {
   siteRedactionJsonSchema,
   siteRedactionSchema,
 } from './site-content.js';
+import { PALETTES, TYPOS } from './site-theme.js';
 import { getTrade } from './trades.js';
 
 const PLOMBIER = getTrade('plombier')!;
@@ -19,6 +20,7 @@ const REDACTION = {
     'pour vos installations. Vous joignez directement l’artisan au téléphone, ' +
     'et il se déplace chez vous.',
   prestations: ['depannage', 'chauffe-eau', 'sanitaire'],
+  theme: { palette: 'cuivre', typo: 'grotesk-serif', heros: 'plomberie-01' },
 };
 
 describe('siteRedactionSchema', () => {
@@ -33,7 +35,12 @@ describe('siteRedactionSchema', () => {
     // n'a jamais eu la main dessus. Le prompt n'est plus le seul rempart —
     // il n'est même plus un rempart, juste une consigne de style.
     const shape = siteRedactionSchema(PLOMBIER).shape;
-    expect(Object.keys(shape).sort()).toEqual(['accroche', 'presentation', 'prestations']);
+    expect(Object.keys(shape).sort()).toEqual([
+      'accroche',
+      'presentation',
+      'prestations',
+      'theme',
+    ]);
   });
 
   it('accepte une rédaction conforme', () => {
@@ -150,7 +157,7 @@ describe('siteRedactionJsonSchema', () => {
     expect(Object.keys(js.properties).sort()).toEqual(
       Object.keys(siteRedactionSchema(PLOMBIER).shape).sort(),
     );
-    expect(js.required.sort()).toEqual(['accroche', 'presentation', 'prestations']);
+    expect(js.required.sort()).toEqual(['accroche', 'presentation', 'prestations', 'theme']);
     expect(js.additionalProperties).toBe(false);
 
     expect(js.properties['accroche']?.maxLength).toBe(REDACTION_LIMITS.accroche.max);
@@ -164,5 +171,46 @@ describe('siteRedactionJsonSchema', () => {
     }).properties.prestations.items.enum;
     expect(items).toEqual(SERRURIER.prestations.map((p) => p.code));
     expect(items).not.toContain('chauffe-eau');
+  });
+});
+
+describe('le passage en v2', () => {
+  it('fait du thème une part de ce que le modèle produit', () => {
+    // D10. Le bloc `theme` s'ajoute à la RÉDACTION et non à côté d'elle, et
+    // ce choix suit la doctrine déjà posée : `redaction` est l'endroit où un
+    // relecteur regarde pour voir ce qu'une génération a décidé. La palette,
+    // la typographie et l'image en font partie exactement au même titre que
+    // l'ordre des prestations — ce sont des choix, pas des faits.
+    expect(SITE_CONTENT_VERSION).toBe('v2');
+    expect(siteRedactionSchema(PLOMBIER).safeParse(REDACTION).success).toBe(true);
+  });
+
+  it('refuse une rédaction v1, restée sans thème', () => {
+    // Un contenu écrit sous v1 vit dans un dépôt GitHub que le site v2 doit
+    // encore savoir construire — ou refuser bruyamment. Il refuse : sans
+    // thème, la page n'a ni couleurs ni police, et le build rendrait des
+    // variables CSS vides plutôt que d'échouer. Mieux vaut le rejet ici, où
+    // il coûte une régénération à quatre centimes.
+    const { theme, ...v1 } = REDACTION;
+    expect(theme).toBeDefined();
+    expect(siteRedactionSchema(PLOMBIER).safeParse(v1).success).toBe(false);
+  });
+
+  it('dit la même chose du thème dans les deux encodages', () => {
+    // Même raison que pour les prestations : le zod valide la réponse reçue,
+    // le JSON Schema contraint son écriture. Rien n'empêcherait de modifier
+    // l'un en oubliant l'autre — sinon ce test.
+    const js = siteRedactionJsonSchema(PLOMBIER) as {
+      properties: { theme: { properties: Record<string, { enum: string[] }>; required: string[] } };
+    };
+    const theme = js.properties.theme;
+
+    expect(theme.required.sort()).toEqual(['heros', 'palette', 'typo']);
+    expect(theme.properties['palette']?.enum).toEqual([...PALETTES]);
+    expect(theme.properties['typo']?.enum).toEqual([...TYPOS]);
+    // Les héros sont ceux DU MÉTIER : le schéma d'un plombier ne doit pas
+    // laisser passer une image de serrurerie.
+    expect(theme.properties['heros']?.enum).toEqual(PLOMBIER.heros.map((h) => h.code));
+    expect(theme.properties['heros']?.enum).not.toContain(SERRURIER.heros[0]!.code);
   });
 });

@@ -179,6 +179,7 @@ const CONTENU: ContenuPublie = {
     accroche: 'Votre plombier à Nantes',
     presentation: 'Une présentation suffisamment longue pour être crédible.',
     prestations: [{ code: 'depannage', label: 'Dépannage', description: 'Fuite.' }],
+    theme: { palette: 'cuivre', typo: 'grotesk-serif', heros: 'plomberie-01' },
   },
 };
 

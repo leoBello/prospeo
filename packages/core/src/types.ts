@@ -23,6 +23,25 @@ export interface Prestation {
   readonly description: string;
 }
 
+/**
+ * Une image de héros proposable pour un métier.
+ *
+ * `sujet` n'est pas un commentaire : il part DANS le prompt. Sans lui, le
+ * modèle choisirait `plomberie-04` sans savoir ce que montre `plomberie-04`,
+ * c'est-à-dire au hasard — et D6 ne serait plus qu'un tirage déguisé en
+ * choix. Avec lui, l'image peut s'accorder à l'accroche qu'il vient d'écrire.
+ *
+ * Il décrit ce que la photographie MONTRE, jamais ce qu'elle prouverait sur
+ * l'entreprise : ces images sont du contenu illustratif de niveau 2 (D7),
+ * identiques sur tous les sites.
+ */
+export interface HeroImage {
+  /** Identifiant stable, seul jeton que le modèle manipule. */
+  readonly code: string;
+  /** Ce que l'image montre, en une ligne, à destination du prompt. */
+  readonly sujet: string;
+}
+
 export interface Trade {
   slug: string;
   label: string;
@@ -54,6 +73,26 @@ export interface Trade {
    * échoue — bruyamment, ce qui est le comportement voulu.
    */
   readonly prestations: readonly Prestation[];
+  /**
+   * Images de héros proposables pour ce métier, liste close.
+   *
+   * **Pourquoi ici et non dans `site-theme.ts`**, où le sketch de D6 les
+   * plaçait. Une palette et une police ne disent rien du travail : elles
+   * valent pour n'importe quel artisan. Une photographie, si. Un chantier de
+   * plomberie ouvrant le site d'un serrurier serait un mensonge visuel sur
+   * une page portant le nom d'une entreprise réelle — et c'est précisément
+   * la classe d'erreur que la liste close existe pour rendre impossible.
+   *
+   * Les placer à côté des prestations donne en outre la bonne obligation :
+   * ajouter un métier au projet impose de fournir ses images, comme il impose
+   * déjà de fournir ses prestations. Un métier qui en manque fait échouer la
+   * construction du schéma, avant tout appel payant.
+   *
+   * Ce ne sont que des identifiants. Les fichiers vivent dans le gabarit
+   * (`apps/site-template/src/assets/heros/`), et le texte alternatif dans son
+   * `ui.ts` — le gabarit est autonome et ne connaît pas ce monorepo.
+   */
+  readonly heros: readonly HeroImage[];
   /**
    * Dépôt modèle par défaut de ce métier, dans l'organisation dédiée.
    *

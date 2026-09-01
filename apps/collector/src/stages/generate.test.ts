@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { getTrade, type SiteFacts } from '@prospeo/core';
+import {
+  getTrade,
+  PALETTES,
+  PALETTES_DECRITES,
+  TYPOS,
+  TYPOS_DECRITES,
+  type SiteFacts,
+} from '@prospeo/core';
 import {
   consignes,
   factsMessage,
@@ -30,6 +37,7 @@ const REDACTION_VALIDE = {
     'pour un dépannage comme pour une installation complète. Vous joignez directement ' +
     'l’artisan au téléphone.',
   prestations: ['depannage', 'chauffe-eau', 'sanitaire'],
+  theme: { palette: 'cuivre', typo: 'grotesk-serif', heros: 'plomberie-02' },
 };
 
 describe('consignes', () => {
@@ -55,6 +63,32 @@ describe('consignes', () => {
     for (const inconnu of ['horaires', 'délai', 'certification', 'tarif', 'avis', 'clientèle']) {
       expect(texte.toLowerCase()).toContain(inconnu);
     }
+  });
+
+  it('donne les trois listes closes du thème, chacune décrite', () => {
+    // Le modèle ne compose pas une apparence : il en choisit une (D6). Encore
+    // faut-il qu'il sache ce qu'il choisit. Un jeton nu — « terracotta » —
+    // le ferait tirer au sort, et D6 ne serait plus qu'un hasard déguisé en
+    // décision. Les descriptions transforment le tirage en choix.
+    for (const palette of PALETTES) {
+      expect(texte).toContain(palette);
+      expect(texte).toContain(PALETTES_DECRITES[palette]);
+    }
+    for (const typo of TYPOS) {
+      expect(texte).toContain(typo);
+      expect(texte).toContain(TYPOS_DECRITES[typo]);
+    }
+    for (const hero of PLOMBIER.heros) {
+      expect(texte).toContain(hero.code);
+      expect(texte).toContain(hero.sujet);
+    }
+  });
+
+  it('ne propose pas les images d’un autre métier', () => {
+    // Une palette vaut pour n'importe quel artisan ; une photographie, non.
+    // Un chantier de plomberie en ouverture du site d'un serrurier serait un
+    // mensonge visuel sur une page qui porte le nom d'une entreprise réelle.
+    expect(consignes(getTrade('serrurier')!)).not.toContain('plomberie-01');
   });
 
   it('donne la liste close des prestations du métier', () => {

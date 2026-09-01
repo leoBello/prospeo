@@ -11,6 +11,7 @@ export * from './naf.js';
 export * from './domain-name.js';
 export * from './pipeline.js';
 export * from './site-facts.js';
+export * from './site-theme.js';
 export * from './site-content.js';
 export * from './site-coherence.js';
 export * from './site-publie.js';

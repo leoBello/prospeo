@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { verifierCoherence } from './site-coherence.js';
-import type { SiteContent } from './site-content.js';
+import { SITE_CONTENT_VERSION, type SiteContent } from './site-content.js';
 
 const BASE: SiteContent = {
-  version: { schema: 'v1', promptVersion: 'test', model: 'test' },
+  version: { schema: SITE_CONTENT_VERSION, promptVersion: 'test', model: 'test' },
   faits: {
     nomAffiche: 'Dos-Services',
     metier: { slug: 'plombier', label: 'Plombier' },
@@ -21,6 +21,7 @@ const BASE: SiteContent = {
       'Dos-Services intervient à Nantes chez les particuliers comme chez les ' +
       'professionnels. Vous joignez directement l’artisan au téléphone.',
     prestations: ['depannage', 'chauffe-eau', 'sanitaire'],
+    theme: { palette: 'cuivre', typo: 'grotesk-serif', heros: 'plomberie-01' },
   },
 };
 

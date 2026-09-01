@@ -1,5 +1,6 @@
 import type { SiteFacts } from './site-facts.js';
 import type { SiteRedaction } from './site-content.js';
+import type { SiteTheme } from './site-theme.js';
 import type { Prestation, Trade } from './types.js';
 
 /**
@@ -84,6 +85,20 @@ export interface ContenuPublie {
     accroche: string;
     presentation: string;
     prestations: Prestation[];
+    /**
+     * La variante visuelle, sous forme de jetons et non de valeurs.
+     *
+     * `cuivre` reste `cuivre` : les couleurs, les familles de police et les
+     * fichiers d'image vivent dans le gabarit, qui est copié dans le dépôt du
+     * prospect et n'a besoin de personne pour les connaître.
+     *
+     * Faire voyager des hexadécimaux à la place rouvrirait ce que D6 ferme.
+     * Un fichier de contenu porteur de couleurs est un fichier qu'une
+     * génération — ou une main dans le dépôt du prospect — peut rendre
+     * illisible sans qu'aucun schéma ne s'en aperçoive, sur une page qui
+     * porte le nom d'une entreprise réelle.
+     */
+    theme: SiteTheme;
   };
 }
 
@@ -120,6 +135,7 @@ export function composerContenuPublie(
       accroche: redaction.accroche,
       presentation: redaction.presentation,
       prestations,
+      theme: redaction.theme,
     },
   };
 }

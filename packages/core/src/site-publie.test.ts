@@ -26,12 +26,15 @@ const DOS_SERVICES: SiteFactsInput = {
 
 const FAITS = assembleFacts(DOS_SERVICES)!;
 
+const THEME = { palette: 'nuit', typo: 'humanist', heros: 'plomberie-04' } as const;
+
 const REDACTION = {
   accroche: 'Votre plombier à Nantes, du dépannage à l’installation',
   presentation:
     'Dos-Services intervient à Nantes chez les particuliers comme chez les ' +
     'professionnels. Vous joignez directement l’artisan au téléphone.',
   prestations: ['chauffe-eau', 'depannage', 'sanitaire'],
+  theme: THEME,
 };
 
 const VERSION = { schema: 'v1', promptVersion: 'test', model: 'claude-opus-4-8' };
@@ -100,5 +103,22 @@ describe('editeurRenseigne', () => {
     // Une adresse qui n'en est pas une ne vaut pas mieux qu'une absente : le
     // mécanisme d'opposition doit être joignable.
     expect(editeurRenseigne({ nom: 'Léo Bello', contact: 'pas-une-adresse' })).toBe(false);
+  });
+});
+
+describe('le thème, du modèle au dépôt', () => {
+  it('traverse la composition sans être retouché', () => {
+    // Le thème est le seul choix du modèle qui ne soit pas résolu en chemin :
+    // les prestations deviennent des libellés, mais `cuivre` reste `cuivre`.
+    // C'est voulu — la valeur est un JETON, pas une couleur. Les couleurs
+    // vivent dans la feuille de style du gabarit, qui est copiée dans le
+    // dépôt du prospect et n'a besoin de personne pour les connaître.
+    //
+    // Faire voyager des hexadécimaux à la place rouvrirait précisément ce que
+    // D6 ferme : un fichier de contenu porteur de couleurs est un fichier
+    // qu'une génération, ou une main dans le dépôt du prospect, peut rendre
+    // illisible sans qu'aucun schéma ne s'en aperçoive.
+    const publie = composerContenuPublie(FAITS, REDACTION, PLOMBIER, VERSION);
+    expect(publie.redaction.theme).toEqual(THEME);
   });
 });

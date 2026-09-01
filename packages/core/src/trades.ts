@@ -1,4 +1,4 @@
-import type { Prestation, Trade } from './types.js';
+import type { HeroImage, Prestation, Trade } from './types.js';
 
 /**
  * Prestations du plombier.
@@ -93,6 +93,51 @@ const PRESTATIONS_SERRURIER: readonly Prestation[] = [
 ];
 
 /**
+ * Les huit héros du plombier.
+ *
+ * Sujets choisis sous la règle de D3 : chantiers, outils, matériaux, matière,
+ * intérieurs. **Aucun visage reconnaissable présenté comme l'équipe** — les
+ * autorisations de modèle ne sont pas garanties sur Unsplash, et une photo
+ * d'inconnu légendée « notre artisan » sur le site d'une entreprise réelle
+ * est un problème pour deux personnes à la fois.
+ *
+ * Huit et non trois : le motif de vente est « voici VOTRE site ». Deux
+ * plombiers nantais démarchés la même semaine qui reçoivent la même
+ * photographie sous le même bandeau cassent ce motif en une seconde. Croisées
+ * aux cinq palettes et aux trois appariements de polices, elles donnent 120
+ * variantes pour 37 prospects éligibles — mesuré en base le 2 septembre 2026.
+ */
+const HEROS_PLOMBIER: readonly HeroImage[] = [
+  { code: 'plomberie-01', sujet: 'soudure au chalumeau sur un tube de cuivre, plan serré' },
+  { code: 'plomberie-02', sujet: 'salle d’eau en chantier, carrelage encore nu' },
+  { code: 'plomberie-03', sujet: 'outils de plomberie rangés sur un établi' },
+  { code: 'plomberie-04', sujet: 'mitigeur neuf posé sur un plan de vasque' },
+  { code: 'plomberie-05', sujet: 'chauffe-eau et ses raccords, en attente de mise en service' },
+  { code: 'plomberie-06', sujet: 'faisceau de canalisations en cuivre le long d’un mur' },
+  { code: 'plomberie-07', sujet: 'douche terminée, lumière rasante sur la robinetterie' },
+  { code: 'plomberie-08', sujet: 'mains gantées serrant un raccord, aucun visage' },
+] as const;
+
+/**
+ * Les huit héros du serrurier.
+ *
+ * Écrits avant que la base ne contienne le moindre serrurier, comme ses
+ * prestations et pour la même raison (D1) : le métier est un champ de
+ * contenu. Le jour où `discover --trade serrurier` tourne, la seule chose qui
+ * manquera sera les fichiers eux-mêmes.
+ */
+const HEROS_SERRURIER: readonly HeroImage[] = [
+  { code: 'serrurerie-01', sujet: 'cylindre européen en gros plan, laiton brossé' },
+  { code: 'serrurerie-02', sujet: 'porte blindée entrouverte, tranche et points de fermeture' },
+  { code: 'serrurerie-03', sujet: 'établi de serrurier, limes et clés brutes' },
+  { code: 'serrurerie-04', sujet: 'trousseau de clés fraîchement taillées' },
+  { code: 'serrurerie-05', sujet: 'pose d’une serrure multipoints sur un montant' },
+  { code: 'serrurerie-06', sujet: 'rideau métallique de commerce, à demi relevé' },
+  { code: 'serrurerie-07', sujet: 'garde-corps en fer forgé, détail d’assemblage' },
+  { code: 'serrurerie-08', sujet: 'mains gantées sur un cylindre, aucun visage' },
+] as const;
+
+/**
  * Ajouter un métier consiste à ajouter un objet ici.
  *
  * `nafCodes` est volontairement un tableau : la nomenclature NAF est en cours
@@ -114,6 +159,7 @@ export const TRADES: readonly Trade[] = [
     keywords: ['plomberie', 'plombier', 'chauffagiste', 'sanitaire', 'chauffage', 'depannage'],
     categoryLabels: ['plombier', 'plomberie', 'chauffagiste'],
     prestations: PRESTATIONS_PLOMBIER,
+    heros: HEROS_PLOMBIER,
     templateRepo: 'plombier',
   },
   {
@@ -124,6 +170,7 @@ export const TRADES: readonly Trade[] = [
     keywords: ['serrurerie', 'serrurier', 'blindage', 'metallerie', 'depannage'],
     categoryLabels: ['serrurier', 'serrurerie', 'metallerie'],
     prestations: PRESTATIONS_SERRURIER,
+    heros: HEROS_SERRURIER,
     templateRepo: 'serrurier',
   },
 ];

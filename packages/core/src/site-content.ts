@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { themeJsonSchema, themeSchema } from './site-theme.js';
 import type { Trade } from './types.js';
 
 /**
@@ -9,8 +10,16 @@ import type { Trade } from './types.js';
  * produit. Ici l'enjeu est concret — un contenu écrit sous v1 vit dans un
  * dépôt GitHub que le site v2 devra encore savoir construire, ou refuser
  * bruyamment.
+ *
+ * **v2 — le bloc `theme` (D10).** Le gabarit du chantier n°5 réclame une
+ * palette, une typographie et une image ; un contenu v1 n'en porte aucune et
+ * produirait une page sans couleurs. Le schéma le refuse plutôt que de le
+ * construire, et le refus est bon marché : un seul prospect avait du contenu
+ * au moment du changement, soit une régénération à quatre centimes. C'était
+ * le meilleur moment possible pour toucher au contrat, et il ne se
+ * représentera pas.
  */
-export const SITE_CONTENT_VERSION = 'v1';
+export const SITE_CONTENT_VERSION = 'v2';
 
 /**
  * Bornes de longueur de la part rédigée.
@@ -94,6 +103,18 @@ export function siteRedactionSchema(trade: Trade) {
         .refine((liste) => new Set(liste).size === liste.length, {
           message: 'Deux fois la même prestation.',
         }),
+      /**
+       * La variante visuelle — trois jetons pris dans des listes closes.
+       *
+       * Elle est DANS la rédaction et non à côté, parce que `redaction` est
+       * par convention l'endroit où un relecteur regarde pour voir ce qu'une
+       * génération a décidé. Une palette et une image sont des choix au même
+       * titre que l'ordre des prestations ; les faits, eux, restent
+       * intouchables dans leur propre bloc.
+       *
+       * Le détail des listes est dans `site-theme.ts`.
+       */
+      theme: themeSchema(trade),
     })
     .strict();
 }
@@ -209,8 +230,9 @@ export function siteRedactionJsonSchema(trade: Trade): Record<string, unknown> {
         minItems: REDACTION_LIMITS.prestations.min,
         maxItems: REDACTION_LIMITS.prestations.max,
       },
+      theme: themeJsonSchema(trade),
     },
-    required: ['accroche', 'presentation', 'prestations'],
+    required: ['accroche', 'presentation', 'prestations', 'theme'],
     // Exigé par les sorties structurées, et c'est aussi ce qui ferme la porte
     // au modèle qui ajouterait spontanément « anneesExperience ».
     additionalProperties: false,
