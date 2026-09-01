@@ -124,17 +124,29 @@ export async function* searchEstablishments(
   const naf = options.trade.nafCodes.join(',');
 
   let page = 1;
-  let totalPages = 1;
+  let totalPages: number | null = null;
 
-  while (page <= totalPages) {
+  while (totalPages === null || page <= totalPages) {
     const url =
       `${BASE_URL}?activite_principale=${encodeURIComponent(naf)}` +
       `&code_postal=${encodeURIComponent(options.postalCode)}` +
       `&page=${page}&per_page=${MAX_PER_PAGE}`;
 
     const json = await fetchPage(url);
-    const meta = json as { total_pages?: unknown };
-    totalPages = typeof meta.total_pages === 'number' ? meta.total_pages : page;
+
+    if (totalPages === null) {
+      // Le nombre de pages est arrêté par la PREMIÈRE réponse et n'est plus
+      // réévalué. Le réévaluer à chaque page ferait qu'une réponse
+      // intermédiaire malformée réduise la borne et tronque la collecte en
+      // silence, sans erreur ni journal.
+      const meta = json as { total_pages?: unknown };
+      if (typeof meta.total_pages !== 'number' || !Number.isFinite(meta.total_pages)) {
+        throw new Error(
+          "API Recherche d'entreprises : total_pages absent ou invalide sur la première page",
+        );
+      }
+      totalPages = meta.total_pages;
+    }
 
     for (const row of mapSearchResponse(json, options.trade)) yield row;
     page += 1;
