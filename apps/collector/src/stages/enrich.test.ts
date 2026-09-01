@@ -254,3 +254,86 @@ describe('runEnrich', () => {
     expect(report.blocked).toBe(false);
   });
 });
+
+describe('runEnrich, disjoncteur de recherches vides', () => {
+  function prospects(count: number): EnrichProspect[] {
+    return Array.from({ length: count }, (_, i) => ({ ...prospect, id: `p${i}` }));
+  }
+
+  it('arrete le run quand plus rien ne remonte de Google', async () => {
+    // Signature d un selecteur casse : `search` rend un tableau vide sans
+    // lever la moindre erreur. Sans disjoncteur, le run traitait les 40
+    // prospects, ecrivait 40 « introuvables » faux et s annoncait reussi.
+    const muet = { search: vi.fn(async () => [] as MapsCandidate[]) };
+    const report = await runEnrich({
+      prospects: prospects(40),
+      trade,
+      config: MATCHING_CONFIG,
+      source: muet,
+      upsert: vi.fn(async () => undefined),
+      dailyRemaining: 100,
+    });
+
+    expect(report.stoppedByEmptySearches).toBe(true);
+    expect(report.processed).toBe(15);
+    expect(report.emptySearches).toBe(15);
+    // Le run s arrete AVANT les 25 prospects restants : c est tout l interet.
+    expect(report.processed).toBeLessThan(40);
+  });
+
+  it('ne se declenche pas sur des introuvables legitimes', async () => {
+    // Ici Google repond parfaitement : des fiches remontent a chaque
+    // recherche, elles ne correspondent simplement a personne. Le chemin de
+    // lecture fonctionne, donc le soupcon ne doit jamais naitre — sinon un
+    // metier reellement peu present sur Maps serait pris pour une panne.
+    const horsSujet = {
+      search: vi.fn(async () => [candidate({ name: 'Boulangerie Dupuis', category: 'Boulangerie' })]),
+    };
+    const report = await runEnrich({
+      prospects: prospects(40),
+      trade,
+      config: MATCHING_CONFIG,
+      source: horsSujet,
+      upsert: vi.fn(async () => undefined),
+      dailyRemaining: 100,
+    });
+
+    expect(report.notFound).toBe(40);
+    expect(report.stoppedByEmptySearches).toBe(false);
+    expect(report.emptySearches).toBe(0);
+    expect(report.processed).toBe(40);
+  });
+
+  it('remet le compteur a zero des qu une fiche est lue', async () => {
+    // Une seule lecture reussie prouve que les selecteurs tiennent : la serie
+    // recommence a zero, sans quoi des absences eparpillees finiraient par
+    // s additionner en fausse alerte au fil d un long run.
+    let call = 0;
+    const alterne = {
+      search: vi.fn(async () => {
+        call += 1;
+        // Une reussite toutes les trente requetes. Ce prospect n a pas
+        // d enseigne, il n emet donc que DEUX requetes — raison sociale puis
+        // repli sur le metier — et une reussite tombe ainsi tous les quinze
+        // prospects environ : juste sous le seuil, ce qui est exactement le
+        // regime que ce test veut eprouver.
+        return call % 30 === 0 ? [candidate()] : [];
+      }),
+    };
+    const report = await runEnrich({
+      prospects: prospects(40),
+      trade,
+      config: MATCHING_CONFIG,
+      source: alterne,
+      upsert: vi.fn(async () => undefined),
+      dailyRemaining: 100,
+    });
+
+    // Le run va jusqu au bout : deux reussites, aux prospects 14 et 29, ont
+    // suffi a couper deux series de quatorze vides qui, mises bout a bout,
+    // auraient franchi le seuil.
+    expect(report.stoppedByEmptySearches).toBe(false);
+    expect(report.processed).toBe(40);
+    expect(report.ok).toBe(2);
+  });
+});

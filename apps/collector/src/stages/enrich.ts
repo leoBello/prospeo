@@ -70,7 +70,15 @@ export interface EnrichmentRow {
   review_count: number | null;
   place_id: string | null;
   maps_url: string | null;
-  /** Candidats conservés pour la revue manuelle ; vide hors `ambiguous`. */
+  /**
+   * Candidats proposés par l'appariement.
+   *
+   * `enrich` ne les remplit que sur `ambiguous`, seul cas où ils servent
+   * encore à trancher. La revue, elle, les conserve sur toutes ses
+   * décisions — y compris le rejet : ce sont les exemples étiquetés dont la
+   * calibration des seuils a besoin. La présence de candidats ne dit donc
+   * rien du statut, et n'est jamais à lire comme telle.
+   */
   candidates: ReviewCandidate[];
   status: 'ok' | 'not_found' | 'ambiguous' | 'blocked';
   enriched_at: string;
@@ -170,6 +178,17 @@ export interface EnrichReport {
   stoppedByCap: boolean;
   /** Run interrompu par une série d'échecs d'écriture : ce n'est plus un incident. */
   stoppedByWriteFailures: boolean;
+  /**
+   * Prospects dont aucune requête n'a rendu le moindre candidat.
+   *
+   * Compté même quand le run va jusqu'au bout : rapporté à `processed`, c'est
+   * l'indicateur qui dit si le chemin de lecture fonctionne encore. Un run
+   * sain en compte peu ; un run dont les sélecteurs sont cassés n'en compte
+   * que ça.
+   */
+  emptySearches: number;
+  /** Run interrompu sur une série de recherches vides : les sélecteurs sont suspects. */
+  stoppedByEmptySearches: boolean;
 }
 
 export interface RunEnrichOptions {
@@ -210,6 +229,32 @@ function queriesFor(prospect: EnrichProspect, trade: Trade): string[] {
  */
 const MAX_CONSECUTIVE_WRITE_FAILURES = 3;
 
+/**
+ * Prospects d'affilée dont AUCUNE requête n'a rendu le moindre candidat
+ * avant que le run se déclare en panne de lecture.
+ *
+ * C'est le garde-fou contre la panne la plus coûteuse de ce chantier, et la
+ * seule qui soit entièrement muette. Si Google renomme une classe, tous les
+ * sélecteurs rendent `null`, `search()` rend un tableau vide sans lever la
+ * moindre erreur, et chaque prospect ressort `not_found` : le run traite ses
+ * 420 lignes, écrit 420 verdicts faux, annonce « 420 introuvables » et sort
+ * en succès. Aucun test hors ligne ne peut détecter cela — une fixture fige
+ * le HTML d'hier, elle ne sait rien de celui de demain. Seul le run lui-même
+ * est en position de s'en apercevoir.
+ *
+ * Le compteur porte sur les recherches **vides**, pas sur les `not_found` :
+ * la distinction est ce qui rend le seuil utilisable. Un `not_found`
+ * légitime naît de fiches trouvées puis écartées par `selectMatch` — le
+ * chemin de lecture a donc fonctionné, et ce prospect remet le compteur à
+ * zéro. Seule l'absence totale de candidat, sur les trois requêtes d'un
+ * prospect, porte la signature d'un sélecteur cassé.
+ *
+ * Quinze : au-delà du plus gros lot où une série d'absents réels reste
+ * plausible, et bien en deçà du prix d'un run complet. Le lot de calibration
+ * en compte cinq, il ne peut donc pas le déclencher.
+ */
+const MAX_CONSECUTIVE_EMPTY_SEARCHES = 15;
+
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -229,19 +274,21 @@ function messageOf(error: unknown): string {
 async function searchAndBuild(
   prospect: EnrichProspect,
   options: RunEnrichOptions,
-): Promise<EnrichmentRow> {
+): Promise<{ row: EnrichmentRow; sawCandidate: boolean }> {
   let row: EnrichmentRow | null = null;
+  let sawCandidate = false;
   for (const query of queriesFor(prospect, options.trade)) {
     const candidates: MapsCandidate[] = await options.source.search(query);
     // Une requête sans aucun candidat n'a rien à apparier : inutile de la
     // scorer, la requête suivante a toutes ses chances.
     if (candidates.length === 0) continue;
+    sawCandidate = true;
     row = buildEnrichmentRow(prospect, candidates, options.trade, options.config);
-    if (row.status !== 'not_found') return row;
+    if (row.status !== 'not_found') return { row, sawCandidate };
   }
   // Toutes les requêtes ont rendu `not_found` : on garde la dernière ligne
   // construite, ou une ligne vide si aucune n'a rendu le moindre candidat.
-  return row ?? emptyRow(prospect.id, 'not_found');
+  return { row: row ?? emptyRow(prospect.id, 'not_found'), sawCandidate };
 }
 
 export async function runEnrich(options: RunEnrichOptions): Promise<EnrichReport> {
@@ -255,9 +302,12 @@ export async function runEnrich(options: RunEnrichOptions): Promise<EnrichReport
     blocked: false,
     stoppedByCap: false,
     stoppedByWriteFailures: false,
+    emptySearches: 0,
+    stoppedByEmptySearches: false,
   };
 
   let consecutiveWriteFailures = 0;
+  let consecutiveEmptySearches = 0;
 
   for (const prospect of options.prospects) {
     if (report.processed >= options.dailyRemaining) {
@@ -269,8 +319,9 @@ export async function runEnrich(options: RunEnrichOptions): Promise<EnrichReport
     // échecs ne se traitent pas pareil : un échec de lecture est isolé, un
     // échec d'écriture rompt l'invariant du run.
     let row: EnrichmentRow;
+    let sawCandidate: boolean;
     try {
-      row = await searchAndBuild(prospect, options);
+      ({ row, sawCandidate } = await searchAndBuild(prospect, options));
     } catch (error) {
       if (error instanceof BlockedError) {
         // Le run s'arrête net. Continuer martèlerait une protection qui vient
@@ -321,6 +372,26 @@ export async function runEnrich(options: RunEnrichOptions): Promise<EnrichReport
     if (row.status === 'ok') report.ok += 1;
     else if (row.status === 'ambiguous') report.ambiguous += 1;
     else report.notFound += 1;
+
+    // Le décompte se fait après l'écriture, donc les lignes suspectes sont
+    // bel et bien en base quand le run s'arrête. C'est assumé : on ne peut
+    // pas savoir qu'une recherche vide est fausse avant d'en avoir vu la
+    // série. Elles restent rattrapables — `not_found` se rejoue avec
+    // `--retry-not-found` — et c'est ce que dit le message d'arrêt. Ce que
+    // le garde-fou empêche, c'est d'en écrire quatre cents de plus et de
+    // présenter le tout comme un succès.
+    if (!sawCandidate) {
+      report.emptySearches += 1;
+      consecutiveEmptySearches += 1;
+      if (consecutiveEmptySearches >= MAX_CONSECUTIVE_EMPTY_SEARCHES) {
+        report.stoppedByEmptySearches = true;
+        break;
+      }
+    } else {
+      // Une seule fiche lue suffit à prouver que le chemin de lecture tient :
+      // le soupçon tombe entièrement.
+      consecutiveEmptySearches = 0;
+    }
   }
 
   return report;
