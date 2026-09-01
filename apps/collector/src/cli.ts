@@ -106,6 +106,53 @@ function flag(argv: string[], name: string): string | undefined {
   return index === -1 ? undefined : argv[index + 1];
 }
 
+/**
+ * Lit et valide `--limit`, ou `'invalide'` si la valeur ne tient pas.
+ *
+ * `Number('abc')` rend NaN, et toute comparaison à NaN est fausse : une garde
+ * non validée ne se déclencherait jamais, et la commande partirait sans borne.
+ * Le helper est partagé parce que la validation ne l'était pas : `--limit`
+ * était annoncé comme option générale et n'était lu que par deux commandes sur
+ * six. Un `domains --limit 5`, tapé pour éprouver prudemment un étage neuf,
+ * envoyait en réalité jusqu'à 1 260 requêtes au registre `.fr`.
+ */
+function parseLimit(argv: string[]): number | undefined | 'invalide' {
+  if (!argv.includes('--limit')) return undefined;
+  const raw = flag(argv, 'limit');
+  const parsed = raw === undefined ? Number.NaN : Number(raw);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    process.stderr.write(`--limit attend un entier positif, reçu : ${raw ?? '(rien)'}\n`);
+    return 'invalide';
+  }
+  return parsed;
+}
+
+/**
+ * Identifiants des prospects marqués cessés par `reconcile`.
+ *
+ * Le §1 du spec pose comme critère de succès qu'un établissement qui cesse
+ * « cesse d'être traité comme un prospect valide ». `is_closed` n'avait
+ * pourtant qu'un lecteur, le barème : les étages coûteux continuaient de
+ * scraper Google, de sonder des sites et d'interroger le registre pour des
+ * entreprises fermées — jusqu'à 270 navigations et quarante minutes par run
+ * pour quinze cessations, au détriment des vivantes.
+ */
+async function fetchClosedIds(client: ReturnType<typeof createClient>): Promise<Set<string>> {
+  const closed = new Set<string>();
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await client
+      .from('prospect')
+      .select('id')
+      .eq('is_closed', true)
+      .order('id')
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    for (const row of data ?? []) closed.add(row.id);
+    if ((data ?? []).length < PAGE_SIZE) break;
+  }
+  return closed;
+}
+
 async function main(argv: string[]): Promise<number> {
   const command = argv[0];
   if (command === undefined || command === '--help' || command === '-h') {
@@ -138,18 +185,8 @@ async function main(argv: string[]): Promise<number> {
       // `--limit` est validé explicitement : `Number.parseInt('abc')` rend NaN,
       // et `seen >= NaN` est toujours faux — la garde ne se déclencherait jamais
       // et la collecte partirait sans limite sur l'API publique.
-      let limit: number | undefined;
-      if (argv.includes('--limit')) {
-        const limitRaw = flag(argv, 'limit');
-        const parsed = limitRaw === undefined ? Number.NaN : Number(limitRaw);
-        if (!Number.isInteger(parsed) || parsed <= 0) {
-          process.stderr.write(
-            `--limit attend un entier positif, reçu : ${limitRaw ?? '(rien)'}\n`,
-          );
-          return 1;
-        }
-        limit = parsed;
-      }
+      const limit = parseLimit(argv);
+      if (limit === 'invalide') return 1;
 
       const config = loadConfig(process.env);
       const client = createClient(config);
@@ -183,18 +220,8 @@ async function main(argv: string[]): Promise<number> {
       // Google et une dizaine d'heures — voir le calcul au commentaire de
       // `DAILY_CAP` — alors que `--limit` sert justement à éprouver
       // prudemment des seuils non calibrés.
-      let limit: number | undefined;
-      if (argv.includes('--limit')) {
-        const limitRaw = flag(argv, 'limit');
-        const parsed = limitRaw === undefined ? Number.NaN : Number(limitRaw);
-        if (!Number.isInteger(parsed) || parsed <= 0) {
-          process.stderr.write(
-            `--limit attend un entier positif, reçu : ${limitRaw ?? '(rien)'}\n`,
-          );
-          return 1;
-        }
-        limit = parsed;
-      }
+      const limit = parseLimit(argv);
+      if (limit === 'invalide') return 1;
 
       const config = loadConfig(process.env);
       const client = createClient(config);
@@ -218,6 +245,9 @@ async function main(argv: string[]): Promise<number> {
           .from('prospect')
           .select('id, denomination, denomination_usuelle, city, address, latitude, longitude')
           .eq('trade_slug', trade.slug)
+          // Une entreprise cessee n'est plus un prospect : la scraper
+          // consommerait du quota Google au detriment des vivantes.
+          .eq('is_closed', false)
           .order('id')
           .range(from, from + PAGE_SIZE - 1);
         if (error) throw new Error(error.message);
@@ -312,6 +342,9 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     }
     case 'review': {
+      const limit = parseLimit(argv);
+      if (limit === 'invalide') return 1;
+
       const config = loadConfig(process.env);
       const client = createClient(config);
 
@@ -340,7 +373,10 @@ async function main(argv: string[]): Promise<number> {
 
       let settled = 0;
       try {
-        for (const row of queue) {
+        // `--limit` borne ce que la commande traite reellement, et pas
+        // seulement ce qu elle annonce : le valider sans l appliquer serait
+        // pire que l ignorer.
+        for (const row of queue.slice(0, limit)) {
           // Tout le traitement d'un prospect est protégé, affichage compris.
           // `candidates` vient d'une colonne `jsonb` : une ligne mal formée —
           // un `lines` absent, une `confidence` manquante — lèverait dans le
@@ -435,8 +471,16 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     }
     case 'probe': {
+      const limit = parseLimit(argv);
+      if (limit === 'invalide') return 1;
+
       const config = loadConfig(process.env);
       const client = createClient(config);
+      // Les cessations viennent de `reconcile` et vivent sur `prospect` :
+      // les deux lectures ci-dessous portent sur d'autres tables, on ecarte
+      // donc en memoire plutot que par une jointure fragile.
+      const closed = await fetchClosedIds(client);
+
       // PostgREST plafonne les reponses (max_rows = 1000). Sans pagination, un
       // run au-dela de ce seuil traiterait une tranche arbitraire et afficherait
       // un compte-rendu de succes complet : la troncature serait invisible.
@@ -472,7 +516,11 @@ async function main(argv: string[]): Promise<number> {
 
       let done = 0;
       let skipped = 0;
-      for (const row of rows) {
+      // `--limit` borne ce que la commande traite reellement, et pas seulement
+      // ce qu elle annonce : le valider sans l appliquer serait pire que
+      // l ignorer.
+      for (const row of rows.slice(0, limit)) {
+        if (closed.has(row.prospect_id)) continue;
         if (!shouldProbe(probedAt.get(row.prospect_id) ?? null, now, force)) {
           skipped += 1;
           continue;
@@ -506,6 +554,9 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     }
     case 'score': {
+      const limit = parseLimit(argv);
+      if (limit === 'invalide') return 1;
+
       const config = loadConfig(process.env);
       const client = createClient(config);
       // Meme raison que pour `probe` : sans pagination explicite, au-dela de
@@ -531,7 +582,10 @@ async function main(argv: string[]): Promise<number> {
       let pendingProbe = 0;
       let eraseFailed = 0;
 
-      for (const p of data ?? []) {
+      // `--limit` borne ce que la commande traite reellement, et pas seulement
+      // ce qu elle annonce : le valider sans l appliquer serait pire que
+      // l ignorer.
+      for (const p of (data ?? []).slice(0, limit)) {
         const enrichment = (Array.isArray(p.prospect_enrichment)
           ? p.prospect_enrichment[0]
           : p.prospect_enrichment) as Record<string, unknown> | null;
@@ -762,8 +816,16 @@ async function main(argv: string[]): Promise<number> {
       return reconcileExitCode(report, prospects.length);
     }
     case 'domains': {
+      const limit = parseLimit(argv);
+      if (limit === 'invalide') return 1;
+
       const config = loadConfig(process.env);
       const client = createClient(config);
+      // Les cessations viennent de `reconcile` et vivent sur `prospect` :
+      // les deux lectures ci-dessous portent sur d'autres tables, on ecarte
+      // donc en memoire plutot que par une jointure fragile.
+      const closed = await fetchClosedIds(client);
+
 
       // Seuls les prospects sans domaine propre : proposer un nom à qui en a
       // déjà un n'a aucun sens.
@@ -798,7 +860,11 @@ async function main(argv: string[]): Promise<number> {
 
       let checked = 0;
       let undecided = 0;
-      for (const row of rows) {
+      // `--limit` borne ce que la commande traite reellement, et pas seulement
+      // ce qu elle annonce : le valider sans l appliquer serait pire que
+      // l ignorer.
+      for (const row of rows.slice(0, limit)) {
+        if (closed.has(row.prospect_id)) continue;
         const trade = getTrade(row.trade_slug);
         if (trade === undefined) continue;
         const candidates = domainCandidates(row.denomination, trade);
