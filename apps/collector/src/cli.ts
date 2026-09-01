@@ -1,6 +1,7 @@
 import { getTrade } from '@prospeo/core';
 import { loadConfig } from './config.js';
 import { createClient } from './supabase.js';
+import { buildScoreRow } from './stages/classify-score.js';
 import { makeUpsertProspect, runDiscover } from './stages/discover.js';
 import { probeUrl } from './stages/probe.js';
 
@@ -119,6 +120,91 @@ async function main(argv: string[]): Promise<number> {
         }
       }
       process.stdout.write(`probe : ${done} URL sondées\n`);
+      return 0;
+    }
+    case 'score': {
+      const config = loadConfig(process.env);
+      const client = createClient(config);
+      const { data, error } = await client
+        .from('prospect')
+        .select(
+          // Un seul littéral (et non une concaténation `+`) : supabase-js infère
+          // le type de la ligne à partir du type littéral de la chaîne passée à
+          // `select()` ; une concaténation élargit ce type en `string` et fait
+          // retomber l'inférence sur `GenericStringError`.
+          'id, denomination, date_creation, effectif_code, prospect_enrichment(declared_url, social_urls, phone_e164, rating, review_count), web_presence(category, probed_url, http_status, is_https, final_url, is_parked, has_viewport_meta, last_social_post_at)',
+        );
+      if (error) throw new Error(error.message);
+
+      let scored = 0;
+      let pending = 0;
+
+      for (const p of data ?? []) {
+        const enrichment = (Array.isArray(p.prospect_enrichment)
+          ? p.prospect_enrichment[0]
+          : p.prospect_enrichment) as Record<string, unknown> | null;
+        const presence = (Array.isArray(p.web_presence)
+          ? p.web_presence[0]
+          : p.web_presence) as Record<string, unknown> | null;
+
+        const row = buildScoreRow({
+          prospectId: p.id as string,
+          declaredUrl: (enrichment?.declared_url as string | null) ?? null,
+          socialUrls: (enrichment?.social_urls as string[] | null) ?? [],
+          probe:
+            presence?.probed_url == null
+              ? null
+              : {
+                  url: presence.probed_url as string,
+                  reachable: presence.http_status !== null,
+                  httpStatus: (presence.http_status as number | null) ?? null,
+                  isHttps: presence.is_https === true,
+                  finalUrl: (presence.final_url as string | null) ?? null,
+                  hasViewportMeta: presence.has_viewport_meta === true,
+                  isParked: presence.is_parked === true,
+                },
+          rating: (enrichment?.rating as number | null) ?? null,
+          reviewCount: (enrichment?.review_count as number | null) ?? null,
+          lastSocialPostAt: (presence?.last_social_post_at as string | null) ?? null,
+          effectifCode: (p.effectif_code as string | null) ?? null,
+          dateCreation: (p.date_creation as string | null) ?? null,
+          phoneRaw: (enrichment?.phone_e164 as string | null) ?? null,
+          denomination: p.denomination as string,
+          // Toujours false : `discover` filtre déjà `etat_administratif !== 'A'`,
+          // aucun établissement cessé n'entre en base.
+          isClosed: false,
+        });
+
+        if (row === null) {
+          pending += 1;
+          continue;
+        }
+
+        await client
+          .from('web_presence')
+          .upsert(
+            { prospect_id: row.prospectId, category: row.category, probed_at: new Date().toISOString() },
+            { onConflict: 'prospect_id' },
+          );
+
+        const { error: scoreError } = await client.from('prospect_score').upsert(
+          {
+            prospect_id: row.prospectId,
+            total: row.total,
+            breakdown: row.breakdown,
+            ruleset_version: row.rulesetVersion,
+            computed_at: new Date().toISOString(),
+          },
+          { onConflict: 'prospect_id' },
+        );
+        if (scoreError) {
+          process.stderr.write(`score: échec sur ${row.prospectId} — ${scoreError.message}\n`);
+          continue;
+        }
+        scored += 1;
+      }
+
+      process.stdout.write(`score : ${scored} prospects notés, ${pending} en attente de sonde\n`);
       return 0;
     }
     default:
