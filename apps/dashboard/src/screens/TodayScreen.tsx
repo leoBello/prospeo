@@ -4,6 +4,7 @@ import { buildToday, computeKpis } from '../domain/today.js';
 import { AppShell } from '../ui/AppShell.js';
 import { KpiBand } from '../ui/KpiBand.js';
 import { ProspectPanel } from '../ui/ProspectPanel.js';
+import type { PanelActions } from '../ui/actions.js';
 import { WorkListSection } from '../ui/WorkListSection.js';
 import { useListNavigation } from '../ui/useListNavigation.js';
 import { useT } from '../ui/preferences.js';
@@ -14,9 +15,17 @@ interface Props {
   currentRulesetVersion: string;
   now?: Date;
   onSignOut: () => void;
+  /** `null` : écran consultable seul, ce que montent les tests. */
+  actions?: PanelActions | null;
 }
 
-export function TodayScreen({ prospects, currentRulesetVersion, now, onSignOut }: Props) {
+export function TodayScreen({
+  prospects,
+  currentRulesetVersion,
+  now,
+  onSignOut,
+  actions = null,
+}: Props) {
   const t = useT();
   // Mémorisé : une `Date` reconstruite à chaque rendu changerait d'identité en
   // permanence et recomposerait les listes sans fin.
@@ -100,6 +109,7 @@ export function TodayScreen({ prospects, currentRulesetVersion, now, onSignOut }
             position={position}
             currentRulesetVersion={currentRulesetVersion}
             onClose={close}
+            actions={actions}
           />
         ) : null
       }

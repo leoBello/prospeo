@@ -3,7 +3,11 @@ import type { ProspectView } from '../domain/prospect.js';
 import { dataWarnings } from '../domain/coherence.js';
 import { groupBreakdown } from '../domain/score.js';
 import type { TranslationKey } from '../i18n/translate.js';
+import { MessagesSection } from './MessagesSection.js';
+import { PipelineSection } from './PipelineSection.js';
+import { SiteSection } from './SiteSection.js';
 import { WarningList } from './WarningList.js';
+import type { PanelActions } from './actions.js';
 import { useT } from './preferences.js';
 import styles from './ProspectPanel.module.css';
 
@@ -52,13 +56,28 @@ function Field({
 
 interface Props {
   prospect: ProspectView | null;
+  /**
+   * Les écritures, injectées.
+   *
+   * `null` rend la fiche strictement consultable, et c'est ce que montent les
+   * tests des sections de lecture : un composant qui fabriquerait lui-même son
+   * client Supabase ne pourrait plus se rendre sans réseau, et l'écran entier
+   * cesserait d'être éprouvable.
+   */
+  actions?: PanelActions | null;
   /** Rang affiché dans la file, pour situer le parcours au clavier. */
   position: { index: number; total: number } | null;
   currentRulesetVersion: string;
   onClose: () => void;
 }
 
-export function ProspectPanel({ prospect, position, currentRulesetVersion, onClose }: Props) {
+export function ProspectPanel({
+  prospect,
+  position,
+  currentRulesetVersion,
+  onClose,
+  actions = null,
+}: Props) {
   const t = useT();
 
   if (prospect === null) {
@@ -196,6 +215,34 @@ export function ProspectPanel({ prospect, position, currentRulesetVersion, onClo
           </p>
         )}
       </section>
+
+      <SiteSection
+        site={prospect.site}
+        onRejeter={actions === null ? null : () => actions.rejeterRedaction(prospect.id)}
+        onAnnulerRejet={actions === null ? null : () => actions.annulerRejet(prospect.id)}
+      />
+
+      <MessagesSection messages={prospect.messages} />
+
+      <PipelineSection
+        pipeline={prospect.pipeline}
+        // « En ligne » veut dire déployé ET non retiré : une ligne conserve son
+        // `deployment_url` après dépublication, et l'avertissement sur le
+        // retrait différé n'aurait alors plus lieu d'être.
+        siteEnLigne={
+          prospect.site !== null &&
+          prospect.site.deploymentUrl !== null &&
+          prospect.site.unpublishedAt === null
+        }
+        onDefinirStatut={
+          actions === null
+            ? null
+            : (status, nextActionAt) => actions.definirStatut(prospect.id, status, nextActionAt)
+        }
+        onJournaliser={
+          actions === null ? null : (kind, body) => actions.journaliser(prospect.id, kind, body)
+        }
+      />
 
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>{t('panel.section.score')}</h3>

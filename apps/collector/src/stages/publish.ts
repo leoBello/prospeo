@@ -165,6 +165,16 @@ export interface PublishDeps {
 export interface PublishInput {
   prospectId: string;
   contenu: ContenuPublie;
+  /**
+   * Date à laquelle cette rédaction a été refusée à la relecture, s'il y en a
+   * eu une (`prospect_site.content_rejected_at`).
+   *
+   * Un contenu rejeté ne se publie pas. C'est ce qui donne son sens au bouton
+   * du dashboard : sans ce couplage, refuser une rédaction puis lancer
+   * `publish` la pousserait quand même, et le clic aurait laissé croire le
+   * contraire de ce qu'il faisait.
+   */
+  rejeteeLe?: Date | null;
 }
 
 /**
@@ -186,7 +196,20 @@ export async function runPublish(
 ): Promise<PublishReport> {
   const report: PublishReport = { created: 0, updated: 0, skipped: 0, failed: 0, refused: 0 };
 
-  for (const { prospectId, contenu } of inputs) {
+  for (const { prospectId, contenu, rejeteeLe } of inputs) {
+    // Un refus humain prime sur tout le reste, et se constate avant le moindre
+    // appel réseau — même place et même raison que le contrôle de l'éditeur
+    // juste en dessous. `generate` reprendra ce prospect ; `publish` n'a rien
+    // à en faire tant qu'une nouvelle rédaction n'a pas été écrite.
+    if (rejeteeLe !== undefined && rejeteeLe !== null) {
+      console.error(
+        `publish : ${prospectId} refusé — rédaction rejetée à la relecture le ` +
+          `${rejeteeLe.toISOString().slice(0, 10)}. Rejouez « generate » pour en écrire une autre.`,
+      );
+      report.refused += 1;
+      continue;
+    }
+
     // §11 conformité : un site publié au nom d'un tiers doit nommer son
     // éditeur réel et offrir un moyen d'en demander le retrait. Le contrôle
     // est ici, avant le moindre appel réseau — un dépôt créé ne se « dé-crée »

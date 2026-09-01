@@ -219,6 +219,36 @@ function fausseDeps(etats: Record<string, EtatSite> = {}) {
 }
 
 describe('runPublish', () => {
+  it('REFUSE de publier une rédaction rejetée à la relecture', async () => {
+    // Le couplage qui donne son sens au bouton « rejeter » du dashboard. Sans
+    // lui, refuser une rédaction puis lancer `publish` la pousserait quand
+    // même : le clic n'aurait servi à rien, et il aurait de surcroît laissé
+    // croire le contraire.
+    //
+    // Le refus est ANTÉRIEUR au moindre appel réseau — même place et même
+    // raison que le contrôle de l'éditeur : un dépôt créé ne se « dé-crée »
+    // pas, et c'est la publication qui expose une page au monde.
+    const { deps, journal } = fausseDeps();
+    const report = await runPublish(
+      [{ ...UN, rejeteeLe: new Date('2026-09-02T09:00:00Z') }],
+      deps,
+    );
+
+    expect(report.refused).toBe(1);
+    expect(report.created).toBe(0);
+    expect(journal).toEqual([]);
+    // Et le run échoue : un lot dont une part attend une décision humaine
+    // n'est pas un lot réussi.
+    expect(publishExitCode(report)).toBe(1);
+  });
+
+  it('publie normalement une rédaction jamais rejetée', async () => {
+    // Le champ est optionnel : les appelants qui l'ignorent — et tout ce qui
+    // existait avant lui — ne doivent pas voir leur comportement changer.
+    const { deps } = fausseDeps();
+    expect((await runPublish([{ ...UN, rejeteeLe: null }], deps)).created).toBe(1);
+  });
+
   it('part du dépôt modèle du métier, et non d’un réglage du run', async () => {
     // Décision de l'utilisateur : un modèle par métier, declare dans
     // `trades.ts`, et a terme pilotable depuis une interface de gestion via le

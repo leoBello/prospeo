@@ -450,6 +450,7 @@ async function fetchSiteRows(client: ReturnType<typeof createClient>) {
     repo_full_name: string | null;
     repo_url: string | null;
     content_hash: string | null;
+    content_rejected_at: string | null;
     published_at: string | null;
     unpublished_at: string | null;
     vercel_project_id: string | null;
@@ -459,7 +460,7 @@ async function fetchSiteRows(client: ReturnType<typeof createClient>) {
     const { data, error } = await client
       .from('prospect_site')
       .select(
-        'prospect_id, content, repo_full_name, repo_url, content_hash, published_at, unpublished_at, vercel_project_id, deployment_url',
+        'prospect_id, content, repo_full_name, repo_url, content_hash, content_rejected_at, published_at, unpublished_at, vercel_project_id, deployment_url',
       )
       .order('prospect_id')
       .range(from, from + PAGE_SIZE - 1);
@@ -1558,7 +1559,15 @@ async function main(argv: string[]): Promise<number> {
 
       // Un contenu déjà écrit n'est pas régénéré : c'est le seul étage qui
       // dépense de l'argent, et un rejeu distrait coûterait vingt-deux appels.
-      const aFaire = candidats.filter((c) => force || dejaFait[c.id]?.content == null);
+      //
+      // Une rédaction REJETÉE à la relecture fait exception, et c'est ce qui
+      // rend le bouton du dashboard utile : le refus remet le prospect dans la
+      // file sans qu'il faille se souvenir de passer `--force`, lequel
+      // régénérerait aussi les vingt et un contenus que personne n'a contestés.
+      const aFaire = candidats.filter((c) => {
+        const ligne = dejaFait[c.id];
+        return force || ligne?.content == null || ligne.content_rejected_at !== null;
+      });
       const lot = limit === undefined ? aFaire : aFaire.slice(0, limit);
 
       if (lot.length === 0) {
@@ -1610,6 +1619,11 @@ async function main(argv: string[]): Promise<number> {
             prompt_version: contenu.version.promptVersion,
             model: contenu.version.model,
             generated_at: new Date().toISOString(),
+            // Le refus portait sur le texte qu'on vient de remplacer. Le
+            // laisser en place bloquerait `publish` sur une rédaction neuve
+            // que personne n'a lue, et remettrait le prospect dans la file de
+            // `generate` à chaque run — une boucle qui coûte un appel par tour.
+            content_rejected_at: null,
             updated_at: new Date().toISOString(),
           });
           if (error) {
@@ -1732,7 +1746,16 @@ async function main(argv: string[]): Promise<number> {
       for (const [prospectId, row] of Object.entries(rows)) {
         if (row.content === null || row.content === undefined) continue;
         if (row.unpublished_at !== null) continue;
-        entrees.push({ prospectId, contenu: row.content as unknown as ContenuPublie });
+        entrees.push({
+          prospectId,
+          contenu: row.content as unknown as ContenuPublie,
+          // Transmis plutôt que filtré ici : `runPublish` porte la décision et
+          // la COMPTE. Écarter la ligne en silence à la lecture ferait
+          // disparaître le prospect du rapport, et un contenu refusé qu'on ne
+          // republie pas doit se voir — c'est du travail qui attend quelqu'un.
+          rejeteeLe:
+            row.content_rejected_at === null ? null : new Date(row.content_rejected_at),
+        });
       }
       const lot = limit === undefined ? entrees : entrees.slice(0, limit);
 

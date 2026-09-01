@@ -29,6 +29,16 @@ export interface ProspectView {
   presence: PresenceView | null;
   enrichment: EnrichmentView | null;
   pipeline: PipelineView | null;
+  /** `null` tant qu'aucune rédaction n'a été écrite pour ce prospect. */
+  site: SiteView | null;
+  /**
+   * Le dernier message de chaque canal, du plus récent au plus ancien.
+   *
+   * Vide, et non `null` : `generated_message` archive, elle n'écrase pas, et
+   * l'absence de ligne est ici indiscernable d'une table jamais alimentée.
+   * Rien ne se perdrait à distinguer les deux, et rien ne s'y gagnerait.
+   */
+  messages: MessageView[];
 }
 
 export interface ScoreView {
@@ -63,6 +73,55 @@ export interface EnrichmentView {
   matchedName: string | null;
   matchConfidence: number | null;
   enrichedAt: string;
+}
+
+/**
+ * L'état du site généré d'un prospect.
+ *
+ * `redaction` porte ce que le MODÈLE a décidé — l'accroche, la présentation,
+ * le choix et l'ordre des prestations. Les faits n'y sont pas : ils sont
+ * ailleurs sur la fiche, tirés des mêmes colonnes, et les afficher deux fois
+ * laisserait croire qu'il en existe deux versions. C'est aussi ce qui rend la
+ * relecture tenable en une minute, comme l'annonce le §3 du plan : le
+ * relecteur ne lit que ce qui a pu être inventé.
+ */
+export interface SiteView {
+  repoUrl: string | null;
+  /** L'URL en ligne — la donnée de vente, celle que le message cite. */
+  deploymentUrl: string | null;
+  promptVersion: string | null;
+  model: string | null;
+  generatedAt: string | null;
+  publishedAt: string | null;
+  /** Renseignée quand D5 a retiré le site : refus du prospect, ou péremption. */
+  unpublishedAt: string | null;
+  /**
+   * Date du refus de relecture, s'il y en a eu un.
+   *
+   * Comparée à `generatedAt`, elle dit si la rédaction affichée est celle qui
+   * a été refusée ou une nouvelle écrite depuis.
+   */
+  contentRejectedAt: string | null;
+  redaction: RedactionView | null;
+}
+
+export interface RedactionView {
+  accroche: string;
+  presentation: string;
+  /** Libellés déjà résolus : c'est le CHOIX et l'ORDRE qui viennent du modèle. */
+  prestations: string[];
+}
+
+/** Un message archivé, tel qu'il a été rédigé. */
+export interface MessageView {
+  /** `email`, `sms` ou `appel` — colonne texte libre, pas une énumération. */
+  channel: string;
+  /** Seul l'email en a un. */
+  subject: string | null;
+  content: string;
+  promptVersion: string;
+  model: string;
+  createdAt: string;
 }
 
 export interface PipelineView {

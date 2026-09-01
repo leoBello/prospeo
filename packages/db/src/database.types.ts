@@ -289,6 +289,7 @@ export type Database = {
         Row: {
           content: Json | null
           content_hash: string | null
+          content_rejected_at: string | null
           deployment_url: string | null
           generated_at: string | null
           model: string | null
@@ -304,6 +305,7 @@ export type Database = {
         Insert: {
           content?: Json | null
           content_hash?: string | null
+          content_rejected_at?: string | null
           deployment_url?: string | null
           generated_at?: string | null
           model?: string | null
@@ -319,6 +321,7 @@ export type Database = {
         Update: {
           content?: Json | null
           content_hash?: string | null
+          content_rejected_at?: string | null
           deployment_url?: string | null
           generated_at?: string | null
           model?: string | null

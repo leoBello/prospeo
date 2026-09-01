@@ -4,10 +4,13 @@ import type { PhoneKind, WebPresenceCategory } from '@prospeo/core';
 import { parseBreakdown } from '../domain/score.js';
 import type {
   EnrichmentView,
+  MessageView,
   PipelineView,
   PresenceView,
   ProspectView,
+  RedactionView,
   ScoreView,
+  SiteView,
 } from '../domain/prospect.js';
 import { fetchAllRows, type FetchAllOptions, type RangeReader } from './paginate.js';
 
@@ -36,6 +39,8 @@ export const PROSPECT_SELECT = [
   'web_presence(category,final_url,http_status,domain_available,probed_at)',
   'prospect_enrichment(status,phone_e164,phone_kind,rating,review_count,declared_url,matched_name,match_confidence,enriched_at)',
   'prospect_pipeline(status,next_action_at,updated_at)',
+  'prospect_site(repo_url,deployment_url,prompt_version,model,generated_at,published_at,unpublished_at,content_rejected_at,content)',
+  'generated_message(channel,subject,content,prompt_version,model,created_at)',
 ].join(',');
 
 /**
@@ -174,6 +179,97 @@ function toPipeline(raw: unknown): PipelineView | null {
   };
 }
 
+/**
+ * La rédaction, extraite du contenu publié.
+ *
+ * Le `jsonb` a été validé contre son schéma AU MOMENT de l'écriture, par
+ * `runGenerate`. Il n'est pas revalidé ici : la couche d'affichage n'a pas
+ * qualité à trancher qu'un contenu déjà publié sous le nom d'une entreprise
+ * est invalide. Elle se contente de ne rien afficher de ce qu'elle ne
+ * reconnaît pas — un contenu écrit sous un schéma futur laisse la section
+ * vide plutôt que de faire tomber l'écran.
+ */
+function toRedaction(raw: unknown): RedactionView | null {
+  const contenu = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : null;
+  const r = contenu === null ? null : unique(contenu['redaction']);
+  if (r === null) return null;
+
+  const accroche = texte(r['accroche']);
+  const presentation = texte(r['presentation']);
+  if (accroche === null || presentation === null) return null;
+
+  // Les prestations arrivent RÉSOLUES dans `ContenuPublie` : des objets
+  // `{code, label, description}`, et non des codes. C'est `label` qu'un
+  // relecteur lit, et `code` qui n'a de sens que pour `trades.ts`.
+  const brutes = r['prestations'];
+  const prestations = Array.isArray(brutes)
+    ? brutes
+        .map((p) => texte(unique(p)?.['label'] ?? null))
+        .filter((l): l is string => l !== null)
+    : [];
+
+  return { accroche, presentation, prestations };
+}
+
+function toSite(raw: unknown): SiteView | null {
+  const o = unique(raw);
+  if (o === null) return null;
+  return {
+    repoUrl: texte(o['repo_url']),
+    deploymentUrl: texte(o['deployment_url']),
+    promptVersion: texte(o['prompt_version']),
+    model: texte(o['model']),
+    generatedAt: texte(o['generated_at']),
+    publishedAt: texte(o['published_at']),
+    unpublishedAt: texte(o['unpublished_at']),
+    contentRejectedAt: texte(o['content_rejected_at']),
+    redaction: toRedaction(o['content']),
+  };
+}
+
+/**
+ * Les messages archivés, le plus récent de chaque canal d'abord.
+ *
+ * `generated_message` ARCHIVE : une régénération ajoute des lignes sans
+ * effacer les précédentes, et un prospect rejoué trois fois en porte neuf. Les
+ * afficher toutes noierait le texte à copier sous ses brouillons ; n'en garder
+ * qu'un par canal les rend lisibles sans rien détruire — l'historique reste en
+ * base pour qui le cherche.
+ *
+ * Le tri est fait ICI et non par PostgREST : ordonner une relation imbriquée
+ * demande une option par relation, qu'un ajout de colonne ferait silencieusement
+ * tomber. Sur trois lignes, le tri client est exact et ne peut pas se perdre.
+ */
+function toMessages(raw: unknown): MessageView[] {
+  if (!Array.isArray(raw)) return [];
+
+  const toutes: MessageView[] = [];
+  for (const brut of raw) {
+    const o = unique(brut);
+    if (o === null) continue;
+    const channel = texte(o['channel']);
+    const content = texte(o['content']);
+    if (channel === null || content === null) continue;
+    toutes.push({
+      channel,
+      subject: texte(o['subject']),
+      content,
+      promptVersion: texte(o['prompt_version']) ?? '',
+      model: texte(o['model']) ?? '',
+      createdAt: texte(o['created_at']) ?? '',
+    });
+  }
+
+  toutes.sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
+
+  const vus = new Set<string>();
+  return toutes.filter((m) => {
+    if (vus.has(m.channel)) return false;
+    vus.add(m.channel);
+    return true;
+  });
+}
+
 /** Traduit une ligne PostgREST en vue d'interface. */
 export function toProspectView(raw: unknown): ProspectView {
   const o = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
@@ -194,6 +290,8 @@ export function toProspectView(raw: unknown): ProspectView {
     presence: toPresence(o['web_presence']),
     enrichment: toEnrichment(o['prospect_enrichment']),
     pipeline: toPipeline(o['prospect_pipeline']),
+    site: toSite(o['prospect_site']),
+    messages: toMessages(o['generated_message']),
   };
 }
 
