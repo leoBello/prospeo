@@ -1,0 +1,21 @@
+{
+  "name": "@prospeo/collector",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": { "prospeo": "./src/cli.ts" },
+  "scripts": {
+    "start": "tsx src/cli.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@prospeo/core": "workspace:*",
+    "@supabase/supabase-js": "^2.45.0",
+    "undici": "^6.19.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0"
+  }
+}
