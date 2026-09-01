@@ -2746,26 +2746,13 @@ Créer `apps/collector/src/stages/review.ts` :
 import { normalizePhone } from '@prospeo/core';
 import type { EnrichmentRow, ReviewCandidate } from './enrich.js';
 
-/**
- * NOTE : ce type est finalement declare dans `stages/enrich.ts`, pas ici.
- *
- * `EnrichmentRow.candidates` doit le referencer, et le declarer dans
- * `review.ts` aurait fait dependre l'etage `enrich` de la commande de revue —
- * l'inverse de la dependance naturelle. `review.ts` l'importe donc depuis
- * `enrich.js`. Il reste un ALIAS de type et non une interface : une interface
- * n'a pas de signature d'index implicite, donc `ReviewCandidate[]` ne serait
- * pas assignable au type `Json` de la colonne `jsonb` qui la stocke — meme
- * piege que `ScoreLine` documente deja dans `packages/core`.
- */
-export type ReviewCandidateShape = {
-  name: string;
-  address: string | null;
-  phone: string | null;
-  website: string | null;
-  mapsUrl: string;
-  confidence: number;
-  lines: MatchLine[];
-}
+// `ReviewCandidate` est déclaré dans `stages/enrich.ts` et importé ici, pas
+// l'inverse : `EnrichmentRow.candidates` le référence, et le déclarer dans
+// `review.ts` ferait dépendre l'étage de la commande de revue. C'est un ALIAS
+// de type et non une interface — une interface n'a pas de signature d'index
+// implicite, donc `ReviewCandidate[]` ne serait pas assignable au type `Json`
+// de la colonne `jsonb` qui la stocke. Même piège que `ScoreLine` dans
+// `packages/core`.
 
 export type ReviewDecision =
   | { kind: 'accept'; index: number }
