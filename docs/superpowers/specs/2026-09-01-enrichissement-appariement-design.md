@@ -113,11 +113,27 @@ signal qui n'entre pas au barème.
 Implémente l'interface déjà posée au socle :
 
 ```ts
-interface EnrichmentSource { enrich(p: Prospect): Promise<Enrichment | null> }
+interface MapsSource {
+  search(query: string): Promise<MapsCandidate[]>;
+  readonly navigations: number;
+  close(): Promise<void>;
+}
 ```
 
-`GoogleMapsEnrichmentSource` est une implémentation parmi d'autres. Le reste
-du pipeline ne la connaît pas.
+**Corrigé après la revue finale.** Ce spec annonçait une interface
+`EnrichmentSource { enrich(p: Prospect) }` « déjà posée au socle » : elle
+n'a jamais existé, ni au socle ni ici. Et le code a eu raison de ne pas la
+créer — enfermer un prospect derrière `enrich(p)` aurait absorbé dans la
+source la stratégie des trois requêtes du §4.2, qui appartient à l'étage, et
+l'aurait rendue à la fois inobservable et intestable.
+
+La source ne sait donc rien des prospects : elle exécute une requête et rend
+des fiches. C'est l'étage qui décide quelles requêtes tenter, dans quel
+ordre, et quand s'arrêter. `navigations` compte les pages réellement
+chargées, pour que le volume envoyé à Google reste visible plutôt que deviné.
+
+`GoogleMapsSource` est une implémentation parmi d'autres ; le reste du
+pipeline ne la connaît pas.
 
 ### 4.2 Stratégie de requête
 
@@ -134,7 +150,8 @@ Maps connaît (voir §5.1).
 ### 4.3 Ce qui est extrait
 
 Nom, adresse, coordonnées, libellé de catégorie Google, téléphone, site
-déclaré, note, nombre d'avis, `place_id`, URL de la fiche.
+déclaré, note, `place_id`, URL de la fiche. Le nombre d'avis figurait dans
+cette liste ; il n'est plus publié par Google (voir §4.5).
 
 Le champ « site web » est le mécanisme central de la classification : chez
 les artisans il contient très souvent une URL Facebook, ce qui rend la
@@ -172,12 +189,29 @@ l'image des étoiles, et le seul `aria-label` chiffré du flux est
 « 4,8 étoiles ». Aucun sélecteur ne peut donc le fournir, et le §4.3 le
 listait à tort parmi les champs extraits.
 
-Conséquence sur le barème : la ligne « nombre d'avis » de la section Vitalité
-ne se déclenchera jamais. Elle est **laissée en place et inerte** plutôt que
-retirée — le barème est versionné, il sera recalibré au jalon, et Google peut
-rétablir l'affichage. Les points concernés ne sont simplement jamais
-attribués, ce qui resserre l'échelle réelle des scores sans fausser leur
-ordre.
+Conséquence sur le barème, corrigée après la revue finale de branche : ce
+n'est pas **une** ligne qui meurt, mais **trois**, et la note s'en trouvait
+entraînée avec elles.
+
+| Règle | Points | État |
+|---|---|---|
+| `reputation` | 25 | **ranimée en v2** — elle exigeait la note *et* le nombre d'avis ; elle ne dépend plus que de la note |
+| `reviews_volume` | 10 | inerte — le nombre d'avis n'est plus publié |
+| `social_fresh` | 15 | inerte — `last_social_post_at` n'a aucun écrivain |
+
+Le cas de `reputation` méritait d'être vu : la note est extraite par le
+scraper, préservée à travers la revue manuelle, et deux correctifs du
+chantier l'ont spécifiquement sauvée — mais elle ne pouvait rapporter aucun
+point, parce que la règle exigeait aussi un nombre d'avis que Google ne
+publie plus. Mesuré avant correction : une note de 4,9 donnait exactement le
+même total qu'une note absente.
+
+Les deux règles réellement inertes sont **laissées en place et le disent à
+l'endroit exact où elles s'écrivent**, plutôt que retirées — le barème est
+versionné, la donnée peut revenir, et une règle inerte qui explique pourquoi
+vaut mieux qu'une règle disparue dont personne ne saura qu'elle a existé.
+Vingt-cinq points restent hors d'atteinte, ce qui resserre l'échelle réelle
+sans fausser l'ordre.
 
 **Google tranche après le chargement entre une liste et une fiche unique**, et
 ne réécrit l'URL en `/maps/place/` qu'au bout d'environ cinq secondes. Le
@@ -324,8 +358,8 @@ type MatchOutcome =
 interface MatchScore {
   confidence: number;       // 0 à 1
   nameSimilarity: number;   // le max du §5.3
-  matchedVariant: string;   // la variante de nom qui a gagné
-  distanceM: number;
+  matchedVariant: string | null;  // la variante qui a gagné, ou aucune
+  distanceM: number | null;       // `null` : position inconnue, pas 0 m
   categoryMatch: boolean;
   lines: MatchLine[];       // libellés français, affichables tels quels
 }
@@ -473,7 +507,7 @@ peut distinguer un succès d'un arrêt anti-bot.
 | Migration | Motif |
 |---|---|
 | `prospect.is_closed boolean not null default false` | branche le disqualifiant du barème |
-| `prospect.reconciled_at timestamptz` | idempotence de `reconcile` |
+| `prospect.reconciled_at timestamptz` | trace de la dernière vérification. **Pas** un prédicat de fraîcheur : `reconcile` revérifie toute la base à chaque passage, sans quoi ce qu'il n'a pas relu resterait indéfiniment hors contrôle |
 | `web_presence.domain_checked_at timestamptz` | idempotence de `domains` ; `probed_at` ne peut pas servir, les deux étages sont distincts |
 | index sur `prospect_enrichment.status` | la file de revue interroge ce champ |
 
