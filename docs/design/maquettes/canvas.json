@@ -1,0 +1,70 @@
+{
+  "pages": [
+    { "id": "page-1", "name": "Application" },
+    { "id": "page-2", "name": "Déploiement" },
+    { "id": "page-3", "name": "Directions" }
+  ],
+  "artboards": [
+    { "file": "Main.dc.html", "page": "page-1", "x": 0, "y": 0, "w": 1440, "h": 900, "title": "Aujourd'hui — refonte", "is_interactive": true },
+    { "file": "Composants.dc.html", "page": "page-1", "x": 1560, "y": 0, "w": 1200, "h": 1000, "title": "Vocabulaire d'interface" },
+
+    { "file": "Deploiements.dc.html", "page": "page-2", "x": 0, "y": 0, "w": 1440, "h": 900, "title": "Suivi des déploiements" },
+    { "file": "DeploiementDetail.dc.html", "page": "page-2", "x": 1560, "y": 0, "w": 760, "h": 900, "title": "Un déploiement en cours" },
+    { "file": "Gabarit.dc.html", "page": "page-2", "x": 2400, "y": 0, "w": 760, "h": 900, "title": "Gabarit GitHub" },
+
+    { "file": "DirectionA.dc.html", "page": "page-3", "x": 0, "y": 0, "w": 560, "h": 880, "title": "A — Console calme" },
+    { "file": "DirectionB.dc.html", "page": "page-3", "x": 680, "y": 0, "w": 560, "h": 880, "title": "B — Cockpit gamifié" },
+    { "file": "DirectionC.dc.html", "page": "page-3", "x": 1360, "y": 0, "w": 560, "h": 880, "title": "C — Dossier éditorial" }
+  ],
+  "annotations": [
+    {
+      "id": "note-panneau",
+      "page": "page-1",
+      "x": 0,
+      "y": -190,
+      "w": 700,
+      "text": "Le défaut central corrigé ici : le panneau passe de 380 px à 720 px et ses sept sections empilées deviennent quatre onglets — Fiche, Site, Messages, Historique. Le reçu de score ligne par ligne, aujourd'hui toujours déplié, passe derrière un dépliant ; ses trois groupes restent lisibles d'un coup d'œil en barres, le détail arrive au survol.\n\nLes onglets fonctionnent : cliquez-les."
+    },
+    {
+      "id": "note-jeu",
+      "page": "page-1",
+      "x": 740,
+      "y": -190,
+      "w": 660,
+      "text": "Gamification adossée à des faits, jamais à du volume : objectif du jour calculé sur votre propre médiane, série de jours, palier, trois badges dont un verrouillé. Le curseur « gamification » au-dessus de l'artboard bascule entre affirmée, discrète et aucune — la question se tranche mieux en la voyant qu'en la décrivant."
+    },
+    {
+      "id": "note-composants",
+      "page": "page-1",
+      "x": 1560,
+      "y": -130,
+      "w": 620,
+      "text": "Badges, infobulles, cartes, jauges, états vides — les pièces qui manquent au code actuel. Le gris de texte secondaire y est corrigé : #6b7280 mesurait 3,6:1, sous le seuil AA que theme.css signalait déjà en réserve."
+    },
+    {
+      "id": "note-deploiement",
+      "page": "page-2",
+      "x": 0,
+      "y": -170,
+      "w": 700,
+      "text": "Cinq étapes, dans l'ordre réel du code : rédaction, dépôt GitHub, projet Vercel, build, mise en ligne. Une ligne en échec porte sa cause dans la ligne même, pas dans un journal à ouvrir. Sélection multiple pour déployer plusieurs prospects d'un coup, et un compteur de péremption à 90 jours, qui est une obligation et non une statistique."
+    },
+    {
+      "id": "note-gabarit",
+      "page": "page-2",
+      "x": 2400,
+      "y": -170,
+      "w": 620,
+      "text": "Désigner un dépôt GitHub substitue celui-ci au gabarit livré avec l'application. Les quatre contrôles sont énoncés avant validation, dont la mention d'éditeur — que publish refuse déjà côté code. L'ordre de résolution reste celui de trades.ts : gabarit du métier, puis gabarit actif, puis défaut."
+    },
+    {
+      "id": "note-directions",
+      "page": "page-3",
+      "x": 0,
+      "y": -200,
+      "w": 900,
+      "text": "Trois partis pris sur le même prospect, pour comparer à contenu égal. Chacun porte son pari et sa contrepartie en pied d'artboard.\n\nB est celui que les autres écrans utilisent — c'est le seul qui accueille vraiment la gamification demandée. A est plus sobre et plus dense ; C se lit mieux mais montre moins. Dites lequel tient, et je reconstruis le reste dessus."
+    }
+  ],
+  "launch": { "view": "canvas", "page": "page-1" }
+}

@@ -1,0 +1,542 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+  <style>
+    :root {
+      --bg: #0b0d12; --surface: #14171f; --surface2: #1a1e28; --surface3: #232936;
+      --border: #252b38; --border2: #333c4e;
+      --text: #e4e8f0; --muted: #98a1b4; --faint: #6b7488;
+      --blue: #6d92ff; --mint: #4fd1a5; --amber: #f0b45c; --rose: #ff7a85; --violet: #a78bfa;
+      --display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+      --ui: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
+      --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--ui); font-size: 13px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+    a { color: var(--blue); text-decoration: none; }
+    a:hover { color: #8fabff; }
+    h1, h2, h3, h4 { margin: 0; font-family: var(--display); font-weight: 600; letter-spacing: -0.015em; }
+    button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+    .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+    .tip { position: relative; display: inline-flex; }
+    .tip > .tipBody {
+      position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%) translateY(3px);
+      background: #030509; border: 1px solid var(--border2); color: var(--text);
+      padding: 7px 10px; border-radius: 8px; font-size: 11.5px; line-height: 1.4; width: max-content; max-width: 230px;
+      opacity: 0; pointer-events: none; transition: opacity 140ms ease, transform 140ms ease; z-index: 40;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.55);
+    }
+    .tip:hover > .tipBody { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .tipK { color: var(--faint); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 2px; }
+
+    .badge { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 999px;
+      font-size: 11px; font-weight: 600; letter-spacing: 0.01em; border: 1px solid transparent; white-space: nowrap; }
+    .badge .dot { width: 5px; height: 5px; border-radius: 999px; background: currentColor; flex: none; }
+    .b-blue { color: #a9c2ff; background: rgba(109,146,255,0.13); border-color: rgba(109,146,255,0.28); }
+    .b-mint { color: #86e3c1; background: rgba(79,209,165,0.13); border-color: rgba(79,209,165,0.28); }
+    .b-amber { color: #f5cd92; background: rgba(240,180,92,0.13); border-color: rgba(240,180,92,0.28); }
+    .b-rose { color: #ffa8b0; background: rgba(255,122,133,0.13); border-color: rgba(255,122,133,0.28); }
+    .b-mute { color: var(--muted); background: rgba(152,161,180,0.10); border-color: var(--border2); }
+  </style>
+</helmet>
+
+<div style="width: 1440px; height: 900px; display: flex; background: var(--bg); overflow: hidden">
+
+  <div style="width: 56px; flex: none; border-right: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; align-items: center; padding: 12px 0; gap: 6px">
+    <div style="width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(150deg, var(--blue), var(--violet)); display: flex; align-items: center; justify-content: center; font-family: var(--display); font-weight: 700; font-size: 15px; color: #0b0d12; margin-bottom: 10px">P</div>
+    <div class="tip">
+      <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(109,146,255,0.14); color: var(--blue); display: flex; align-items: center; justify-content: center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>
+      </div>
+      <span class="tipBody"><span class="tipK">Aujourd'hui</span>Les relances dues et les nouveaux prospects à fort score.</span>
+    </div>
+    <div class="tip">
+      <div style="width: 36px; height: 36px; border-radius: 10px; color: var(--faint); display: flex; align-items: center; justify-content: center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v16"/></svg>
+      </div>
+      <span class="tipBody"><span class="tipK">Base</span>Les 139 prospects, filtrables et triables.</span>
+    </div>
+    <div class="tip">
+      <div style="width: 36px; height: 36px; border-radius: 10px; color: var(--faint); display: flex; align-items: center; justify-content: center; position: relative">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+        <span style="position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; border-radius: 999px; background: var(--amber); border: 2px solid var(--surface)"></span>
+      </div>
+      <span class="tipBody"><span class="tipK">Déploiements</span>2 builds en cours, 1 en échec.</span>
+    </div>
+    <div class="tip">
+      <div style="width: 36px; height: 36px; border-radius: 10px; color: var(--faint); display: flex; align-items: center; justify-content: center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
+      </div>
+      <span class="tipBody"><span class="tipK">Gabarit</span>Le dépôt GitHub qui sert de modèle aux sites.</span>
+    </div>
+  </div>
+
+  <div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+
+    <header style="height: 52px; flex: none; border-bottom: 1px solid var(--border); background: var(--surface); display: flex; align-items: center; gap: 16px; padding: 0 16px">
+      <span style="font-family: var(--display); font-weight: 700; font-size: 15px; letter-spacing: -0.02em">Prospeo</span>
+      <span style="color: var(--faint); font-size: 12px">Nantes · plomberie &amp; serrurerie</span>
+      <div style="flex: 1"></div>
+      <div style="display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px 0 9px; border: 1px solid var(--border2); border-radius: 8px; color: var(--faint); font-size: 12px; min-width: 230px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+        <span style="flex: 1">Chercher un prospect, une action…</span>
+        <span class="num" style="font-size: 10.5px; border: 1px solid var(--border2); border-radius: 5px; padding: 1px 5px">⌘K</span>
+      </div>
+      <div class="tip">
+        <span class="badge b-amber"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3c3 4 5 6 5 9a5 5 0 0 1-10 0c0-1.6.8-3 2-4.4.3 1.6 1 2.4 2 2.4 1.2 0 1.6-1.2 1-7z"/></svg><span class="num">6</span> jours</span>
+        <span class="tipBody"><span class="tipK">Série en cours</span>6 jours d'affilée avec au moins une relance tenue. Meilleure série : 11 jours.</span>
+      </div>
+      <div style="width: 30px; height: 30px; border-radius: 999px; background: var(--surface3); border: 1px solid var(--border2); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: var(--muted)">LB</div>
+    </header>
+
+    <div style="flex: 1; min-height: 0; display: flex">
+
+      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden">
+        <div style="padding: 18px 20px 0">
+          <div style="display: flex; align-items: baseline; gap: 10px">
+            <h1 style="font-size: 22px">Aujourd'hui</h1>
+            <span style="color: var(--faint); font-size: 12px">mercredi 2 septembre</span>
+          </div>
+
+          <sc-if value="{{ jeuAffirme }}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; align-items: center; gap: 18px; margin-top: 14px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px">
+            <div class="tip" style="flex: none">
+              <div style="position: relative; width: 52px; height: 52px">
+                <svg width="52" height="52" viewBox="0 0 52 52">
+                  <circle cx="26" cy="26" r="22" fill="none" stroke="#232936" stroke-width="6"/>
+                  <circle cx="26" cy="26" r="22" fill="none" stroke="{{accent}}" stroke-width="6" stroke-linecap="round" stroke-dasharray="138.2" stroke-dashoffset="27.6" transform="rotate(-90 26 26)"/>
+                </svg>
+                <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0">
+                  <span class="num" style="font-size: 14px; font-weight: 700; line-height: 1">12</span>
+                  <span style="font-size: 9px; color: var(--faint); line-height: 1">/ 15</span>
+                </div>
+              </div>
+              <span class="tipBody"><span class="tipK">Objectif du jour</span>12 fiches traitées sur 15. L'objectif est la médiane de vos 14 derniers jours, pas un chiffre imposé.</span>
+            </div>
+
+            <div style="flex: 1; min-width: 0">
+              <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px">
+                <span style="font-size: 12px; color: var(--muted)">Palier <b style="color: var(--text)">Prospecteur</b> → <span style="color: var(--mint)">Closer</span></span>
+                <span class="num" style="font-size: 11px; color: var(--faint)">340 / 500</span>
+              </div>
+              <div style="height: 7px; border-radius: 999px; background: #232936; overflow: hidden; display: flex">
+                <div style="width: 68%; background: linear-gradient(90deg, {{accent}}, var(--mint))"></div>
+              </div>
+              <div style="display: flex; gap: 14px; margin-top: 8px; font-size: 11px; color: var(--faint)">
+                <span>+40 pts · relance tenue</span>
+                <span>+120 pts · site mis en ligne</span>
+                <span>+200 pts · rendez-vous obtenu</span>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 6px; flex: none; padding-left: 16px; border-left: 1px solid var(--border)">
+              <div class="tip">
+                <div style="width: 34px; height: 34px; border-radius: 10px; background: rgba(79,209,165,0.13); border: 1px solid rgba(79,209,165,0.3); color: var(--mint); display: flex; align-items: center; justify-content: center">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+                </div>
+                <span class="tipBody"><span class="tipK">Premier site en ligne</span>Obtenu le 1ᵉʳ septembre. 22 sites publiés depuis.</span>
+              </div>
+              <div class="tip">
+                <div style="width: 34px; height: 34px; border-radius: 10px; background: rgba(240,180,92,0.13); border: 1px solid rgba(240,180,92,0.3); color: var(--amber); display: flex; align-items: center; justify-content: center">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4"/><path d="M6 4h12v5a6 6 0 0 1-12 0z"/><path d="M6 6H4a2 2 0 0 0 0 4h2M18 6h2a2 2 0 0 1 0 4h-2"/></svg>
+                </div>
+                <span class="tipBody"><span class="tipK">Dix relances tenues</span>Dix engagements de rappel honorés à la date prévue.</span>
+              </div>
+              <div class="tip">
+                <div style="width: 34px; height: 34px; border-radius: 10px; background: var(--surface2); border: 1px dashed var(--border2); color: var(--faint); display: flex; align-items: center; justify-content: center">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+                </div>
+                <span class="tipBody"><span class="tipK">Verrouillé — Première vente</span>Se débloque au premier prospect passé au statut « Gagné ».</span>
+              </div>
+            </div>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ jeuDiscret }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 12px; color: var(--muted)">
+            <span class="num" style="color: var(--text); font-weight: 700">12</span> fiches traitées sur 15 ·
+            <span style="flex: 1; height: 4px; border-radius: 999px; background: #232936; overflow: hidden; max-width: 200px"><span style="display: block; width: 80%; height: 100%; background: {{accent}}"></span></span>
+          </div>
+          </sc-if>
+        </div>
+
+        <div style="flex: 1; min-height: 0; overflow: hidden; padding: 16px 20px 0">
+
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px">
+            <h3 style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-family: var(--ui); font-weight: 600">Relances dues</h3>
+            <span class="badge b-rose"><span class="num">3</span></span>
+            <div style="flex: 1; height: 1px; background: var(--border)"></div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 20px">
+            <sc-for list="{{ relances }}" as="p" hint-placeholder-count="3">
+              <div style="{{ p.rowStyle }}">
+                <div style="{{ p.markStyle }}"></div>
+                <div style="flex: 1; min-width: 0">
+                  <div style="display: flex; align-items: center; gap: 7px">
+                    <span style="font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ p.nom }}</span>
+                    <span style="{{ p.badgeStyle }}">{{ p.statut }}</span>
+                  </div>
+                  <div style="font-size: 11.5px; color: var(--muted); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ p.raison }}</div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px; flex: none">
+                  <div style="display: flex; gap: 2px">
+                    <span style="{{ p.seg1 }}"></span><span style="{{ p.seg2 }}"></span><span style="{{ p.seg3 }}"></span>
+                  </div>
+                  <span class="num" style="{{ p.scoreStyle }}">{{ p.score }}</span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px">
+            <h3 style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-family: var(--ui); font-weight: 600">Nouveaux prospects à fort score</h3>
+            <span class="badge b-mute"><span class="num">12</span></span>
+            <div style="flex: 1; height: 1px; background: var(--border)"></div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 4px">
+            <sc-for list="{{ nouveaux }}" as="p" hint-placeholder-count="5">
+              <div style="{{ p.rowStyle }}">
+                <div style="{{ p.markStyle }}"></div>
+                <div style="flex: 1; min-width: 0">
+                  <div style="display: flex; align-items: center; gap: 7px">
+                    <span style="font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ p.nom }}</span>
+                    <span style="{{ p.badgeStyle }}">{{ p.statut }}</span>
+                  </div>
+                  <div style="font-size: 11.5px; color: var(--muted); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ p.raison }}</div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px; flex: none">
+                  <div style="display: flex; gap: 2px">
+                    <span style="{{ p.seg1 }}"></span><span style="{{ p.seg2 }}"></span><span style="{{ p.seg3 }}"></span>
+                  </div>
+                  <span class="num" style="{{ p.scoreStyle }}">{{ p.score }}</span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <aside style="width: 720px; flex: none; border-left: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; overflow: hidden">
+
+        <div style="padding: 18px 22px 0">
+          <div style="display: flex; align-items: flex-start; gap: 14px">
+            <div style="flex: 1; min-width: 0">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px">
+                <span class="badge b-mute">Prospect <span class="num">4</span> / <span class="num">15</span></span>
+                <span style="color: var(--faint); font-size: 11px">↑ ↓ pour naviguer</span>
+              </div>
+              <h2 style="font-size: 24px; letter-spacing: -0.025em">Plomberie Guérin &amp; Fils</h2>
+              <div style="display: flex; align-items: center; gap: 6px; margin-top: 8px; flex-wrap: wrap">
+                <span class="badge b-amber"><span class="dot"></span>Relancé</span>
+                <span class="badge b-mint"><span class="dot"></span>Site en ligne</span>
+                <span class="badge b-blue">Plombier</span>
+                <div class="tip">
+                  <span class="badge b-rose">Pas de site déclaré</span>
+                  <span class="tipBody"><span class="tipK">Motif de qualification</span>Aucun site trouvé par la sonde web, et aucune URL déclarée sur la fiche Google. C'est le signal le plus lourd du barème : +30 points.</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="tip" style="flex: none">
+              <div style="position: relative; width: 84px; height: 84px">
+                <svg width="84" height="84" viewBox="0 0 84 84">
+                  <circle cx="42" cy="42" r="35" fill="none" stroke="#232936" stroke-width="8"/>
+                  <circle cx="42" cy="42" r="35" fill="none" stroke="{{accent}}" stroke-width="8" stroke-linecap="round" stroke-dasharray="219.9" stroke-dashoffset="57.2" transform="rotate(-90 42 42)"/>
+                </svg>
+                <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center">
+                  <span class="num" style="font-size: 26px; font-weight: 700; line-height: 1; letter-spacing: -0.03em">74</span>
+                  <span style="font-size: 9.5px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.07em">sur 100</span>
+                </div>
+              </div>
+              <span class="tipBody"><span class="tipK">Score · barème v3</span>Présence 30 · Vitalité 26 · Joignabilité 18. Calculé le 2 septembre.</span>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 8px; margin-top: 18px">
+            <button style="display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 14px; border-radius: 9px; background: {{accent}}; color: #0b0d12; font-weight: 600; font-size: 12.5px">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a1 1 0 0 1-1 1A16 16 0 0 1 4 5a1 1 0 0 1 1-1z"/></svg>
+              Appeler 06 12 34 56 78
+            </button>
+            <button style="display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 13px; border-radius: 9px; border: 1px solid var(--border2); color: var(--text); font-size: 12.5px">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+              Voir le site
+            </button>
+            <button style="display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 13px; border-radius: 9px; border: 1px solid var(--border2); color: var(--text); font-size: 12.5px">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V6M6 12l6-6 6 6"/></svg>
+              Redéployer
+            </button>
+            <div style="flex: 1"></div>
+            <button style="width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--border2); color: var(--muted); display: inline-flex; align-items: center; justify-content: center">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+          </div>
+
+          <div style="display: flex; gap: 2px; margin-top: 18px; border-bottom: 1px solid var(--border)">
+            <sc-for list="{{ onglets }}" as="o" hint-placeholder-count="4">
+              <button onClick="{{ o.choisir }}" style="{{ o.style }}">
+                {{ o.libelle }}
+                <span style="{{ o.compteurStyle }}">{{ o.compteur }}</span>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="flex: 1; min-height: 0; overflow: hidden; padding: 18px 22px">
+
+          <sc-if value="{{ estFiche }}" hint-placeholder-val="{{ true }}">
+            <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+
+              <div style="background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 14px">
+                <div style="display: flex; align-items: center; gap: 7px; margin-bottom: 11px; color: var(--muted)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V8l7-5 7 5v13"/><path d="M10 21v-5h4v5"/></svg>
+                  <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 600">Identité</span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 9px">
+                  <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px"><span style="color: var(--muted)">SIRET</span><span class="num">812 456 789 00023</span></div>
+                  <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px"><span style="color: var(--muted); flex: none">Adresse</span><span style="text-align: right">14 rue des Olivettes, 44000 Nantes</span></div>
+                  <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px"><span style="color: var(--muted)">Créée</span><span class="num">12/03/2019</span></div>
+                  <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px"><span style="color: var(--muted)">Effectif</span><span>3 à 5 salariés</span></div>
+                </div>
+              </div>
+
+              <div style="background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 14px">
+                <div style="display: flex; align-items: center; gap: 7px; margin-bottom: 11px; color: var(--muted)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a1 1 0 0 1-1 1A16 16 0 0 1 4 5a1 1 0 0 1 1-1z"/></svg>
+                  <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 600">Joignabilité</span>
+                  <div style="flex: 1"></div>
+                  <span class="badge b-mint" style="height: 19px; font-size: 10px">Google · 94 %</span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 9px">
+                  <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px"><span style="color: var(--muted)">Téléphone</span><span class="num">+33 6 12 34 56 78 <span style="color: var(--faint); font-family: var(--ui)">mobile</span></span></div>
+                  <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px"><span style="color: var(--muted)">Note</span><span><span class="num">4,6</span> <span style="color: var(--faint)">★</span></span></div>
+                  <div class="tip" style="display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px; width: 100%">
+                    <span style="color: var(--muted)">Nombre d'avis</span>
+                    <span style="color: var(--faint); font-style: italic">non publié par la source</span>
+                    <span class="tipBody" style="left: auto; right: 0; transform: none"><span class="tipK">Ce n'est pas un trou de collecte</span>Google ne publie plus le nombre d'avis depuis août 2026. Ce champ ne se remplira pas en relançant l'enrichissement.</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px"><span style="color: var(--muted)">URL déclarée</span><span style="color: var(--faint); font-style: italic">aucune</span></div>
+                </div>
+              </div>
+
+              <div style="grid-column: span 2; background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 14px">
+                <div style="display: flex; align-items: center; gap: 7px; margin-bottom: 12px; color: var(--muted)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>
+                  <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 600">Composition du score</span>
+                  <div style="flex: 1"></div>
+                  <span style="font-size: 11.5px; color: var(--blue)">Voir le reçu ligne par ligne ▾</span>
+                </div>
+                <div style="display: flex; gap: 10px">
+                  <div class="tip" style="flex: 1">
+                    <div style="width: 100%">
+                      <div style="display: flex; justify-content: space-between; font-size: 11.5px; margin-bottom: 5px"><span style="color: var(--muted)">Présence</span><span class="num" style="color: var(--text); font-weight: 700">30</span></div>
+                      <div style="height: 6px; border-radius: 999px; background: #232936; overflow: hidden"><div style="width: 100%; height: 100%; background: {{accent}}"></div></div>
+                    </div>
+                    <span class="tipBody"><span class="tipK">Présence · 30 / 30</span>Aucun site (+30). C'est le motif de présence du prospect dans la file.</span>
+                  </div>
+                  <div class="tip" style="flex: 1">
+                    <div style="width: 100%">
+                      <div style="display: flex; justify-content: space-between; font-size: 11.5px; margin-bottom: 5px"><span style="color: var(--muted)">Vitalité</span><span class="num" style="color: var(--text); font-weight: 700">26</span></div>
+                      <div style="height: 6px; border-radius: 999px; background: #232936; overflow: hidden"><div style="width: 74%; height: 100%; background: #5a7de0"></div></div>
+                    </div>
+                    <span class="tipBody"><span class="tipK">Vitalité · 26 / 35</span>Note 4,6 (+16) · entreprise de plus de 3 ans (+10). Effectif inconnu : rien n'est compté.</span>
+                  </div>
+                  <div class="tip" style="flex: 1">
+                    <div style="width: 100%">
+                      <div style="display: flex; justify-content: space-between; font-size: 11.5px; margin-bottom: 5px"><span style="color: var(--muted)">Joignabilité</span><span class="num" style="color: var(--text); font-weight: 700">18</span></div>
+                      <div style="height: 6px; border-radius: 999px; background: #232936; overflow: hidden"><div style="width: 51%; height: 100%; background: #3f568f"></div></div>
+                    </div>
+                    <span class="tipBody"><span class="tipK">Joignabilité · 18 / 35</span>Mobile trouvé (+18). Aucune adresse email : le canal écrit reste fermé.</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ estSite }}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; flex-direction: column; gap: 12px">
+              <div style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: rgba(79,209,165,0.07); border: 1px solid rgba(79,209,165,0.25); border-radius: 12px">
+                <span class="badge b-mint"><span class="dot"></span>En ligne depuis le 1ᵉʳ septembre</span>
+                <a href="#" style="font-size: 12.5px">plomberie-guerin-81245678900023.vercel.app</a>
+                <div style="flex: 1"></div>
+                <div class="tip">
+                  <span class="badge b-amber">Péremption dans <span class="num">89</span> j</span>
+                  <span class="tipBody" style="left: auto; right: 0; transform: none"><span class="tipK">Retrait automatique</span>Un site publié au nom d'un tiers est retiré 90 jours après sa mise en ligne, sans action de votre part.</span>
+                </div>
+              </div>
+
+              <div style="background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 16px">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px">
+                  <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 600; color: var(--muted)">Ce que le modèle a écrit</span>
+                  <span class="badge b-mute" style="height: 19px; font-size: 10px">claude-opus-5 · consignes v4</span>
+                </div>
+                <div style="font-family: var(--display); font-size: 17px; font-weight: 600; letter-spacing: -0.015em; margin-bottom: 8px">Dépannage plomberie à Nantes, 7 j / 7</div>
+                <p style="margin: 0 0 12px; font-size: 12.5px; line-height: 1.6; color: #c6cddb">Installée aux Olivettes depuis 2019, l'équipe intervient sur les fuites, les chauffe-eau et la rénovation de salle de bains dans toute la métropole nantaise. Cinq artisans, une note de 4,6 sur Google.</p>
+                <div style="display: flex; gap: 6px; flex-wrap: wrap">
+                  <span class="badge b-blue">Dépannage fuite</span>
+                  <span class="badge b-blue">Chauffe-eau</span>
+                  <span class="badge b-blue">Salle de bains</span>
+                  <span class="badge b-blue">Débouchage</span>
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 8px">
+                <button style="height: 32px; padding: 0 13px; border-radius: 9px; border: 1px solid rgba(255,122,133,0.35); color: #ffa8b0; font-size: 12.5px">Rejeter cette rédaction</button>
+                <button style="height: 32px; padding: 0 13px; border-radius: 9px; border: 1px solid var(--border2); color: var(--text); font-size: 12.5px">Ouvrir le dépôt</button>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ estMessages }}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; flex-direction: column; gap: 10px">
+              <div style="background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 14px">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 9px">
+                  <span class="badge b-blue">Email</span>
+                  <span style="font-size: 12px; font-weight: 600">Votre site est déjà en ligne, jetez-y un œil</span>
+                  <div style="flex: 1"></div>
+                  <span class="num" style="font-size: 11px; color: var(--faint)">01/09</span>
+                </div>
+                <p style="margin: 0; font-size: 12.5px; line-height: 1.6; color: #c6cddb; white-space: pre-line">Bonjour,
+
+J'ai remarqué que Plomberie Guérin &amp; Fils n'apparaissait nulle part en ligne alors que vous êtes noté 4,6 sur Google. J'ai préparé une page pour vous : plomberie-guerin-81245678900023.vercel.app</p>
+              </div>
+              <div style="background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 14px; opacity: 0.72">
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <span class="badge b-mute">SMS</span>
+                  <span style="font-size: 12.5px; color: var(--muted)">Bonjour, j'ai mis en ligne une page pour votre entreprise…</span>
+                  <div style="flex: 1"></div>
+                  <span class="num" style="font-size: 11px; color: var(--faint)">01/09</span>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ estHistorique }}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; flex-direction: column; gap: 0">
+              <sc-for list="{{ historique }}" as="h" hint-placeholder-count="4">
+                <div style="display: flex; gap: 14px; padding-bottom: 16px">
+                  <div style="display: flex; flex-direction: column; align-items: center; flex: none; width: 10px">
+                    <span style="{{ h.puce }}"></span>
+                    <span style="flex: 1; width: 1px; background: var(--border)"></span>
+                  </div>
+                  <div style="flex: 1; min-width: 0; margin-top: -3px">
+                    <div style="display: flex; align-items: baseline; gap: 8px">
+                      <span style="font-size: 12.5px; font-weight: 600">{{ h.titre }}</span>
+                      <span class="num" style="font-size: 11px; color: var(--faint)">{{ h.date }}</span>
+                    </div>
+                    <div style="font-size: 12px; color: var(--muted); margin-top: 2px">{{ h.detail }}</div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{
+  "accent": {"editor": "color", "default": "#6d92ff", "options": ["#6d92ff", "#4fd1a5", "#a78bfa", "#f0b45c"], "section": "Direction"},
+  "gamification": {"editor": "enum", "options": ["affirmee", "discrete", "aucune"], "default": "affirmee", "section": "Direction"}
+}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { onglet: 'fiche' };
+  }
+
+  accent() {
+    return this.props.accent ?? '#6d92ff';
+  }
+
+  seg(largeur, couleur) {
+    return 'display: block; width: ' + largeur + 'px; height: 6px; border-radius: 2px; background: ' + couleur + ';';
+  }
+
+  ligne(p, choisie) {
+    const fond = choisie
+      ? 'background: rgba(109,146,255,0.10); border-color: rgba(109,146,255,0.35);'
+      : 'background: transparent; border-color: transparent;';
+    return {
+      nom: p.nom,
+      statut: p.statut,
+      raison: p.raison,
+      score: p.score,
+      rowStyle: 'display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 0; border: 1px solid; border-radius: 10px; ' + fond,
+      markStyle: 'width: 3px; height: 30px; border-radius: 999px; flex: none; background: ' + (choisie ? this.accent() : 'transparent') + ';',
+      badgeStyle: 'display: inline-flex; align-items: center; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10px; font-weight: 600; white-space: nowrap; flex: none; '
+        + (p.ton === 'rose' ? 'color: #ffa8b0; background: rgba(255,122,133,0.13); border: 1px solid rgba(255,122,133,0.28);'
+          : p.ton === 'amber' ? 'color: #f5cd92; background: rgba(240,180,92,0.13); border: 1px solid rgba(240,180,92,0.28);'
+          : 'color: #98a1b4; background: rgba(152,161,180,0.10); border: 1px solid #333c4e;'),
+      seg1: this.seg(p.parts[0], this.accent()),
+      seg2: this.seg(p.parts[1], '#5a7de0'),
+      seg3: this.seg(p.parts[2], '#3f568f'),
+      scoreStyle: 'font-size: 13px; font-weight: 700; min-width: 22px; text-align: right; color: ' + (p.score >= 70 ? this.accent() : '#98a1b4') + ';',
+    };
+  }
+
+  onglet(id, libelle, compteur) {
+    const actif = this.state.onglet === id;
+    return {
+      libelle: libelle,
+      compteur: compteur,
+      choisir: () => this.setState({ onglet: id }),
+      style: 'display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 13px; font-size: 12.5px; font-weight: '
+        + (actif ? '600' : '400') + '; color: ' + (actif ? '#e4e8f0' : '#98a1b4')
+        + '; border-bottom: 2px solid ' + (actif ? this.accent() : 'transparent') + '; margin-bottom: -1px;',
+      compteurStyle: 'font-family: JetBrains Mono, monospace; font-size: 10px; padding: 1px 5px; border-radius: 999px; background: '
+        + (actif ? 'rgba(109,146,255,0.16)' : 'rgba(152,161,180,0.10)') + '; color: ' + (actif ? '#a9c2ff' : '#6b7488') + ';',
+    };
+  }
+
+  renderVals() {
+    const jeu = this.props.gamification ?? 'affirmee';
+    return {
+      accent: this.accent(),
+      jeuAffirme: jeu === 'affirmee',
+      jeuDiscret: jeu === 'discrete',
+      estFiche: this.state.onglet === 'fiche',
+      estSite: this.state.onglet === 'site',
+      estMessages: this.state.onglet === 'messages',
+      estHistorique: this.state.onglet === 'historique',
+      onglets: [
+        this.onglet('fiche', 'Fiche', '12'),
+        this.onglet('site', 'Site', '1'),
+        this.onglet('messages', 'Messages', '2'),
+        this.onglet('historique', 'Historique', '6'),
+      ],
+      relances: [
+        { nom: 'Serrurerie du Bouffay', statut: 'Relancé', ton: 'rose', raison: 'relance en retard de 3 j · aucun site · note 4,8', score: 81, parts: [17, 14, 9] },
+        { nom: 'Plomberie Guérin & Fils', statut: 'Relancé', ton: 'amber', raison: 'relance prévue aujourd’hui · site en ligne depuis 1 j', score: 74, parts: [16, 12, 8] },
+        { nom: 'SARL Moreau Chauffage', statut: 'Contacté', ton: 'mute', raison: 'relance prévue aujourd’hui · réseaux sociaux seuls', score: 68, parts: [14, 12, 8] },
+      ].map((p, i) => this.ligne(p, i === 1)),
+      nouveaux: [
+        { nom: 'Aquatech Nantes', statut: 'À contacter', ton: 'mute', raison: 'aucun site · note 4,9 · mobile trouvé', score: 86, parts: [18, 15, 10] },
+        { nom: 'Serrurier Express 44', statut: 'À contacter', ton: 'mute', raison: 'site hors service · créée en 2016', score: 79, parts: [17, 13, 9] },
+        { nom: 'Chauffage Bellevue', statut: 'À contacter', ton: 'mute', raison: 'annuaire seul · note 4,5 · fixe trouvé', score: 72, parts: [15, 12, 8] },
+        { nom: 'Dépannage Loire Plomberie', statut: 'À contacter', ton: 'mute', raison: 'aucun site · effectif 6 à 9 salariés', score: 70, parts: [16, 11, 7] },
+        { nom: 'Clés & Cylindres Chantenay', statut: 'À contacter', ton: 'mute', raison: 'réseaux sociaux seuls · note 4,4', score: 66, parts: [14, 11, 7] },
+      ].map((p) => this.ligne(p, false)),
+      historique: [
+        { titre: 'Site déployé', date: '01/09 · 14 h 22', detail: 'Build Vercel réussi en 38 s · plomberie-guerin-81245678900023.vercel.app', puce: 'width: 9px; height: 9px; border-radius: 999px; background: #4fd1a5; flex: none;' },
+        { titre: 'Dépôt créé', date: '01/09 · 14 h 20', detail: 'Depuis le gabarit prospeo/gabarit-agence-v2', puce: 'width: 9px; height: 9px; border-radius: 999px; background: #6d92ff; flex: none;' },
+        { titre: 'Rédaction générée', date: '01/09 · 14 h 18', detail: 'claude-opus-5 · consignes v4 · 4 prestations retenues', puce: 'width: 9px; height: 9px; border-radius: 999px; background: #6d92ff; flex: none;' },
+        { titre: 'Appel — pas de réponse', date: '31/08 · 10 h 05', detail: 'Rappel programmé au 2 septembre', puce: 'width: 9px; height: 9px; border-radius: 999px; background: #333c4e; flex: none;' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>
