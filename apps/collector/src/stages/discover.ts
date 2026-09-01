@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@prospeo/db';
 import type { RawEstablishment, Trade } from '@prospeo/core';
 import { searchEstablishments } from '../sources/recherche-entreprises.js';
 
@@ -43,7 +44,7 @@ export async function runDiscover(deps: DiscoverDeps): Promise<DiscoverReport> {
 }
 
 /** Écriture Supabase, séparée pour rester testable sans réseau. */
-export function makeUpsertProspect(client: SupabaseClient) {
+export function makeUpsertProspect(client: SupabaseClient<Database>) {
   return async (row: RawEstablishment): Promise<void> => {
     const { error } = await client.from('prospect').upsert(
       {

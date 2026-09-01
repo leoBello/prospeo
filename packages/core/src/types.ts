@@ -75,12 +75,18 @@ export interface ScoreInput {
   isFranchise: boolean;
 }
 
-export interface ScoreLine {
+/**
+ * Alias de type et non `interface` : une interface n'a pas de signature d'index
+ * implicite, donc `ScoreLine[]` ne serait pas assignable au type `Json` de la
+ * colonne `jsonb` qui la stocke. Le comportement est identique pour les
+ * consommateurs, seule la compatibilite structurelle change.
+ */
+export type ScoreLine = {
   code: string;
   label: string;
   points: number;
   group: 'presence' | 'vitalite' | 'joignabilite' | 'disqualifiant';
-}
+};
 
 export interface ScoreResult {
   total: number;
