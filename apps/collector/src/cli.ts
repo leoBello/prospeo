@@ -297,7 +297,7 @@ async function main(argv: string[]): Promise<number> {
         const { data, error } = await client
           .from('prospect_enrichment')
           .select(
-            'prospect_id, candidates, prospect(denomination, denomination_usuelle, address, naf_code, trade_slug)',
+            'prospect_id, candidates, enriched_at, prospect(denomination, denomination_usuelle, address, naf_code, trade_slug)',
           )
           .eq('status', 'ambiguous')
           .order('prospect_id')
@@ -315,51 +315,79 @@ async function main(argv: string[]): Promise<number> {
       let settled = 0;
       try {
         for (const row of queue) {
-          const p = (Array.isArray(row.prospect) ? row.prospect[0] : row.prospect) as
-            | Record<string, unknown>
-            | null;
-          if (p === null || p === undefined) continue;
+          // Tout le traitement d'un prospect est protégé, affichage compris.
+          // `candidates` vient d'une colonne `jsonb` : une ligne mal formée —
+          // un `lines` absent, une `confidence` manquante — lèverait dans le
+          // code d'affichage et emporterait la session entière au milieu de la
+          // file. Les décisions déjà écrites survivraient, mais l'opérateur
+          // devrait tout reprendre.
+          try {
+            const p = (Array.isArray(row.prospect) ? row.prospect[0] : row.prospect) as
+              | Record<string, unknown>
+              | null;
+            if (p === null || p === undefined) continue;
 
-          const trade = getTrade(p.trade_slug as string);
-          const nafOk =
-            trade === undefined ? null : nafMatchesTrade(p.naf_code as string | null, trade);
+            const slug = p.trade_slug as string | null;
+            const trade = slug === null ? undefined : getTrade(slug);
+            const nafOk =
+              trade === undefined ? null : nafMatchesTrade(p.naf_code as string | null, trade);
 
-          process.stdout.write(`\n${'─'.repeat(60)}\n`);
-          process.stdout.write(`${p.denomination as string}\n${p.address as string}\n`);
-          if (nafOk === false) {
+            process.stdout.write(`\n${'─'.repeat(60)}\n`);
             process.stdout.write(
-              `⚠ NAF ${p.naf_code as string} étranger au métier ${trade?.label ?? ''}\n`,
+              `${(p.denomination as string | null) ?? '(sans dénomination)'}\n` +
+                `${(p.address as string | null) ?? '(sans adresse)'}\n`,
             );
-          }
+            if (trade === undefined) {
+              // Un métier absent de la configuration n'est pas anodin : le
+              // drapeau NAF ne peut plus être calculé, et l'opérateur tranche
+              // alors sans ce signal. Mieux vaut le dire que le taire.
+              process.stdout.write(`⚠ métier « ${slug ?? '?'} » inconnu de la configuration\n`);
+            }
+            if (nafOk === false) {
+              process.stdout.write(
+                `⚠ NAF ${p.naf_code as string} étranger au métier ${trade?.label ?? ''}\n`,
+              );
+            }
 
-          const candidates = (row.candidates ?? []) as ReviewCandidate[];
-          candidates.forEach((c, index) => {
-            process.stdout.write(
-              `\n  [${index + 1}] ${c.name}  (confiance ${c.confidence.toFixed(2)})\n`,
-            );
-            for (const line of c.lines) process.stdout.write(`      ${line.label}\n`);
-            if (c.phone !== null) process.stdout.write(`      tél. ${c.phone}\n`);
-            if (c.website !== null) process.stdout.write(`      ${c.website}\n`);
-          });
+            const candidates = (row.candidates ?? []) as ReviewCandidate[];
+            candidates.forEach((c, index) => {
+              process.stdout.write(
+                `\n  [${index + 1}] ${c.name}  (confiance ${c.confidence.toFixed(2)})\n`,
+              );
+              for (const line of c.lines ?? []) process.stdout.write(`      ${line.label}\n`);
+              if (c.phone !== null) process.stdout.write(`      tél. ${c.phone}\n`);
+              if (c.website !== null) process.stdout.write(`      ${c.website}\n`);
+              if (c.rating !== null) process.stdout.write(`      note ${c.rating}\n`);
+            });
 
-          const answer = (await rl.question('\n  Numéro à retenir, [a]ucun, [p]lus tard : ')).trim();
+            const answer = (
+              await rl.question('\n  Numéro à retenir, [a]ucun, [p]lus tard : ')
+            ).trim();
           // Toute réponse qui n'est pas un nombre vaut report, jamais erreur :
           // devant une file de cas douteux, la faute de frappe la plus probable
           // est une touche parasite, et repasser plus tard est l'interprétation
           // la moins destructrice. Un indice hors bornes, lui, échoue
           // bruyamment — `applyReviewDecision` lève et la boucle journalise
           // sans interrompre la revue.
-          const index = /^\d+$/.test(answer) ? Number(answer) - 1 : null;
-          const decision: ReviewDecision =
-            answer === 'a'
-              ? { kind: 'reject' }
-              : index === null
-                ? { kind: 'skip' }
-                : { kind: 'accept', index };
+            const index = /^\d+$/.test(answer) ? Number(answer) - 1 : null;
+            const decision: ReviewDecision =
+              answer === 'a'
+                ? { kind: 'reject' }
+                : index === null
+                  ? { kind: 'skip' }
+                  : { kind: 'accept', index };
 
-          if (decision.kind === 'skip') continue;
-          try {
-            const updated = applyReviewDecision(row.prospect_id as string, candidates, decision);
+            if (decision.kind === 'skip') continue;
+
+            const updated = applyReviewDecision(
+              row.prospect_id as string,
+              candidates,
+              decision,
+              // Repris de la ligne existante : trancher un doute n'enrichit
+              // rien, et réécrire cet horodatage ferait consommer le quota de
+              // scraping du lendemain par une session purement humaine.
+              row.enriched_at as string,
+            );
             const { error: writeError } = await client
               .from('prospect_enrichment')
               .upsert(updated, { onConflict: 'prospect_id' });

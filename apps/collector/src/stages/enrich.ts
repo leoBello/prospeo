@@ -28,6 +28,16 @@ export type ReviewCandidate = {
   phone: string | null;
   website: string | null;
   mapsUrl: string;
+  /**
+   * Note Google et identifiant de lieu.
+   *
+   * Ils ne servent pas à trancher, mais ils doivent survivre à la revue : la
+   * note alimente les points de vitalité du barème. Sans eux, un prospect
+   * tranché à la main ressortirait moins bien noté qu'un prospect apparié
+   * automatiquement — un biais qui pénaliserait précisément les cas douteux.
+   */
+  rating: number | null;
+  placeId: string | null;
   confidence: number;
   lines: ReviewLine[];
 };
@@ -94,6 +104,8 @@ function forReview(scored: ScoredCandidate): ReviewCandidate {
     phone: scored.candidate.phone,
     website: scored.candidate.website,
     mapsUrl: scored.candidate.mapsUrl,
+    rating: scored.candidate.rating,
+    placeId: scored.candidate.placeId,
     confidence: scored.score.confidence,
     lines: scored.score.lines,
   };
