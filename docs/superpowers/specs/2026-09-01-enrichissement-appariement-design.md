@@ -140,34 +140,6 @@ Le champ « site web » est le mécanisme central de la classification : chez
 les artisans il contient très souvent une URL Facebook, ce qui rend la
 détection `social_only` gratuite.
 
-### 4.5 Ce que la source rend reellement — verifie le 1er septembre 2026
-
-La verification des selecteurs sur une recherche reelle a corrige une
-hypothese du §4.3.
-
-**Le nombre d'avis n'est plus publie par Google Maps.** Ni sur les cartes de
-resultat, ni sur le panneau d'une fiche : l'entete ne porte que la note et
-l'image des etoiles, et le seul `aria-label` chiffre du flux est
-« 4,8 etoiles ». Aucun selecteur ne peut donc le fournir.
-
-Consequence sur le bareme : la ligne « nombre d'avis » de la section Vitalite
-ne se declenchera jamais. Elle est **laissee en place et inerte** plutot que
-retiree — le bareme est versionne et sera recalibre au jalon de calibration,
-et Google peut retablir l'affichage. Les points concernes sont simplement
-jamais attribues, ce qui resserre l'echelle reelle des scores sans fausser
-leur ordre.
-
-Ce qui reste disponible et verifie : nom, adresse, coordonnees, categorie,
-telephone, site declare, note. C'est-a-dire tout ce dont l'appariement et la
-classification de presence web ont besoin.
-
-**`place_id` n'est renseigne que dans le cas d'une liste de resultats.**
-Quand la recherche ne designe qu'une entreprise, l'URL de la fiche ne porte
-pas le segment `!19s` d'ou il est extrait. Sans consequence : le SIRET reste
-la cle de deduplication, `place_id` n'est qu'un confort.
-
----
-
 ### 4.4 Anti-bot et résilience
 
 Reprise du §4.2 du socle, sans modification : navigateur unique, contexte
@@ -187,6 +159,46 @@ Précisions apportées ici :
   être traitée comme une erreur de configuration, pas contournée en boucle.
 - **Captcha ou interstitiel :** arrêt immédiat du run, prospect marqué
   `blocked`, sortie en code non nul.
+
+### 4.5 Ce que la source rend réellement — vérifié le 1er septembre 2026
+
+Les sélecteurs ont été confrontés à une vraie recherche sur `google.com/maps`.
+Cinq écarts sont apparus ; deux d'entre eux corrigent des hypothèses de ce
+spec et méritent d'y figurer.
+
+**Le nombre d'avis n'est plus publié par Google Maps.** Ni sur les cartes de
+résultat, ni sur le panneau d'une fiche : l'entête ne porte que la note et
+l'image des étoiles, et le seul `aria-label` chiffré du flux est
+« 4,8 étoiles ». Aucun sélecteur ne peut donc le fournir, et le §4.3 le
+listait à tort parmi les champs extraits.
+
+Conséquence sur le barème : la ligne « nombre d'avis » de la section Vitalité
+ne se déclenchera jamais. Elle est **laissée en place et inerte** plutôt que
+retirée — le barème est versionné, il sera recalibré au jalon, et Google peut
+rétablir l'affichage. Les points concernés ne sont simplement jamais
+attribués, ce qui resserre l'échelle réelle des scores sans fausser leur
+ordre.
+
+**Google tranche après le chargement entre une liste et une fiche unique**, et
+ne réécrit l'URL en `/maps/place/` qu'au bout d'environ cinq secondes. Le
+détail est technique mais la conséquence ne l'est pas : décider trop tôt fait
+prendre une fiche unique pour une liste vide, et l'étage conclut
+« introuvable » sur précisément les appariements les plus sûrs — ceux dont le
+nom ne désigne qu'une entreprise. Sans aucune erreur levée, et avec un
+compte-rendu d'exécution qui paraît normal.
+
+Ce qui reste disponible et vérifié : nom, adresse, coordonnées, catégorie,
+téléphone, site déclaré, note. C'est-à-dire tout ce dont l'appariement et la
+classification de présence web ont besoin.
+
+`place_id` n'est renseigné que dans le cas d'une liste de résultats — l'URL
+d'une fiche unique ne porte pas le segment dont il est extrait. Sans
+conséquence : le SIRET reste la clé de déduplication.
+
+**Cette vérification est à refaire après toute interruption longue du
+chantier.** Google renomme ses classes sans préavis, et un sélecteur muet ne
+casse rien : il produit des `not_found` en masse qui ressemblent à des
+artisans réellement absents d'internet.
 
 ---
 
