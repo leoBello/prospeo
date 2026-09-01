@@ -1,0 +1,129 @@
+import type { fr } from './fr.js';
+
+/**
+ * Catalogue anglais.
+ *
+ * Le type est calqué sur `fr` : oublier une clé ici est une erreur de
+ * compilation, pas une découverte à l'écran. La spec (§9.5) demande les deux
+ * locales dès la première ligne de code, précisément parce qu'externaliser
+ * après coup impose de repasser sur chaque composant.
+ *
+ * Les messages de prospection produits par le LLM ne relèvent pas de ce
+ * mécanisme : ce sont des données, rédigées en français parce que les
+ * artisans ciblés le sont, et stockées telles quelles.
+ */
+export const en: Record<keyof typeof fr, string> = {
+  'app.name': 'Prospeo',
+  'nav.today': 'Today',
+  'nav.signOut': 'Sign out',
+
+  'theme.toDark': 'Switch to dark theme',
+  'theme.toLight': 'Switch to light theme',
+  'locale.switch': 'Français',
+
+  'auth.title': 'Prospeo',
+  'auth.subtitle': 'Sign in to the prospecting dashboard',
+  'auth.email': 'Email address',
+  'auth.password': 'Password',
+  'auth.submit': 'Sign in',
+  'auth.pending': 'Signing in…',
+  'auth.error.credentials': 'Incorrect email address or password.',
+  'auth.error.generic': 'Sign-in failed: {message}',
+  'auth.noSignup': 'Single account, created in Supabase. There is no sign-up on this screen.',
+
+  'app.loading': 'Loading…',
+  'app.error.title': 'Could not read the data',
+  'app.error.retry': 'Try again',
+
+  'today.title': 'Today',
+  'today.subtitle': 'What the database knows, and what it does not know yet.',
+
+  'today.kpi.inBase': 'In database',
+  'today.kpi.contacted': 'Contacted',
+  'today.kpi.interested': 'Interested',
+  'today.kpi.qualified': 'Scored',
+
+  'today.section.followUps': 'Follow-ups due',
+  'today.section.newHighScore': 'New high-scoring prospects',
+
+  'today.empty.followUps':
+    'No follow-up: the pipeline table holds no rows yet. Nothing writes to it so far.',
+  'today.empty.newHighScore': 'No scored prospect yet.',
+
+  'today.reason.followUp.today': 'follow-up due today',
+  'today.reason.followUp.late': 'follow-up {days} days overdue',
+  'today.reason.followUp.late_one': 'follow-up one day overdue',
+  'today.reason.followUp.future': 'follow-up due in {days} days',
+  'today.reason.followUp.future_one': 'follow-up due tomorrow',
+  'today.reason.followUp.undated': 'follow-up with no date set',
+
+  'today.reason.separator': ' · ',
+
+  'score.absent': 'not scored yet',
+  'score.absent.hint': 'This prospect has no score, which is not the same as a score of zero.',
+  'score.outOf': '{total} / 100',
+  'warning.badge': '{count} flags',
+  'warning.badge_one': '1 flag',
+  'warning.title': 'Flags',
+  'warning.hint':
+    'These gaps are fixed by replaying the collector stages. This screen reports them; it does not repair them.',
+  'warning.presenceContradicted':
+    'The “no web presence” category is contradicted by the declared site {url} — the score is likely inverted, not merely out of date.',
+  'warning.scorePredatesEnrichment':
+    'Score computed before the Google enrichment: it ignores the phone, rating and website found since.',
+  'warning.staleRuleset':
+    'Score computed with ruleset {stored}, while the ruleset in force is {current}.',
+  'score.total': 'Total',
+  'score.group.presence': 'Web presence',
+  'score.group.vitalite': 'Vitality',
+  'score.group.joignabilite': 'Reachability',
+  'score.group.disqualifiant': 'Disqualifiers',
+  'score.bar.label': 'Score {total} out of 100: {detail}',
+
+  'presence.none': 'No web presence',
+  'presence.social_only': 'Social page, no website',
+  'presence.directory_only': 'Directory listing only',
+  'presence.dead_site': 'Broken or outdated website',
+  'presence.has_site': 'Sound, live website',
+  'presence.absent': 'Web presence not probed yet',
+
+  'enrichment.ok': 'Google listing matched',
+  'enrichment.not_found': 'No Google listing found',
+  'enrichment.ambiguous': 'Match to be decided',
+  'enrichment.blocked': 'Enrichment blocked by Google',
+  'enrichment.absent': 'Not enriched yet',
+
+  'panel.close': 'Close panel',
+  'panel.empty': 'Select a prospect to see its record.',
+  'panel.section.identity': 'Identity',
+  'panel.section.contact': 'Contact details',
+  'panel.section.web': 'Web presence',
+  'panel.section.score': 'Score breakdown',
+  'panel.position': '{index} of {total}',
+
+  'field.siret': 'SIRET',
+  'field.address': 'Address',
+  'field.created': 'Founded',
+  'field.staff': 'Headcount',
+  'field.phone': 'Phone',
+  'field.rating': 'Google rating',
+  'field.reviewCount': 'Reviews',
+  'field.declaredUrl': 'Declared website',
+  'field.matchedName': 'Matched name',
+  'field.matchConfidence': 'Match confidence',
+
+  'value.unknown': 'not recorded',
+  'value.notCollected': 'not collected yet',
+  'value.notPublished': 'not published by the source',
+  'value.mobile': 'mobile',
+  'value.landline': 'landline',
+
+  'list.keyboardHint': 'Up and down arrows move between prospects, Escape closes the panel.',
+  'list.overflow': '{count} more, not shown here',
+  'list.overflow_one': '1 more, not shown here',
+
+  'unit.prospects': '{count} prospects',
+  'unit.prospects_one': '{count} prospect',
+  'unit.employees': 'at least {count} employees',
+  'unit.employees_one': 'at least {count} employee',
+};

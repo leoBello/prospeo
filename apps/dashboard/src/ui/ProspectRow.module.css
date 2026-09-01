@@ -1,0 +1,53 @@
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  /* Lignes compactes (§9.4) : l'usage reel consiste a trier des centaines de
+     lignes, et une mise en page plus aeree montre moitie moins de prospects
+     a surface egale. */
+  padding: var(--space-2) var(--space-3);
+  transition: background-color 160ms ease;
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.row:hover {
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+
+/*
+ * La ligne selectionnee porte un lisere en plus du fond : la couleur seule ne
+ * doit jamais etre le seul indicateur d'un etat.
+ */
+.selected {
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  box-shadow: inset 2px 0 0 var(--color-accent);
+}
+
+.identity {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.name {
+  font-size: var(--text-md);
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.city {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
