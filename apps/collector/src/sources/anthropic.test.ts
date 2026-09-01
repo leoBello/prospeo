@@ -8,13 +8,15 @@ const PLOMBIER = getTrade('plombier')!;
 /** Faux `messages.parse` : enregistre les paramètres, ne sort jamais. */
 function fauxClient(reponse: Record<string, unknown>) {
   const appels: Record<string, unknown>[] = [];
+  const options: (Record<string, unknown> | undefined)[] = [];
   const client = {
-    parse: async (params: Record<string, unknown>) => {
+    parse: async (params: Record<string, unknown>, opts?: Record<string, unknown>) => {
       appels.push(params);
+      options.push(opts);
       return reponse;
     },
   } as never;
-  return { client, appels };
+  return { client, appels, options };
 }
 
 const USAGE = {
@@ -81,6 +83,29 @@ describe('createRedacteur', () => {
     });
     const r = await createRedacteur({ apiKey: 'k', trade: PLOMBIER, client }).rediger('c', 'f');
     expect(r.usage).toEqual({ input: 1920, cacheRead: 0, output: 240 });
+  });
+
+  it('déclare le workspace quand la clé y est rattachée', async () => {
+    // Une clé créée dans un Workspace dédié — ce que `.env.example` recommande
+    // pour pouvoir lui fixer un plafond de dépense — est « identity-linked » :
+    // l'API refuse par un 400 toute requête qui ne dit pas dans quel workspace
+    // elle agit. Constaté au premier appel réel, pas deviné.
+    const { client, options } = fauxClient({ parsed_output: {}, usage: USAGE });
+    await createRedacteur({
+      apiKey: 'k',
+      trade: PLOMBIER,
+      workspaceId: 'wrkspc_abc',
+      client,
+    }).rediger('c', 'f');
+    expect(options[0]).toEqual({ headers: { 'anthropic-workspace-id': 'wrkspc_abc' } });
+  });
+
+  it('n’envoie pas d’en-tête de workspace vide', async () => {
+    // Un en-tête creux serait envoyé puis rejeté, là où son absence laisse
+    // passer une clé qui n'est rattachée à aucun workspace.
+    const { client, options } = fauxClient({ parsed_output: {}, usage: USAGE });
+    await createRedacteur({ apiKey: 'k', trade: PLOMBIER, workspaceId: '', client }).rediger('c', 'f');
+    expect(options[0]).toBeUndefined();
   });
 
   it('rend null plutôt que de lever quand l’analyse échoue', async () => {

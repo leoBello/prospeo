@@ -25,6 +25,19 @@ const MAX_TOKENS = 8000;
 export interface RedacteurOptions {
   apiKey: string;
   trade: Trade;
+  /**
+   * Workspace auquel la clé est rattachée.
+   *
+   * Une clé créée dans un Workspace dédié — ce que fait `.env.example` pour
+   * pouvoir lui fixer un plafond de dépense — est « identity-linked » : l'API
+   * REFUSE toute requête qui ne dit pas dans quel workspace elle agit, avec
+   * un 400 explicite. Ce n'est donc pas une option de confort.
+   *
+   * Le SDK sait lire `ANTHROPIC_WORKSPACE_ID`, mais seulement par le chemin
+   * des profils de configuration — pas quand on lui passe une clé
+   * directement, ce que fait le collector. On pose donc l'en-tête nous-mêmes.
+   */
+  workspaceId?: string | undefined;
   /** Injectable pour les tests ; le SDK réel par défaut. */
   client?: Pick<Anthropic['messages'], 'parse'>;
 }
@@ -32,6 +45,14 @@ export interface RedacteurOptions {
 export function createRedacteur(options: RedacteurOptions): GenerateDeps {
   const messages =
     options.client ?? new Anthropic({ apiKey: options.apiKey }).messages;
+
+  // Absent plutôt que vide : un en-tête `anthropic-workspace-id` creux serait
+  // envoyé et rejeté, là où son absence laisse passer une clé qui n'est
+  // rattachée à aucun workspace.
+  const enTetes =
+    options.workspaceId === undefined || options.workspaceId === ''
+      ? undefined
+      : { 'anthropic-workspace-id': options.workspaceId };
 
   return {
     async rediger(systeme, utilisateur) {
@@ -73,7 +94,7 @@ export function createRedacteur(options: RedacteurOptions): GenerateDeps {
             siteRedactionJsonSchema(options.trade) as never,
           ),
         },
-      });
+      }, enTetes === undefined ? undefined : { headers: enTetes });
 
       // `parsed_output` vaut `null` quand l'analyse a échoué. On rend l'objet
       // brut plutôt que de lever : `runGenerate` porte déjà la validation et
