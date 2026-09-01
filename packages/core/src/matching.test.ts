@@ -12,6 +12,9 @@ import { getTrade } from './trades.js';
 const plombier = getTrade('plombier');
 if (plombier === undefined) throw new Error('métier plombier absent de la configuration');
 
+const serrurier = getTrade('serrurier');
+if (serrurier === undefined) throw new Error('métier serrurier absent de la configuration');
+
 const subject: MatchSubject = {
   denomination: 'SARL ALLARD',
   denominationUsuelle: null,
@@ -71,6 +74,31 @@ describe('scoreCandidate', () => {
     );
     expect(score.distanceM).toBeNull();
     expect(score.confidence).toBeLessThan(1);
+  });
+
+  it('ne confirme pas le métier serrurier via une catégorie « Dépannage électroménager »', () => {
+    // « Dépannage » figure dans les mots-clés du serrurier — utile pour
+    // retirer des jetons génériques d'un nom d'entreprise — mais c'est aussi
+    // le mot de n'importe quel dépanneur d'électroménager, d'informatique ou
+    // d'automobile. La cohérence de catégorie doit donc lire `categoryLabels`,
+    // plus étroit, et refuser cette catégorie sans rapport avec la serrurerie.
+    const score = scoreCandidate(
+      {
+        denomination: 'SARL MARTIN SERRURERIE',
+        denominationUsuelle: null,
+        latitude: 47.2213,
+        longitude: -1.5601,
+      },
+      candidate({
+        name: 'Martin Dépannage',
+        category: 'Dépannage électroménager',
+        latitude: 47.2213,
+        longitude: -1.5601,
+      }),
+      serrurier,
+      MATCHING_CONFIG,
+    );
+    expect(score.categoryMatch).toBe(false);
   });
 });
 
@@ -152,5 +180,34 @@ describe('selectMatch', () => {
       MATCHING_CONFIG,
     );
     expect(outcome.kind).toBe('not_found');
+  });
+
+  it('ne fusionne pas automatiquement un serrurier avec un homonyme sans rapport', () => {
+    // Constat critique de revue : « SARL MARTIN SERRURERIE » ne partage avec
+    // « Martin Dépannage » qu'un patronyme banal, une fois le métier retiré
+    // des deux côtés. Sans catégorie et à distance nulle, l'ancien calcul
+    // atteignait exactement 0,8500 — le seuil de fusion automatique. Un faux
+    // appariement ne se voit pas dans les statistiques : il se voit au
+    // téléphone. Le cas doit revenir à un humain.
+    const martinSubject: MatchSubject = {
+      denomination: 'SARL MARTIN SERRURERIE',
+      denominationUsuelle: null,
+      latitude: 47.2213,
+      longitude: -1.5601,
+    };
+    const outcome = selectMatch(
+      martinSubject,
+      [
+        candidate({
+          name: 'Martin Dépannage',
+          category: null,
+          latitude: 47.2213,
+          longitude: -1.5601,
+        }),
+      ],
+      serrurier,
+      MATCHING_CONFIG,
+    );
+    expect(outcome.kind).toBe('ambiguous');
   });
 });

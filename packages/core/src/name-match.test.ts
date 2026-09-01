@@ -42,7 +42,9 @@ describe('significantTokens', () => {
 
 describe('tokenContainment', () => {
   it('vaut 1 quand tous les jetons significatifs sont présents', () => {
-    expect(tokenContainment('martin', 'plomberie martin fils', ['plomberie'])).toBe(1);
+    expect(
+      tokenContainment('martin dupont', 'plomberie martin dupont fils', ['plomberie']),
+    ).toBe(1);
   });
 
   it('vaut 0 sans jeton significatif commun', () => {
@@ -56,7 +58,20 @@ describe('tokenContainment', () => {
   });
 
   it('normalise b comme a : la casse ne doit pas casser la comparaison', () => {
-    expect(tokenContainment('MARTIN', 'plomberie MARTIN fils', ['plomberie'])).toBe(1);
+    expect(
+      tokenContainment('MARTIN DUPONT', 'plomberie MARTIN DUPONT fils', ['plomberie']),
+    ).toBe(1);
+  });
+
+  it('plafonne à 0,80 sur un seul jeton, mais rend toujours 1 sur deux jetons présents', () => {
+    // Un patronyme seul n'est pas une identité : « Martin » retrouvé dans
+    // « Plomberie Martin Fils » ne doit pas valoir 1, sous peine de fusionner
+    // deux entreprises que seul un nom de famille banal réunit. Dès que deux
+    // jetons significatifs distinguent le nom, le comportement ne change pas.
+    expect(tokenContainment('martin', 'plomberie martin fils', ['plomberie'])).toBe(0.8);
+    expect(
+      tokenContainment('martin dupont', 'plomberie martin dupont fils', ['plomberie']),
+    ).toBe(1);
   });
 });
 
@@ -106,9 +121,14 @@ describe('bestNameMatch — les cas réels de la base', () => {
     expect(match.score).toBeGreaterThan(0.9);
   });
 
-  it('rattrape un patronyme noyé dans un nom commercial', () => {
+  it('rattrape un patronyme noyé dans un nom commercial, plafonné à 0,80', () => {
+    // « SARL ALLARD » ne comporte, une fois le métier retiré, qu'un seul
+    // jeton significatif — « allard » — donc le plafond du jeton unique
+    // s'applique : 0,80, et non plus 1,00 comme avant le correctif de revue.
+    // C'est la mesure jeton à jeton qui l'emporte ici, faute d'un jeu de
+    // longueurs comparables pour la comparaison de chaînes entières.
     const match = bestNameMatch(nameVariants('SARL ALLARD', null), 'Allard Plomberie', generic);
-    expect(match.score).toBeGreaterThan(0.85);
+    expect(match.score).toBe(0.8);
   });
 
   it('ne rapproche pas deux entreprises que seul le métier réunit', () => {

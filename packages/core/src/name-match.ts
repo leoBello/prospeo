@@ -108,12 +108,28 @@ export function significantTokens(name: string, generic: readonly string[]): str
  * piège ne s'y voit pas — mais `tokenContainment` est exportée et peut être
  * appelée directement avec des chaînes brutes.
  */
+/**
+ * Plafond appliqué quand le nom source ne tient qu'à un seul jeton
+ * significatif.
+ *
+ * Un patronyme n'est pas une identité. Quand tout ce qui distingue une
+ * entreprise se réduit à un nom de famille — « Martin », une fois le métier
+ * retiré — la coïncidence avec un candidat qui porte ce même patronyme est
+ * trop banale pour emporter seule la décision : « Martin » est aussi courant
+ * qu'homonyme, et le cas doit revenir à un humain plutôt que fusionner
+ * automatiquement. 0,80 est une valeur de calibrage, choisie pour rester sous
+ * le seuil de fusion automatique ; elle est destinée à être revue sur données
+ * réelles.
+ */
+const SINGLE_TOKEN_CAP = 0.8;
+
 export function tokenContainment(a: string, b: string, generic: readonly string[]): number {
   const tokens = significantTokens(a, generic);
   if (tokens.length === 0) return 0;
   const target = new Set(normalizeCompanyName(b).split(' '));
   const found = tokens.filter((token) => target.has(token)).length;
-  return found / tokens.length;
+  const ratio = found / tokens.length;
+  return tokens.length === 1 ? Math.min(ratio, SINGLE_TOKEN_CAP) : ratio;
 }
 
 /**
@@ -192,6 +208,18 @@ const MAX_TOKEN_LENGTH_DIFF = 1;
  * caractères ou plus sont des noms différents : s'il s'agissait vraiment de
  * la même entreprise, la comparaison de chaînes entières ou l'inclusion de
  * jetons l'auraient déjà rattrapée.
+ *
+ * Une égalité stricte entre l'unique jeton significatif de la source et un
+ * jeton du candidat n'est pas une variante d'écriture : c'est exactement ce
+ * que `tokenContainment` mesure déjà, plafond compris (voir
+ * `SINGLE_TOKEN_CAP`). La laisser remonter ici — Jaro-Winkler d'un jeton avec
+ * lui-même vaut toujours 1 — annulerait silencieusement ce plafond par la
+ * porte à côté : « martin » de « SARL MARTIN SERRURERIE » retrouverait son
+ * 1,00 face à « Martin Dépannage » dès que « serrurerie » et « dépannage »
+ * ont tous deux été retirés comme génériques du métier. Cette exclusion ne
+ * change rien pour les jetons qui se ressemblent sans être identiques,
+ * comme « h20 »/« h2o » : c'est précisément le cas que cette fonction sert à
+ * couvrir.
  */
 function bestTokenScore(a: string, b: string, generic: readonly string[]): number {
   const aTokens = significantTokens(a, generic);
@@ -200,6 +228,7 @@ function bestTokenScore(a: string, b: string, generic: readonly string[]): numbe
   for (const aToken of aTokens) {
     for (const bToken of bTokens) {
       if (Math.abs(aToken.length - bToken.length) > MAX_TOKEN_LENGTH_DIFF) continue;
+      if (aTokens.length === 1 && aToken === bToken) continue;
       best = Math.max(best, jaroWinkler(aToken, bToken));
     }
   }

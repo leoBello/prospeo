@@ -109,12 +109,20 @@ function genericTokens(trade: Trade): string[] {
   );
 }
 
-/** Le libellé de catégorie Google recoupe-t-il le métier attendu ? */
+/**
+ * Le libellé de catégorie Google recoupe-t-il le métier attendu ?
+ *
+ * Se limite à `categoryLabels`, volontairement plus étroit que `keywords` :
+ * `keywords` contient des mots comme « dépannage », choisis pour être
+ * fréquents dans les noms d'artisans — ce qui en fait le pire discriminant
+ * de catégorie possible, puisqu'il qualifie tout autant l'électroménager,
+ * l'informatique ou l'automobile.
+ */
 function matchesCategory(category: string | null, trade: Trade): boolean {
   if (category === null) return false;
   const normalized = normalizeCompanyName(category);
   if (normalized === '') return false;
-  return [trade.slug, trade.label, ...trade.keywords, ...trade.mapsQueries].some((word) => {
+  return trade.categoryLabels.some((word) => {
     const target = normalizeCompanyName(word);
     return target !== '' && normalized.includes(target);
   });

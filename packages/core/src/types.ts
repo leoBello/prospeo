@@ -7,6 +7,20 @@ export interface Trade {
   readonly mapsQueries: readonly string[];
   /** Mots-clés de cohérence métier, utilisés à l'appariement. */
   readonly keywords: readonly string[];
+  /**
+   * Libellés de catégorie Google Maps qui valent confirmation du métier.
+   *
+   * Délibérément plus étroit que `keywords` : `keywords` sert au retrait des
+   * jetons génériques d'un nom d'entreprise et à la construction des
+   * requêtes, un usage où la largeur est un atout — mieux vaut retirer un mot
+   * de trop que laisser un jeton de métier polluer la comparaison de noms.
+   * Une catégorie Google, elle, doit au contraire *distinguer* le métier des
+   * métiers voisins : un mot comme « dépannage », utile pour retirer des
+   * jetons, qualifie aussi bien l'électroménager, l'informatique ou
+   * l'automobile, et confirmerait à tort n'importe quelle fiche « Dépannage »
+   * comme un serrurier.
+   */
+  readonly categoryLabels: readonly string[];
 }
 
 export interface RawEstablishment {
