@@ -148,3 +148,104 @@ describe('bestNameMatch — les cas réels de la base', () => {
     expect(bestNameMatch([], 'Plomberie Dupont', generic)).toEqual({ score: 0, variant: null });
   });
 });
+
+describe('bestNameMatch — ce que le lot de calibration a mis au jour', () => {
+  const generic = ['plomberie', 'plombier', 'chauffage', 'depannage'];
+
+  it('ne tire aucun score du métier partagé par les deux noms', () => {
+    // Mesuré sur le lot : « lallemand plomberie » ~ « adorenov plomberie »
+    // valait 0,755, contre 0,569 entre les seuls noms. Le mot de métier
+    // apportait 0,19 de ressemblance à deux entreprises que rien ne relie —
+    // et c est lui qui peuplait la file de LALLEMAND de huit « … PLOMBERIE ».
+    //
+    // L invariant est plus fort qu un seuil : le métier ne doit RIEN
+    // apporter, donc le score doit être le même avec et sans lui.
+    const avec = bestNameMatch(
+      nameVariants('EURL LALLEMAND-PLOMBERIE', null),
+      'ADORÉNOV PLOMBERIE',
+      generic,
+    );
+    const sans = bestNameMatch(nameVariants('EURL LALLEMAND', null), 'ADORÉNOV', generic);
+    expect(avec.score).toBeCloseTo(sans.score, 10);
+    expect(avec.score).toBeLessThan(0.65);
+  });
+
+  it('n apparie pas un sigle de trois lettres sur son seul préfixe', () => {
+    // Mesuré : « epb » ~ « epsi » = 0,778 et « epb » ~ « epa » = 0,822,
+    // quand « epb » ~ « ebp » — le MÊME sigle transposé — ne vaut que 0,600.
+    // Le score mesurait le préfixe partagé, pas l identité. EPB retenait
+    // « C est le Plombier ».
+    const variants = nameVariants('EPB', null);
+    for (const fiche of ['EPSI - Ecole d ingénierie informatique', 'EDBS Nantes', 'beople']) {
+      expect(bestNameMatch(variants, fiche, generic).score).toBeLessThan(0.3);
+    }
+  });
+
+  it('rattrape encore « H20 » face à « H2O », qui est le même nom transcrit', () => {
+    // La contrainte de longueur minimale ne doit pas emporter ce cas : trois
+    // lettres, mais les mêmes exactement, à l ordre près. C est une variante
+    // d écriture, pas une ressemblance de préfixe.
+    const match = bestNameMatch(nameVariants('ERIC ESCAPIN', 'H20'), 'H2O Plomberie', generic);
+    expect(match.score).toBeGreaterThan(0.8);
+    expect(match.variant).toBe('h20');
+  });
+
+  it('rattrape « RGSERVICES » dans un nom Maps qui porte des mots en plus', () => {
+    // Le test existant éprouvait « RG Services » seul. La vraie fiche
+    // s appelle « Plombier Nantes RG Services », et le chemin sans espaces
+    // était alors annulé par le garde-fou de ratio de longueur (0,417 < 0,50).
+    // Résultat mesuré : 0 sur ce chemin, et le meilleur score retombait sur
+    // « ghaith rahali » à 0,56 — exactement le score obtenu face au CCAS de
+    // Nantes. L appariement ne distinguait pas le bon candidat d un centre
+    // d action sociale.
+    const match = bestNameMatch(
+      nameVariants('GHAITH RAHALI (RGSERVICES)', 'RGSERVICES'),
+      'Plombier Nantes RG Services',
+      generic,
+    );
+    expect(match.variant).toBe('rgservices');
+    expect(match.score).toBeGreaterThan(0.75);
+  });
+
+  it('ne prend pas un nom prolongé pour un nom contenu', () => {
+    // L inclusion sans espaces ne doit pas rouvrir la porte que la contrainte
+    // de longueur ferme : « martin » est bien contenu dans « martinez », mais
+    // il s y termine en plein milieu d un mot. Une agglutination légitime
+    // commence et finit sur une frontière de jeton — « rgservices » couvre
+    // « rg » + « services » entiers.
+    const match = bestNameMatch(nameVariants('SARL MARTIN', null), 'MARTINEZ Plomberie', generic);
+    expect(match.score).toBeLessThan(0.55);
+  });
+
+  it('ne relève pas un patronyme unique au-dessus de son plafond par l inclusion', () => {
+    // « martin » est contenu jeton pour jeton dans « martin dupont », donc
+    // l inclusion vaudrait 1,00 et contournerait le plafond du jeton unique
+    // par la porte à côté. Le plafond doit tenir : un patronyme n est pas
+    // une identité, quel que soit le chemin qui le mesure.
+    const match = bestNameMatch(nameVariants('SARL MARTIN', null), 'Martin Dupont', generic);
+    expect(match.score).toBeLessThanOrEqual(0.8);
+  });
+});
+
+describe('bestNameMatch — identité complète contre patronyme noyé', () => {
+  const generic = ['plomberie', 'plombier', 'chauffage', 'depannage'];
+
+  it('rend 1 quand les deux noms sont le même nom, en entier', () => {
+    // Cas réel du lot : « IDEAL » face à la fiche « Ideal ». Le plafond du
+    // jeton unique existe pour refuser qu un patronyme SEUL emporte la
+    // décision quand le candidat porte, lui, une identité en plus — « Martin »
+    // face à « Martin Dépannage ». Ici il n y a pas d identité en plus : les
+    // deux noms sont le même, rien n a été retiré d un côté pour les faire
+    // coïncider. Les plafonner reviendrait à punir la correspondance parfaite.
+    const match = bestNameMatch(nameVariants('IDEAL', null), 'Ideal', generic);
+    expect(match.score).toBe(1);
+  });
+
+  it('continue de plafonner un patronyme que le candidat complète', () => {
+    // Le garde-fou du cas précédent : « martin » et « martin depannage » ne
+    // sont PAS le même nom, même une fois le métier retiré — le candidat
+    // porte un mot que la variante n a pas.
+    const match = bestNameMatch(nameVariants('SARL MARTIN', null), 'Martin Dépannage', generic);
+    expect(match.score).toBe(0.8);
+  });
+});
