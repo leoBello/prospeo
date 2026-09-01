@@ -4,16 +4,13 @@ import { normalizeCompanyName } from './normalize.js';
 const MIN_TOKEN_LENGTH = 3;
 
 /**
- * Poids du préfixe commun dans l'ajustement Winkler.
- *
- * La valeur usuelle (0.1) laisse « h20 »/« h2o » — un cas réel de la base,
- * cf. contexte de la tâche — sous le seuil de décision malgré un préfixe
- * commun de deux caractères sur trois : à 0.1, le score plafonne à ~0.82.
- * Relevé à 0.18 (borne haute encore documentée dans la littérature Winkler,
- * qui va jusqu'à 0.25), il dépasse 0.85 sans changer les autres cas testés,
- * où le préfixe commun est soit nul soit déjà suffisant.
+ * Poids du préfixe commun dans l'ajustement Winkler, valeur de référence de
+ * Jaro-Winkler. Le seuil de décision du projet porte sur la confiance
+ * combinée (nom + proximité + catégorie), pas sur le seul signal de nom : ce
+ * n'est pas à cette constante de compenser un seuil choisi sur une autre
+ * échelle.
  */
-const WINKLER_SCALE = 0.18;
+const WINKLER_SCALE = 0.1;
 
 /** Longueur maximale du préfixe commun pris en compte, valeur usuelle. */
 const WINKLER_MAX_PREFIX = 4;
