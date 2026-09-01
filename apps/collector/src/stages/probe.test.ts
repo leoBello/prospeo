@@ -121,4 +121,8 @@ describe('shouldProbe', () => {
   it('sonde quand l horodatage est illisible plutôt que de le supposer frais', () => {
     expect(shouldProbe('pas une date', now, false)).toBe(true);
   });
+
+  it('sonde quand l horodatage est dans le futur plutôt que de le croire frais', () => {
+    expect(shouldProbe('2026-09-15T12:00:00Z', now, false)).toBe(true);
+  });
 });

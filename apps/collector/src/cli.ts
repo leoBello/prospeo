@@ -203,6 +203,7 @@ async function main(argv: string[]): Promise<number> {
 
       let scored = 0;
       let pending = 0;
+      let eraseFailed = 0;
 
       for (const p of data ?? []) {
         const enrichment = (Array.isArray(p.prospect_enrichment)
@@ -256,6 +257,13 @@ async function main(argv: string[]): Promise<number> {
             process.stderr.write(
               `score: échec d'effacement sur ${write.prospectId} — ${failure.message}\n`,
             );
+            // `pending` ne doit compter que les prospects réellement sortis du
+            // classement : si l'un des deux effacements a échoué, la ligne
+            // `prospect_score` ou `web_presence.category` peut être restée en
+            // place, et compter quand même en `pending` ferait croire à un
+            // état propre qui n'a pas été vérifié.
+            eraseFailed += 1;
+            continue;
           }
           pending += 1;
           continue;
@@ -301,6 +309,13 @@ async function main(argv: string[]): Promise<number> {
       }
 
       process.stdout.write(`score : ${scored} prospects notés, ${pending} en attente de sonde\n`);
+      // N'apparaît que si non nul : une ligne « 0 en échec » à chaque run
+      // n'apprend rien et noierait le signal les fois où il compte.
+      if (eraseFailed > 0) {
+        process.stderr.write(
+          `score : ${eraseFailed} effacements en échec, catégorie possiblement périmée\n`,
+        );
+      }
       return 0;
     }
     default:
