@@ -9,7 +9,7 @@ import {
   type WebPresenceCategory,
 } from '@prospeo/core';
 
-const FRANCHISE_MARKERS = ['franchise', 'reseau', 'groupe', 'sos ', 'allo ', '24h24'];
+const FRANCHISE_MARKERS = ['franchise', 'reseau', 'groupe', 'sos', 'allo', '24h24'];
 
 export interface ScoreRowInput {
   prospectId: string;
@@ -36,8 +36,11 @@ export interface ScoreRow {
 }
 
 function looksLikeFranchise(denomination: string): boolean {
-  const normalized = `${normalizeCompanyName(denomination)} `;
-  return FRANCHISE_MARKERS.some((marker) => normalized.includes(marker));
+  // Comparaison par MOTS ENTIERS, jamais par sous-chaine : « cavallo » se
+  // termine par « allo » et « regroupement » contient « groupe ». Un patronyme
+  // banal serait sinon penalise de 30 points comme enseigne de reseau.
+  const words = normalizeCompanyName(denomination).split(' ');
+  return words.some((word) => FRANCHISE_MARKERS.includes(word));
 }
 
 /**

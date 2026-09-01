@@ -180,12 +180,21 @@ async function main(argv: string[]): Promise<number> {
           continue;
         }
 
-        await client
+        // L'erreur doit etre verifiee : sans cela une categorie non persistee
+        // passe inapercue ET le compteur `scored` s'incremente quand meme,
+        // le rapport affirmant un succes qui n'a pas eu lieu.
+        const { error: presenceError } = await client
           .from('web_presence')
           .upsert(
             { prospect_id: row.prospectId, category: row.category, probed_at: new Date().toISOString() },
             { onConflict: 'prospect_id' },
           );
+        if (presenceError) {
+          process.stderr.write(
+            `score: echec d'ecriture de la categorie sur ${row.prospectId} — ${presenceError.message}\n`,
+          );
+          continue;
+        }
 
         const { error: scoreError } = await client.from('prospect_score').upsert(
           {

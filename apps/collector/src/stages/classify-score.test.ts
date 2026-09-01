@@ -74,6 +74,16 @@ describe('buildScoreRow', () => {
     expect(row.breakdown.some((l) => l.code === 'franchise')).toBe(true);
   });
 
+  it('ne prend pas un patronyme terminant par allo pour une franchise', () => {
+    const row = buildScoreRow({ ...base, denomination: 'SARL CAVALLO' }, NOW)!;
+    expect(row.breakdown.some((l) => l.code === 'franchise')).toBe(false);
+  });
+
+  it('ne prend pas regroupement pour groupe', () => {
+    const row = buildScoreRow({ ...base, denomination: 'REGROUPEMENT DES ARTISANS' }, NOW)!;
+    expect(row.breakdown.some((l) => l.code === 'franchise')).toBe(false);
+  });
+
   it('ignore un telephone illisible', () => {
     const row = buildScoreRow({ ...base, phoneRaw: '12345' }, NOW)!;
     expect(row.phoneKind).toBeNull();
