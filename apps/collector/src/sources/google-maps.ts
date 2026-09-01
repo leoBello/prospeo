@@ -38,21 +38,47 @@ export interface GoogleMapsOptions {
 
 const DEFAULTS = { minDelayMs: 3000, maxDelayMs: 8000, headless: true, maxCandidates: 5 };
 
-/** Les sélecteurs sont regroupés ici : ce sont eux qui casseront en premier. */
+/**
+ * Les sélecteurs sont regroupés ici : ce sont eux qui casseront en premier.
+ *
+ * Vérifiés sur une recherche réelle le 1er septembre 2026. Deux constats de
+ * cette vérification méritent d'être notés, parce qu'ils ne se devinent pas :
+ *
+ * - la note vit dans `.MW4etd` sur une carte de résultat, mais dans `.F7nice`
+ *   sur le panneau d'une fiche ; le premier sélecteur n'existe pas sur le
+ *   second écran ;
+ * - **le nombre d'avis n'est plus affiché nulle part.** Ni sur les cartes, ni
+ *   sur la fiche : `.F7nice` ne contient que la note et l'image des étoiles,
+ *   et le seul `aria-label` chiffré du feed est « 4,8 étoiles ». Aucun
+ *   sélecteur ne peut donc le fournir, et `reviewCountText` reste `null`.
+ */
 const SELECTORS = {
   consent: 'button[aria-label*="Tout accepter"], button:has-text("Tout accepter")',
   feed: 'div[role="feed"]',
-  card: 'div[role="feed"] > div > div[jsaction]',
-  cardLink: 'a[href*="/maps/place/"]',
+  cardLink: 'div[role="feed"] a[href*="/maps/place/"]',
   cardName: '.qBF1Pd',
   cardRating: '.MW4etd',
-  cardReviews: '.UY7F9',
   placeName: 'h1',
+  placeRating: '.F7nice',
   placeCategory: 'button[jsaction*="category"]',
   placeAddress: 'button[data-item-id="address"]',
   placePhone: 'button[data-item-id^="phone"]',
   placeWebsite: 'a[data-item-id="authority"]',
 } as const;
+
+/**
+ * Retire le libellé que Google préfixe à ses `aria-label`.
+ *
+ * Une adresse s'y lit « Adresse: 25 Rue Petite Biesse, 44200 Nantes, France »
+ * et un téléphone « Numéro de téléphone: +33 2 85 52 26 00 ». Conserver le
+ * préfixe le ferait remonter tel quel dans la fiche de prospection, et
+ * apparaître dans le message envoyé à l'artisan.
+ */
+function stripAriaLabel(value: string | null): string | null {
+  if (value === null) return null;
+  const cleaned = value.replace(/^[^:]{0,40}:\s*/, '').trim();
+  return cleaned === '' ? null : cleaned;
+}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -85,17 +111,48 @@ async function attrOf(
 }
 
 async function readPlacePanel(page: Page): Promise<RawMapsPlace | null> {
+  // `domcontentloaded` ne suffit pas : le panneau d'une fiche est rendu après
+  // coup, et lire les sélecteurs sans attendre rend `null` sur toute la fiche.
+  // Ce n'est pas théorique — une recherche réelle a renvoyé zéro candidat pour
+  // cette seule raison, sans lever la moindre erreur.
+  await page.waitForSelector(SELECTORS.placeName, { timeout: 15_000 }).catch(() => null);
+
   const name = await textOf(page, SELECTORS.placeName);
   if (name === null) return null;
   return {
     name,
-    address: await attrOf(page, SELECTORS.placeAddress, 'aria-label'),
+    address: stripAriaLabel(await attrOf(page, SELECTORS.placeAddress, 'aria-label')),
     category: await textOf(page, SELECTORS.placeCategory),
-    phone: await attrOf(page, SELECTORS.placePhone, 'aria-label'),
+    phone: stripAriaLabel(await attrOf(page, SELECTORS.placePhone, 'aria-label')),
     website: await attrOf(page, SELECTORS.placeWebsite, 'href'),
-    ratingText: await textOf(page, SELECTORS.cardRating),
-    reviewCountText: await textOf(page, SELECTORS.cardReviews),
+    ratingText: await textOf(page, SELECTORS.placeRating),
+    // Google ne publie plus le nombre d'avis. Voir la note de `SELECTORS`.
+    reviewCountText: null,
     placeUrl: page.url(),
+  };
+}
+
+/**
+ * Complète les champs de la carte par ceux de la fiche, champ par champ.
+ *
+ * Un remplacement en bloc perdrait la note : elle est lisible sur la carte
+ * (`.MW4etd`) mais pas toujours sur la fiche, et la fiche apporte en échange
+ * le téléphone, le site et la catégorie, absents de la carte.
+ */
+function mergePlace(card: RawMapsPlace, detail: RawMapsPlace | null): RawMapsPlace {
+  if (detail === null) return card;
+  return {
+    name: detail.name ?? card.name,
+    address: detail.address ?? card.address,
+    category: detail.category ?? card.category,
+    phone: detail.phone ?? card.phone,
+    website: detail.website ?? card.website,
+    ratingText: detail.ratingText ?? card.ratingText,
+    reviewCountText: detail.reviewCountText ?? card.reviewCountText,
+    // L'URL de la carte fait foi : celle de la fiche peut avoir été réécrite
+    // par une redirection, et c'est d'elle que viennent les coordonnées qui
+    // alimentent le filtre de distance de l'appariement.
+    placeUrl: card.placeUrl,
   };
 }
 
@@ -163,29 +220,45 @@ export function createGoogleMapsSource(options: GoogleMapsOptions): MapsSource {
           await page.waitForLoadState('domcontentloaded');
         }
 
-        // Résultat unique : Maps ouvre directement la fiche.
+        // Google décide APRÈS le chargement s'il affiche une liste ou une
+        // fiche unique, et il réécrit alors l'URL en `/maps/place/` — mesuré à
+        // cinq secondes sur une recherche réelle. Trancher plus tôt fait
+        // prendre une fiche unique pour une liste vide : la recherche renvoie
+        // zéro candidat sans lever la moindre erreur, et l'étage conclut
+        // « introuvable » sur précisément les appariements les plus sûrs,
+        // ceux dont le nom ne désigne qu'une entreprise.
+        await Promise.race([
+          page.waitForURL(/\/maps\/place\//, { timeout: 15_000 }),
+          page.waitForSelector(SELECTORS.feed, { timeout: 15_000 }),
+        ]).catch(() => null);
+        assertNotBlocked(page.url());
+
+        // Résultat unique : Maps a ouvert directement la fiche.
         if (page.url().includes('/maps/place/')) {
           const single = await readPlacePanel(page);
           if (single === null) return [];
           const candidate = toMapsCandidate(single);
           return candidate === null ? [] : [candidate];
         }
-
-        await page.waitForSelector(SELECTORS.feed, { timeout: 15_000 }).catch(() => null);
-        const cards = await page.locator(SELECTORS.card).all();
+        // On part des liens, pas des conteneurs : le flux contient aussi des
+        // éléments de mise en page sans lien, qui consommeraient sinon une
+        // place du quota de candidats sans jamais rien apporter. Constaté sur
+        // une recherche réelle — 9 conteneurs pour 8 fiches.
+        const links = await page.locator(SELECTORS.cardLink).all();
 
         const raws: RawMapsPlace[] = [];
-        for (const card of cards.slice(0, settings.maxCandidates)) {
-          const href = await attrOf(card, SELECTORS.cardLink, 'href');
+        for (const link of links.slice(0, settings.maxCandidates)) {
+          const href = await link.getAttribute('href').catch(() => null);
           if (href === null) continue;
           raws.push({
-            name: await textOf(card, SELECTORS.cardName),
+            name: await textOf(link, SELECTORS.cardName),
             address: null,
             category: null,
             phone: null,
             website: null,
-            ratingText: await textOf(card, SELECTORS.cardRating),
-            reviewCountText: await textOf(card, SELECTORS.cardReviews),
+            ratingText: await textOf(link, SELECTORS.cardRating),
+            // Google ne publie plus le nombre d'avis. Voir la note de `SELECTORS`.
+            reviewCountText: null,
             placeUrl: href,
           });
         }
@@ -197,10 +270,7 @@ export function createGoogleMapsSource(options: GoogleMapsOptions): MapsSource {
         for (const raw of raws) {
           await sleep(randomDelay());
           const detail = await openPlace(ctx, raw.placeUrl);
-          // L'URL de la carte fait foi : celle de la fiche ouverte peut avoir
-          // été réécrite par une redirection, et c'est d'elle qu'on tire les
-          // coordonnées qui alimentent le filtre de distance.
-          const candidate = toMapsCandidate({ ...(detail ?? raw), placeUrl: raw.placeUrl });
+          const candidate = toMapsCandidate(mergePlace(raw, detail));
           if (candidate !== null) candidates.push(candidate);
         }
         return candidates;
