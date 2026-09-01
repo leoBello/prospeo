@@ -1,4 +1,7 @@
+import { getTrade } from '@prospeo/core';
 import { loadConfig } from './config.js';
+import { createClient } from './supabase.js';
+import { makeUpsertProspect, runDiscover } from './stages/discover.js';
 
 const USAGE = `
 prospeo <commande> [options]
@@ -14,6 +17,11 @@ Options
 
 /** Commandes reconnues. Les étages sont branchés par les tâches 9 à 11. */
 const COMMANDS = ['discover', 'probe', 'score'] as const;
+
+function flag(argv: string[], name: string): string | undefined {
+  const index = argv.indexOf(`--${name}`);
+  return index === -1 ? undefined : argv[index + 1];
+}
 
 async function main(argv: string[]): Promise<number> {
   const command = argv[0];
@@ -33,6 +41,31 @@ async function main(argv: string[]): Promise<number> {
   const config = loadConfig(process.env);
 
   switch (command) {
+    case 'discover': {
+      const slug = flag(argv, 'trade');
+      const postalCode = flag(argv, 'postal-code');
+      if (slug === undefined || postalCode === undefined) {
+        process.stderr.write('discover exige --trade et --postal-code\n');
+        return 1;
+      }
+      const trade = getTrade(slug);
+      if (trade === undefined) {
+        process.stderr.write(`Métier inconnu : ${slug}\n`);
+        return 1;
+      }
+      const limitRaw = flag(argv, 'limit');
+      const client = createClient(config);
+      const report = await runDiscover({
+        trade,
+        postalCode,
+        limit: limitRaw === undefined ? undefined : Number.parseInt(limitRaw, 10),
+        upsertProspect: makeUpsertProspect(client),
+      });
+      process.stdout.write(
+        `discover ${trade.slug} ${postalCode} : ${report.upserted}/${report.seen} enregistrés\n`,
+      );
+      return 0;
+    }
     default:
       process.stderr.write(`Commande non encore implémentée : ${command}\n`);
       return 1;
