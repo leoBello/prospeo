@@ -4,11 +4,26 @@ import { useT } from '../ui/preferences.js';
 import styles from './LoginScreen.module.css';
 
 /**
- * Le message que Supabase rend quand la paire e-mail / mot de passe est
- * refusée. Il ne dit pas lequel des deux est faux, et l'interface non plus :
- * distinguer les deux cas permettrait d'énumérer les comptes existants.
+ * Reconnaît un refus d'identifiants.
+ *
+ * Le code d'erreur d'abord : `invalid_credentials` fait partie du contrat de
+ * l'API, là où le libellé est de la prose anglaise que GoTrue peut reformuler
+ * d'une version à l'autre. Le jour où il le ferait, un test portant sur le
+ * seul message laisserait passer le texte technique anglais jusqu'à l'écran,
+ * sans erreur et sans que personne ne le remarque avant un utilisateur.
+ *
+ * Le libellé reste testé en second, pour les versions de GoTrue antérieures à
+ * l'introduction des codes.
+ *
+ * Ni l'un ni l'autre ne dit lequel des deux champs est faux, et l'interface
+ * non plus : distinguer les deux cas permettrait d'énumérer les comptes.
  */
-const REFUS = 'Invalid login credentials';
+function estRefusIdentifiants(cause: unknown): boolean {
+  if (typeof cause !== 'object' || cause === null) return false;
+  const { code, message } = cause as { code?: unknown; message?: unknown };
+  if (code === 'invalid_credentials') return true;
+  return typeof message === 'string' && message.includes('Invalid login credentials');
+}
 
 interface Props {
   onSignIn: (email: string, password: string) => Promise<void>;
@@ -30,7 +45,7 @@ export function LoginScreen({ onSignIn }: Props) {
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
       setErreur(
-        message.includes(REFUS)
+        estRefusIdentifiants(cause)
           ? t('auth.error.credentials')
           : t('auth.error.generic', { message }),
       );

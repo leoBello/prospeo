@@ -50,6 +50,26 @@ describe('LoginScreen', () => {
     expect(alerte.textContent).toContain('incorrect');
   });
 
+  it('reconnait le refus a son code stable, et non a un libelle anglais susceptible d etre reformule', async () => {
+    // Supabase rend `error_code: 'invalid_credentials'` a cote du message.
+    // S'appuyer sur le seul message ferait reapparaitre du texte technique
+    // anglais a l'ecran le jour ou GoTrue le reformule — sans erreur, et sans
+    // que personne ne s'en apercoive avant un utilisateur.
+    const refus = Object.assign(new Error('Wrong email or password'), {
+      code: 'invalid_credentials',
+    });
+    const onSignIn = vi.fn().mockRejectedValue(refus);
+    const user = userEvent.setup();
+
+    renderWithPreferences(<LoginScreen onSignIn={onSignIn} />);
+    await user.type(screen.getByLabelText('Adresse e-mail'), 'contact@saisoneo.fr');
+    await user.type(screen.getByLabelText('Mot de passe'), 'faux');
+    await user.click(screen.getByRole('button', { name: 'Se connecter' }));
+
+    const alerte = await screen.findByRole('alert');
+    expect(alerte.textContent).toBe('Adresse e-mail ou mot de passe incorrect.');
+  });
+
   it('ne divulgue pas lequel des deux champs est faux', async () => {
     // Distinguer « adresse inconnue » de « mot de passe faux » permettrait
     // d'énumérer les comptes existants.
