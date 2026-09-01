@@ -31,7 +31,6 @@ export const en: Record<keyof typeof fr, string> = {
   'auth.error.generic': 'Sign-in failed: {message}',
   'auth.noSignup': 'Single account, created in Supabase. There is no sign-up on this screen.',
 
-  'app.config.invalid': 'Invalid configuration',
   'app.loading': 'Loading…',
   'app.error.title': 'Could not read the data',
   'app.error.retry': 'Try again',
@@ -47,7 +46,6 @@ export const en: Record<keyof typeof fr, string> = {
   'today.kpi.unavailable.noPipeline': 'no prospect has been contacted yet',
   'today.kpi.unavailable.notModelled':
     'the schema does not tell an incoming exchange from an outgoing one',
-  'today.kpi.emptyTable': 'the pipeline table is empty',
 
   'today.section.followUps': 'Follow-ups due',
   'today.section.newHighScore': 'New high-scoring prospects',
@@ -84,7 +82,6 @@ export const en: Record<keyof typeof fr, string> = {
   'score.group.joignabilite': 'Reachability',
   'score.group.disqualifiant': 'Disqualifiers',
   'score.bar.label': 'Score {total} out of 100: {detail}',
-  'score.bar.absent': 'No score computed',
 
   'presence.none': 'No web presence',
   'presence.social_only': 'Social page, no website',
@@ -117,8 +114,6 @@ export const en: Record<keyof typeof fr, string> = {
   'field.declaredUrl': 'Declared website',
   'field.matchedName': 'Matched name',
   'field.matchConfidence': 'Match confidence',
-  'field.trade': 'Trade',
-  'field.city': 'City',
 
   'value.unknown': 'not recorded',
   'value.notCollected': 'not collected yet',
@@ -132,8 +127,6 @@ export const en: Record<keyof typeof fr, string> = {
 
   'unit.prospects': '{count} prospects',
   'unit.prospects_one': '{count} prospect',
-  'unit.years': '{count} years',
-  'unit.years_one': '{count} year',
   'unit.employees': 'at least {count} employees',
   'unit.employees_one': 'at least {count} employee',
 };

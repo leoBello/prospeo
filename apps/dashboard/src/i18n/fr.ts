@@ -30,7 +30,6 @@ export const fr = {
   'auth.noSignup':
     "Compte unique, créé côté Supabase. Il n'y a pas d'inscription depuis cet écran.",
 
-  'app.config.invalid': 'Configuration invalide',
   'app.loading': 'Chargement…',
   'app.error.title': 'Lecture impossible',
   'app.error.retry': 'Réessayer',
@@ -46,7 +45,6 @@ export const fr = {
   'today.kpi.unavailable.noPipeline': 'aucun prospect n’a encore été contacté',
   'today.kpi.unavailable.notModelled':
     'le schéma ne distingue pas un échange reçu d’un échange émis',
-  'today.kpi.emptyTable': 'la table de suivi est vide',
 
   'today.section.followUps': 'Relances dues',
   'today.section.newHighScore': 'Nouveaux prospects à fort score',
@@ -84,7 +82,6 @@ export const fr = {
   'score.group.joignabilite': 'Joignabilité',
   'score.group.disqualifiant': 'Disqualifiants',
   'score.bar.label': 'Score {total} sur 100 : {detail}',
-  'score.bar.absent': 'Aucun score calculé',
 
   'presence.none': 'Aucune présence web',
   'presence.social_only': 'Page sociale, aucun site',
@@ -117,8 +114,6 @@ export const fr = {
   'field.declaredUrl': 'Site déclaré',
   'field.matchedName': 'Nom apparié',
   'field.matchConfidence': 'Confiance d’appariement',
-  'field.trade': 'Métier',
-  'field.city': 'Ville',
 
   'value.unknown': 'non renseigné',
   'value.notCollected': 'pas encore collecté',
@@ -133,8 +128,6 @@ export const fr = {
 
   'unit.prospects': '{count} prospects',
   'unit.prospects_one': '{count} prospect',
-  'unit.years': '{count} ans',
-  'unit.years_one': '{count} an',
   'unit.employees': 'au moins {count} salariés',
   'unit.employees_one': 'au moins {count} salarié',
 } as const;
