@@ -173,7 +173,7 @@ describe('runReconcile — garde-fou anti-suppression massive', () => {
     expect(report).toMatchObject({ kept: 3, closed: 2, failed: 0 });
   });
 
-  it('exécute la même vague sous force', async () => {
+  it('exécute la même vague quand le budget déclaré la couvre', async () => {
     const remove = vi.fn(async () => undefined);
 
     const report = await runReconcile({
@@ -182,13 +182,35 @@ describe('runReconcile — garde-fou anti-suppression massive', () => {
       remove,
       close: async () => undefined,
       touch: async () => undefined,
-      force: true,
+      forcedDeletionBudget: 15,
       wait: noWait,
     });
 
     expect(remove).toHaveBeenCalledTimes(15);
     expect(report.deleted).toBe(15);
     expect(report.refusedDeletions).toBe(0);
+  });
+
+  it('reprend la main quand la vague depasse le budget declare', async () => {
+    // C'est ce qui separe un garde-fou d'une protection de facade : colle une
+    // fois dans une tache planifiee, une derogation sans borne ne protegerait
+    // plus jamais. Ici l'operateur a verifie 3 suppressions, il en survient 15,
+    // et le garde-fou reprend la main.
+    const remove = vi.fn(async () => undefined);
+
+    const report = await runReconcile({
+      prospects: makeProspects(20),
+      fetchStatus: async (siret) => statusOfFifteenAbsent(siret),
+      remove,
+      close: async () => undefined,
+      touch: async () => undefined,
+      forcedDeletionBudget: 3,
+      wait: noWait,
+    });
+
+    expect(remove).not.toHaveBeenCalled();
+    expect(report.deleted).toBe(0);
+    expect(report.refusedDeletions).toBe(15);
   });
 
   it('laisse passer deux suppressions sur vingt décisions', async () => {

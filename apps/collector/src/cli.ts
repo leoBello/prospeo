@@ -35,10 +35,12 @@ Options
   --limit <n>          Plafond d'enregistrements traités
   --force              (probe) Resonde même les URL encore fraîches
   --retry-not-found    Rejoue les prospects déjà classés introuvables
-  --force-deletions    (reconcile) Exécute une vague de suppressions que le
-                       garde-fou a refusée. À n'employer qu'après avoir vérifié
-                       que l'API répond correctement : la suppression est
-                       irréversible et part en cascade.
+  --force-deletions <n>
+                       (reconcile) Autorise n suppressions que le garde-fou a
+                       refusées. Le nombre est exigé : une dérogation sans
+                       borne, collée dans une tâche planifiée, ne protégerait
+                       plus jamais. La suppression est irréversible et emporte
+                       enrichissements, scores et historique.
 `;
 
 /** Taille de page des lectures Supabase (PostgREST plafonne a max_rows = 1000). */
@@ -622,6 +624,24 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     }
     case 'reconcile': {
+      // `--force-deletions` exige un nombre, et ce n'est pas une coquetterie :
+      // un interrupteur nu serait une protection de façade, désarmée pour
+      // toujours dès qu'on l'aurait collé une fois dans une tâche planifiée.
+      // En demandant combien de suppressions l'opérateur a vérifiées, on rend
+      // la dérogation caduque dès que la réalité s'en écarte.
+      let deletionBudget: number | undefined;
+      if (argv.includes('--force-deletions')) {
+        const raw = flag(argv, 'force-deletions');
+        const parsed = raw === undefined ? Number.NaN : Number(raw);
+        if (!Number.isInteger(parsed) || parsed <= 0) {
+          process.stderr.write(
+            `--force-deletions attend le nombre de suppressions vérifiées, reçu : ${raw ?? '(rien)'}\n`,
+          );
+          return 1;
+        }
+        deletionBudget = parsed;
+      }
+
       const config = loadConfig(process.env);
       const client = createClient(config);
 
@@ -648,7 +668,7 @@ async function main(argv: string[]): Promise<number> {
         // veut dire « resonde des URL encore fraîches », ici « supprime des
         // prospects malgré le garde-fou ». Les confondre ferait vider la base à
         // qui voulait seulement resonder.
-        force: argv.includes('--force-deletions'),
+        forcedDeletionBudget: deletionBudget,
         remove: async (id) => {
           // Les dépendances partent en cascade : c'est la définition même de
           // « ne pas conserver ».

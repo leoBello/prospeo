@@ -98,10 +98,18 @@ export interface RunReconcileOptions {
   close: (prospectId: string) => Promise<void>;
   touch: (prospectId: string) => Promise<void>;
   /**
-   * Passe outre le garde-fou anti-suppression massive. Réservé à l'opérateur
-   * qui a vérifié que la vague est légitime — jamais un défaut.
+   * Budget de suppressions que l'opérateur déclare avoir vérifiées.
+   *
+   * Passe outre le garde-fou, mais **jusqu'à ce nombre seulement**. Un
+   * interrupteur sans borne serait une protection de façade : collé une fois
+   * dans une tâche planifiée, il la désarmerait pour toujours, et le jour où
+   * l'API renverrait une base vide, plus rien ne s'y opposerait. En exigeant
+   * un nombre, on force l'opérateur à dire ce qu'il a constaté, et la
+   * dérogation cesse de valoir dès que la réalité s'en écarte.
+   *
+   * `undefined` signifie « aucune dérogation », qui est le défaut.
    */
-  force?: boolean;
+  forcedDeletionBudget?: number;
   /** Injecté dans les tests, pour ne pas attendre réellement. */
   wait?: (ms: number) => Promise<void>;
 }
@@ -158,14 +166,22 @@ export async function runReconcile(options: RunReconcileOptions): Promise<Reconc
 
   // ── Deuxième temps : contrôler, puis appliquer. ──
   const deletions = decisions.filter((decision) => decision.action === 'delete').length;
-  const guardTripped = options.force !== true && isDeletionWaveSuspect(deletions, decisions.length);
+  const budget = options.forcedDeletionBudget;
+  // La dérogation ne vaut que jusqu'au nombre déclaré : au-delà, la réalité
+  // s'écarte de ce que l'opérateur a vérifié, et le garde-fou reprend la main.
+  const derogationCovers = budget !== undefined && deletions <= budget;
+  const guardTripped = !derogationCovers && isDeletionWaveSuspect(deletions, decisions.length);
 
   if (guardTripped) {
     report.refusedDeletions = deletions;
+    const depasse =
+      budget === undefined
+        ? ''
+        : ` — au-delà du budget de ${budget} déclaré par --force-deletions`;
     process.stderr.write(
       `reconcile: garde-fou déclenché — ${deletions} suppressions sur ${decisions.length} ` +
-        "décisions, aucune n'est exécutée. Vérifier l'API, puis relancer avec " +
-        '--force-deletions si la vague est légitime.\n',
+        `décisions${depasse}, aucune n'est exécutée. Vérifier l'API, puis relancer avec ` +
+        '--force-deletions <n> si la vague est légitime.\n',
     );
   }
 
