@@ -1484,27 +1484,43 @@ Options
   --limit <n>   Plafond d'enregistrements traités
 `;
 
+/** Commandes reconnues. Les etages sont branches par les taches 9 a 11. */
+const COMMANDS = ['discover', 'probe', 'score'] as const;
+
 async function main(argv: string[]): Promise<number> {
   const command = argv[0];
-  if (command === undefined || command === '--help') {
+  if (command === undefined || command === '--help' || command === '-h') {
     process.stdout.write(USAGE);
     return 0;
+  }
+
+  // La commande est validee AVANT le chargement de la configuration : sinon une
+  // simple faute de frappe repond « configuration invalide », ce qui envoie
+  // chercher un probleme qui n'existe pas.
+  if (!(COMMANDS as readonly string[]).includes(command)) {
+    process.stderr.write(`Commande inconnue : ${command}\n${USAGE}`);
+    return 1;
   }
 
   const config = loadConfig(process.env);
 
   switch (command) {
     default:
-      process.stderr.write(`Commande inconnue : ${command}\n${USAGE}`);
+      process.stderr.write(`Commande non encore implementee : ${command}\n`);
       return 1;
   }
 }
 
 main(process.argv.slice(2))
-  .then((code) => process.exit(code))
+  .then((code) => {
+    // `exitCode` et non `process.exit()` : Node termine alors apres avoir vide
+    // ses tampons de sortie. Un exit immediat peut tronquer stdout/stderr quand
+    // la sortie part dans un tube, cas courant sous Windows.
+    process.exitCode = code;
+  })
   .catch((error: unknown) => {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-    process.exit(1);
+    process.exitCode = 1;
   });
 ```
 
@@ -1858,17 +1874,28 @@ export async function* searchEstablishments(
   const naf = options.trade.nafCodes.join(',');
 
   let page = 1;
-  let totalPages = 1;
+  let totalPages: number | null = null;
 
-  while (page <= totalPages) {
+  while (totalPages === null || page <= totalPages) {
     const url =
       `${BASE_URL}?activite_principale=${encodeURIComponent(naf)}` +
       `&code_postal=${encodeURIComponent(options.postalCode)}` +
       `&page=${page}&per_page=${MAX_PER_PAGE}`;
 
     const json = await fetchPage(url);
-    const meta = json as { total_pages?: unknown };
-    totalPages = typeof meta.total_pages === 'number' ? meta.total_pages : page;
+
+    if (totalPages === null) {
+      // Le nombre de pages est arrete par la PREMIERE reponse et n'est plus
+      // reevalue. Le reevaluer a chaque page ferait qu'une reponse intermediaire
+      // malformee reduirait la borne et tronquerait la collecte en silence.
+      const meta = json as { total_pages?: unknown };
+      if (typeof meta.total_pages !== 'number' || !Number.isFinite(meta.total_pages)) {
+        throw new Error(
+          "API Recherche d'entreprises : total_pages absent ou invalide sur la premiere page",
+        );
+      }
+      totalPages = meta.total_pages;
+    }
 
     for (const row of mapSearchResponse(json, options.trade)) yield row;
     page += 1;
