@@ -1474,7 +1474,10 @@ export interface RawMapsPlace {
 /** Note Google, de 0 à 5, virgule décimale française admise. */
 export function parseRating(text: string | null): number | null {
   if (text === null) return null;
-  const found = text.replace(',', '.').match(/\d+(?:\.\d+)?/);
+  // Le signe est capturé : sans lui, « -1 » rendrait 1 au lieu d'être rejeté,
+  // c'est-à-dire qu'une valeur hors échelle serait silencieusement tronquée
+  // en une note plausible.
+  const found = text.replace(',', '.').match(/-?\d+(?:\.\d+)?/);
   if (found === null) return null;
   const value = Number(found[0]);
   // Hors échelle : mieux vaut ne rien savoir qu'affirmer une note fausse.
@@ -1485,10 +1488,45 @@ export function parseRating(text: string | null): number | null {
 /** Nombre d'avis, parenthèses et séparateurs de milliers absorbés. */
 export function parseReviewCount(text: string | null): number | null {
   if (text === null) return null;
-  // `\s` couvre l'espace insécable, que Google utilise comme séparateur.
-  const digits = text.replace(/[\s  .,]/g, '').match(/\d+/);
-  if (digits === null) return null;
-  const value = Number(digits[0]);
+  // `\s` couvre déjà l'espace insécable (U+00A0) et l'espace fine
+  // insécable (U+202F) que Google utilise comme séparateurs de milliers ;
+  // on les liste aussi explicitement, en séquences d'échappement littérales,
+  // pour ne rien laisser dépendre d'un caractère invisible dans ce fichier.
+  //
+  // La virgule et le point ne sont volontairement pas dans cette liste :
+  // en français la virgule est une marque décimale (« 4,7 »), jamais un
+  // séparateur de milliers, et l'espace est le seul séparateur de milliers.
+  // Les traiter comme des séparateurs de milliers fusionnerait une note
+  // avec un nombre d'avis (« 4,7 (128) » deviendrait 47 au lieu de 128) et
+  // produirait une valeur plausible mais fausse. Or ce champ alimente
+  // directement le barème de qualification : rendre `null` vaut mieux
+  // qu'affirmer un nombre faux.
+  const THOUSANDS_SEPARATORS = /[\s\u00a0\u202f]/g;
+
+  // Entre parenthèses, le contenu est le nombre d'avis lui-même — Google
+  // n'y place rien d'autre — donc on en extrait les chiffres directement,
+  // sans se soucier de ce qui précède les parenthèses (typiquement une
+  // note, comme dans « 4,7 (128) »).
+  const parenMatch = text.match(/\(([^)]*)\)/);
+  if (parenMatch !== null) {
+    const inside = (parenMatch[1] ?? '').replace(THOUSANDS_SEPARATORS, '');
+    const digits = inside.match(/\d+/);
+    if (digits === null) return null;
+    const value = Number(digits[0]);
+    return Number.isSafeInteger(value) ? value : null;
+  }
+
+  // Sans parenthèses, une note et un nombre d'avis peuvent se côtoyer dans
+  // la même chaîne (« 128 avis · 4,7 »). On n'accepte donc que le groupe
+  // de chiffres en tête de chaîne, une fois les espaces de séparation des
+  // milliers retirées, et on le rejette s'il est immédiatement suivi d'une
+  // virgule ou d'un point : ce serait alors le début d'une note à virgule
+  // décimale, pas un nombre d'avis entier.
+  const compact = text.replace(THOUSANDS_SEPARATORS, '');
+  const found = compact.match(/^(\d+)(.?)/);
+  if (found === null) return null;
+  if (found[2] === ',' || found[2] === '.') return null;
+  const value = Number(found[1]);
   return Number.isSafeInteger(value) ? value : null;
 }
 
