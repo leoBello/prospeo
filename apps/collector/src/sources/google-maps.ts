@@ -94,7 +94,7 @@ const SELECTORS = {
  * valeur intacte — le comportement sûr, un préfixe non retiré coûtant moins
  * qu'une adresse tronquée.
  */
-function stripAriaLabel(value: string | null): string | null {
+export function stripAriaLabel(value: string | null): string | null {
   if (value === null) return null;
   const cleaned = value.replace(/^(?:Adresse|Numéro de téléphone)\s*:\s*/i, '').trim();
   return cleaned === '' ? null : cleaned;
@@ -130,12 +130,39 @@ function emptyToNull(value: string | null): string | null {
   return trimmed === '' ? null : trimmed;
 }
 
+/**
+ * Attente accordée à UN champ absent, et la valeur compte.
+ *
+ * Sans timeout explicite, Playwright applique son défaut de trente secondes :
+ * `textContent()` attend que l'élément soit attaché, et un élément qui
+ * n'existe pas ne s'attache jamais. Or l'absence est ici le cas NORMAL, pas
+ * l'exception — un artisan sans site n'a pas de `a[data-item-id="authority"]`
+ * sur sa fiche, et c'est exactement la population que ce projet cherche. Le
+ * défaut faisait donc payer trente secondes de pure attente par champ absent,
+ * sur précisément les prospects qui nous intéressent : plusieurs heures de
+ * blocage muet sur un run de Nantes, indiscernables d'une lenteur réseau.
+ *
+ * Trois secondes, et les champs sont lus EN PARALLÈLE : c'est ce qui permet
+ * d'être large. Séquentiellement, une fiche sans site, sans téléphone et sans
+ * catégorie aurait payé trois fois le délai ; en parallèle elle n'en paie
+ * qu'un seul, quel que soit le nombre d'absents. On peut donc laisser à Maps
+ * le temps d'hydrater son panneau — il ne rend pas tout d'un bloc avec le
+ * titre — sans que l'absence coûte cher. Rater un téléphone présent mais
+ * tardif rendrait le prospect inexploitable ; c'est l'erreur à ne pas
+ * commettre, et trois secondes contre un étranglement anti-bot de trois à
+ * huit secondes entre deux navigations ne se voient pas.
+ *
+ * Valeur raisonnée, non mesurée : le run de calibration est le moment de la
+ * confronter au réel.
+ */
+const FIELD_TIMEOUT_MS = 3000;
+
 /** `Locator` et `Page` exposent tous deux `locator()` : un seul helper suffit. */
 async function textOf(scope: Page | Locator, selector: string): Promise<string | null> {
   const raw = await scope
     .locator(selector)
     .first()
-    .textContent()
+    .textContent({ timeout: FIELD_TIMEOUT_MS })
     .catch(() => null);
   return emptyToNull(raw);
 }
@@ -148,12 +175,84 @@ async function attrOf(
   const raw = await scope
     .locator(selector)
     .first()
-    .getAttribute(attribute)
+    .getAttribute(attribute, { timeout: FIELD_TIMEOUT_MS })
     .catch(() => null);
   return emptyToNull(raw);
 }
 
-async function readPlacePanel(page: Page): Promise<RawMapsPlace | null> {
+/**
+ * Ce que Maps a fini par afficher : une fiche, ou une liste.
+ *
+ * Google décide APRÈS le chargement, et il réécrit alors l'URL en
+ * `/maps/place/` — mesuré à cinq secondes sur une recherche réelle.
+ * Trancher plus tôt fait prendre une fiche unique pour une liste vide : la
+ * recherche renvoie zéro candidat sans lever la moindre erreur, et l'étage
+ * conclut « introuvable » sur précisément les appariements les plus sûrs,
+ * ceux dont le nom ne désigne qu'une entreprise.
+ *
+ * La course attend donc le premier des deux signaux, au lieu de supposer
+ * lequel viendra.
+ */
+export async function settleResultShape(page: Page): Promise<'place' | 'feed'> {
+  await Promise.race([
+    page.waitForURL(/\/maps\/place\//, { timeout: 15_000 }),
+    page.waitForSelector(SELECTORS.feed, { timeout: 15_000 }),
+  ]).catch(() => null);
+  return page.url().includes('/maps/place/') ? 'place' : 'feed';
+}
+
+/**
+ * Les cartes de la liste de résultats, dans l'ordre où Maps les présente.
+ *
+ * On part des LIENS, pas des conteneurs : le flux contient aussi des
+ * éléments de mise en page sans lien, qui consommeraient sinon une place du
+ * quota de candidats sans jamais rien apporter. Constaté sur une recherche
+ * réelle — neuf conteneurs pour huit fiches.
+ *
+ * Une carte ne porte ni téléphone, ni site, ni catégorie : seulement un nom,
+ * une note et l'URL de sa fiche. Le reste vient de `readPlacePanel`, au prix
+ * d'une navigation par fiche.
+ */
+export async function readCards(page: Page, maxCandidates: number): Promise<RawMapsPlace[]> {
+  const links = await page.locator(SELECTORS.cardLink).all();
+
+  // Toutes les cartes en parallèle, et tous les champs d'une carte avec.
+  // Lire le DOM n'envoie aucune requête à Google — l'étranglement anti-bot
+  // porte sur les navigations, pas sur les lectures — donc rien n'oblige à
+  // les mettre à la file. Or une carte sans note paie `FIELD_TIMEOUT_MS` :
+  // en série, cinq fiches récentes et sans avis auraient fait attendre
+  // quinze secondes une page déjà entièrement chargée.
+  const cards = await Promise.all(
+    links.slice(0, maxCandidates).map(async (link): Promise<RawMapsPlace | null> => {
+      const [href, name, ratingText] = await Promise.all([
+        link.getAttribute('href').catch(() => null),
+        textOf(link, SELECTORS.cardName),
+        textOf(link, SELECTORS.cardRating),
+      ]);
+      // Sans URL de fiche, la carte n'est ni ouvrable ni localisable : elle
+      // n'apporterait qu'un nom sans rien pour l'apparier.
+      if (href === null) return null;
+      return {
+        name,
+        address: null,
+        category: null,
+        phone: null,
+        website: null,
+        ratingText,
+        // Google ne publie plus le nombre d'avis. Voir la note de `SELECTORS`.
+        reviewCountText: null,
+        placeUrl: href,
+      };
+    }),
+  );
+
+  // `Promise.all` préserve l'ordre des liens, donc celui dans lequel Maps
+  // classe ses résultats — et c'est un signal : la première fiche est la
+  // plus pertinente selon Google.
+  return cards.filter((card): card is RawMapsPlace => card !== null);
+}
+
+export async function readPlacePanel(page: Page): Promise<RawMapsPlace | null> {
   // `domcontentloaded` ne suffit pas : le panneau d'une fiche est rendu après
   // coup, et lire les sélecteurs sans attendre rend `null` sur toute la fiche.
   // Ce n'est pas théorique — une recherche réelle a renvoyé zéro candidat pour
@@ -162,13 +261,26 @@ async function readPlacePanel(page: Page): Promise<RawMapsPlace | null> {
 
   const name = await textOf(page, SELECTORS.placeName);
   if (name === null) return null;
+
+  // En parallèle, et c'est ce qui rend `FIELD_TIMEOUT_MS` abordable : un
+  // champ absent fait attendre tous les autres en même temps que lui, au
+  // lieu d'ajouter son délai à la file. Une fiche sans site ni téléphone —
+  // le profil même que ce projet cherche — coûte ainsi un délai, pas quatre.
+  const [address, category, phone, website, ratingText] = await Promise.all([
+    attrOf(page, SELECTORS.placeAddress, 'aria-label'),
+    textOf(page, SELECTORS.placeCategory),
+    attrOf(page, SELECTORS.placePhone, 'aria-label'),
+    attrOf(page, SELECTORS.placeWebsite, 'href'),
+    textOf(page, SELECTORS.placeRating),
+  ]);
+
   return {
     name,
-    address: stripAriaLabel(await attrOf(page, SELECTORS.placeAddress, 'aria-label')),
-    category: await textOf(page, SELECTORS.placeCategory),
-    phone: stripAriaLabel(await attrOf(page, SELECTORS.placePhone, 'aria-label')),
-    website: await attrOf(page, SELECTORS.placeWebsite, 'href'),
-    ratingText: await textOf(page, SELECTORS.placeRating),
+    address: stripAriaLabel(address),
+    category,
+    phone: stripAriaLabel(phone),
+    website,
+    ratingText,
     // Google ne publie plus le nombre d'avis. Voir la note de `SELECTORS`.
     reviewCountText: null,
     placeUrl: page.url(),
@@ -182,7 +294,7 @@ async function readPlacePanel(page: Page): Promise<RawMapsPlace | null> {
  * (`.MW4etd`) mais pas toujours sur la fiche, et la fiche apporte en échange
  * le téléphone, le site et la catégorie, absents de la carte.
  */
-function mergePlace(card: RawMapsPlace, detail: RawMapsPlace | null): RawMapsPlace {
+export function mergePlace(card: RawMapsPlace, detail: RawMapsPlace | null): RawMapsPlace {
   if (detail === null) return card;
   return {
     name: detail.name ?? card.name,
@@ -305,48 +417,18 @@ export function createGoogleMapsSource(options: GoogleMapsOptions): MapsSource {
           await page.waitForLoadState('domcontentloaded');
         }
 
-        // Google décide APRÈS le chargement s'il affiche une liste ou une
-        // fiche unique, et il réécrit alors l'URL en `/maps/place/` — mesuré à
-        // cinq secondes sur une recherche réelle. Trancher plus tôt fait
-        // prendre une fiche unique pour une liste vide : la recherche renvoie
-        // zéro candidat sans lever la moindre erreur, et l'étage conclut
-        // « introuvable » sur précisément les appariements les plus sûrs,
-        // ceux dont le nom ne désigne qu'une entreprise.
-        await Promise.race([
-          page.waitForURL(/\/maps\/place\//, { timeout: 15_000 }),
-          page.waitForSelector(SELECTORS.feed, { timeout: 15_000 }),
-        ]).catch(() => null);
+        const shape = await settleResultShape(page);
         assertNotBlocked(page.url());
 
         // Résultat unique : Maps a ouvert directement la fiche.
-        if (page.url().includes('/maps/place/')) {
+        if (shape === 'place') {
           const single = await readPlacePanel(page);
           if (single === null) return [];
           const candidate = toMapsCandidate(single);
           return candidate === null ? [] : [candidate];
         }
-        // On part des liens, pas des conteneurs : le flux contient aussi des
-        // éléments de mise en page sans lien, qui consommeraient sinon une
-        // place du quota de candidats sans jamais rien apporter. Constaté sur
-        // une recherche réelle — 9 conteneurs pour 8 fiches.
-        const links = await page.locator(SELECTORS.cardLink).all();
 
-        const raws: RawMapsPlace[] = [];
-        for (const link of links.slice(0, settings.maxCandidates)) {
-          const href = await link.getAttribute('href').catch(() => null);
-          if (href === null) continue;
-          raws.push({
-            name: await textOf(link, SELECTORS.cardName),
-            address: null,
-            category: null,
-            phone: null,
-            website: null,
-            ratingText: await textOf(link, SELECTORS.cardRating),
-            // Google ne publie plus le nombre d'avis. Voir la note de `SELECTORS`.
-            reviewCountText: null,
-            placeUrl: href,
-          });
-        }
+        const raws = await readCards(page, settings.maxCandidates);
 
         // Les cartes de résultat ne portent ni téléphone ni site : il faut
         // ouvrir chaque fiche. C'est le coût réel du run, et la raison du

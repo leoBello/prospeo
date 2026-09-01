@@ -1,0 +1,44 @@
+<!--
+  Recherche à résultat unique — le piège le plus coûteux de cet étage.
+
+  Chargée sur une URL `/maps/search/`, cette page NE CONTIENT NI FLUX NI
+  FICHE. Google décide après coup qu'il n'y a qu'un résultat, réécrit l'URL
+  en `/maps/place/` par l'API History, puis rend le panneau. Mesuré à cinq
+  secondes sur une recherche réelle ; réduit ici à quelques centaines de
+  millisecondes pour que le test reste rapide, le mécanisme étant le même.
+
+  Trancher la forme du résultat juste après le chargement voyait donc une
+  URL de recherche sans flux, concluait « liste vide », et renvoyait zéro
+  candidat sans lever la moindre erreur. L'étage écrivait alors
+  « introuvable » sur précisément les appariements les plus sûrs : ceux dont
+  la raison sociale ne désigne qu'une seule entreprise.
+
+  Les deux délais sont distincts à dessein : l'URL change AVANT que le
+  panneau existe, ce qui oblige `readPlacePanel` à attendre son titre plutôt
+  qu'à lire un DOM encore vide.
+-->
+<div id="attente">Chargement…</div>
+<script>
+  const PLACE_URL =
+    '/maps/place/Ouest+D%C3%A9pannage+Plomberie/@47.2050,-1.5700,17z/data=!4m6!3m5!8m2!3d47.2050!4d-1.5700!19sChIJOuest';
+
+  setTimeout(() => {
+    history.replaceState({}, '', PLACE_URL);
+  }, 300);
+
+  setTimeout(() => {
+    document.getElementById('attente').remove();
+    document.body.insertAdjacentHTML(
+      'beforeend',
+      [
+        '<div role="main">',
+        '<h1 class="DUwDvf lfPIob">Ouest Dépannage Plomberie</h1>',
+        '<div class="F7nice"><span aria-hidden="true">5,0</span></div>',
+        '<button class="DkEaL" jsaction="pane.rating.category">Plombier</button>',
+        '<button data-item-id="address" aria-label="Adresse: 3 Rue de la Paix, 44200 Nantes, France"></button>',
+        '<button data-item-id="phone:tel:+33240000000" aria-label="Numéro de téléphone: +33 2 40 00 00 00"></button>',
+        '</div>',
+      ].join(''),
+    );
+  }, 700);
+</script>
