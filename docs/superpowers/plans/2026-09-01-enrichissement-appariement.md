@@ -241,7 +241,11 @@ export function shouldProbe(probedAt: string | null, now: Date, force: boolean):
   const previous = new Date(probedAt).getTime();
   if (Number.isNaN(previous)) return true;
   const ageDays = (now.getTime() - previous) / 86_400_000;
-  return ageDays >= PROBE_FRESHNESS_DAYS;
+  // Un horodatage futur donne un age negatif, donc toujours sous la
+  // fenetre : le prospect serait fige comme fraichement sonde jusqu'a ce que
+  // l'horloge rattrape cette date. Une date impossible ne vaut pas mieux
+  // qu'une date absente.
+  return ageDays < 0 || ageDays >= PROBE_FRESHNESS_DAYS;
 }
 ```
 
@@ -279,6 +283,11 @@ bloc `if (row === null)` par :
             process.stderr.write(
               `score: échec d'effacement sur ${write.prospectId} — ${failure.message}\n`,
             );
+            // `pending` ne compte que les prospects reellement sortis du
+            // classement. Compter ici ferait croire a un etat propre qui n'a
+            // pas ete verifie.
+            eraseFailed += 1;
+            continue;
           }
           pending += 1;
           continue;
@@ -289,6 +298,15 @@ bloc `if (row === null)` par :
 
 Mettre à jour l'import en tête de fichier : `planScoreWrite` remplace
 `buildScoreRow`.
+
+Declarer `let eraseFailed = 0;` aux cotes de `scored` et `pending`, et
+n'ajouter la ligne au compte-rendu que si le compteur est non nul.
+
+**L'ordre des deux ecritures est delibere.** Supprimer le score en premier
+sort le prospect du classement le temps que la sonde passe. L'ordre inverse
+protegerait la categorie, qui ne pilote rien, en exposant le score perime,
+c'est-a-dire precisement ce qui remonte en tete de liste et fait decrocher le
+telephone.
 
 - [ ] **Étape 9 : brancher `shouldProbe` dans le CLI**
 
