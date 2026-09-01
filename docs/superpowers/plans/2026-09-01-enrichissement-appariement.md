@@ -2064,12 +2064,17 @@ describe('buildEnrichmentRow', () => {
     expect(row.match_confidence).toBeGreaterThan(MATCHING_CONFIG.highThreshold);
   });
 
+  // Le candidat ambigu porte le bon patronyme mais une activite qui ne
+  // confirme pas le metier : confiance 0,7188, entre les deux seuils. Un nom
+  // qui en PROLONGE un autre — « Allardin » face a « Allard » — ne convient
+  // pas ici : la tache 2 refuse deliberement de les rapprocher, et le cas
+  // tomberait en `not_found`, laissant sans test la branche `ambiguous`.
   it('n écrit aucune donnée de fiche quand le cas est ambigu', () => {
     // Écrire un téléphone non validé le rendrait indiscernable d un
     // téléphone confirmé, et il finirait composé.
     const row = buildEnrichmentRow(
       prospect,
-      [candidate({ name: 'Allardin Chauffage', category: 'Chauffagiste' })],
+      [candidate({ name: 'Allard Multiservices', category: 'Entreprise de rénovation' })],
       trade,
       MATCHING_CONFIG,
     );
@@ -2081,7 +2086,7 @@ describe('buildEnrichmentRow', () => {
   it('conserve les candidats ambigus pour la revue', () => {
     const row = buildEnrichmentRow(
       prospect,
-      [candidate({ name: 'Allardin Chauffage', category: 'Chauffagiste' })],
+      [candidate({ name: 'Allard Multiservices', category: 'Entreprise de rénovation' })],
       trade,
       MATCHING_CONFIG,
     );
@@ -2682,7 +2687,8 @@ Créer `apps/collector/src/stages/review.test.ts` :
 
 ```ts
 import { describe, expect, it } from 'vitest';
-import { applyReviewDecision, type ReviewCandidate } from './review.js';
+import { applyReviewDecision } from './review.js';
+import type { ReviewCandidate } from './enrich.js';
 
 const candidates: ReviewCandidate[] = [
   {
@@ -2737,11 +2743,21 @@ describe('applyReviewDecision', () => {
 Créer `apps/collector/src/stages/review.ts` :
 
 ```ts
-import { normalizePhone, type MatchLine } from '@prospeo/core';
-import type { EnrichmentRow } from './enrich.js';
+import { normalizePhone } from '@prospeo/core';
+import type { EnrichmentRow, ReviewCandidate } from './enrich.js';
 
-/** Un candidat tel qu'il a été conservé par `enrich` pour la revue. */
-export interface ReviewCandidate {
+/**
+ * NOTE : ce type est finalement declare dans `stages/enrich.ts`, pas ici.
+ *
+ * `EnrichmentRow.candidates` doit le referencer, et le declarer dans
+ * `review.ts` aurait fait dependre l'etage `enrich` de la commande de revue —
+ * l'inverse de la dependance naturelle. `review.ts` l'importe donc depuis
+ * `enrich.js`. Il reste un ALIAS de type et non une interface : une interface
+ * n'a pas de signature d'index implicite, donc `ReviewCandidate[]` ne serait
+ * pas assignable au type `Json` de la colonne `jsonb` qui la stocke — meme
+ * piege que `ScoreLine` documente deja dans `packages/core`.
+ */
+export type ReviewCandidateShape = {
   name: string;
   address: string | null;
   phone: string | null;
@@ -2905,11 +2921,8 @@ Imports à ajouter en tête :
 ```ts
 import { createInterface } from 'node:readline/promises';
 import { nafMatchesTrade } from '@prospeo/core';
-import {
-  applyReviewDecision,
-  type ReviewCandidate,
-  type ReviewDecision,
-} from './stages/review.js';
+import { applyReviewDecision, type ReviewDecision } from './stages/review.js';
+import type { ReviewCandidate } from './stages/enrich.js';
 ```
 
 - [ ] **Étape 7 : commit**
