@@ -284,6 +284,7 @@ export type Database = {
       }
       prospect_site: {
         Row: {
+          content: Json | null
           content_hash: string | null
           deployment_url: string | null
           generated_at: string | null
@@ -298,6 +299,7 @@ export type Database = {
           vercel_project_id: string | null
         }
         Insert: {
+          content?: Json | null
           content_hash?: string | null
           deployment_url?: string | null
           generated_at?: string | null
@@ -312,6 +314,7 @@ export type Database = {
           vercel_project_id?: string | null
         }
         Update: {
+          content?: Json | null
           content_hash?: string | null
           deployment_url?: string | null
           generated_at?: string | null
