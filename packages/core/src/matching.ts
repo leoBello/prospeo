@@ -48,15 +48,35 @@ export interface MatchScore {
   lines: MatchLine[];
 }
 
+/**
+ * Pourquoi un candidat n'a pas participé à la décision.
+ *
+ * `'distance'` : au-delà de `maxDistanceM`, donc écarté quel que soit son nom.
+ * `'confiance'` : sous `lowThreshold`, donc trop faible pour valoir un doute.
+ */
+export type Elimination = 'distance' | 'confiance';
+
 export interface ScoredCandidate {
   candidate: MapsCandidate;
   score: MatchScore;
+  /** `null` quand le candidat a participé à la décision. */
+  rejectedFor: Elimination | null;
 }
 
+/**
+ * Le verdict, et **tout** ce qui a été examiné pour l'atteindre.
+ *
+ * `scored` porte les candidats éliminés autant que les retenus, chacun avec
+ * son motif. C'est ce qui rend les seuils calibrables : « ce candidat-ci
+ * était le bon, et c'est la distance qui l'a écarté » ne se constate pas sur
+ * une liste d'où les éliminés ont disparu. Sans cette trace, tout changement
+ * de seuil se repaierait en requêtes Google, puisque la pièce à conviction
+ * aurait été jetée avant d'être écrite.
+ */
 export type MatchOutcome =
-  | { kind: 'ok'; candidate: MapsCandidate; score: MatchScore }
+  | { kind: 'ok'; candidate: MapsCandidate; score: MatchScore; scored: ScoredCandidate[] }
   | { kind: 'ambiguous'; scored: ScoredCandidate[] }
-  | { kind: 'not_found' };
+  | { kind: 'not_found'; scored: ScoredCandidate[] };
 
 export interface MatchingConfig {
   version: string;
@@ -70,17 +90,37 @@ export interface MatchingConfig {
 }
 
 /**
- * Points de départ explicitement destinés à bouger.
+ * Réglages de l'appariement, v2 — premier tour de calibration sur données
+ * réelles.
  *
- * Ils seront calibrés sur les 25 premiers prospects réels, à l'étape 6 du
- * plan. La version est portée dans l'objet pour qu'un changement de réglage
- * soit traçable dans les données, comme pour le barème de notation.
+ * **La catégorie passe de 0,15 à 0,10, le nom de 0,60 à 0,65.** Ce n'est pas
+ * un ajustement de confort : à 0,15, le maximum atteignable sans catégorie
+ * confirmée valait `nameWeight + distanceWeight` = 0,85, soit exactement
+ * `highThreshold`, et seulement à nom parfait et distance nulle. Toute fiche
+ * dont Google omet ou se trompe la catégorie était donc structurellement
+ * inéligible à la fusion automatique. Mesuré sur le premier lot : « IDEAL »
+ * face à la fiche « Ideal » à 1 mètre atteignait 0,849 et partait en revue ;
+ * « DIRECT ASSISTANCE » face à « Direct Assistance » à 7 mètres, 0,844.
+ *
+ * Alléger la catégorie plutôt qu'abaisser le seuil traite la cause. Le
+ * libellé Google est peu fiable sur cette population — « Ideal », plombier,
+ * y est classé « Électricien », exactement le décalage déjà documenté pour
+ * le code NAF de l'établissement. Baisser le seuil aurait abaissé la barre
+ * pour tout le monde sans rien corriger du signal fautif.
+ *
+ * **`maxDistanceM` reste à 300 en attendant la population complète.** Le lot
+ * dit qu'il est trop serré — le bon candidat de « RGSERVICES » est à
+ * 1 825 m, et il faut 3 000 m pour qu'il passe devant un centre d'action
+ * sociale situé à 39 m. Mais cela ne repose que sur UN cas, et une constante
+ * qui décide de toute la sélection mérite mieux qu'un cas. Le rejeu hors
+ * ligne de `calibrate` permet de trancher sans redemander une seule page à
+ * Google, une fois les 25 enrichis.
  */
 export const MATCHING_CONFIG: MatchingConfig = {
-  version: 'v1',
-  nameWeight: 0.6,
+  version: 'v2',
+  nameWeight: 0.65,
   distanceWeight: 0.25,
-  categoryWeight: 0.15,
+  categoryWeight: 0.1,
   maxDistanceM: 300,
   highThreshold: 0.85,
   lowThreshold: 0.55,
@@ -216,20 +256,32 @@ export function selectMatch(
   for (const candidate of candidates) {
     const score = scoreCandidate(subject, candidate, trade, config);
     // Au-delà de la distance maximale, deux homonymes sont deux entreprises.
-    if (score.distanceM !== null && score.distanceM > config.maxDistanceM) continue;
-    if (score.confidence < config.lowThreshold) continue;
-    scored.push({ candidate, score });
+    // Le candidat est marqué, pas jeté : la décision l'ignore, la trace le
+    // garde. L'ordre des deux motifs est significatif — la distance prime,
+    // parce qu'elle disqualifie indépendamment de la confiance atteinte.
+    const rejectedFor: Elimination | null =
+      score.distanceM !== null && score.distanceM > config.maxDistanceM
+        ? 'distance'
+        : score.confidence < config.lowThreshold
+          ? 'confiance'
+          : null;
+    scored.push({ candidate, score, rejectedFor });
   }
 
-  if (scored.length === 0) return { kind: 'not_found' };
-
+  // Tri sur la liste entière, éliminés compris : la trace se lit du plus
+  // probable au moins probable, et l'ordre relatif des retenus est le même
+  // qu'avant puisque le tri est stable sur une même clé.
   scored.sort((a, b) => b.score.confidence - a.score.confidence);
-  const confident = scored.filter((s) => s.score.confidence >= config.highThreshold);
+  const retained = scored.filter((s) => s.rejectedFor === null);
+
+  if (retained.length === 0) return { kind: 'not_found', scored };
+
+  const confident = retained.filter((s) => s.score.confidence >= config.highThreshold);
 
   if (confident.length === 1) {
     const only = confident[0];
-    if (only === undefined) return { kind: 'not_found' };
-    return { kind: 'ok', candidate: only.candidate, score: only.score };
+    if (only === undefined) return { kind: 'not_found', scored };
+    return { kind: 'ok', candidate: only.candidate, score: only.score, scored };
   }
 
   return { kind: 'ambiguous', scored };

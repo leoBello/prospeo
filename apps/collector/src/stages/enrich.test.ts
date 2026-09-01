@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MATCHING_CONFIG, getTrade, type MapsCandidate } from '@prospeo/core';
-import { buildEnrichmentRow, runEnrich, type EnrichProspect } from './enrich.js';
+import {
+  buildEnrichmentRow,
+  runEnrich,
+  type EnrichmentRow,
+  type EnrichProspect,
+} from './enrich.js';
 import { BlockedError } from '../sources/google-maps.js';
 
 const trade = getTrade('plombier');
@@ -47,9 +52,10 @@ describe('buildEnrichmentRow', () => {
    * Candidat volontairement ambigu : même patronyme et même adresse, mais une
    * catégorie Google qui ne recoupe pas le métier.
    *
-   * Mesuré : confiance 0,7188 — nom 0,80 (plafond patronyme unique), soit
-   * 0,48, plus 0,2388 de proximité, plus 0 de catégorie. C'est entre
-   * `lowThreshold` (0,55) et `highThreshold` (0,85), donc `ambiguous`.
+   * Mesuré sous les poids v2 : confiance 0,7588 — nom 0,80 (plafond
+   * patronyme unique), soit 0,52, plus 0,2388 de proximité, plus 0 de
+   * catégorie. C'est entre `lowThreshold` (0,55) et `highThreshold` (0,85),
+   * donc `ambiguous`.
    */
   function ambigu(): MapsCandidate {
     return candidate({ name: 'Allard Multiservices', category: 'Entreprise de rénovation' });
@@ -335,5 +341,155 @@ describe('runEnrich, disjoncteur de recherches vides', () => {
     expect(report.stoppedByEmptySearches).toBe(false);
     expect(report.processed).toBe(40);
     expect(report.ok).toBe(2);
+  });
+});
+
+describe('enrich — la trace que la calibration consommera', () => {
+  function source(results: MapsCandidate[][]) {
+    let call = 0;
+    return {
+      search: vi.fn(async () => results[call++] ?? []),
+      close: vi.fn(async () => undefined),
+    };
+  }
+
+  it('conserve les candidats même quand la fusion est automatique', () => {
+    // « Ce cas fusionné était-il faux ? » est la première des trois questions
+    // du jalon de calibration. Elle ne se pose pas si la ligne ne garde que
+    // le gagnant : il faut voir face à quoi il a gagné.
+    const row = buildEnrichmentRow(
+      prospect,
+      [candidate(), candidate({ placeId: 'zzz', name: 'Boulangerie Dupont', category: 'Boulangerie' })],
+      trade,
+      MATCHING_CONFIG,
+    );
+    expect(row.status).toBe('ok');
+    expect(row.candidates).toHaveLength(2);
+    expect(row.candidates.filter((c) => c.rejectedFor === null)).toHaveLength(1);
+  });
+
+  it('conserve les candidats écartés d un not_found, avec leur motif', () => {
+    // « Un vrai candidat a-t-il été éliminé par la distance ? » — troisième
+    // question du jalon, et la seule à laquelle la ligne ne répondait pas du
+    // tout : l éliminé disparaissait avant d être écrit.
+    const loin = candidate({ latitude: 47.26, longitude: -1.5601 });
+    const row = buildEnrichmentRow(prospect, [loin], trade, MATCHING_CONFIG);
+    expect(row.status).toBe('not_found');
+    expect(row.candidates).toHaveLength(1);
+    expect(row.candidates[0]?.rejectedFor).toBe('distance');
+  });
+
+  it('garde de quoi rejouer le calcul hors ligne', () => {
+    // Coordonnées et catégorie ne servent pas à l affichage de la revue :
+    // elles servent à recalculer distance et catégorie sous d autres seuils,
+    // sans repasser par Google. Les omettre rendrait la trace inerte.
+    const row = buildEnrichmentRow(prospect, [candidate()], trade, MATCHING_CONFIG);
+    const stored = row.candidates[0];
+    expect(stored?.latitude).toBe(47.2214);
+    expect(stored?.longitude).toBe(-1.5602);
+    expect(stored?.category).toBe('Plombier');
+    expect(stored?.reviewCount).toBe(31);
+  });
+
+  it('réunit les candidats de toutes les requêtes jouées, sans doublon', async () => {
+    // La première requête n a rien retenu, la seconde tranche. Sans réunion,
+    // la fiche écartée par la première disparaîtrait — or c est précisément
+    // une candidate à réexaminer quand on desserre un seuil.
+    const written: EnrichmentRow[] = [];
+    await runEnrich({
+      prospects: [prospect],
+      trade,
+      config: MATCHING_CONFIG,
+      source: source([
+        [candidate({ placeId: 'ecarte', name: 'Boulangerie Dupont', category: 'Boulangerie' })],
+        [candidate({ placeId: 'ecarte', name: 'Boulangerie Dupont', category: 'Boulangerie' }), candidate()],
+      ]),
+      upsert: async (row) => {
+        written.push(row);
+      },
+      dailyRemaining: 10,
+    });
+    expect(written).toHaveLength(1);
+    expect(written[0]?.candidates.map((c) => c.placeId).sort()).toEqual(['abc', 'ecarte']);
+  });
+});
+
+describe('enrich — identité d une fiche vue deux fois', () => {
+  function source(results: MapsCandidate[][]) {
+    let call = 0;
+    return {
+      search: vi.fn(async () => results[call++] ?? []),
+      close: vi.fn(async () => undefined),
+    };
+  }
+
+  it('reconnaît la même fiche trouvée avec et sans identifiant de lieu', async () => {
+    // Cas réel du lot de calibration : « Plombier Nantes RG Services » revient
+    // par deux URL, celle de la carte de résultat (sans `!19s`, donc sans
+    // placeId) et celle du panneau de fiche (avec). Une clé fondée d abord
+    // sur le placeId les prend pour deux entreprises.
+    //
+    // L enjeu n est pas cosmétique : deux exemplaires RETENUS d une même
+    // fiche font deux candidats au-dessus du seuil haut, et `selectMatch`
+    // refuse alors de trancher. Le doublon empêcherait la fusion qu il
+    // décrit.
+    // La première requête ne retient rien — c est la condition pour que la
+    // seconde parte, et donc pour que la même fiche soit vue deux fois.
+    const doublon = { name: 'Boulangerie Dupont', category: 'Boulangerie' };
+    const written: EnrichmentRow[] = [];
+    await runEnrich({
+      prospects: [prospect],
+      trade,
+      config: MATCHING_CONFIG,
+      source: source([
+        [
+          candidate({
+            ...doublon,
+            placeId: null,
+            mapsUrl: 'https://maps.google.com/place/@47.2214,-1.5602,17z',
+          }),
+        ],
+        [
+          candidate({
+            ...doublon,
+            placeId: 'ChIJdup',
+            mapsUrl: 'https://maps.google.com/place/data=!19sChIJdup',
+          }),
+          candidate(),
+        ],
+      ]),
+      upsert: async (row) => {
+        written.push(row);
+      },
+      dailyRemaining: 10,
+    });
+    // La boulangerie une seule fois, plus le bon candidat : deux, pas trois.
+    expect(written[0]?.candidates).toHaveLength(2);
+    // On garde l exemplaire identifié : le placeId est ce qui rattache la
+    // fiche à un lieu de façon stable.
+    const boulangerie = written[0]?.candidates.find((c) => c.name === 'Boulangerie Dupont');
+    expect(boulangerie?.placeId).toBe('ChIJdup');
+  });
+
+  it('ne confond pas deux entreprises distinctes à la même adresse', async () => {
+    // Un immeuble abrite deux sociétés : même coordonnées, noms différents.
+    // Les fondre perdrait un candidat réel.
+    const written: EnrichmentRow[] = [];
+    await runEnrich({
+      prospects: [prospect],
+      trade,
+      config: MATCHING_CONFIG,
+      source: source([
+        [
+          candidate({ placeId: null, name: 'Allard Plomberie' }),
+          candidate({ placeId: null, name: 'Durand Chauffage' }),
+        ],
+      ]),
+      upsert: async (row) => {
+        written.push(row);
+      },
+      dailyRemaining: 10,
+    });
+    expect(written[0]?.candidates).toHaveLength(2);
   });
 });

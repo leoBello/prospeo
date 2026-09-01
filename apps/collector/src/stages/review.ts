@@ -52,6 +52,11 @@ export function applyReviewDecision(
     maps_url: null,
     candidates: [],
     status: 'not_found',
+    // Un humain a regardé les fiches et tranché. C'est vrai du rejet autant
+    // que de l'acceptation : « aucune de ces fiches n'est la bonne » est une
+    // conclusion, pas une absence de décision. Sans cette marque, le rejeu
+    // hors ligne de `calibrate --apply` la contredirait dans son dos.
+    decided_by: 'human',
     enriched_at: enrichedAt,
   };
 

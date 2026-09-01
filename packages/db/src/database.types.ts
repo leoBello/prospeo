@@ -156,6 +156,7 @@ export type Database = {
       prospect_enrichment: {
         Row: {
           candidates: Json
+          decided_by: string
           declared_url: string | null
           enriched_at: string
           maps_url: string | null
@@ -174,6 +175,7 @@ export type Database = {
         }
         Insert: {
           candidates?: Json
+          decided_by?: string
           declared_url?: string | null
           enriched_at?: string
           maps_url?: string | null
@@ -192,6 +194,7 @@ export type Database = {
         }
         Update: {
           candidates?: Json
+          decided_by?: string
           declared_url?: string | null
           enriched_at?: string
           maps_url?: string | null

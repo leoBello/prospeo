@@ -123,6 +123,35 @@ export function significantTokens(name: string, generic: readonly string[]): str
  */
 const SINGLE_TOKEN_CAP = 0.8;
 
+/**
+ * Proportion des mots non génériques de `a` retrouvés dans `b`, **jetons
+ * courts compris**.
+ *
+ * Elle ne remplace pas `tokenContainment` : elle la borne. La différence est
+ * le sort des jetons de moins de trois lettres. `significantTokens` les
+ * écarte — « du », « et », « 44 » n'identifient rien — mais ils portent
+ * parfois toute la distinction : « AB SERVICES » face à « CD SERVICES » se
+ * réduisait des deux côtés au seul « services », donnant une couverture
+ * parfaite et, avec une catégorie concordante, une fusion automatique entre
+ * deux entreprises différentes.
+ *
+ * Compter ces jetons au dénominateur sans exiger qu'ils identifient quoi que
+ * ce soit règle le cas : ils ne peuvent plus être ignorés, seulement
+ * retrouvés ou manquants. La mesure peut être un peu sévère — « MARTIN DU
+ * BOIS » face à « Martin Bois » rend 2/3 — mais elle se trompe du bon côté :
+ * un appariement manqué coûte une minute de revue, un faux appariement coûte
+ * l'appel.
+ */
+export function tokenCoverage(a: string, b: string, generic: readonly string[]): number {
+  const banned = new Set(generic.map((word) => normalizeCompanyName(word)));
+  const tokens = normalizeCompanyName(a)
+    .split(' ')
+    .filter((token) => token !== '' && !banned.has(token));
+  if (tokens.length === 0) return 0;
+  const target = new Set(normalizeCompanyName(b).split(' '));
+  return tokens.filter((token) => target.has(token)).length / tokens.length;
+}
+
 export function tokenContainment(a: string, b: string, generic: readonly string[]): number {
   const tokens = significantTokens(a, generic);
   if (tokens.length === 0) return 0;
@@ -164,6 +193,82 @@ export function nameVariants(denomination: string, denominationUsuelle: string |
 /** Retire les espaces : « rgservices » et « rg services » désignent la même enseigne. */
 function despace(value: string): string {
   return value.replace(/ /g, '');
+}
+
+/**
+ * Le nom privé de ses seuls mots de métier, jetons courts conservés.
+ *
+ * Distinct de `significantTokens`, et la différence compte deux fois :
+ *
+ * - elle garde les jetons de moins de trois lettres, sans quoi le « rg » de
+ *   « Plombier Nantes RG Services » disparaîtrait — or c'est précisément lui
+ *   qu'il faut recoller à « services » pour retrouver l'enseigne
+ *   « RGSERVICES » ;
+ * - elle rend une chaîne, pas des jetons, parce que les mesures de chaîne
+ *   entière en ont besoin.
+ *
+ * Sans ce retrait, ces mesures voyaient le métier des deux côtés et le
+ * comptaient comme une ressemblance : « lallemand plomberie » face à
+ * « adorenov plomberie » valait 0,755, quand les deux noms seuls valent
+ * 0,569. Deux entreprises que rien ne relie se ressemblaient par leur seul
+ * corps de métier — celui-là même sur lequel toute la population est
+ * sélectionnée, et qui ne distingue donc jamais personne.
+ */
+export function stripGenericTokens(name: string, generic: readonly string[]): string {
+  const banned = new Set(generic.map((word) => normalizeCompanyName(word)));
+  return normalizeCompanyName(name)
+    .split(' ')
+    .filter((token) => token !== '' && !banned.has(token))
+    .join(' ');
+}
+
+/**
+ * Longueur minimale d'une enseigne agglutinée pour que son inclusion compte.
+ *
+ * En deçà, l'inclusion d'une suite de lettres dans une autre est une
+ * coïncidence banale plutôt qu'un indice.
+ */
+const MIN_CONTAINMENT_LENGTH = 5;
+
+/**
+ * L'un des deux noms est-il l'autre, écrit sans ses espaces ?
+ *
+ * C'est le cas « RGSERVICES » / « RG Services » : Sirene agglutine ce que
+ * Maps sépare. La comparaison de chaînes entières sans espaces devait le
+ * couvrir, mais son garde-fou de ratio de longueur l'annule dès que la fiche
+ * Maps porte des mots en plus — « Plombier Nantes RG Services » donne 0,417,
+ * sous le seuil de 0,50 — et c'est la forme NORMALE d'une fiche d'artisan.
+ *
+ * L'inclusion doit commencer et finir sur une **frontière de jeton**, sans
+ * quoi elle rouvrirait la porte que la contrainte de longueur ferme :
+ * « martin » est bien contenu dans « martinez », mais s'y termine au milieu
+ * d'un mot — c'est une extension, donc un autre patronyme. « rgservices »,
+ * lui, couvre « rg » et « services » entiers.
+ */
+function agglutinatedContainment(a: string, b: string): number {
+  return containsOnBoundaries(a, b) || containsOnBoundaries(b, a) ? 1 : 0;
+}
+
+/** `needle`, sans ses espaces, couvre-t-il des jetons entiers de `haystack` ? */
+function containsOnBoundaries(needle: string, haystack: string): boolean {
+  const text = despace(needle);
+  if (text.length < MIN_CONTAINMENT_LENGTH) return false;
+
+  const tokens = haystack.split(' ').filter((token) => token !== '');
+  const starts = new Set<number>();
+  const ends = new Set<number>();
+  let offset = 0;
+  for (const token of tokens) {
+    starts.add(offset);
+    offset += token.length;
+    ends.add(offset);
+  }
+
+  const flat = tokens.join('');
+  for (let at = flat.indexOf(text); at !== -1; at = flat.indexOf(text, at + 1)) {
+    if (starts.has(at) && ends.has(at + text.length)) return true;
+  }
+  return false;
 }
 
 /** Proportion, entre 0 et 1, de la plus courte longueur sur la plus longue. */
@@ -221,14 +326,75 @@ const MAX_TOKEN_LENGTH_DIFF = 1;
  * comme « h20 »/« h2o » : c'est précisément le cas que cette fonction sert à
  * couvrir.
  */
+/**
+ * Longueur en deçà de laquelle deux jetons ne se comparent plus lettre à
+ * lettre, sauf à être composés exactement des mêmes caractères.
+ *
+ * Sur un jeton court, Jaro-Winkler mesure le préfixe partagé et non
+ * l'identité. Mesuré sur le lot de calibration : « epb » face à « epsi »
+ * vaut 0,778 et face à « epa » 0,822, quand « epb » face à « ebp » — le
+ * MÊME sigle, deux lettres transposées — ne vaut que 0,600. Un score qui
+ * classe deux inconnus au-dessus du bon candidat ne mesure rien d'utile, et
+ * c'est lui qui faisait retenir « C'est le Plombier » pour « EPB ».
+ *
+ * L'exception des mêmes caractères garde le cas que la mesure par jeton sert
+ * à couvrir : « h20 » et « h2o » sont deux transcriptions d'un même nom, pas
+ * deux noms qui commencent pareil.
+ */
+const MIN_FUZZY_TOKEN_LENGTH = 5;
+
+/**
+ * Chiffres employés pour les lettres qu'ils imitent.
+ *
+ * « H20 » pour « H2O » est le cas de la base, et ce n'est pas une faute de
+ * frappe : c'est la façon dont l'enseigne est déposée chez Sirene. Sans ce
+ * repli, « h20 » et « h2o » sont deux jetons courts sans caractère commun en
+ * dernière position, donc rejetés comme « epb » et « epa » — alors que l'un
+ * est le même nom et l'autre non. On s'en tient aux trois substitutions
+ * réellement usuelles : élargir la table reviendrait à rapprocher des noms
+ * que rien ne rapproche.
+ */
+const LOOKALIKE_DIGITS: Record<string, string> = { '0': 'o', '1': 'i', '5': 's' };
+
+function foldLookalikes(value: string): string {
+  return [...value].map((char) => LOOKALIKE_DIGITS[char] ?? char).join('');
+}
+
+/** Deux jetons qui ne diffèrent que par l'ordre, ou par un chiffre sosie. */
+function sameLetters(a: string, b: string): boolean {
+  const fold = (value: string): string => [...foldLookalikes(value)].sort().join('');
+  return fold(a) === fold(b);
+}
+
 function bestTokenScore(a: string, b: string, generic: readonly string[]): number {
   const aTokens = significantTokens(a, generic);
   const bTokens = significantTokens(b, generic);
+
+  // La mesure ne vaut que pour une enseigne d'UN SEUL mot — ce que sa
+  // documentation dit depuis toujours : « rattrape une enseigne courte noyée
+  // dans un nom candidat plus long ». Elle prend le maximum sur les paires de
+  // jetons, donc appliquée à un nom qui en compte plusieurs, un unique mot
+  // banal partagé emporte le score du nom ENTIER.
+  //
+  // Ce n'est pas théorique : mesuré sur le lot de calibration, « ACTIF
+  // SERVICES » face à « Boulangerie Services » valait 1,00 — une boulangerie,
+  // score de nom parfait, sur le seul « services ». Avec une catégorie qui
+  // concorde et une adresse proche, cela franchissait le seuil et fusionnait
+  // tout seul. C'est la pire panne possible de cet étage : un faux
+  // appariement ne se voit pas dans les statistiques, il se voit au téléphone.
+  //
+  // Un nom de plusieurs mots a déjà sa mesure, `tokenContainment`, qui rend
+  // la PROPORTION de jetons retrouvés — 0,5 pour un « services » sur deux —
+  // au lieu du maximum. C'est elle qui doit décider dans ce cas.
+  if (aTokens.length !== 1) return 0;
+
   let best = 0;
   for (const aToken of aTokens) {
     for (const bToken of bTokens) {
       if (Math.abs(aToken.length - bToken.length) > MAX_TOKEN_LENGTH_DIFF) continue;
       if (aTokens.length === 1 && aToken === bToken) continue;
+      const short = aToken.length < MIN_FUZZY_TOKEN_LENGTH || bToken.length < MIN_FUZZY_TOKEN_LENGTH;
+      if (short && !sameLetters(aToken, bToken)) continue;
       best = Math.max(best, jaroWinkler(aToken, bToken));
     }
   }
@@ -251,15 +417,82 @@ export function bestNameMatch(
   generic: readonly string[],
 ): NameMatch {
   const target = normalizeCompanyName(candidateName);
+  const targetCore = stripGenericTokens(candidateName, generic);
   let best: NameMatch = { score: 0, variant: null };
 
   for (const variant of variants) {
+    const variantCore = stripGenericTokens(variant, generic);
+
+    // Deux noms réduits chacun à un seul mot ne sont pas deux chaînes à
+    // comparer : ce sont deux jetons, et les règles des jetons s'appliquent —
+    // notamment le refus des extensions. Sans cette réserve, retirer le
+    // métier rapprocherait « martin » de « martinez » au point de les rendre
+    // comparables lettre à lettre, alors que le projet a justement décidé que
+    // martin/martinez sont deux patronymes distincts. Le garde-fou de ratio
+    // de longueur les séparait par accident, tant que le mot de métier
+    // gonflait l'une des deux chaînes ; on le remplace ici par une règle qui
+    // dit ce qu'elle fait.
+    const bothSingleWords = !variantCore.includes(' ') && !targetCore.includes(' ');
+
+    // Les deux noms sont le même, à un espace près : « RGSERVICES » et
+    // « RG Services ». C'est l'agglutination elle-même qui fait preuve, et
+    // elle échappe donc au plafond du jeton unique — la condition exige que
+    // les chaînes DIFFÈRENT avant d'être recollées, faute de quoi « allard »
+    // face à « allard » se hisserait à 1,00 par cette porte alors que le
+    // projet a décidé qu'un patronyme seul ne vaut pas une identité.
+    const exactlyAgglutinated =
+      variantCore !== targetCore && despace(variantCore) === despace(targetCore);
+
+    // Les deux noms sont le même nom, en entier et sans rien retirer.
+    //
+    // Le plafond du jeton unique refuse qu'un patronyme SEUL emporte la
+    // décision quand le candidat porte une identité en plus — « Martin »
+    // face à « Martin Dépannage ». Ici il n'y a pas d'identité en plus : rien
+    // n'a été écarté d'un côté pour faire coïncider les deux. Plafonner
+    // « IDEAL » face à « Ideal » reviendrait à punir la correspondance
+    // parfaite, et c'est bien ce qui se produisait — 0,80 au lieu de 1,00.
+    const identical = variant === target;
+
+    // Partout ailleurs, le plafond du jeton unique tient, y compris sur les
+    // mesures de chaîne entière : « martin » couvre le premier jeton entier
+    // de « martin dupont », et sans plafond l'inclusion — ou la comparaison
+    // sans espaces, qui atteint 0,90 — rendrait au patronyme l'identité que
+    // `tokenContainment` lui refuse. Le nom candidat porte ici un second
+    // jeton que la variante n'a pas : ce n'est pas le même nom.
+    const singleToken = significantTokens(variant, generic).length === 1;
+    const cap = (value: number): number =>
+      singleToken ? Math.min(value, SINGLE_TOKEN_CAP) : value;
+
+    // Proportion des mots distinctifs de la variante réellement retrouvés.
+    // Elle sert de PLAFOND aux mesures de chaîne entière, qui sans elle
+    // récompensent un long suffixe partagé sans regarder si la partie qui
+    // distingue concorde. Mesuré : « NANTES HABITAT » face à « RENNES
+    // HABITAT » atteignait 0,877 et fusionnait automatiquement — deux
+    // entreprises de deux villes — et « MARTIN RENOVATION » face à « DURAND
+    // RENOVATION » 0,859, deux artisans sans rapport.
+    //
+    // Le compromis est assumé : une faute de frappe portant sur tout le nom
+    // n'atteindra plus le seuil de fusion et partira en revue. C'est le sens
+    // de l'échange — un appariement manqué coûte une minute d'humain, un
+    // faux appariement coûte l'appel.
+    const coverage = tokenCoverage(variant, target, generic);
+    const grounded = (value: number): number => Math.min(value, coverage);
+
+    // Deux mesures échappent au plafond de couverture, et pour la même
+    // raison : elles servent les cas où la couverture est légitimement nulle.
+    // `bestTokenScore` rattrape l'enseigne d'un seul mot que le candidat
+    // écrit autrement — « h20 » n'est pas dans « h2o plomberie ».
+    // `agglutinatedContainment` rattrape l'enseigne recollée — « rgservices »
+    // n'est dans aucun jeton de « plombier nantes rg services ». Les
+    // plafonner par la couverture les annulerait toutes les deux.
     const score = Math.max(
-      wholeStringScore(variant, target),
-      wholeStringScore(despace(variant), despace(target)),
-      tokenContainment(variant, target, generic),
-      tokenContainment(target, variant, generic),
+      identical || exactlyAgglutinated ? 1 : 0,
+      cap(agglutinatedContainment(variantCore, targetCore)),
       bestTokenScore(variant, target, generic),
+      bothSingleWords ? 0 : cap(grounded(wholeStringScore(variantCore, targetCore))),
+      bothSingleWords ? 0 : cap(grounded(wholeStringScore(despace(variantCore), despace(targetCore)))),
+      grounded(tokenContainment(variant, target, generic)),
+      grounded(tokenContainment(target, variant, generic)),
     );
     if (score > best.score) best = { score, variant };
   }

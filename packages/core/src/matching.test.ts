@@ -119,8 +119,10 @@ describe('selectMatch', () => {
   });
 
   it('renvoie ambiguous entre les deux seuils', () => {
-    // Le bon nom, la bonne catégorie, mais à 200 m : confiance 0,833, sous le
-    // seuil haut. C'est exactement le cas qu'un humain doit trancher — deux
+    // Le bon nom, la bonne catégorie, mais à 200 m : confiance 0,7032 sous
+    // les poids v2 — nom 0,80 plafonné (patronyme unique) soit 0,52, plus
+    // 0,0833 de proximité, plus 0,10 de catégorie. Sous le seuil haut, donc
+    // c'est exactement le cas qu'un humain doit trancher — deux
     // établissements du même artisan, ou deux artisans homonymes du quartier ?
     const loin = candidate({ latitude: 47.2231, longitude: -1.5601 });
     const outcome = selectMatch(subject, [loin], plombier, MATCHING_CONFIG);
@@ -209,5 +211,69 @@ describe('selectMatch', () => {
       MATCHING_CONFIG,
     );
     expect(outcome.kind).toBe('ambiguous');
+  });
+});
+
+describe('selectMatch — trace de ce qui a été examiné', () => {
+  // Ces tests fixent ce dont la calibration des seuils a besoin. Sans eux,
+  // `selectMatch` peut redevenir muet sur ses éliminations sans qu'aucun
+  // test ne s'en aperçoive — et le prix de cette régression n'est pas une
+  // erreur visible, c'est un run Google à refaire.
+
+  it('conserve un candidat écarté par la distance, avec son motif', () => {
+    const loin = candidate({ latitude: 47.26, longitude: -1.5601 });
+    const outcome = selectMatch(subject, [loin], plombier, MATCHING_CONFIG);
+    expect(outcome.kind).toBe('not_found');
+    expect(outcome.scored).toHaveLength(1);
+    expect(outcome.scored[0]?.rejectedFor).toBe('distance');
+    // La distance mesurée reste lisible : c'est elle qu'on compare au seuil
+    // quand on se demande si `maxDistanceM` est trop serré.
+    expect(outcome.scored[0]?.score.distanceM).toBeGreaterThan(MATCHING_CONFIG.maxDistanceM);
+  });
+
+  it('conserve un candidat passé sous le seuil bas, avec son motif', () => {
+    const outcome = selectMatch(
+      subject,
+      [candidate({ name: 'Boulangerie Dupont', category: 'Boulangerie' })],
+      plombier,
+      MATCHING_CONFIG,
+    );
+    expect(outcome.kind).toBe('not_found');
+    expect(outcome.scored[0]?.rejectedFor).toBe('confiance');
+  });
+
+  it('expose aussi les candidats examinés quand il fusionne automatiquement', () => {
+    // Le cas que la calibration doit pouvoir rejuger : la fusion était-elle
+    // fausse, et un autre candidat méritait-il mieux ? Sans le second, la
+    // question ne se pose même pas.
+    const outcome = selectMatch(
+      subject,
+      [candidate(), candidate({ placeId: 'zzz', name: 'Boulangerie Dupont', category: 'Boulangerie' })],
+      plombier,
+      MATCHING_CONFIG,
+    );
+    expect(outcome.kind).toBe('ok');
+    expect(outcome.scored).toHaveLength(2);
+    expect(outcome.scored.filter((s) => s.rejectedFor === null)).toHaveLength(1);
+  });
+
+  it('classe tout le monde par confiance décroissante, éliminés compris', () => {
+    const outcome = selectMatch(
+      subject,
+      [
+        candidate({ placeId: 'hors-sujet', name: 'Boulangerie Dupont', category: 'Boulangerie' }),
+        candidate({ placeId: 'bon' }),
+      ],
+      plombier,
+      MATCHING_CONFIG,
+    );
+    const confidences = outcome.scored.map((s) => s.score.confidence);
+    expect(confidences).toEqual([...confidences].sort((a, b) => b - a));
+    expect(outcome.scored[0]?.candidate.placeId).toBe('bon');
+  });
+
+  it('ne marque aucun motif sur un candidat retenu', () => {
+    const outcome = selectMatch(subject, [candidate()], plombier, MATCHING_CONFIG);
+    expect(outcome.scored[0]?.rejectedFor).toBeNull();
   });
 });
