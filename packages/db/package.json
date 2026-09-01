@@ -1,0 +1,10 @@
+{
+  "name": "@prospeo/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "echo 'no tests' && exit 0",
+    "typecheck": "echo 'no types' && exit 0"
+  }
+}
