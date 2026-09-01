@@ -228,6 +228,17 @@ export async function runPublish(
         );
         repoFullName = cree.fullName;
         repoUrl = cree.htmlUrl;
+
+        // La création est ASYNCHRONE côté GitHub : `POST /generate` répond
+        // 201 avant que le contenu du modèle ne soit copié. Écrire tout de
+        // suite poserait le fichier sur un dépôt vide, que la copie du modèle
+        // écraserait deux secondes plus tard — le prospect recevrait alors
+        // l'URL d'un site affichant la fiche d'exemple. Mesuré au premier
+        // JALON réel, et parfaitement silencieux : le run se déclarait réussi.
+        //
+        // On attend donc le `sha` du fichier venu du modèle, et on écrit
+        // PAR-DESSUS lui — la création devient une mise à jour.
+        sha = await deps.github.attendreContenuModele(depot);
       } else {
         repoFullName = etat?.repoFullName ?? depot;
         repoUrl = `https://github.com/${repoFullName}`;

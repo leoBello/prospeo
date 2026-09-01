@@ -198,6 +198,10 @@ function fausseDeps(etats: Record<string, EtatSite> = {}) {
         journal.push(`sha:${depot}`);
         return 'sha-existant';
       },
+      async attendreContenuModele(depot) {
+        journal.push(`attendre:${depot}`);
+        return 'sha-du-modele';
+      },
       async ecrireContenu(depot, _contenu, sha) {
         journal.push(`ecrire:${depot}:${sha ?? 'sans-sha'}`);
       },
@@ -230,9 +234,13 @@ describe('runPublish', () => {
     const report = await runPublish([UN], deps);
 
     expect(report).toEqual({ created: 1, updated: 0, skipped: 0, failed: 0, refused: 0 });
+    // L'attente du modèle est INTERCALÉE entre la création et l'écriture, et
+    // l'écriture porte le `sha` du fichier venu du modèle : elle l'écrase au
+    // lieu de le précéder.
     expect(journal).toEqual([
       'creer:plombier:dos-services-51000900400035',
-      'ecrire:dos-services-51000900400035:sans-sha',
+      'attendre:dos-services-51000900400035',
+      'ecrire:dos-services-51000900400035:sha-du-modele',
       'enregistrer:p1',
     ]);
   });
@@ -310,6 +318,7 @@ describe('runPublish', () => {
     // (spec du socle, §12). Sur vingt-deux prospects, interrompre au premier
     // 403 laisserait les vingt et un autres au point mort sans raison.
     const { deps, journal } = fausseDeps();
+    deps.github.attendreContenuModele = async () => 'sha-du-modele';
     deps.github.creerDepuisModele = async (_modele, nom) => {
       if (nom.endsWith('51000900400035')) throw new Error('GitHub création : 403 — refusé');
       journal.push(`creer:${nom}`);

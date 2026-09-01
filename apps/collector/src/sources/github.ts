@@ -35,11 +35,19 @@ const API_VERSION = '2022-11-28';
  */
 export const CHEMIN_CONTENU = 'src/content/site.json';
 
+/** Tentatives d'attente de la copie du modèle, et leur espacement. */
+const ATTENTE_TENTATIVES = 30;
+const ATTENTE_INTERVALLE_MS = 1000;
+
 export interface GithubOptions {
   token: string;
   /** Organisation dédiée (D4). Le jeton n'a de portée que sur elle. */
   org: string;
   fetch?: typeof fetch;
+  /** Espacement des tentatives d'attente du modèle. Abaissé à 0 dans les tests. */
+  attenteMs?: number;
+  /** Nombre de tentatives avant d'abandonner. */
+  tentatives?: number;
 }
 
 export interface DepotCree {
@@ -55,6 +63,17 @@ export interface GithubClient {
    * ait à construire deux clients ni à le scinder.
    */
   creerDepuisModele(templateRepo: string, nom: string, description: string): Promise<DepotCree>;
+  /**
+   * Attend que la copie du modèle soit réellement posée, et rend le `sha` du
+   * fichier de contenu.
+   *
+   * `POST /generate` répond 201 immédiatement, mais GitHub copie le contenu du
+   * modèle de façon ASYNCHRONE — deux secondes plus tard, mesuré. Écrire sans
+   * attendre pose le contenu sur un dépôt encore vide, et la copie du modèle
+   * l'écrase ensuite : le site du prospect affiche alors la fiche d'exemple,
+   * et le run se déclare réussi.
+   */
+  attendreContenuModele(depot: string): Promise<string>;
   shaContenu(depot: string): Promise<string | null>;
   ecrireContenu(depot: string, contenu: unknown, sha: string | null): Promise<void>;
 }
@@ -107,6 +126,27 @@ export function createGithubClient(options: GithubOptions): GithubClient {
       if (!reponse.ok) return echec(reponse, `création de ${nom}`);
       const corps = (await reponse.json()) as { full_name: string; html_url: string };
       return { fullName: corps.full_name, htmlUrl: corps.html_url };
+    },
+
+    async attendreContenuModele(depot) {
+      const intervalle = options.attenteMs ?? ATTENTE_INTERVALLE_MS;
+      const max = options.tentatives ?? ATTENTE_TENTATIVES;
+
+      for (let essai = 0; essai < max; essai += 1) {
+        const sha = await this.shaContenu(depot);
+        if (sha !== null) return sha;
+        if (intervalle > 0) await new Promise((r) => setTimeout(r, intervalle));
+      }
+
+      // ÉCHEC FRANC, et c'est tout l'intérêt. Écrire « quand même » après
+      // expiration reproduirait le défaut : le contenu serait posé, puis
+      // écrasé par la copie tardive, et le run se déclarerait réussi. Mieux
+      // vaut un dépôt vide et un compteur d'échecs visible.
+      throw new Error(
+        `GitHub : le contenu du modèle n'est pas arrivé dans ${depot} après ` +
+          `${max} tentatives. Le dépôt existe mais reste vide ; le publier ` +
+          'maintenant écrirait un contenu que la copie tardive écraserait.',
+      );
     },
 
     async shaContenu(depot) {

@@ -282,6 +282,59 @@ export type Database = {
           },
         ]
       }
+      prospect_site: {
+        Row: {
+          content_hash: string | null
+          deployment_url: string | null
+          generated_at: string | null
+          model: string | null
+          prompt_version: string | null
+          prospect_id: string
+          published_at: string | null
+          repo_full_name: string | null
+          repo_url: string | null
+          unpublished_at: string | null
+          updated_at: string
+          vercel_project_id: string | null
+        }
+        Insert: {
+          content_hash?: string | null
+          deployment_url?: string | null
+          generated_at?: string | null
+          model?: string | null
+          prompt_version?: string | null
+          prospect_id: string
+          published_at?: string | null
+          repo_full_name?: string | null
+          repo_url?: string | null
+          unpublished_at?: string | null
+          updated_at?: string
+          vercel_project_id?: string | null
+        }
+        Update: {
+          content_hash?: string | null
+          deployment_url?: string | null
+          generated_at?: string | null
+          model?: string | null
+          prompt_version?: string | null
+          prospect_id?: string
+          published_at?: string | null
+          repo_full_name?: string | null
+          repo_url?: string | null
+          unpublished_at?: string | null
+          updated_at?: string
+          vercel_project_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prospect_site_prospect_id_fkey"
+            columns: ["prospect_id"]
+            isOneToOne: true
+            referencedRelation: "prospect"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       web_presence: {
         Row: {
           category: Database["public"]["Enums"]["web_presence_category"] | null

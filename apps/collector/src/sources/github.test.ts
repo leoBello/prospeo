@@ -144,3 +144,49 @@ describe('CHEMIN_CONTENU', () => {
     expect(chemins).toContain(CHEMIN_CONTENU);
   });
 });
+
+describe('attendreContenuModele', () => {
+  it('attend que la copie du modèle soit réellement posée', async () => {
+    // LE défaut trouvé au premier JALON réel, et il aurait frappé les 22 sites.
+    //
+    // `POST /generate` répond 201 immédiatement, mais GitHub copie le contenu
+    // du modèle de façon ASYNCHRONE. Mesuré sur le dépôt
+    // `prospeo/dos-services-51000900400035` :
+    //
+    //   2aea527  20:14:45  « contenu du site (généré) »  <- notre écriture
+    //   be844e9  20:14:47  « Initial commit »            <- le modèle, 2 s APRÈS
+    //
+    // Notre écriture est arrivée sur un dépôt encore vide, et la copie du
+    // modèle l'a écrasée. Le run rapportait pourtant `created: 1, failed: 0` :
+    // les 22 artisans auraient reçu l'URL d'un site affichant la fiche d'un
+    // autre. C'est la panne la plus embarrassante que cette chaîne puisse
+    // produire, et elle était parfaitement silencieuse.
+    const { fn, appels } = faussetch([
+      { status: 404 },
+      { status: 404 },
+      { status: 200, body: { sha: 'sha-du-modele' } },
+    ]);
+    const sha = await createGithubClient({
+      ...OPTIONS,
+      fetch: fn,
+      attenteMs: 0,
+    }).attendreContenuModele('depot');
+
+    expect(sha).toBe('sha-du-modele');
+    expect(appels).toHaveLength(3);
+  });
+
+  it('ÉCHOUE plutôt que d’écrire dans un dépôt dont le modèle n’est pas arrivé', async () => {
+    // Le point qui décide de la valeur de tout ceci. Écrire « quand même »
+    // après expiration reproduirait exactement le défaut : le contenu serait
+    // posé, puis écrasé par la copie tardive du modèle, et le run se
+    // déclarerait réussi. Un échec franc laisse au contraire un dépôt vide et
+    // un compteur d'échecs qui se voit.
+    const { fn } = faussetch([{ status: 404 }]);
+    await expect(
+      createGithubClient({ ...OPTIONS, fetch: fn, attenteMs: 0, tentatives: 3 }).attendreContenuModele(
+        'depot',
+      ),
+    ).rejects.toThrow(/modèle/i);
+  });
+});

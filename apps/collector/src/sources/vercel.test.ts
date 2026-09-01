@@ -54,7 +54,66 @@ describe('createVercelClient', () => {
     expect(avec.appels[0]?.url).toBe('https://api.vercel.com/v11/projects?teamId=team_x');
   });
 
-  it("rend l'URL de production quand le déploiement est prêt", async () => {
+  it('amorce le premier déploiement depuis le dépôt lié', async () => {
+    // Mesuré au premier JALON : lier un dépôt ne déploie PAS son HEAD. Le
+    // projet était correctement lié et comptait zéro déploiement cinq minutes
+    // plus tard, sans la moindre erreur — `deployment_url` serait restée nulle
+    // indéfiniment.
+    const { fn, appels } = faussetch([{ status: 200, body: { id: 'dpl_1' } }]);
+    const id = await createVercelClient({ token: 't', fetch: fn }).declencherDeploiement(
+      'prj_1',
+      'prospeo/dos-services-51000900400035',
+      'main',
+    );
+
+    expect(id).toBe('dpl_1');
+    expect(appels[0]?.url).toBe('https://api.vercel.com/v13/deployments');
+    const corps = JSON.parse(String(appels[0]?.init.body));
+    expect(corps.project).toBe('prj_1');
+    expect(corps.target).toBe('production');
+    // `org` + `repo` plutôt que `repoId` : les deux formes sont documentées, et
+    // celle-ci évite une requête de plus pour résoudre l'identifiant numérique.
+    expect(corps.gitSource).toEqual({
+      type: 'github',
+      org: 'prospeo',
+      repo: 'dos-services-51000900400035',
+      ref: 'main',
+    });
+  });
+
+  it("rend l'alias stable, et non l'URL du déploiement", async () => {
+    // Mesuré au premier JALON. `url` porte une empreinte qui CHANGE à chaque
+    // redéploiement ; l'alias suit la production. C'est la donnée de vente :
+    // elle part dans un email que l'artisan ouvrira peut-être des semaines
+    // plus tard, et après une régénération de contenu. Stocker l'URL du
+    // déploiement lui ferait voir une version périmée — toujours en ligne,
+    // donc sans le moindre signe d'erreur.
+    const { fn } = faussetch([
+      {
+        status: 200,
+        body: {
+          targets: {
+            production: {
+              url: 'dos-3yuhxrizx-leobellos-projects.vercel.app',
+              alias: [
+                'dos-git-main-leobellos-projects.vercel.app',
+                'dos.vercel.app',
+                'dos-leobellos-projects.vercel.app',
+              ],
+              readyState: 'READY',
+            },
+          },
+        },
+      },
+    ]);
+    // Le plus court des alias est le canonique : les autres portent le nom de
+    // l'équipe ou celui de la branche.
+    expect(await createVercelClient({ token: 't', fetch: fn }).urlProduction('dos')).toBe(
+      'https://dos.vercel.app',
+    );
+  });
+
+  it("se rabat sur l'URL du déploiement quand aucun alias n'existe", async () => {
     const { fn } = faussetch([
       { status: 200, body: { targets: { production: { url: 'dos.vercel.app', readyState: 'READY' } } } },
     ]);
