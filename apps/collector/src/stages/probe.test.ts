@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectParked, domainCandidates, hasViewport, probeUrl } from './probe.js';
+import { detectParked, domainCandidates, hasViewport, probeUrl, shouldProbe } from './probe.js';
 
 describe('hasViewport', () => {
   it('detecte la balise viewport', () => {
@@ -96,5 +96,29 @@ describe('domainCandidates', () => {
 
   it('tolere un nom vide', () => {
     expect(domainCandidates('SARL')).toEqual([]);
+  });
+});
+
+describe('shouldProbe', () => {
+  const now = new Date('2026-09-01T12:00:00Z');
+
+  it('sonde une URL jamais sondée', () => {
+    expect(shouldProbe(null, now, false)).toBe(true);
+  });
+
+  it('ne resonde pas dans la fenêtre de fraîcheur', () => {
+    expect(shouldProbe('2026-08-28T12:00:00Z', now, false)).toBe(false);
+  });
+
+  it('resonde au-delà de la fenêtre', () => {
+    expect(shouldProbe('2026-08-20T12:00:00Z', now, false)).toBe(true);
+  });
+
+  it('resonde toujours sous --force', () => {
+    expect(shouldProbe('2026-08-31T12:00:00Z', now, true)).toBe(true);
+  });
+
+  it('sonde quand l horodatage est illisible plutôt que de le supposer frais', () => {
+    expect(shouldProbe('pas une date', now, false)).toBe(true);
   });
 });

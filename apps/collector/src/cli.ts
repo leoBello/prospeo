@@ -3,9 +3,9 @@ import { fileURLToPath } from 'node:url';
 import { getTrade } from '@prospeo/core';
 import { loadConfig } from './config.js';
 import { createClient } from './supabase.js';
-import { buildScoreRow } from './stages/classify-score.js';
+import { planScoreWrite } from './stages/classify-score.js';
 import { makeUpsertProspect, runDiscover } from './stages/discover.js';
-import { probeUrl } from './stages/probe.js';
+import { probeUrl, shouldProbe } from './stages/probe.js';
 
 // `.env` vit a la racine du depot. Ni tsx ni Node ne le chargent tout seuls :
 // sans cette ligne, la procedure documentee (« copier .env.example en .env »)
@@ -24,6 +24,7 @@ Commandes
 
 Options
   --limit <n>   Plafond d'enregistrements traités
+  --force       Resonde même les URL encore fraîches
 `;
 
 /** Taille de page des lectures Supabase (PostgREST plafonne a max_rows = 1000). */
@@ -131,8 +132,29 @@ async function main(argv: string[]): Promise<number> {
         if ((data ?? []).length < PAGE_SIZE) break;
       }
 
+      const force = argv.includes('--force');
+      const now = new Date();
+
+      // Deuxième lecture paginée : les horodatages de sonde.
+      const probedAt = new Map<string, string | null>();
+      for (let from = 0; ; from += PAGE_SIZE) {
+        const { data, error } = await client
+          .from('web_presence')
+          .select('prospect_id, probed_at')
+          .order('prospect_id')
+          .range(from, from + PAGE_SIZE - 1);
+        if (error) throw new Error(error.message);
+        for (const row of data ?? []) probedAt.set(row.prospect_id, row.probed_at);
+        if ((data ?? []).length < PAGE_SIZE) break;
+      }
+
       let done = 0;
+      let skipped = 0;
       for (const row of rows) {
+        if (!shouldProbe(probedAt.get(row.prospect_id) ?? null, now, force)) {
+          skipped += 1;
+          continue;
+        }
         // Un échec isolé ne doit pas avorter le run : même discipline que
         // `discover`, l'écriture est unitaire et l'erreur est journalisée.
         try {
@@ -158,7 +180,7 @@ async function main(argv: string[]): Promise<number> {
           );
         }
       }
-      process.stdout.write(`probe : ${done} URL sondées\n`);
+      process.stdout.write(`probe : ${done} URL sondées, ${skipped} encore fraîches\n`);
       return 0;
     }
     case 'score': {
@@ -190,7 +212,7 @@ async function main(argv: string[]): Promise<number> {
           ? p.web_presence[0]
           : p.web_presence) as Record<string, unknown> | null;
 
-        const row = buildScoreRow({
+        const write = planScoreWrite({
           prospectId: p.id as string,
           declaredUrl: (enrichment?.declared_url as string | null) ?? null,
           socialUrls: (enrichment?.social_urls as string[] | null) ?? [],
@@ -218,10 +240,28 @@ async function main(argv: string[]): Promise<number> {
           isClosed: false,
         });
 
-        if (row === null) {
+        if (write.kind === 'erase') {
+          // Effacer plutôt que laisser en place : le score précédent a été
+          // calculé sans connaître l'URL qu'on vient de découvrir.
+          const { error: eraseScoreError } = await client
+            .from('prospect_score')
+            .delete()
+            .eq('prospect_id', write.prospectId);
+          const { error: eraseCategoryError } = await client
+            .from('web_presence')
+            .update({ category: null })
+            .eq('prospect_id', write.prospectId);
+          const failure = eraseScoreError ?? eraseCategoryError;
+          if (failure) {
+            process.stderr.write(
+              `score: échec d'effacement sur ${write.prospectId} — ${failure.message}\n`,
+            );
+          }
           pending += 1;
           continue;
         }
+
+        const row = write.row;
 
         // L'erreur doit etre verifiee : sans cela une categorie non persistee
         // passe inapercue ET le compteur `scored` s'incremente quand meme,

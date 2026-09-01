@@ -101,3 +101,23 @@ export function domainCandidates(denomination: string): string[] {
   const [first, second] = words as [string, string];
   return [`${first}-${second}.fr`, `${first}${second}.fr`, `${second}-${first}.fr`];
 }
+
+/** Fenêtre au-delà de laquelle une sonde est considérée périmée. */
+export const PROBE_FRESHNESS_DAYS = 7;
+
+/**
+ * Resonder est voulu — un site meurt entre deux runs, c'est précisément ce
+ * qu'on cherche. Mais tout resonder à chaque passage retéléchargerait une
+ * centaine de sites pour reconstater l'évidence dès que `enrich` aura rempli
+ * `declared_url`.
+ *
+ * Un horodatage illisible fait sonder : supposer une sonde fraîche sur une
+ * donnée qu'on ne sait pas lire reviendrait à inventer une observation.
+ */
+export function shouldProbe(probedAt: string | null, now: Date, force: boolean): boolean {
+  if (force || probedAt === null) return true;
+  const previous = new Date(probedAt).getTime();
+  if (Number.isNaN(previous)) return true;
+  const ageDays = (now.getTime() - previous) / 86_400_000;
+  return ageDays >= PROBE_FRESHNESS_DAYS;
+}

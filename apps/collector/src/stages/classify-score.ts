@@ -80,3 +80,19 @@ export function buildScoreRow(input: ScoreRowInput, now: Date = new Date()): Sco
     rulesetVersion: score.rulesetVersion,
   };
 }
+
+/**
+ * Ce que `score` doit écrire pour un prospect.
+ *
+ * `erase` existe parce qu'un prospect qui redevient « en attente de sonde »
+ * conserverait sinon le score du passage précédent, sans rien qui le
+ * distingue d'un score frais. Une absence de score se dit par son absence.
+ */
+export type ScoreWrite =
+  | { kind: 'score'; row: ScoreRow }
+  | { kind: 'erase'; prospectId: string };
+
+export function planScoreWrite(input: ScoreRowInput, now: Date = new Date()): ScoreWrite {
+  const row = buildScoreRow(input, now);
+  return row === null ? { kind: 'erase', prospectId: input.prospectId } : { kind: 'score', row };
+}
