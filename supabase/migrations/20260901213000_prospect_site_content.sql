@@ -1,0 +1,16 @@
+-- Le contenu généré, entre `generate` et `publish`.
+--
+-- Les deux étages sont séparés par le plan, et le contenu doit donc survivre
+-- de l'un à l'autre. Il ne pouvait vivre nulle part : le dépôt GitHub, son
+-- domicile définitif, n'existe qu'à partir de `publish`.
+--
+-- La colonne sert deux fois. Elle rend d'abord les étages réellement
+-- indépendants : on peut générer un lot, le relire, puis ne publier que ce
+-- qu'on retient. Elle est ensuite la source de la revue prévue par la tâche 7
+-- — « affichage dans le dashboard : contenu généré […] et de quoi rejeter une
+-- génération ». Sans elle, la seule façon de relire une génération serait
+-- d'ouvrir le dépôt, c'est-à-dire après l'avoir publiée.
+--
+-- `jsonb` et non `text` : c'est un objet validé contre un schéma, et le
+-- dashboard voudra en lire des champs sans le désérialiser entièrement.
+alter table prospect_site add column content jsonb;

@@ -25,6 +25,8 @@ function vue(id: string, patch: Partial<ProspectView> = {}): ProspectView {
     presence: null,
     enrichment: null,
     pipeline: null,
+    site: null,
+    messages: [],
     ...patch,
   };
 }

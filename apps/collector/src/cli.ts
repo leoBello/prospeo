@@ -3,7 +3,14 @@ import { existsSync } from 'node:fs';
 import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 import { domainCandidates, getTrade, MATCHING_CONFIG, nafMatchesTrade } from '@prospeo/core';
-import { loadConfig } from './config.js';
+import {
+  loadConfig,
+  loadDeployConfig,
+  loadGenerateConfig,
+  loadPitchConfig,
+  loadPublishConfig,
+} from './config.js';
+import type { Json } from '@prospeo/db';
 import { createClient } from './supabase.js';
 import { createGoogleMapsSource } from './sources/google-maps.js';
 import { fetchStatusBySiret } from './sources/recherche-entreprises.js';
@@ -26,6 +33,32 @@ import {
   type StoredEnrichment,
 } from './stages/calibrate.js';
 import { applyReviewDecision, type ReviewDecision } from './stages/review.js';
+import {
+  assembleFacts,
+  assemblePitchFacts,
+  segmentsSms,
+  type ContenuPublie,
+  type PitchFacts,
+  type SiteFacts,
+} from '@prospeo/core';
+import { createPitchRedacteur, createRedacteur } from './sources/anthropic.js';
+import { createGithubClient } from './sources/github.js';
+import { createVercelClient } from './sources/vercel.js';
+import { runGenerate, type GenerateInput } from './stages/generate.js';
+import {
+  publishExitCode,
+  runPublish,
+  type EtatSite,
+  type PublishDeps,
+  type PublishInput,
+} from './stages/publish.js';
+import { runPitch, PITCH_TRACE, type PitchInput } from './stages/pitch.js';
+import {
+  runUnpublish,
+  unpublishExitCode,
+  type SiteEnLigne,
+  type UnpublishDeps,
+} from './stages/unpublish.js';
 
 // `.env` vit a la racine du depot. Ni tsx ni Node ne le chargent tout seuls :
 // sans cette ligne, la procedure documentee (« copier .env.example en .env »)
@@ -46,6 +79,11 @@ Commandes
   score                                        Classe et note les prospects
   reconcile                                    Revérifie l'état Sirene des prospects
   domains                                      Cherche un nom de domaine libre
+  generate [--trade <slug>]                    Rédige le contenu des sites (LLM)
+  publish                                      Crée les dépôts et y écrit le contenu
+  deploy                                       Déploie et enregistre les URL
+  unpublish [--dry-run]                        Dépublie les refus et les périmés
+  pitch [--force]                              Rédige email, SMS et script d'appel
 
 Options
   --limit <n>          Plafond d'enregistrements traités
@@ -80,6 +118,37 @@ Calibrer les seuils d'appariement
   la seule donnée de cette base que rien ne permet de reconstituer, et un
   recalcul qui la contredirait ne ferait aucun bruit. Le décompte des lignes
   ainsi protégées est affiché.
+
+La chaine de vente, dans l'ordre
+  generate  ->  publish  ->  deploy
+
+  Les trois etages sont independants et rejouables. generate ecrit le contenu
+  en base (colonne prospect_site.content) sans rien publier : on peut donc
+  generer un lot, le relire, et ne publier que ce qu'on retient.
+
+  Chacun ne traite que ce qui lui reste a faire. Rejouer la chaine entiere
+  apres un run complet ne fait rien, n'appelle aucune API et ne coute rien :
+  generate saute les contenus deja ecrits, publish compare l'empreinte du
+  contenu a celle du depot, deploy saute les sites qui ont deja une URL.
+
+  --force  (generate) Regenere un contenu deja ecrit. C'est la seule option
+           qui depense de l'argent sur un prospect deja traite.
+
+  Les prospects sont pris par SCORE DECROISSANT : --limit 3 traite les trois
+  meilleurs, jamais trois au hasard.
+
+  generate compte et affiche les jetons consommes, en separant l'entree,
+  l'ecriture de cache et la lecture de cache : elles sont facturees a trois
+  tarifs differents, et les additionner masquerait ce que le cache economise.
+
+Depublier, comme le veut D5
+  unpublish retire les sites des prospects passes a ne_pas_contacter ou perdu
+  — sans delai — et ceux restes sans reponse au-dela de 90 jours. Les
+  prospects interesse et gagne en sont exemptes : le delai vise le silence,
+  pas l'anciennete.
+
+  Comme reconcile, cette commande detruit : --dry-run decide, compte et
+  n'ecrit rien.
 
 Supprimer des prospects, en deux temps
   1. prospeo reconcile --dry-run
@@ -138,6 +207,11 @@ const COMMANDS = [
   'score',
   'reconcile',
   'domains',
+  'generate',
+  'publish',
+  'deploy',
+  'unpublish',
+  'pitch',
 ] as const;
 
 function flag(argv: string[], name: string): string | undefined {
@@ -190,6 +264,240 @@ async function fetchClosedIds(client: ReturnType<typeof createClient>): Promise<
     if ((data ?? []).length < PAGE_SIZE) break;
   }
   return closed;
+}
+
+/**
+ * Les prospects éligibles à un site, du meilleur score au moins bon.
+ *
+ * L'ordre n'est pas cosmétique : c'est lui qui donne son sens à `--limit`.
+ * « Trois prospects » doit vouloir dire les trois meilleurs, pas trois au
+ * hasard — sans quoi éprouver prudemment un étage neuf sur un petit lot
+ * reviendrait à l'éprouver sur un échantillon quelconque.
+ *
+ * Le filtrage final est délégué à `assembleFacts`, qui écarte déjà les
+ * prospects sans téléphone et les métiers inconnus. Le refaire ici en dupliquerait
+ * la règle, et les deux divergeraient.
+ */
+async function fetchSiteCandidates(
+  client: ReturnType<typeof createClient>,
+  tradeSlug: string | undefined,
+): Promise<{ id: string; faits: SiteFacts; total: number }[]> {
+  const lignes: { id: string; faits: SiteFacts; total: number }[] = [];
+
+  for (let from = 0; ; from += PAGE_SIZE) {
+    let query = client
+      .from('prospect')
+      .select(
+        'id, siret, denomination, denomination_usuelle, trade_slug, address, postal_code, city, date_creation, latitude, longitude, is_closed, prospect_enrichment(status, matched_name, phone_e164, rating, maps_url), web_presence(category), prospect_score(total)',
+      )
+      .order('id')
+      .range(from, from + PAGE_SIZE - 1);
+    if (tradeSlug !== undefined) query = query.eq('trade_slug', tradeSlug);
+
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+
+    for (const row of data ?? []) {
+      // Un établissement cessé n'est pas un prospect : lui publier un site au
+      // nom d'une entreprise qui n'existe plus serait le pire des envois.
+      if (row.is_closed === true) continue;
+
+      const one = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
+      const enr = one(row.prospect_enrichment);
+      const wp = one(row.web_presence);
+      const sc = one(row.prospect_score);
+
+      // `has_site` est écarté ici comme il l'est du barème : proposer une
+      // vitrine à qui en a déjà une correcte n'a pas de sens. Une catégorie
+      // absente veut dire « pas encore sondé », donc pas encore décidable.
+      if (wp === null || wp.category === null || wp.category === 'has_site') continue;
+      if (sc === null) continue;
+
+      const faits = assembleFacts({
+        siret: row.siret,
+        denomination: row.denomination,
+        denominationUsuelle: row.denomination_usuelle,
+        tradeSlug: row.trade_slug,
+        address: row.address,
+        postalCode: row.postal_code,
+        city: row.city,
+        dateCreation: row.date_creation,
+        latitude: row.latitude,
+        longitude: row.longitude,
+        enrichment:
+          enr === null
+            ? null
+            : {
+                status: enr.status,
+                matchedName: enr.matched_name,
+                phoneE164: enr.phone_e164,
+                rating: enr.rating,
+                mapsUrl: enr.maps_url,
+              },
+      });
+      if (faits === null) continue;
+
+      lignes.push({ id: row.id, faits, total: sc.total });
+    }
+    if ((data ?? []).length < PAGE_SIZE) break;
+  }
+
+  return lignes.sort((a, b) => b.total - a.total);
+}
+
+/**
+ * Les prospects à qui l'on peut écrire, du meilleur score au moins bon.
+ *
+ * Le filtrage est délégué à `assemblePitchFacts`, qui porte les quatre refus —
+ * le prospect a dit non, il n'a pas de site en ligne, il en a déjà un correct,
+ * ou `assembleFacts` l'écarte déjà. Les refaire ici en dupliquerait la règle,
+ * et les deux divergeraient : la version SQL est celle qu'on relit le moins.
+ *
+ * La jointure sur `prospect_site` n'est pas un filtre serveur mais un
+ * enrichissement : un prospect sans site remonte avec `site: null`, et c'est
+ * `assemblePitchFacts` qui le renvoie. Filtrer côté serveur rendrait le
+ * décompte des écartés impossible à établir.
+ */
+async function fetchPitchCandidates(
+  client: ReturnType<typeof createClient>,
+): Promise<{ id: string; faits: PitchFacts; total: number }[]> {
+  const lignes: { id: string; faits: PitchFacts; total: number }[] = [];
+
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await client
+      .from('prospect')
+      .select(
+        'id, siret, denomination, denomination_usuelle, trade_slug, address, postal_code, city, date_creation, is_closed, prospect_enrichment(status, matched_name, phone_e164, rating, maps_url), web_presence(category, domain_free_name), prospect_score(total), prospect_pipeline(status), prospect_site(deployment_url, unpublished_at)',
+      )
+      .order('id')
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+
+    for (const row of data ?? []) {
+      // Un établissement cessé n'est pas un prospect : lui écrire au nom d'une
+      // entreprise qui n'existe plus serait le pire des envois.
+      if (row.is_closed === true) continue;
+
+      const one = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
+      const enr = one(row.prospect_enrichment);
+      const wp = one(row.web_presence);
+      const sc = one(row.prospect_score);
+      const pl = one(row.prospect_pipeline);
+      const site = one(row.prospect_site);
+
+      const faits = assemblePitchFacts({
+        prospect: {
+          siret: row.siret,
+          denomination: row.denomination,
+          denominationUsuelle: row.denomination_usuelle,
+          tradeSlug: row.trade_slug,
+          address: row.address,
+          postalCode: row.postal_code,
+          city: row.city,
+          dateCreation: row.date_creation,
+          // Le message de vente n'a pas de carte : ces deux champs ne servent
+          // qu'à satisfaire le contrat partagé avec `assembleFacts`.
+          latitude: null,
+          longitude: null,
+          enrichment:
+            enr === null
+              ? null
+              : {
+                  status: enr.status,
+                  matchedName: enr.matched_name,
+                  phoneE164: enr.phone_e164,
+                  rating: enr.rating,
+                  mapsUrl: enr.maps_url,
+                },
+        },
+        site:
+          site === null
+            ? null
+            : {
+                deploymentUrl: site.deployment_url,
+                unpublishedAt: site.unpublished_at === null ? null : new Date(site.unpublished_at),
+              },
+        presenceWeb: wp?.category ?? null,
+        domaineLibre: wp?.domain_free_name ?? null,
+        pipelineStatus: pl?.status ?? null,
+      });
+      if (faits === null) continue;
+
+      lignes.push({ id: row.id, faits, total: sc?.total ?? 0 });
+    }
+    if ((data ?? []).length < PAGE_SIZE) break;
+  }
+
+  return lignes.sort((a, b) => b.total - a.total);
+}
+
+/** Les prospects qui ont déjà au moins un message archivé. */
+async function fetchProspectsDejaRediges(
+  client: ReturnType<typeof createClient>,
+): Promise<Set<string>> {
+  const vus = new Set<string>();
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await client
+      .from('generated_message')
+      .select('prospect_id')
+      .order('prospect_id')
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    for (const r of data ?? []) vus.add(r.prospect_id);
+    if ((data ?? []).length < PAGE_SIZE) break;
+  }
+  return vus;
+}
+
+/** L'état de site déjà enregistré, par prospect. */
+async function fetchSiteRows(client: ReturnType<typeof createClient>) {
+  const rows: Record<string, {
+    content: unknown;
+    repo_full_name: string | null;
+    repo_url: string | null;
+    content_hash: string | null;
+    content_rejected_at: string | null;
+    published_at: string | null;
+    unpublished_at: string | null;
+    vercel_project_id: string | null;
+    deployment_url: string | null;
+  }> = {};
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await client
+      .from('prospect_site')
+      .select(
+        'prospect_id, content, repo_full_name, repo_url, content_hash, content_rejected_at, published_at, unpublished_at, vercel_project_id, deployment_url',
+      )
+      .order('prospect_id')
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    for (const r of data ?? []) rows[r.prospect_id] = r;
+    if ((data ?? []).length < PAGE_SIZE) break;
+  }
+  return rows;
+}
+
+/**
+ * Attend qu'un déploiement devienne joignable, dans une limite raisonnable.
+ *
+ * Un build Astro d'une page prend une dizaine de secondes ; on laisse large
+ * pour la file d'attente Vercel. Passé le délai, on rend `null` plutôt que
+ * d'attendre indéfiniment : le run se termine, la ligne garde son URL nulle,
+ * et le prochain `deploy` la reprendra sans rien recréer.
+ */
+const ATTENTE_DEPLOIEMENT_TENTATIVES = 40;
+const ATTENTE_DEPLOIEMENT_INTERVALLE_MS = 5_000;
+
+async function attendreUrl(
+  vercel: ReturnType<typeof createVercelClient>,
+  projectId: string,
+): Promise<string | null> {
+  for (let essai = 0; essai < ATTENTE_DEPLOIEMENT_TENTATIVES; essai += 1) {
+    const url = await vercel.urlProduction(projectId);
+    if (url !== null) return url;
+    await new Promise((r) => setTimeout(r, ATTENTE_DEPLOIEMENT_INTERVALLE_MS));
+  }
+  return null;
 }
 
 async function main(argv: string[]): Promise<number> {
@@ -920,6 +1228,7 @@ async function main(argv: string[]): Promise<number> {
           category: typeof row.category;
           domain_available?: boolean | null;
           domain_candidates?: string[];
+          domain_free_name?: string | null;
           domain_checked_at?: string | null;
         } = {
           prospect_id: row.prospectId,
@@ -936,6 +1245,11 @@ async function main(argv: string[]): Promise<number> {
         if (!domainProposalApplies(row.category)) {
           presenceWrite.domain_available = null;
           presenceWrite.domain_candidates = [];
+          // Le NOM part avec le verdict. C'est lui que `pitch` citerait — « j'ai
+          // vérifié, plomberie-allard.fr est libre » — et le laisser derrière un
+          // `domain_available` remis à null rendrait l'affirmation atteignable
+          // par une autre lecture que celle du booléen.
+          presenceWrite.domain_free_name = null;
           // L'horodatage part avec le verdict : le laisser ferait passer pour
           // « vérifié récemment » une ligne dont on vient d'effacer le
           // résultat, et `domains` ne la reprendrait pas si le prospect
@@ -1176,10 +1490,17 @@ async function main(argv: string[]): Promise<number> {
         // `false` ne se dit que si TOUS ont été tranchés et pris ; il suffit
         // d'un seul « je ne sais pas » pour que le champ reste `null`.
         let available: boolean | null = candidates.length === 0 ? null : false;
+        // Le NOM du premier candidat libre, et pas seulement le fait qu'il en
+        // existe un. Le booléen seul ne permet d'écrire qu'« un domaine est
+        // libre », ce qu'aucun artisan ne peut vérifier ; le plan veut « j'ai
+        // vérifié, serrurier-untel.fr est libre », et c'est le nom qui porte
+        // l'argument.
+        let libre: string | null = null;
         for (const name of candidates) {
           const verdict = await checkDomainAvailability(name, deps);
           if (verdict === true) {
             available = true;
+            libre = name;
             break;
           }
           if (verdict === null) available = null;
@@ -1196,10 +1517,16 @@ async function main(argv: string[]): Promise<number> {
           prospect_id: string;
           domain_candidates: string[];
           domain_available?: boolean;
+          domain_free_name?: string | null;
           domain_checked_at?: string;
         } = { prospect_id: row.prospect_id, domain_candidates: candidates };
         if (available !== null) {
           write.domain_available = available;
+          // Explicitement remis à null quand plus rien n'est libre : un nom
+          // laissé d'un run précédent survivrait au dépôt du domaine par
+          // quelqu'un d'autre, et c'est exactement le fait périssable que
+          // `DOMAIN_FRESHNESS_DAYS` existe pour borner.
+          write.domain_free_name = libre;
           write.domain_checked_at = new Date().toISOString();
         }
 
@@ -1224,6 +1551,428 @@ async function main(argv: string[]): Promise<number> {
       // ferait passer « rien n'a été écrit » pour un succès.
       return domainFailed > 0 ? 1 : 0;
     }
+    case 'generate': {
+      const limit = parseLimit(argv);
+      if (limit === 'invalide') return 1;
+      const force = argv.includes('--force');
+      const tradeSlug = flag(argv, 'trade');
+
+      const genConfig = loadGenerateConfig(process.env);
+      const client = createClient(loadConfig(process.env));
+
+      const candidats = await fetchSiteCandidates(client, tradeSlug);
+      const dejaFait = await fetchSiteRows(client);
+
+      // Un contenu déjà écrit n'est pas régénéré : c'est le seul étage qui
+      // dépense de l'argent, et un rejeu distrait coûterait vingt-deux appels.
+      //
+      // Une rédaction REJETÉE à la relecture fait exception, et c'est ce qui
+      // rend le bouton du dashboard utile : le refus remet le prospect dans la
+      // file sans qu'il faille se souvenir de passer `--force`, lequel
+      // régénérerait aussi les vingt et un contenus que personne n'a contestés.
+      const aFaire = candidats.filter((c) => {
+        const ligne = dejaFait[c.id];
+        return force || ligne?.content == null || ligne.content_rejected_at !== null;
+      });
+      const lot = limit === undefined ? aFaire : aFaire.slice(0, limit);
+
+      if (lot.length === 0) {
+        process.stdout.write(
+          `generate : rien à faire (${candidats.length} prospects éligibles, tous déjà générés)\n`,
+        );
+        return 0;
+      }
+
+      // Un rédacteur par métier : les consignes en dépendent, et c'est sur
+      // elles que porte la mise en cache du préfixe.
+      const parMetier = new Map<string, GenerateInput[]>();
+      for (const c of lot) {
+        const liste = parMetier.get(c.faits.metier.slug) ?? [];
+        liste.push({ prospectId: c.id, faits: c.faits, trade: getTrade(c.faits.metier.slug)! });
+        parMetier.set(c.faits.metier.slug, liste);
+      }
+
+      let genere = 0;
+      let rejete = 0;
+      let echoue = 0;
+      const usage = { input: 0, cacheWrite: 0, cacheRead: 0, output: 0 };
+
+      for (const [slug, entrees] of parMetier) {
+        const trade = getTrade(slug)!;
+        const resultat = await runGenerate(
+          entrees,
+          createRedacteur({
+            apiKey: genConfig.anthropicApiKey,
+            workspaceId: genConfig.anthropicWorkspaceId,
+            trade,
+          }),
+        );
+        genere += resultat.report.generated;
+        rejete += resultat.report.rejected;
+        echoue += resultat.report.failed;
+        usage.input += resultat.report.usage.input;
+        usage.cacheWrite += resultat.report.usage.cacheWrite;
+        usage.cacheRead += resultat.report.usage.cacheRead;
+        usage.output += resultat.report.usage.output;
+
+        for (const { prospectId, contenu } of resultat.contenus) {
+          const { error } = await client.from('prospect_site').upsert({
+            prospect_id: prospectId,
+            // La colonne est `jsonb`. Le contenu a déjà été validé contre son
+            // schéma par `runGenerate` ; la conversion ne masque donc aucun
+            // contrôle, elle traverse seulement une frontière de typage.
+            content: contenu as unknown as Json,
+            prompt_version: contenu.version.promptVersion,
+            model: contenu.version.model,
+            generated_at: new Date().toISOString(),
+            // Le refus portait sur le texte qu'on vient de remplacer. Le
+            // laisser en place bloquerait `publish` sur une rédaction neuve
+            // que personne n'a lue, et remettrait le prospect dans la file de
+            // `generate` à chaque run — une boucle qui coûte un appel par tour.
+            content_rejected_at: null,
+            updated_at: new Date().toISOString(),
+          });
+          if (error) {
+            echoue += 1;
+            genere -= 1;
+            process.stderr.write(`generate: échec d'écriture sur ${prospectId} — ${error.message}\n`);
+          }
+        }
+      }
+
+      // Le §4 du plan veut que ce qui coûte soit compté ET affiché. Les trois
+      // formes d'entrée sont séparées parce qu'elles sont facturées à trois
+      // tarifs différents ; les additionner masquerait ce que le cache
+      // économise réellement.
+      process.stdout.write(
+        `generate : ${genere} contenus écrits, ${rejete} rejetés, ${echoue} en échec\n` +
+          `  jetons : ${usage.input} entrée, ${usage.cacheWrite} écriture de cache, ` +
+          `${usage.cacheRead} lecture de cache, ${usage.output} sortie\n`,
+      );
+      return echoue > 0 || rejete > 0 ? 1 : 0;
+    }
+
+    case 'pitch': {
+      const limit = parseLimit(argv);
+      if (limit === 'invalide') return 1;
+      const force = argv.includes('--force');
+
+      const pitchConfig = loadPitchConfig(process.env);
+      const client = createClient(loadConfig(process.env));
+
+      const candidats = await fetchPitchCandidates(client);
+      const dejaRediges = await fetchProspectsDejaRediges(client);
+
+      // Un prospect déjà rédigé n'est pas repris : c'est un étage payant, et un
+      // rejeu distrait coûterait autant que le premier passage.
+      const aFaire = candidats.filter((c) => force || !dejaRediges.has(c.id));
+      const lot = limit === undefined ? aFaire : aFaire.slice(0, limit);
+
+      if (lot.length === 0) {
+        process.stdout.write(
+          `pitch : rien a faire (${candidats.length} prospects joignables, tous deja rediges)\n`,
+        );
+        return 0;
+      }
+
+      // Un seul rédacteur pour tout le lot, et c'est la différence avec
+      // `generate` : les consignes du message ne dépendent d'aucun métier, donc
+      // une seule écriture de cache couvre l'ensemble.
+      const entrees: PitchInput[] = lot.map((c) => ({ prospectId: c.id, faits: c.faits }));
+      const resultat = await runPitch(
+        entrees,
+        createPitchRedacteur({
+          apiKey: pitchConfig.anthropicApiKey,
+          workspaceId: pitchConfig.anthropicWorkspaceId,
+        }),
+      );
+
+      let ecrits = 0;
+      let echoue = resultat.report.failed;
+      for (const m of resultat.messages) {
+        const { error } = await client.from('generated_message').insert({
+          prospect_id: m.prospectId,
+          channel: m.canal,
+          subject: m.objet,
+          content: m.contenu,
+          model: PITCH_TRACE.model,
+          prompt_version: PITCH_TRACE.promptVersion,
+        });
+        if (error) {
+          echoue += 1;
+          process.stderr.write(`pitch: echec d'ecriture sur ${m.prospectId} — ${error.message}\n`);
+          continue;
+        }
+        ecrits += 1;
+      }
+
+      const u = resultat.report.usage;
+      process.stdout.write(
+        `pitch : ${resultat.report.generated} prospects rediges (${ecrits} messages ecrits), ` +
+          `${resultat.report.rejected} rejetes, ${echoue} en echec` +
+          (resultat.report.refusedEditeur > 0
+            ? `, ${resultat.report.refusedEditeur} refuses faute d'editeur renseigne`
+            : '') +
+          `\n  jetons : ${u.input} entree, ${u.cacheWrite} ecriture de cache, ` +
+          `${u.cacheRead} lecture de cache, ${u.output} sortie\n`,
+      );
+
+      // Le décompte des segments est une MESURE, pas un verdict : le schéma a
+      // déjà borné le SMS en caractères. Elle est affichée parce que le plafond
+      // de 306 ne vaut que dans l'alphabet GSM — une seule apostrophe
+      // typographique fait basculer le message en UCS-2, où le même texte tient
+      // en cinq segments au lieu de deux. Celui qui copie le message doit
+      // pouvoir le voir.
+      for (const m of resultat.messages.filter((x) => x.canal === 'sms')) {
+        const mesure = segmentsSms(m.contenu);
+        process.stdout.write(
+          `  SMS ${m.prospectId} : ${mesure.caracteres} caracteres, ${mesure.alphabet}, ` +
+            `${mesure.segments} segment(s)` +
+            (mesure.horsGsm7.length > 0 ? ` — hors GSM : ${mesure.horsGsm7.join(' ')}` : '') +
+            '\n',
+        );
+      }
+
+      return echoue > 0 || resultat.report.rejected > 0 || resultat.report.refusedEditeur > 0
+        ? 1
+        : 0;
+    }
+
+    case 'publish': {
+      const limit = parseLimit(argv);
+      if (limit === 'invalide') return 1;
+
+      const pubConfig = loadPublishConfig(process.env);
+      const client = createClient(loadConfig(process.env));
+      const rows = await fetchSiteRows(client);
+
+      // On ne publie que ce qui a été généré. L'ordre des étages est une
+      // dépendance de données, pas une convention.
+      const entrees: PublishInput[] = [];
+      for (const [prospectId, row] of Object.entries(rows)) {
+        if (row.content === null || row.content === undefined) continue;
+        if (row.unpublished_at !== null) continue;
+        entrees.push({
+          prospectId,
+          contenu: row.content as unknown as ContenuPublie,
+          // Transmis plutôt que filtré ici : `runPublish` porte la décision et
+          // la COMPTE. Écarter la ligne en silence à la lecture ferait
+          // disparaître le prospect du rapport, et un contenu refusé qu'on ne
+          // republie pas doit se voir — c'est du travail qui attend quelqu'un.
+          rejeteeLe:
+            row.content_rejected_at === null ? null : new Date(row.content_rejected_at),
+        });
+      }
+      const lot = limit === undefined ? entrees : entrees.slice(0, limit);
+
+      const deps: PublishDeps = {
+        github: createGithubClient({ token: pubConfig.githubToken, org: pubConfig.githubOrg }),
+        templateRepoDefaut: pubConfig.githubTemplateRepo,
+        async lireEtat(prospectId) {
+          const row = rows[prospectId];
+          if (row === undefined || row.repo_full_name === null) return null;
+          return {
+            repoFullName: row.repo_full_name,
+            empreinte: row.content_hash,
+            publishedAt: row.published_at === null ? null : new Date(row.published_at),
+          } satisfies EtatSite;
+        },
+        async enregistrer(prospectId, etat) {
+          const { error } = await client.from('prospect_site').upsert({
+            prospect_id: prospectId,
+            repo_full_name: etat.repoFullName,
+            repo_url: etat.repoUrl,
+            content_hash: etat.empreinte,
+            prompt_version: etat.promptVersion,
+            model: etat.model,
+            generated_at: etat.generatedAt.toISOString(),
+            published_at: etat.publishedAt.toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+          if (error) throw new Error(error.message);
+        },
+        maintenant: () => new Date(),
+      };
+
+      const report = await runPublish(lot, deps);
+      process.stdout.write(
+        `publish : ${report.created} dépôts créés, ${report.updated} mis à jour, ` +
+          `${report.skipped} inchangés, ${report.refused} refusés, ${report.failed} en échec\n`,
+      );
+      return publishExitCode(report);
+    }
+
+    case 'deploy': {
+      const limit = parseLimit(argv);
+      if (limit === 'invalide') return 1;
+
+      const depConfig = loadDeployConfig(process.env);
+      const client = createClient(loadConfig(process.env));
+      const vercel = createVercelClient({
+        token: depConfig.vercelToken,
+        teamId: depConfig.vercelTeamId,
+      });
+
+      const rows = await fetchSiteRows(client);
+      const aDeployer = Object.entries(rows).filter(
+        ([, r]) => r.repo_full_name !== null && r.unpublished_at === null && r.deployment_url === null,
+      );
+      const lot = limit === undefined ? aDeployer : aDeployer.slice(0, limit);
+
+      if (lot.length === 0) {
+        process.stdout.write('deploy : rien à faire, tous les sites publiés ont une URL\n');
+        return 0;
+      }
+
+      let deploye = 0;
+      let enAttente = 0;
+      let echoue = 0;
+
+      for (const [prospectId, row] of lot) {
+        const depot = row.repo_full_name as string;
+        const nom = depot.split('/')[1] as string;
+        try {
+          let projectId = row.vercel_project_id;
+          if (projectId === null) {
+            const projet = await vercel.creerProjet(nom, depot);
+            projectId = projet.id;
+            const { error } = await client
+              .from('prospect_site')
+              .update({ vercel_project_id: projectId, updated_at: new Date().toISOString() })
+              .eq('prospect_id', prospectId);
+            if (error) throw new Error(error.message);
+          }
+
+          let url = await vercel.urlProduction(projectId);
+          if (url === null) {
+            // Vercel ne déploie pas le HEAD d'un dépôt qu'on vient de lier :
+            // il attend le commit suivant, et `publish` a poussé le sien AVANT
+            // que le projet existe. Le premier déploiement doit donc être
+            // amorcé. Le déclencher deux fois est sans conséquence : l'API
+            // dédoublonne les déploiements identiques faute de `forceNew`.
+            await vercel.declencherDeploiement(projectId, depot, 'main');
+            url = await attendreUrl(vercel, projectId);
+          }
+
+          if (url === null) {
+            // Le build est en cours. Rejouer `deploy` reprendra la ligne : son
+            // URL est toujours nulle, et le projet ne sera pas recréé.
+            enAttente += 1;
+            process.stdout.write(`deploy : ${nom} en construction, à reprendre au prochain run\n`);
+            continue;
+          }
+
+          const { error } = await client
+            .from('prospect_site')
+            .update({ deployment_url: url, updated_at: new Date().toISOString() })
+            .eq('prospect_id', prospectId);
+          if (error) throw new Error(error.message);
+          deploye += 1;
+          process.stdout.write(`deploy : ${url}\n`);
+        } catch (erreur) {
+          echoue += 1;
+          process.stderr.write(
+            `deploy : échec sur ${prospectId} (${depot}) — ${
+              erreur instanceof Error ? erreur.message : String(erreur)
+            }\n`,
+          );
+        }
+      }
+
+      process.stdout.write(
+        `deploy : ${deploye} sites en ligne, ${enAttente} en construction, ${echoue} en échec\n`,
+      );
+      // Un build en cours n'est pas un échec : c'est un run à rejouer.
+      return echoue > 0 ? 1 : 0;
+    }
+
+    case 'unpublish': {
+      const dryRun = argv.includes('--dry-run');
+      const depConfig = loadDeployConfig(process.env);
+      const client = createClient(loadConfig(process.env));
+      const vercel = createVercelClient({
+        token: depConfig.vercelToken,
+        teamId: depConfig.vercelTeamId,
+      });
+
+      const deps: UnpublishDeps = {
+        async lireSitesEnLigne() {
+          const sites: SiteEnLigne[] = [];
+          for (let from = 0; ; from += PAGE_SIZE) {
+            const { data, error } = await client
+              .from('prospect_site')
+              .select(
+                'prospect_id, vercel_project_id, repo_full_name, published_at, unpublished_at, prospect(prospect_pipeline(status))',
+              )
+              .not('repo_full_name', 'is', null)
+              .order('prospect_id')
+              .range(from, from + PAGE_SIZE - 1);
+            if (error) throw new Error(error.message);
+            for (const r of data ?? []) {
+              const p = (Array.isArray(r.prospect) ? r.prospect[0] : r.prospect) as
+                | { prospect_pipeline: unknown }
+                | null;
+              const pipe = p === null ? null : (Array.isArray(p.prospect_pipeline)
+                ? p.prospect_pipeline[0]
+                : p.prospect_pipeline) as { status: string } | null;
+              sites.push({
+                prospectId: r.prospect_id,
+                vercelProjectId: r.vercel_project_id,
+                repoFullName: r.repo_full_name ?? '',
+                // Sans ligne de suivi, le prospect n'a jamais été contacté :
+                // `a_contacter` est l'état par défaut de `prospect_pipeline`.
+                pipelineStatus: pipe?.status ?? 'a_contacter',
+                publishedAt: r.published_at === null ? null : new Date(r.published_at),
+                unpublishedAt: r.unpublished_at === null ? null : new Date(r.unpublished_at),
+              });
+            }
+            if ((data ?? []).length < PAGE_SIZE) break;
+          }
+          return sites;
+        },
+        async lireProjetsEnregistres() {
+          const connus = new Set<string>();
+          for (let from = 0; ; from += PAGE_SIZE) {
+            const { data, error } = await client
+              .from('prospect_site')
+              .select('vercel_project_id')
+              .not('vercel_project_id', 'is', null)
+              .order('prospect_id')
+              .range(from, from + PAGE_SIZE - 1);
+            if (error) throw new Error(error.message);
+            for (const r of data ?? []) {
+              if (r.vercel_project_id !== null) connus.add(r.vercel_project_id);
+            }
+            if ((data ?? []).length < PAGE_SIZE) break;
+          }
+          return connus;
+        },
+        async supprimerProjet(id) {
+          await vercel.supprimerProjet(id);
+        },
+        async marquerDepublie(prospectId) {
+          const { error } = await client
+            .from('prospect_site')
+            .update({ unpublished_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+            .eq('prospect_id', prospectId);
+          if (error) throw new Error(error.message);
+        },
+        maintenant: () => new Date(),
+      };
+
+      const report = await runUnpublish(deps, { dryRun });
+      process.stdout.write(
+        (dryRun ? 'unpublish (simulation) : ' : 'unpublish : ') +
+          `${report.decided.refus} refus, ${report.decided.peremption} périmés, ` +
+          `${report.decided.garder} conservés` +
+          (dryRun
+            ? '\n  Rien n\'a été écrit. Relancer sans --dry-run pour exécuter.\n'
+            : ` — ${report.unpublished} dépubliés, ${report.refusedGuard} refusés par le garde-fou, ` +
+              `${report.failed} en échec\n`),
+      );
+      return dryRun ? 0 : unpublishExitCode(report);
+    }
+
     default:
       process.stderr.write(`Commande non encore implémentée : ${command}\n`);
       return 1;

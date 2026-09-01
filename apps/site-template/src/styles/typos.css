@@ -1,0 +1,56 @@
+/*
+ * Les trois appariements de polices, auto-hébergés (D5).
+ *
+ * **Aucune requête vers un CDN.** Le CDN Google Fonts transmet l'adresse IP du
+ * visiteur à un tiers — sanctionné en Allemagne, et inutilement risqué sur la
+ * page d'une entreprise qu'on démarche sans son accord. Les fichiers viennent
+ * de `@fontsource-variable`, sont servis depuis le dépôt du prospect, et Vite
+ * leur donne une empreinte au build.
+ *
+ * **Pourquoi les quatre familles sont déclarées alors qu'un site n'en emploie
+ * qu'une ou deux.** Une déclaration `@font-face` ne télécharge rien : le
+ * navigateur ne va chercher un fichier que lorsqu'une règle effectivement
+ * appliquée réclame cette famille. Les faces non retenues par `[data-typo]`
+ * coûtent donc quelques centaines d'octets de CSS et zéro requête — alors
+ * qu'un import conditionnel exigerait de connaître la typographie avant la
+ * compilation, ce qui n'est vrai ni du dépôt modèle ni des rechargements.
+ *
+ * Variables et sous-ensemble latin : une seule requête par famille couvre
+ * toutes les graisses employées, du 400 du texte au 700 des titres.
+ */
+
+@import '@fontsource-variable/archivo/wght.css';
+@import '@fontsource-variable/newsreader/wght.css';
+@import '@fontsource-variable/outfit/wght.css';
+@import '@fontsource-variable/source-sans-3/wght.css';
+
+/*
+ * Chaque appariement pose trois variables, et une seule est employée partout
+ * ailleurs. Les piles de repli ne sont pas décoratives : elles servent la
+ * première peinture, avant que la police variable ne soit arrivée, et le
+ * choix d'un repli aux proportions voisines évite le saut de mise en page qui
+ * signale un site mal fabriqué.
+ */
+
+[data-typo='grotesk-serif'] {
+  --police-titre: 'Archivo Variable', 'Helvetica Neue', Arial, sans-serif;
+  --police-texte: 'Newsreader Variable', Georgia, 'Times New Roman', serif;
+  /* Un grotesque serré supporte — et réclame — un interlettrage négatif que
+     l'humaniste ne supporterait pas. */
+  --serrage-titre: -0.03em;
+}
+
+[data-typo='humanist'] {
+  --police-titre: 'Source Sans 3 Variable', 'Segoe UI', system-ui, sans-serif;
+  --police-texte: 'Source Sans 3 Variable', 'Segoe UI', system-ui, sans-serif;
+  --serrage-titre: -0.015em;
+}
+
+[data-typo='geometrique'] {
+  --police-titre: 'Outfit Variable', 'Helvetica Neue', Arial, sans-serif;
+  /* Outfit en texte courant fatigue : ses formes géométriques n'ont presque
+     pas de repères d'ascendantes. Le texte revient donc à l'humaniste, qui
+     laisse au titre tout le caractère. */
+  --police-texte: 'Source Sans 3 Variable', 'Segoe UI', system-ui, sans-serif;
+  --serrage-titre: -0.02em;
+}

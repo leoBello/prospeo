@@ -5,6 +5,7 @@ import { SCORING_RULESET } from '@prospeo/core';
 import { AuthProvider, useAuth } from './auth/AuthProvider.js';
 import { createDashboardClient } from './data/supabase.js';
 import { useProspects } from './data/useProspects.js';
+import { makePanelActions } from './ui/actions.js';
 import { LoginScreen } from './screens/LoginScreen.js';
 import { TodayScreen } from './screens/TodayScreen.js';
 import { PreferencesProvider, useT } from './ui/preferences.js';
@@ -34,6 +35,12 @@ function Authenticated({ client }: { client: SupabaseClient<Database> }) {
   const t = useT();
   const { signOut } = useAuth();
   const state = useProspects(client);
+  const reload = state.reload;
+
+  // Mémorisées : recréées à chaque rendu, elles changeraient d'identité en
+  // permanence et feraient rerendre la fiche entière à chaque frappe dans le
+  // champ de note.
+  const actions = useMemo(() => makePanelActions(client, reload), [client, reload]);
 
   if (state.status === 'loading') {
     // `aria-live` : le changement d'état est annoncé, sans quoi un lecteur
@@ -62,6 +69,7 @@ function Authenticated({ client }: { client: SupabaseClient<Database> }) {
       prospects={state.prospects}
       currentRulesetVersion={SCORING_RULESET.version}
       onSignOut={() => void signOut()}
+      actions={actions}
     />
   );
 }

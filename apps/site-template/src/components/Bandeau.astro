@@ -1,0 +1,59 @@
+---
+import { t } from '../content/ui';
+
+interface Props {
+  entreprise: string;
+}
+const { entreprise } = Astro.props;
+
+/*
+ * Le bandeau de démonstration.
+ *
+ * Il n'est PAS pilotable par le fichier de contenu, et c'est tout son intérêt.
+ * Le site porte le nom d'une entreprise réelle et est publié sans son accord
+ * (D5, §11 conformité) : s'il pouvait s'éteindre par une clé JSON, une
+ * génération malheureuse — ou une main humaine dans le dépôt du prospect —
+ * produirait une page qui se ferait passer pour le site officiel de
+ * l'artisan.
+ *
+ * Il est volontairement discret plutôt qu'alarmant. L'argumentaire de vente
+ * est « voici à quoi ressemblerait votre site » : un bandeau rouge le
+ * détruirait, une absence de bandeau serait malhonnête.
+ */
+---
+
+<aside class="bandeau" aria-label={t('demo.aria')}>
+  <p class="texte">{t('demo.banner', { entreprise })}</p>
+</aside>
+
+<style>
+  .bandeau {
+    /*
+     * Les DEUX couleurs viennent de la palette, et c'est ce qui a manqué.
+     *
+     * La première version posait `color: #fff` sur `background: var(--encre)`.
+     * Sur les quatre palettes claires, l'encre est sombre et le bandeau se
+     * lisait. Sur `nuit`, l'encre est presque blanche : bandeau blanc, texte
+     * blanc — INVISIBLE.
+     *
+     * Et ce n'est pas un bandeau ordinaire. C'est lui qui déclare que la page
+     * est une démonstration non commandée ; sans lui, le site se fait passer
+     * pour celui de l'artisan. Un défaut de contraste est ici un défaut de
+     * conformité (§11), pas de style.
+     *
+     * `--fond` sur `--encre` s'inverse correctement dans les cinq palettes,
+     * puisque ce sont par construction les deux extrêmes de chacune. Un test
+     * interdit désormais toute couleur écrite en dur hors du héros.
+     */
+    background: var(--encre);
+    color: var(--fond);
+    padding-block: 0.6rem;
+  }
+  .texte {
+    width: min(var(--largeur), 100% - 2.5rem);
+    margin-inline: auto;
+    font-size: 0.82rem;
+    line-height: 1.45;
+    opacity: 0.92;
+  }
+</style>

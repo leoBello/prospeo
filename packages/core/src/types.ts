@@ -1,3 +1,47 @@
+/**
+ * Une prestation que le métier recouvre, écrite à la main.
+ *
+ * C'est un fait vérifié sur le MÉTIER, jamais sur l'entreprise — et c'est
+ * toute la différence. La base ne sait rien de ce que fait tel plombier en
+ * particulier : elle connaît son SIRET, son code NAF et son adresse, rien de
+ * plus. Laisser le modèle rédiger des prestations reviendrait donc à lui
+ * faire deviner l'activité réelle d'une entreprise, et à publier cette
+ * supposition sur un site portant son nom.
+ *
+ * D'où la liste close : le modèle SÉLECTIONNE et ORDONNE, il n'écrit pas.
+ * `label` et `description` sortent d'ici et vont à l'écran sans passer par
+ * lui. Ce que le schéma `zod` accepte est exactement l'ensemble des `code`
+ * ci-dessous, si bien qu'une prestation inventée n'est pas rattrapée à la
+ * relecture : elle fait échouer la validation.
+ */
+export interface Prestation {
+  /** Identifiant stable, seul jeton que le modèle manipule. */
+  readonly code: string;
+  /** Titre affiché sur le site. */
+  readonly label: string;
+  /** Une phrase, volontairement descriptive et sans promesse de délai. */
+  readonly description: string;
+}
+
+/**
+ * Une image de héros proposable pour un métier.
+ *
+ * `sujet` n'est pas un commentaire : il part DANS le prompt. Sans lui, le
+ * modèle choisirait `plomberie-04` sans savoir ce que montre `plomberie-04`,
+ * c'est-à-dire au hasard — et D6 ne serait plus qu'un tirage déguisé en
+ * choix. Avec lui, l'image peut s'accorder à l'accroche qu'il vient d'écrire.
+ *
+ * Il décrit ce que la photographie MONTRE, jamais ce qu'elle prouverait sur
+ * l'entreprise : ces images sont du contenu illustratif de niveau 2 (D7),
+ * identiques sur tous les sites.
+ */
+export interface HeroImage {
+  /** Identifiant stable, seul jeton que le modèle manipule. */
+  readonly code: string;
+  /** Ce que l'image montre, en une ligne, à destination du prompt. */
+  readonly sujet: string;
+}
+
 export interface Trade {
   slug: string;
   label: string;
@@ -21,6 +65,55 @@ export interface Trade {
    * comme un serrurier.
    */
   readonly categoryLabels: readonly string[];
+  /**
+   * Prestations proposables pour ce métier, liste close.
+   *
+   * Ajouter un métier au projet impose d'écrire la sienne : sans elle, le
+   * schéma de rédaction n'a pas d'énumération à contraindre et la génération
+   * échoue — bruyamment, ce qui est le comportement voulu.
+   */
+  readonly prestations: readonly Prestation[];
+  /**
+   * Images de héros proposables pour ce métier, liste close.
+   *
+   * **Pourquoi ici et non dans `site-theme.ts`**, où le sketch de D6 les
+   * plaçait. Une palette et une police ne disent rien du travail : elles
+   * valent pour n'importe quel artisan. Une photographie, si. Un chantier de
+   * plomberie ouvrant le site d'un serrurier serait un mensonge visuel sur
+   * une page portant le nom d'une entreprise réelle — et c'est précisément
+   * la classe d'erreur que la liste close existe pour rendre impossible.
+   *
+   * Les placer à côté des prestations donne en outre la bonne obligation :
+   * ajouter un métier au projet impose de fournir ses images, comme il impose
+   * déjà de fournir ses prestations. Un métier qui en manque fait échouer la
+   * construction du schéma, avant tout appel payant.
+   *
+   * Ce ne sont que des identifiants. Les fichiers vivent dans le gabarit
+   * (`apps/site-template/src/assets/heros/`), et le texte alternatif dans son
+   * `ui.ts` — le gabarit est autonome et ne connaît pas ce monorepo.
+   */
+  readonly heros: readonly HeroImage[];
+  /**
+   * Dépôt modèle par défaut de ce métier, dans l'organisation dédiée.
+   *
+   * **Un modèle par métier, et non un modèle unique.** D1 pose que le site est
+   * neutre en métier — et il l'est : le gabarit d'aujourd'hui ne câble aucun
+   * métier, et `prospeo/plombier` comme `prospeo/serrurier` en seraient
+   * aujourd'hui deux copies identiques. Ce que ce champ ouvre, c'est la
+   * possibilité qu'ils DIVERGENT : un serrurier peut vouloir une mise en avant
+   * différente de celle d'un plombier, et rien n'oblige à ce que les deux
+   * restent éternellement le même fichier.
+   *
+   * Le coût de cette liberté doit être dit : N modèles font N endroits où
+   * corriger un défaut du site. Tant que les modèles sont identiques, une
+   * correction doit être reportée dans chacun — c'est exactement ce que D1
+   * évitait avec un modèle unique, et c'est le prix de l'option.
+   *
+   * Facultatif : un métier qui n'en déclare pas retombe sur
+   * `PROSPEO_GITHUB_TEMPLATE_REPO`. C'est ce repli qui permettra à une
+   * interface de gestion de trancher depuis la base sans toucher au code.
+   */
+  readonly templateRepo?: string;
 }
 
 export interface RawEstablishment {

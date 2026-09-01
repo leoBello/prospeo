@@ -1,0 +1,205 @@
+---
+import { Picture } from 'astro:assets';
+import type { ContenuPublie } from '../content/contrat';
+import { imageHeros } from '../content/images';
+import { estCleUi, t } from '../content/ui';
+import Icone from './Icone.astro';
+
+interface Props {
+  contenu: ContenuPublie;
+}
+const { faits, redaction } = Astro.props.contenu;
+
+/*
+ * Le héros : une photographie pleine largeur, un voile, et le nom.
+ *
+ * C'est le seul endroit du site où la couleur est sombre quelle que soit la
+ * palette. Le parti l'assume : le contraste entre cette ouverture et la suite,
+ * claire et calme, est ce qui sépare une page d'agence d'un gabarit de
+ * plateforme. Tout le reste de la page dépense sa sobriété ici.
+ */
+
+/*
+ * Le sous-titre change selon qu'on connaît ou non l'année de création.
+ *
+ * « Plombier à Nantes depuis 2009 » est le meilleur argument que la base
+ * puisse fournir : une ancienneté vérifiée, tirée de Sirene, qui ne se périme
+ * pas. Quand `date_creation` manque, la phrase se raccourcit — elle ne se
+ * remplit pas d'un « depuis de nombreuses années » qui n'engagerait personne.
+ */
+const sousTitre =
+  faits.anneeCreation === null
+    ? t('hero.trade', { metier: faits.metier.label, ville: faits.adresse.ville })
+    : t('hero.tradeSince', {
+        metier: faits.metier.label,
+        ville: faits.adresse.ville,
+        annee: faits.anneeCreation,
+      });
+
+const image = imageHeros(redaction.theme.heros);
+
+/*
+ * Le texte alternatif dépend de l'image, donc d'un choix du modèle.
+ *
+ * La clé est construite, ce qui est le seul endroit du gabarit où une clé
+ * d'interface ne soit pas écrite en toutes lettres. `ui.ts` en porte une par
+ * image ; le repli sur une description générique n'est atteignable que si
+ * quelqu'un ajoute un fichier dans `src/assets/heros/` sans ajouter sa clé —
+ * auquel cas mieux vaut un texte alternatif vague qu'un `undefined` lu à voix
+ * haute par un lecteur d'écran.
+ */
+const cleAlt = `hero.alt.${redaction.theme.heros}`;
+const alt = estCleUi(cleAlt) ? t(cleAlt) : t('gallery.intro');
+---
+
+<section class="heros">
+  {/*
+    `loading="eager"` et `fetchpriority="high"` : c'est la plus grande image de
+    la page et elle est au-dessus de la ligne de flottaison. La laisser en
+    chargement paresseux retarderait le plus grand rendu de contenu, qui est
+    précisément ce que Lighthouse mesure et ce que l'artisan perçoit comme
+    « le site est lent ».
+
+    `widths` s'arrête à 1920 : au-delà, on paierait des octets pour une
+    différence que personne ne voit sur une photographie voilée.
+
+    `<Picture>` et non `<Image>`, et c'est le SEUL endroit du gabarit où la
+    différence se paie. `<Image>` ne rend qu'un format — sa propriété
+    `formats` n'existe pas et serait ignorée en silence. `<Picture>` produit
+    l'AVIF avec repli WebP, ce qui a été mesuré : le héros passe de 211 à
+    122 Ko en 1920, et de 57 à 28 Ko en 960, contre six secondes de build
+    supplémentaires.
+
+    L'arbitrage ne vaut que pour cette image-ci. Les neuf autres sont sous la
+    ligne de flottaison et chargées paresseusement : leur encoder un AVIF
+    coûterait le même temps de build, payé vingt-deux fois, pour des octets
+    que personne n'attend.
+  */}
+  <Picture
+    class="photo"
+    src={image}
+    alt={alt}
+    widths={[640, 960, 1440, 1920]}
+    sizes="100vw"
+    formats={['avif', 'webp']}
+    loading="eager"
+    fetchpriority="high"
+  />
+  <div class="voile" aria-hidden="true"></div>
+
+  <div class="contenu texte">
+    <p class="oeil apparition-hero">{sousTitre}</p>
+    <h1 class="apparition-hero">{faits.nomAffiche}</h1>
+    <p class="accroche apparition-hero">{redaction.accroche}</p>
+
+    <div class="actions apparition-hero">
+      {/*
+        Pas d'`aria-label` ici, et c'est le bon choix plutôt qu'un oubli.
+
+        Le texte visible — « Appeler 06 02 00 23 60 » — est déjà un nom
+        accessible complet. Le doubler d'un libellé qui dit autre chose fait
+        DIVERGER ce qu'on voit de ce qui est annoncé : axe le signale
+        (`label-content-name-mismatch`), et la conséquence est concrète pour
+        qui pilote son navigateur à la voix, en prononçant ce qu'il lit.
+
+        Le bouton de l'en-tête en garde un, lui : sous 26rem il n'affiche que
+        son icône, et son nom accessible doit bien venir de quelque part.
+      */}
+      <a class="bouton" href={`tel:${faits.telephone.e164}`}>
+        <Icone nom="telephone" />
+        <span>{t('cta.call')}</span>
+        <span class="numero">{faits.telephone.affichage}</span>
+      </a>
+      <a class="bouton bouton--fantome" href="#prestations">{t('hero.secondary')}</a>
+    </div>
+  </div>
+</section>
+
+<style>
+  .heros {
+    position: relative;
+    display: grid;
+    /* `svh` et non `vh` : sur mobile, `vh` compte la barre d'adresse comme si
+       elle était rétractée, ce qui pousse le bouton d'appel sous le bord bas
+       de l'écran au premier affichage — sur le seul élément qui doit être
+       atteignable tout de suite. */
+    min-height: min(74svh, 620px);
+    align-items: end;
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .photo {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    /* Les photographies retenues n'ont pas toutes le même format — certaines
+       sont en portrait. `cover` les recadre plutôt que de les déformer, et le
+       point d'intérêt reste au centre sur les huit. */
+    object-fit: cover;
+    z-index: -2;
+  }
+  .voile {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    /* Un dégradé et non un aplat : le bas doit porter du texte blanc lisible,
+       le haut doit laisser voir la photographie. Les valeurs sont assez
+       sombres pour tenir le contraste AA sur les huit images, y compris la
+       plus claire (la salle de bain en lumière du matin). */
+    background: linear-gradient(
+      to top,
+      rgba(6, 10, 14, 0.92) 6%,
+      rgba(6, 10, 14, 0.62) 42%,
+      rgba(6, 10, 14, 0.3) 100%
+    );
+  }
+  .texte {
+    position: relative;
+    padding-block: 3rem 3.25rem;
+    /* Le texte du héros est blanc sur photographie, quelle que soit la
+       palette : c'est la seule zone du site qui échappe aux variables, et
+       c'est voulu. Une encre de palette claire sur une image sombre serait
+       illisible une fois sur deux. */
+    color: #fff;
+  }
+  .oeil {
+    color: rgba(255, 255, 255, 0.85);
+  }
+  h1 {
+    /* `clamp` plutôt qu'une requête média : le titre est le nom de
+       l'entreprise, dont la longueur varie du simple au quadruple d'un
+       prospect à l'autre. Une taille fixe déborderait sur les plus longs. */
+    font-size: clamp(2.3rem, 8.5vw, 4.25rem);
+    margin-block: 0.5rem 0.85rem;
+    color: #fff;
+  }
+  .accroche {
+    font-size: clamp(1.1rem, 3vw, 1.35rem);
+    line-height: 1.42;
+    max-width: 34ch;
+    color: rgba(255, 255, 255, 0.94);
+    text-wrap: pretty;
+  }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    margin-top: 1.9rem;
+  }
+  .numero {
+    font-variant-numeric: tabular-nums;
+    opacity: 0.92;
+  }
+  .bouton--fantome:hover {
+    background: rgba(255, 255, 255, 0.12);
+  }
+  @media (min-width: 52rem) {
+    .heros {
+      min-height: min(78svh, 720px);
+    }
+    .texte {
+      padding-block: 4rem 4.5rem;
+    }
+  }
+</style>

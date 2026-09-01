@@ -1,0 +1,103 @@
+---
+import type { Prestation } from '../content/contrat';
+import { t } from '../content/ui';
+import Icone, { type NomIcone } from './Icone.astro';
+
+interface Props {
+  prestations: Prestation[];
+}
+const { prestations } = Astro.props;
+
+/*
+ * Les prestations viennent de `trades.ts`, jamais du modèle.
+ *
+ * Le fichier de contenu ne porte que des `code` ; `label` et `description`
+ * arrivent ici depuis le code et vont à l'écran sans être passés par une
+ * génération. C'est la seule construction qui rend IMPOSSIBLE — et non
+ * seulement improbable — qu'un site annonce une prestation que l'artisan ne
+ * fournit pas.
+ *
+ * Le modèle n'a qu'un degré de liberté : l'ordre. Il compte, puisque la
+ * première carte est celle qu'on lit.
+ */
+
+/*
+ * L'icône est choisie par le CODE de prestation, jamais par son libellé.
+ *
+ * Le libellé est du texte destiné à l'écran : le retoucher — « Dépannage » qui
+ * devient « Dépannage d'urgence » — casserait silencieusement la
+ * correspondance et rendrait des cartes sans icône. Le code, lui, est le
+ * jeton stable que le modèle manipule et que le schéma contraint.
+ *
+ * Le repli sur `cle` n'est pas décoratif : `trades.ts` peut gagner une
+ * prestation sans que ce fichier le sache, et une carte sans icône vaut mieux
+ * qu'un build rouge sur une décision purement graphique.
+ */
+const ICONES: Record<string, NomIcone> = {
+  depannage: 'goutte',
+  'chauffe-eau': 'ballon',
+  sanitaire: 'vasque',
+  chauffage: 'radiateur',
+  'salle-de-bain': 'douche',
+  canalisation: 'tuyau',
+  // Serrurier — le gabarit reste neutre en métier (D1), même si un seul
+  // dépôt modèle sert aujourd'hui.
+  'ouverture-porte': 'cle',
+  'changement-serrure': 'cle',
+};
+---
+
+<section class="section" id="prestations" aria-labelledby="titre-prestations">
+  <div class="contenu">
+    <p class="oeil">{t('services.eyebrow')}</p>
+    <h2 class="titre-section" id="titre-prestations">{t('section.services')}</h2>
+    <p class="chapo-section">{t('services.intro')}</p>
+
+    <ul class="grille corps-section">
+      {
+        prestations.map((prestation) => (
+          <li class="carte apparition">
+            <Icone nom={ICONES[prestation.code] ?? 'cle'} classe="icone marque" />
+            <h3>{prestation.label}</h3>
+            <p>{prestation.description}</p>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</section>
+
+<style>
+  .grille {
+    display: grid;
+    /* `auto-fit` + `minmax` : une colonne sur téléphone, deux ou trois sur
+       écran large, sans requête média et sans dépendre du nombre de
+       prestations retenues — qui varie de trois à cinq. */
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: 0.85rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .carte {
+    background: var(--fond);
+    border: 1px solid var(--trait);
+    border-radius: var(--rayon);
+    padding: 1.4rem 1.35rem 1.5rem;
+  }
+  .carte :global(.marque) {
+    width: 1.55rem;
+    height: 1.55rem;
+    stroke: var(--accent);
+    margin-bottom: 0.85rem;
+  }
+  .carte h3 {
+    font-size: 1.15rem;
+    margin-bottom: 0.4rem;
+  }
+  .carte p {
+    font-size: 0.96rem;
+    color: var(--encre-douce);
+    text-wrap: pretty;
+  }
+</style>

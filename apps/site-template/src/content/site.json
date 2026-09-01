@@ -1,0 +1,67 @@
+{
+  "version": {
+    "schema": "v2",
+    "promptVersion": "manuel-v0",
+    "model": "aucun — rédigé à la main"
+  },
+  "editeur": {
+    "nom": "Léo Bello",
+    "contact": "leobello.wd@gmail.com"
+  },
+  "faits": {
+    "nomAffiche": "Dos-Services",
+    "metier": {
+      "slug": "plombier",
+      "label": "Plombier"
+    },
+    "adresse": {
+      "rue": "37 Rue Jacques Cartier",
+      "codePostal": "44300",
+      "ville": "Nantes"
+    },
+    "telephone": {
+      "e164": "+33602002360",
+      "affichage": "06 02 00 23 60"
+    },
+    "anneeCreation": 2009,
+    "noteGoogle": 4.6,
+    "lienMaps": "https://www.google.com/maps/place/Dos-Services/@47.2603579,-1.5721302,17z",
+    "coordonnees": {
+      "lat": 47.2603579,
+      "lon": -1.5721302
+    },
+    "raisonSociale": "SOULEYMANE DOSSO (DOS SERVICES)",
+    "siret": "51000900400035"
+  },
+  "redaction": {
+    "accroche": "Votre plombier à Nantes, du dépannage à l’installation",
+    "presentation": "Installé à Nantes depuis 2009, Dos-Services intervient chez les particuliers comme chez les professionnels, pour un dépannage comme pour une installation complète. Vous joignez directement l’artisan au téléphone : c’est lui qui se déplace et qui suit votre chantier du début à la fin.",
+    "prestations": [
+      {
+        "code": "depannage",
+        "label": "Dépannage",
+        "description": "Fuite, robinet qui coule, panne d’eau chaude, engorgement."
+      },
+      {
+        "code": "chauffe-eau",
+        "label": "Chauffe-eau et ballon",
+        "description": "Remplacement, entretien et réparation de chauffe-eau."
+      },
+      {
+        "code": "sanitaire",
+        "label": "Sanitaire",
+        "description": "Pose et remplacement de lavabo, WC, douche et robinetterie."
+      },
+      {
+        "code": "salle-de-bain",
+        "label": "Salle de bain",
+        "description": "Rénovation complète, de la dépose à la mise en eau."
+      }
+    ],
+    "theme": {
+      "palette": "cuivre",
+      "typo": "grotesk-serif",
+      "heros": "plomberie-06"
+    }
+  }
+}

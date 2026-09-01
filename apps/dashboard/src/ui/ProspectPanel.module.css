@@ -144,3 +144,130 @@
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
+
+/* --- Site généré, messages et suivi (chantier n°4, tâche 7) --------------- */
+
+.hint {
+  margin: var(--space-2) 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+/* Traçabilité : modèle, version de consignes, date. Discrète par construction
+   — on la cherche quand un texte surprend, on ne la lit pas autrement. */
+.trace {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.rejected {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: var(--space-2) 0;
+  padding: var(--space-2);
+  border-left: 3px solid var(--color-warning);
+  background: var(--color-bg);
+  font-size: var(--text-sm);
+}
+
+.warning {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2);
+  border-left: 3px solid var(--color-warning);
+  background: var(--color-bg);
+  font-size: var(--text-sm);
+}
+
+.error {
+  margin: var(--space-2) 0 0;
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+}
+
+.action {
+  margin-top: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.action:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+
+.action:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.message {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.messageHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.messageTitle {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.messageSubject {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+}
+
+/* `pre` : les sauts de ligne sont signifiants — les paragraphes de l'email, et
+   la ligne isolée qui porte l'URL. `pre-wrap` les conserve tout en repliant
+   les lignes trop longues, et `break-word` empêche une URL de quarante-six
+   caractères d'élargir le panneau entier. */
+.messageBody {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.control {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.control select,
+.control textarea {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+
+.logger {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}

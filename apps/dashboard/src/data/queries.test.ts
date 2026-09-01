@@ -54,6 +54,8 @@ const dtoMinimal = {
   web_presence: null,
   prospect_enrichment: null,
   prospect_pipeline: null,
+  prospect_site: null,
+  generated_message: [],
 };
 
 describe('prospectRangeReader', () => {
@@ -154,5 +156,106 @@ describe('loadProspects', () => {
 
     const vues = await loadProspects(read, { pageSize: 3 });
     expect(vues.map((v) => v.id)).toEqual(['p0', 'p1', 'p2', 'p3']);
+  });
+});
+
+describe('site et messages generes', () => {
+  const contenu = {
+    version: { schema: 'v1', promptVersion: 'v3', model: 'claude-opus-4-8' },
+    editeur: { nom: 'Léo Bello', contact: 'leobello.wd@gmail.com' },
+    faits: { nomAffiche: 'Dos-Services' },
+    redaction: {
+      accroche: 'Dépannage et installation sanitaire',
+      presentation: 'Un paragraphe.',
+      prestations: [
+        { code: 'depannage', label: 'Dépannage', description: 'x' },
+        { code: 'chauffe_eau', label: 'Chauffe-eau', description: 'y' },
+      ],
+    },
+  };
+
+  it('demande le site et les messages dans la MEME requete que le prospect', () => {
+    // Meme raison que pour les quatre satellites d'origine : deux lectures
+    // prises a des instants differents decriraient deux etats de la base. Ici
+    // l'ecart serait visible — un site publie sans son message, ou un message
+    // citant une URL que la fiche n'affiche pas encore.
+    expect(PROSPECT_SELECT).toContain('prospect_site(');
+    expect(PROSPECT_SELECT).toContain('generated_message(');
+  });
+
+  it('n affiche du contenu publie que ce que le MODELE a decide', () => {
+    // Les faits sont deja ailleurs sur la fiche, tires des memes colonnes. Les
+    // repeter ici laisserait croire qu'il en existe deux versions, et surtout
+    // noierait la seule chose qu'un relecteur doit examiner : ce qui a pu etre
+    // invente.
+    const vue = toProspectView({
+      ...dtoMinimal,
+      prospect_site: {
+        repo_url: 'https://github.com/prospeo/dos',
+        deployment_url: 'https://dos.vercel.app',
+        prompt_version: 'v3',
+        model: 'claude-opus-4-8',
+        generated_at: '2026-09-01T20:00:00Z',
+        published_at: '2026-09-01T20:17:31Z',
+        unpublished_at: null,
+        content_rejected_at: null,
+        content: contenu,
+      },
+    });
+
+    expect(vue.site?.deploymentUrl).toBe('https://dos.vercel.app');
+    expect(vue.site?.redaction?.accroche).toBe('Dépannage et installation sanitaire');
+    // Les libelles, pas les codes : `depannage` ne se lit pas, « Dépannage »
+    // si. L'ordre est conserve, c'est le seul degre de liberte du modele.
+    expect(vue.site?.redaction?.prestations).toEqual(['Dépannage', 'Chauffe-eau']);
+  });
+
+  it('laisse la redaction vide plutot que de faire tomber l ecran', () => {
+    // Un contenu ecrit sous un schema futur, ou une ligne a moitie ecrite. Le
+    // `jsonb` a ete valide A L ECRITURE par `runGenerate` ; la couche
+    // d'affichage n'a pas qualite a declarer invalide un contenu deja publie
+    // sous le nom d'une entreprise. Elle n'affiche que ce qu'elle reconnait.
+    const vue = toProspectView({
+      ...dtoMinimal,
+      prospect_site: { deployment_url: 'https://x.vercel.app', content: { redaction: {} } },
+    });
+    expect(vue.site?.redaction).toBeNull();
+    expect(vue.site?.deploymentUrl).toBe('https://x.vercel.app');
+  });
+
+  it('ne garde que le dernier message de chaque canal', () => {
+    // `generated_message` ARCHIVE : `pitch --force` ajoute trois lignes sans
+    // effacer les precedentes, et un prospect rejoue trois fois en porte neuf.
+    // Les afficher toutes noierait le texte a copier sous ses brouillons.
+    const vue = toProspectView({
+      ...dtoMinimal,
+      generated_message: [
+        { channel: 'email', subject: 'Vieux', content: 'v1', created_at: '2026-09-01T10:00:00Z', prompt_version: 'v1-v1', model: 'm' },
+        { channel: 'sms', subject: null, content: 'sms recent', created_at: '2026-09-02T10:00:00Z', prompt_version: 'v1-v1', model: 'm' },
+        { channel: 'email', subject: 'Recent', content: 'v2', created_at: '2026-09-02T10:00:00Z', prompt_version: 'v1-v2', model: 'm' },
+      ],
+    });
+
+    expect(vue.messages).toHaveLength(2);
+    expect(vue.messages.find((m) => m.channel === 'email')?.subject).toBe('Recent');
+    // Le plus recent d'abord, tous canaux confondus.
+    expect(vue.messages[0]?.createdAt).toBe('2026-09-02T10:00:00Z');
+  });
+
+  it('rend une liste VIDE quand aucun message n existe, jamais null', () => {
+    expect(toProspectView(dtoMinimal).messages).toEqual([]);
+    expect(toProspectView({ ...dtoMinimal, generated_message: null }).messages).toEqual([]);
+  });
+
+  it('distingue une redaction rejetee d une redaction jamais relue', () => {
+    // Le refus est un horodatage, pas un effacement : on doit pouvoir lire CE
+    // QU ON A REFUSE pour corriger le prompt, plutot que de retirer la meme
+    // chose au hasard.
+    const vue = toProspectView({
+      ...dtoMinimal,
+      prospect_site: { content: contenu, content_rejected_at: '2026-09-02T09:00:00Z' },
+    });
+    expect(vue.site?.contentRejectedAt).toBe('2026-09-02T09:00:00Z');
+    expect(vue.site?.redaction?.accroche).toBe('Dépannage et installation sanitaire');
   });
 });

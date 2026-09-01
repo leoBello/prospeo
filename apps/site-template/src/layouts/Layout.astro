@@ -1,0 +1,119 @@
+---
+import type { ContenuPublie } from '../content/contrat';
+import { t } from '../content/ui';
+import palettesCss from '../styles/palettes.css?raw';
+import '../styles/theme.css';
+
+interface Props {
+  contenu: ContenuPublie;
+}
+
+const { contenu } = Astro.props;
+const { faits, redaction } = contenu;
+
+// Le titre est composé ici plutôt que dans le gabarit : il part aussi dans
+// `og:title`, et deux compositions séparées finiraient par diverger.
+const sousTitre =
+  faits.anneeCreation === null
+    ? t('hero.trade', { metier: faits.metier.label, ville: faits.adresse.ville })
+    : t('hero.tradeSince', {
+        metier: faits.metier.label,
+        ville: faits.adresse.ville,
+        annee: faits.anneeCreation,
+      });
+const titre = `${faits.nomAffiche} — ${sousTitre}`;
+
+/*
+ * Un favicon composé à la volée, en SVG, dans la couleur de la palette.
+ *
+ * Sans lui, le navigateur demande `/favicon.ico` et reçoit un 404 — que
+ * Lighthouse compte comme une erreur de console, et qu'un artisan qui inspecte
+ * « son » site verrait dans l'onglet sous la forme d'une icône générique.
+ *
+ * En donnée URI plutôt qu'en fichier : c'est une requête de moins, et surtout
+ * l'icône SUIT LA PALETTE choisie par le modèle. Un fichier statique aurait
+ * imposé une couleur unique aux cinq variantes.
+ *
+ * L'initiale plutôt qu'un pictogramme de métier : D1 veut le gabarit neutre en
+ * métier, et une goutte d'eau sur le site d'un serrurier serait à refaire.
+ */
+/*
+ * Les deux couleurs sont LUES dans la feuille de style, jamais recopiées ici.
+ *
+ * Une table `{ cuivre: '#9a5b18', … }` dans ce fichier aurait été une
+ * TROISIÈME copie des palettes, après `palettes.css` et le schéma. Les deux
+ * premières sont liées par un test ; une troisième aurait dérivé au premier
+ * ajustement de couleur, et le symptôme — un favicon d'une teinte, une page
+ * d'une autre — n'aurait fait rougir aucune suite.
+ *
+ * `?raw` donne le texte du fichier à la compilation. Le coût est nul à
+ * l'exécution : tout se résout au build, et la page ne reçoit qu'une donnée
+ * URI déjà composée.
+ */
+function jeton(palette: string, nom: string, defaut: string): string {
+  const bloc = new RegExp(`\[data-palette='${palette}'\]\s*\{([^}]*)\}`).exec(palettesCss);
+  return new RegExp(`${nom}:\s*(#[0-9a-fA-F]{6})`).exec(bloc?.[1] ?? '')?.[1] ?? defaut;
+}
+const accent = jeton(redaction.theme.palette, '--accent', '#9a5b18');
+// Sur `nuit`, l'accent est clair : la lettre doit alors être sombre. La
+// palette porte déjà cette décision sous le nom `--sur-accent`, employé par
+// les boutons — on la reprend plutôt que de la redécider ici.
+const surAccent = jeton(redaction.theme.palette, '--sur-accent', '#ffffff');
+const initiale = [...faits.nomAffiche][0]?.toLocaleUpperCase('fr-FR') ?? '?';
+const favicon =
+  'data:image/svg+xml,' +
+  encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">` +
+      `<rect width="64" height="64" rx="12" fill="${accent}"/>` +
+      `<text x="32" y="44" text-anchor="middle" font-family="system-ui,sans-serif" ` +
+      `font-size="38" font-weight="700" fill="${surAccent}">${initiale}</text>` +
+      `</svg>`,
+  );
+---
+
+{/*
+  `data-palette` et `data-typo` sont posés sur `<html>` et non sur le corps.
+
+  C'est ce qui permet à la couleur de fond de la palette de peindre la surface
+  entière, y compris la zone de rebond du défilement sur iOS. Posées sur
+  `<body>`, les variables laisseraient apparaître le blanc du navigateur
+  au-dessus et en dessous de la page — visible d'un coup d'œil sur la palette
+  `nuit`, et impossible à diagnostiquer sans savoir où regarder.
+*/}
+<!doctype html>
+<html lang="fr" data-palette={redaction.theme.palette} data-typo={redaction.theme.typo}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{titre}</title>
+    <meta name="description" content={redaction.accroche} />
+
+    {/*
+      Pas de balise `robots` permissive, et c'est délibéré : le site porte le
+      nom d'une entreprise réelle qui n'a rien demandé (D5). Tant qu'elle n'a
+      pas accepté, il n'a aucune raison d'être indexé — il doit être joignable
+      par l'artisan à qui l'on envoie l'URL, pas trouvable par ses clients ni
+      par ses concurrents. L'indexation viendra avec la vente, pas avant.
+
+      D2 a levé le « zéro JavaScript » du chantier n°4 ; il n'a pas levé
+      celle-ci, et un test la tient.
+    */}
+    <meta name="robots" content="noindex, nofollow" />
+
+    <link rel="icon" href={favicon} type="image/svg+xml" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={titre} />
+    <meta property="og:description" content={redaction.accroche} />
+
+    {/*
+      Aucune police distante, aucune feuille distante (D5). Le CDN Google
+      transmettrait l'adresse IP du visiteur à un tiers, sur une page que
+      personne n'a commandée. Les fichiers viennent de `@fontsource-variable`
+      et sont servis depuis ce dépôt.
+    */}
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

@@ -1,0 +1,87 @@
+---
+import type { ContenuPublie } from '../content/contrat';
+import { nombreFr, t } from '../content/ui';
+import Icone from './Icone.astro';
+
+interface Props {
+  contenu: ContenuPublie;
+}
+const { faits } = Astro.props.contenu;
+
+/*
+ * Le bandeau de confiance : trois faits vérifiés, et chacun tombe SEUL.
+ *
+ * C'est la section où la dégradation se voit le mieux, et elle a été
+ * construite sur la mesure plutôt que sur une intuition. Au 2 septembre 2026,
+ * sur les 37 prospects que `assembleFacts` juge éligibles :
+ *
+ *   ville   37/37    année   37/37    note   26/37
+ *
+ * Onze pages n'auront donc que deux puces, et aucune n'en aura zéro. Le
+ * bandeau ne disparaît pas — la ville et l'année suffisent à le remplir — mais
+ * il devait pouvoir le faire, et c'est pourquoi le rendu est piloté par la
+ * longueur de la liste et non par un compte écrit en dur.
+ *
+ * Ce qui ne s'y trouve PAS est aussi important : ni « intervention rapide »,
+ * ni « devis gratuit », ni « artisan certifié ». Ces trois phrases occupent ce
+ * bandeau sur la plupart des vitrines d'artisan, et la base n'en sait rien.
+ */
+
+const puces = [
+  { icone: 'lieu' as const, texte: t('trust.city', { ville: faits.adresse.ville }) },
+  ...(faits.anneeCreation === null
+    ? []
+    : [{ icone: 'horloge' as const, texte: t('trust.since', { annee: faits.anneeCreation }) }]),
+  ...(faits.noteGoogle === null
+    ? []
+    : [
+        {
+          icone: 'etoile' as const,
+          texte: t('rating.value', { note: nombreFr(faits.noteGoogle) }),
+        },
+      ]),
+];
+---
+
+<div class="confiance">
+  <ul class="contenu liste">
+    {
+      puces.map((puce) => (
+        <li>
+          <Icone nom={puce.icone} />
+          <span>{puce.texte}</span>
+        </li>
+      ))
+    }
+  </ul>
+</div>
+
+<style>
+  .confiance {
+    background: var(--surface);
+    border-bottom: 1px solid var(--trait);
+  }
+  .liste {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem 2.2rem;
+    list-style: none;
+    padding: 0;
+    padding-block: 1.05rem;
+  }
+  li {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-size: 0.95rem;
+    color: var(--encre-douce);
+  }
+  li :global(.icone) {
+    width: 1.05rem;
+    height: 1.05rem;
+    stroke: var(--accent);
+  }
+  span {
+    font-variant-numeric: tabular-nums;
+  }
+</style>
