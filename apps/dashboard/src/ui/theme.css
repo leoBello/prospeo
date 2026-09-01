@@ -8,6 +8,16 @@
  * fichier — c'est-à-dire, en pratique, en thème clair jamais livré.
  *
  * Les valeurs viennent du tableau du §9.4 et n'ont pas été retouchées.
+ *
+ * RÉSERVE MESURÉE, non corrigée ici : `--color-text-muted` n'atteint pas le
+ * rapport de contraste AA de 4,5:1 pour du texte normal, dans les deux
+ * thèmes — #6b7280 sur #171a21 mesure 3,60:1, #8a8a8a sur #ffffff mesure
+ * 3,45:1. Ce n'est pas anodin, parce que cette couleur porte la « raison de
+ * présence » de chaque ligne, que le §9.2 tient pour essentielle.
+ * Les valeurs du §9.4 étant arbitrées, elles sont conservées telles quelles
+ * et l'écart est remonté plutôt que corrigé unilatéralement. Atteindraient
+ * AA sans changer la teinte : #949ba9 en sombre (6,24:1) et #6f6f6f en clair
+ * (5,02:1).
  */
 
 :root {

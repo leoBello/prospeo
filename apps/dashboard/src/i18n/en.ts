@@ -127,7 +127,8 @@ export const en: Record<keyof typeof fr, string> = {
   'value.landline': 'landline',
 
   'list.keyboardHint': 'Up and down arrows move between prospects, Escape closes the panel.',
-  'list.countLabel': '{count} rows',
+  'list.overflow': '{count} more, not shown here',
+  'list.overflow_one': '1 more, not shown here',
 
   'unit.prospects': '{count} prospects',
   'unit.prospects_one': '{count} prospect',

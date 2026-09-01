@@ -128,7 +128,8 @@ export const fr = {
 
   'list.keyboardHint':
     'Flèches haut et bas pour parcourir les prospects, Échap pour fermer le panneau.',
-  'list.countLabel': '{count} lignes',
+  'list.overflow': '{count} de plus, non affichés ici',
+  'list.overflow_one': '1 de plus, non affiché ici',
 
   'unit.prospects': '{count} prospects',
   'unit.prospects_one': '{count} prospect',
