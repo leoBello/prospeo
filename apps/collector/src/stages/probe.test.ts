@@ -16,6 +16,23 @@ describe('detectParked', () => {
     expect(detectParked('<p>Site en construction</p>')).toBe(true);
     expect(detectParked('<h1>Plomberie Martin, dépannage 24h/24</h1>')).toBe(false);
   });
+
+  it('ne prend pas un chantier en construction pour une page parquee', () => {
+    expect(
+      detectParked(
+        '<title>Plomberie Martin</title><p>Nous intervenons sur tous les chantiers en construction du secteur.</p>',
+      ),
+    ).toBe(false);
+  });
+
+  it('ignore un marqueur enfoui loin dans le corps de la page', () => {
+    const html = `<title>Plomberie Martin</title><div>${'x'.repeat(4000)}</div><p>coming soon</p>`;
+    expect(detectParked(html)).toBe(false);
+  });
+
+  it('repere un marqueur present dans le titre', () => {
+    expect(detectParked('<title>Site en construction</title><body></body>')).toBe(true);
+  });
 });
 
 describe('probeUrl', () => {
@@ -51,6 +68,16 @@ describe('probeUrl', () => {
       body: '<html></html>',
     }));
     expect(result.isHttps).toBe(false);
+  });
+
+  it('deduit HTTPS de l URL finale apres redirection', async () => {
+    const result = await probeUrl('http://plomberie-martin.fr', async () => ({
+      status: 200,
+      finalUrl: 'https://plomberie-martin.fr/',
+      body: '<meta name="viewport" content="width=device-width">',
+    }));
+    expect(result.isHttps).toBe(true);
+    expect(result.finalUrl).toBe('https://plomberie-martin.fr/');
   });
 });
 

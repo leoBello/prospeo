@@ -1,19 +1,34 @@
-import { request } from 'undici';
 import { normalizeCompanyName, type ProbeResult } from '@prospeo/core';
 
 const PARKED_MARKERS = [
-  'domaine est à vendre', 'domain is for sale', 'this domain',
-  'en construction', 'under construction', 'coming soon',
-  'parked domain', 'site en cours de création',
+  'ce domaine est à vendre',
+  'domaine à vendre',
+  'this domain is for sale',
+  'domain for sale',
+  'parked domain',
+  'site en construction',
+  'page en construction',
+  'site en cours de construction',
+  'site en cours de création',
+  'under construction',
+  'coming soon',
 ];
 
 export function hasViewport(html: string): boolean {
   return /<meta[^>]+name\s*=\s*["']?viewport["']?/i.test(html);
 }
 
+/**
+ * Une page parquée l'annonce dans son titre ou tout en haut du document.
+ * On ne cherche donc pas dans la page entière : « nous intervenons sur les
+ * chantiers en construction » est une phrase banale chez un plombier, et la
+ * chercher partout classerait une entreprise bien vivante comme site mort.
+ */
 export function detectParked(html: string): boolean {
-  const text = html.toLowerCase();
-  return PARKED_MARKERS.some((marker) => text.includes(marker));
+  const lower = html.toLowerCase();
+  const title = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(lower)?.[1] ?? '';
+  const haystack = `${title} ${lower.slice(0, 3000)}`;
+  return PARKED_MARKERS.some((marker) => haystack.includes(marker));
 }
 
 export interface FetchedPage {
@@ -23,15 +38,26 @@ export interface FetchedPage {
 }
 
 async function defaultFetch(url: string): Promise<FetchedPage> {
-  const response = await request(url, {
-    method: 'GET',
-    maxRedirections: 5,
-    headersTimeout: 10_000,
-    bodyTimeout: 10_000,
-    headers: { 'user-agent': 'Mozilla/5.0 (compatible; ProspeoBot/1.0)' },
-  });
-  const body = await response.body.text();
-  return { status: response.statusCode, finalUrl: url, body: body.slice(0, 200_000) };
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10_000);
+  try {
+    const response = await fetch(url, {
+      redirect: 'follow',
+      signal: controller.signal,
+      headers: { 'user-agent': 'Mozilla/5.0 (compatible; ProspeoBot/1.0)' },
+    });
+    const body = await response.text();
+    // `response.url` porte la destination réelle APRÈS redirections, ce que
+    // l'URL demandée ne dit pas. Un site qui redirige http vers https est sain ;
+    // renvoyer l'URL demandée le ferait passer pour un site sans HTTPS.
+    return {
+      status: response.status,
+      finalUrl: response.url === '' ? url : response.url,
+      body: body.slice(0, 200_000),
+    };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** Ne lève jamais : une URL injoignable est un résultat, pas une erreur. */

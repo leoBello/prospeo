@@ -39,8 +39,6 @@ async function main(argv: string[]): Promise<number> {
     return 1;
   }
 
-  const config = loadConfig(process.env);
-
   switch (command) {
     case 'discover': {
       const slug = flag(argv, 'trade');
@@ -54,12 +52,29 @@ async function main(argv: string[]): Promise<number> {
         process.stderr.write(`Métier inconnu : ${slug}\n`);
         return 1;
       }
-      const limitRaw = flag(argv, 'limit');
+
+      // `--limit` est validé explicitement : `Number.parseInt('abc')` rend NaN,
+      // et `seen >= NaN` est toujours faux — la garde ne se déclencherait jamais
+      // et la collecte partirait sans limite sur l'API publique.
+      let limit: number | undefined;
+      if (argv.includes('--limit')) {
+        const limitRaw = flag(argv, 'limit');
+        const parsed = limitRaw === undefined ? Number.NaN : Number(limitRaw);
+        if (!Number.isInteger(parsed) || parsed <= 0) {
+          process.stderr.write(
+            `--limit attend un entier positif, reçu : ${limitRaw ?? '(rien)'}\n`,
+          );
+          return 1;
+        }
+        limit = parsed;
+      }
+
+      const config = loadConfig(process.env);
       const client = createClient(config);
       const report = await runDiscover({
         trade,
         postalCode,
-        limit: limitRaw === undefined ? undefined : Number.parseInt(limitRaw, 10),
+        limit,
         upsertProspect: makeUpsertProspect(client),
       });
       process.stdout.write(
@@ -68,6 +83,7 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     }
     case 'probe': {
+      const config = loadConfig(process.env);
       const client = createClient(config);
       const { data, error } = await client
         .from('prospect_enrichment')
@@ -77,27 +93,30 @@ async function main(argv: string[]): Promise<number> {
 
       let done = 0;
       for (const row of data ?? []) {
-        const result = await probeUrl(row.declared_url as string);
-        // `category` reste absent : cet étage tourne avant `classify`, seul à
-        // savoir la catégoriser. La colonne est nullable pour cette raison.
-        const { error: writeError } = await client.from('web_presence').upsert(
-          {
-            prospect_id: row.prospect_id,
-            probed_url: result.url,
-            http_status: result.httpStatus,
-            is_https: result.isHttps,
-            final_url: result.finalUrl,
-            is_parked: result.isParked,
-            has_viewport_meta: result.hasViewportMeta,
-            probed_at: new Date().toISOString(),
-          },
-          { onConflict: 'prospect_id' },
-        );
-        if (writeError) {
-          process.stderr.write(`probe: échec sur ${row.prospect_id} — ${writeError.message}\n`);
-          continue;
+        // Un échec isolé ne doit pas avorter le run : même discipline que
+        // `discover`, l'écriture est unitaire et l'erreur est journalisée.
+        try {
+          const result = await probeUrl(row.declared_url as string);
+          const { error: writeError } = await client.from('web_presence').upsert(
+            {
+              prospect_id: row.prospect_id,
+              probed_url: result.url,
+              http_status: result.httpStatus,
+              is_https: result.isHttps,
+              final_url: result.finalUrl,
+              is_parked: result.isParked,
+              has_viewport_meta: result.hasViewportMeta,
+              probed_at: new Date().toISOString(),
+            },
+            { onConflict: 'prospect_id' },
+          );
+          if (writeError) throw new Error(writeError.message);
+          done += 1;
+        } catch (error) {
+          process.stderr.write(
+            `probe: échec sur ${row.prospect_id} — ${error instanceof Error ? error.message : String(error)}\n`,
+          );
         }
-        done += 1;
       }
       process.stdout.write(`probe : ${done} URL sondées\n`);
       return 0;
