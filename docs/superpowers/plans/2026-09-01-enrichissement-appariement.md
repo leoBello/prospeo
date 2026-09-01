@@ -2769,6 +2769,16 @@ export function applyReviewDecision(
   prospectId: string,
   candidates: readonly ReviewCandidate[],
   decision: ReviewDecision,
+  /**
+   * Horodatage d'enrichissement de la ligne existante, repris tel quel.
+   *
+   * Trancher un doute n'est pas enrichir : aucune requête n'est partie chez
+   * Google. Or le plafond journalier de `enrich` compte les lignes dont
+   * `enriched_at` tombe aujourd'hui — le réécrire ferait donc consommer au
+   * scraping le quota d'une revue purement humaine, et une session de vingt
+   * cas amputerait d'autant le run du lendemain.
+   */
+  enrichedAt: string,
 ): EnrichmentRow {
   const base: EnrichmentRow = {
     prospect_id: prospectId,
@@ -2778,14 +2788,16 @@ export function applyReviewDecision(
     phone_e164: null,
     phone_kind: null,
     declared_url: null,
-    social_urls: [],
+    // Pas de `social_urls`, pour la même raison qu'à l'étage `enrich` : la
+    // revue ne connaît pas cette colonne, et la réécrire à `[]` effacerait sur
+    // conflit une donnée posée par ailleurs.
     rating: null,
     review_count: null,
     place_id: null,
     maps_url: null,
     candidates: [],
     status: 'not_found',
-    enriched_at: new Date().toISOString(),
+    enriched_at: enrichedAt,
   };
 
   if (decision.kind === 'reject') return base;
@@ -2811,6 +2823,11 @@ export function applyReviewDecision(
     phone_kind: phone?.kind ?? null,
     declared_url: chosen.website,
     maps_url: chosen.mapsUrl,
+    // La note alimente les points de vitalité du barème : la perdre ici
+    // classerait moins bien un prospect tranché à la main qu'un prospect
+    // apparié automatiquement, à information identique.
+    rating: chosen.rating,
+    place_id: chosen.placeId,
   };
 }
 ```
