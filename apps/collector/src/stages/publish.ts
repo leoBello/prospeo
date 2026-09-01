@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
-import type { SiteFacts } from '@prospeo/core';
+import { editeurRenseigne, type ContenuPublie, type SiteFacts } from '@prospeo/core';
+import type { GithubClient } from '../sources/github.js';
 
 /** Plafond GitHub pour un nom de dépôt. */
 const MAX_NOM_DEPOT = 100;
@@ -76,6 +77,11 @@ export interface EtatSite {
   repoFullName: string;
   /** Empreinte du contenu réellement écrit, `null` si elle n'a pas été enregistrée. */
   empreinte: string | null;
+  /**
+   * Date de PREMIÈRE publication. C'est elle qui fait courir les 90 jours de
+   * la péremption (D5) ; voir `runPublish`, qui la préserve.
+   */
+  publishedAt?: Date | null;
 }
 
 export type PublishAction = 'create' | 'update' | 'skip';
@@ -116,4 +122,132 @@ export interface PublishReport {
  */
 export function publishExitCode(report: PublishReport): number {
   return report.failed > 0 || report.refused > 0 ? 1 : 0;
+}
+
+
+// ---------------------------------------------------------------------------
+// Orchestration
+// ---------------------------------------------------------------------------
+
+/** Ce que `publish` écrit en base pour un prospect. */
+export interface EtatSiteEcrit {
+  repoFullName: string;
+  repoUrl: string;
+  empreinte: string;
+  publishedAt: Date;
+  promptVersion: string;
+  model: string;
+  generatedAt: Date;
+}
+
+export interface PublishDeps {
+  github: GithubClient;
+  lireEtat(prospectId: string): Promise<EtatSite | null>;
+  enregistrer(prospectId: string, etat: EtatSiteEcrit): Promise<void>;
+  /** Injectée plutôt que `new Date()` : une date de publication se teste. */
+  maintenant(): Date;
+}
+
+export interface PublishInput {
+  prospectId: string;
+  contenu: ContenuPublie;
+}
+
+/**
+ * Publie un lot de prospects, un par un.
+ *
+ * **Séquentiel, et non parallèle.** GitHub limite le débit d'écriture sur un
+ * même compte, et le lot ne dépasse pas vingt-deux prospects : la parallélisation
+ * gagnerait quelques secondes contre un risque de 429 au milieu du lot, dont
+ * la reprise serait à écrire.
+ *
+ * **Un échec n'interrompt pas le lot** — « aucun étage ne peut corrompre la
+ * base sur un échec partiel » (spec du socle, §12). Sur vingt-deux prospects,
+ * s'arrêter au premier 403 laisserait les vingt et un autres au point mort
+ * sans raison. L'échec est compté, et le décompte décide du code de sortie.
+ */
+export async function runPublish(
+  inputs: readonly PublishInput[],
+  deps: PublishDeps,
+): Promise<PublishReport> {
+  const report: PublishReport = { created: 0, updated: 0, skipped: 0, failed: 0, refused: 0 };
+
+  for (const { prospectId, contenu } of inputs) {
+    // §11 conformité : un site publié au nom d'un tiers doit nommer son
+    // éditeur réel et offrir un moyen d'en demander le retrait. Le contrôle
+    // est ici, avant le moindre appel réseau — un dépôt créé ne se « dé-crée »
+    // pas, et c'est la publication, pas le build, qui expose une page au monde.
+    if (!editeurRenseigne(contenu.editeur)) {
+      console.error(
+        `publish : ${prospectId} refusé — éditeur non renseigné (voir EDITEUR dans packages/core).`,
+      );
+      report.refused += 1;
+      continue;
+    }
+
+    const depot = nomDepot(contenu.faits);
+    const empreinte = empreinteContenu(contenu);
+
+    try {
+      const etat = await deps.lireEtat(prospectId);
+      const action = decidePublish(etat, empreinte);
+      if (action === 'skip') {
+        report.skipped += 1;
+        continue;
+      }
+
+      let repoFullName: string;
+      let repoUrl: string;
+      let sha: string | null = null;
+
+      if (action === 'create') {
+        const cree = await deps.github.creerDepuisModele(
+          depot,
+          `Site de démonstration — ${contenu.faits.nomAffiche}`,
+        );
+        repoFullName = cree.fullName;
+        repoUrl = cree.htmlUrl;
+      } else {
+        repoFullName = etat?.repoFullName ?? depot;
+        repoUrl = `https://github.com/${repoFullName}`;
+        // Obligatoire en mise à jour : sans le sha du fichier existant,
+        // l'API répond 422 et le run croirait avoir republié.
+        sha = await deps.github.shaContenu(depot);
+      }
+
+      await deps.github.ecrireContenu(depot, contenu, sha);
+
+      const maintenant = deps.maintenant();
+      await deps.enregistrer(prospectId, {
+        repoFullName,
+        repoUrl,
+        empreinte,
+        // La date de PREMIÈRE publication est préservée. La remettre à jour à
+        // chaque republication repousserait indéfiniment la péremption de D5 :
+        // un site régénéré tous les deux mois n'expirerait jamais et resterait
+        // en ligne au nom d'un tiers sans que personne ne s'en aperçoive. Elle
+        // dit « depuis quand ce site est publié », pas « quand on l'a
+        // retouché ».
+        publishedAt: etat?.publishedAt ?? maintenant,
+        promptVersion: contenu.version.promptVersion,
+        model: contenu.version.model,
+        generatedAt: maintenant,
+      });
+
+      if (action === 'create') report.created += 1;
+      else report.updated += 1;
+    } catch (erreur) {
+      // Journalisé AVEC le prospect concerné, comme l'exige le §12 du spec :
+      // un message d'erreur qui ne dit pas sur quelle ligne il porte oblige à
+      // rejouer le lot entier pour le retrouver.
+      console.error(
+        `publish : échec sur ${prospectId} (${depot}) — ${
+          erreur instanceof Error ? erreur.message : String(erreur)
+        }`,
+      );
+      report.failed += 1;
+    }
+  }
+
+  return report;
 }

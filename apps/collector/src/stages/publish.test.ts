@@ -163,3 +163,157 @@ describe('publishExitCode', () => {
     expect(publishExitCode({ ...vide, created: 2, refused: 1 })).toBe(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Orchestration
+// ---------------------------------------------------------------------------
+
+import { runPublish, type PublishDeps, type PublishInput } from './publish.js';
+import type { ContenuPublie } from '@prospeo/core';
+
+const CONTENU: ContenuPublie = {
+  version: { schema: 'v1', promptVersion: 'v1', model: 'claude-opus-4-8' },
+  editeur: { nom: 'Léo Bello', contact: 'leobello.wd@gmail.com' },
+  faits: FAITS,
+  redaction: {
+    accroche: 'Votre plombier à Nantes',
+    presentation: 'Une présentation suffisamment longue pour être crédible.',
+    prestations: [{ code: 'depannage', label: 'Dépannage', description: 'Fuite.' }],
+  },
+};
+
+const UN: PublishInput = { prospectId: 'p1', contenu: CONTENU };
+
+/** Dépendances de test : enregistre les appels, ne sort jamais sur le réseau. */
+function fausseDeps(etats: Record<string, EtatSite> = {}) {
+  const journal: string[] = [];
+  const ecrits: Record<string, Record<string, unknown>> = {};
+  const deps: PublishDeps = {
+    github: {
+      async creerDepuisModele(nom) {
+        journal.push(`creer:${nom}`);
+        return { fullName: `org/${nom}`, htmlUrl: `https://github.com/org/${nom}` };
+      },
+      async shaContenu(depot) {
+        journal.push(`sha:${depot}`);
+        return 'sha-existant';
+      },
+      async ecrireContenu(depot, _contenu, sha) {
+        journal.push(`ecrire:${depot}:${sha ?? 'sans-sha'}`);
+      },
+    },
+    async lireEtat(id) {
+      return etats[id] ?? null;
+    },
+    async enregistrer(id, etat) {
+      journal.push(`enregistrer:${id}`);
+      ecrits[id] = etat as unknown as Record<string, unknown>;
+    },
+    maintenant: () => new Date('2026-09-01T12:00:00Z'),
+  };
+  return { deps, journal, ecrits };
+}
+
+describe('runPublish', () => {
+  it('crée puis écrit, à la première publication', async () => {
+    const { deps, journal } = fausseDeps();
+    const report = await runPublish([UN], deps);
+
+    expect(report).toEqual({ created: 1, updated: 0, skipped: 0, failed: 0, refused: 0 });
+    expect(journal).toEqual([
+      'creer:dos-services-51000900400035',
+      'ecrire:dos-services-51000900400035:sans-sha',
+      'enregistrer:p1',
+    ]);
+  });
+
+  it('ne touche pas au réseau quand le contenu n’a pas bougé', async () => {
+    // L'idempotence de la tâche 3, mesurée sur les appels réellement émis :
+    // un rejeu sur les 22 prospects ne doit pousser aucun commit, donc ne
+    // redéclencher aucun déploiement, donc ne rien coûter.
+    const empreinte = empreinteContenu(CONTENU);
+    const { deps, journal } = fausseDeps({
+      p1: { repoFullName: 'org/dos-services-51000900400035', empreinte },
+    });
+    const report = await runPublish([UN], deps);
+
+    expect(report.skipped).toBe(1);
+    expect(journal).toEqual([]);
+  });
+
+  it('relit le sha avant de réécrire un contenu modifié', async () => {
+    const { deps, journal } = fausseDeps({
+      p1: { repoFullName: 'org/dos-services-51000900400035', empreinte: 'ancien' },
+    });
+    const report = await runPublish([UN], deps);
+
+    expect(report.updated).toBe(1);
+    // Pas de `creer` : le dépôt existe. Et le `sha` est relu, sans quoi GitHub
+    // répondrait 422 et le run croirait avoir republié.
+    expect(journal).toEqual([
+      'sha:dos-services-51000900400035',
+      'ecrire:dos-services-51000900400035:sha-existant',
+      'enregistrer:p1',
+    ]);
+  });
+
+  it('pose la date de publication une seule fois', async () => {
+    // C'est elle qui fait courir les 90 jours de D5. La remettre à jour à
+    // chaque republication repousserait indéfiniment la péremption : un site
+    // régénéré tous les deux mois n'expirerait JAMAIS, et resterait en ligne
+    // au nom d'un tiers sans que personne ne s'en aperçoive. La date dit
+    // « depuis quand ce site est publié », pas « quand on l'a retouché ».
+    const premier = fausseDeps();
+    await runPublish([UN], premier.deps);
+    expect(premier.ecrits['p1']?.publishedAt).toEqual(new Date('2026-09-01T12:00:00Z'));
+
+    const ensuite = fausseDeps({
+      p1: {
+        repoFullName: 'org/dos-services-51000900400035',
+        empreinte: 'ancien',
+        publishedAt: new Date('2026-06-01T00:00:00Z'),
+      },
+    });
+    await runPublish([UN], ensuite.deps);
+    expect(ensuite.ecrits['p1']?.publishedAt).toEqual(new Date('2026-06-01T00:00:00Z'));
+  });
+
+  it('refuse de publier quand l’éditeur n’est pas identifiable', async () => {
+    // §11 conformité : un site publié au nom d'un tiers doit nommer son
+    // éditeur et offrir un moyen d'en demander le retrait. Sans cela la
+    // publication n'a pas lieu — et le refus est compté, donc le run échoue.
+    const { deps, journal } = fausseDeps();
+    const sansEditeur: PublishInput = {
+      prospectId: 'p1',
+      contenu: { ...CONTENU, editeur: { nom: 'À RENSEIGNER', contact: 'x@example.com' } },
+    };
+    const report = await runPublish([sansEditeur], deps);
+
+    expect(report.refused).toBe(1);
+    expect(report.created).toBe(0);
+    expect(journal).toEqual([]);
+    expect(publishExitCode(report)).toBe(1);
+  });
+
+  it('poursuit le lot quand un prospect échoue', async () => {
+    // « Aucun étage ne peut corrompre la base sur un échec partiel »
+    // (spec du socle, §12). Sur vingt-deux prospects, interrompre au premier
+    // 403 laisserait les vingt et un autres au point mort sans raison.
+    const { deps, journal } = fausseDeps();
+    deps.github.creerDepuisModele = async (nom) => {
+      if (nom.endsWith('51000900400035')) throw new Error('GitHub création : 403 — refusé');
+      journal.push(`creer:${nom}`);
+      return { fullName: `org/${nom}`, htmlUrl: 'u' };
+    };
+    const autre: PublishInput = {
+      prospectId: 'p2',
+      contenu: { ...CONTENU, faits: { ...FAITS, siret: '52405116600014' } },
+    };
+
+    const report = await runPublish([UN, autre], deps);
+    expect(report.failed).toBe(1);
+    expect(report.created).toBe(1);
+    expect(journal).toContain('enregistrer:p2');
+    expect(journal).not.toContain('enregistrer:p1');
+  });
+});
