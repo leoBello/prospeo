@@ -108,20 +108,42 @@ export interface MatchingConfig {
  * le code NAF de l'établissement. Baisser le seuil aurait abaissé la barre
  * pour tout le monde sans rien corriger du signal fautif.
  *
- * **`maxDistanceM` reste à 300 en attendant la population complète.** Le lot
- * dit qu'il est trop serré — le bon candidat de « RGSERVICES » est à
- * 1 825 m, et il faut 3 000 m pour qu'il passe devant un centre d'action
- * sociale situé à 39 m. Mais cela ne repose que sur UN cas, et une constante
- * qui décide de toute la sélection mérite mieux qu'un cas. Le rejeu hors
- * ligne de `calibrate` permet de trancher sans redemander une seule page à
- * Google, une fois les 25 enrichis.
+ * **`maxDistanceM` passe de 300 à 1 000 m (v3), mesuré sur les 139 prospects
+ * de Nantes entière.** La valeur de 300 postulait que l'adresse déclarée à
+ * Sirene et la position de la fiche Google coïncident. Elles ne coïncident
+ * pas : chez un artisan, Sirene enregistre souvent le domicile ou l'adresse
+ * du comptable, quand Maps géocode le local commercial.
+ *
+ * Balayage hors ligne sur la population complète, sans une requête Google :
+ *
+ *     rayon      fusions   à trancher   introuvables
+ *     300 m         35          9            95
+ *     1 000 m       39         10            90
+ *     2 000 m       39         21            79
+ *     3 000 m       39         29            71
+ *
+ * Quatre fusions gagnées pour un seul cas de revue supplémentaire, et cinq
+ * introuvables récupérés. Au-delà de 1 000 m le gain s'arrête net — plus
+ * aucune fusion — tandis que la file de revue double puis triple : c'est du
+ * travail humain acheté sans rien en retour.
+ *
+ * Les quatre fusions gagnées ont été vérifiées une par une, parce que le prix
+ * d'une fusion fausse n'est pas celui d'un appariement manqué : inversions
+ * prénom/nom que Sirene et Maps écrivent dans l'ordre inverse (« LUCIAN
+ * LAZA » / « Laza Lucian », « MOHAMMED BOUCENNA » / « Boucenna Mohammed »),
+ * une enseigne à 25 m (« TSM »), une raison sociale identique à 73 m
+ * (« ATLANTIK HOME »). Aucune n'est douteuse.
+ *
+ * Ce réglage se révise hors ligne : les 676 candidats que le rayon écarte
+ * restent enregistrés avec leurs coordonnées, et `calibrate --apply` propage
+ * tout changement sans rescraper.
  */
 export const MATCHING_CONFIG: MatchingConfig = {
-  version: 'v2',
+  version: 'v3',
   nameWeight: 0.65,
   distanceWeight: 0.25,
   categoryWeight: 0.1,
-  maxDistanceM: 300,
+  maxDistanceM: 1000,
   highThreshold: 0.85,
   lowThreshold: 0.55,
 };
