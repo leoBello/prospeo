@@ -90,17 +90,37 @@ export interface MatchingConfig {
 }
 
 /**
- * Points de départ explicitement destinés à bouger.
+ * Réglages de l'appariement, v2 — premier tour de calibration sur données
+ * réelles.
  *
- * Ils seront calibrés sur les 25 premiers prospects réels, à l'étape 6 du
- * plan. La version est portée dans l'objet pour qu'un changement de réglage
- * soit traçable dans les données, comme pour le barème de notation.
+ * **La catégorie passe de 0,15 à 0,10, le nom de 0,60 à 0,65.** Ce n'est pas
+ * un ajustement de confort : à 0,15, le maximum atteignable sans catégorie
+ * confirmée valait `nameWeight + distanceWeight` = 0,85, soit exactement
+ * `highThreshold`, et seulement à nom parfait et distance nulle. Toute fiche
+ * dont Google omet ou se trompe la catégorie était donc structurellement
+ * inéligible à la fusion automatique. Mesuré sur le premier lot : « IDEAL »
+ * face à la fiche « Ideal » à 1 mètre atteignait 0,849 et partait en revue ;
+ * « DIRECT ASSISTANCE » face à « Direct Assistance » à 7 mètres, 0,844.
+ *
+ * Alléger la catégorie plutôt qu'abaisser le seuil traite la cause. Le
+ * libellé Google est peu fiable sur cette population — « Ideal », plombier,
+ * y est classé « Électricien », exactement le décalage déjà documenté pour
+ * le code NAF de l'établissement. Baisser le seuil aurait abaissé la barre
+ * pour tout le monde sans rien corriger du signal fautif.
+ *
+ * **`maxDistanceM` reste à 300 en attendant la population complète.** Le lot
+ * dit qu'il est trop serré — le bon candidat de « RGSERVICES » est à
+ * 1 825 m, et il faut 3 000 m pour qu'il passe devant un centre d'action
+ * sociale situé à 39 m. Mais cela ne repose que sur UN cas, et une constante
+ * qui décide de toute la sélection mérite mieux qu'un cas. Le rejeu hors
+ * ligne de `calibrate` permet de trancher sans redemander une seule page à
+ * Google, une fois les 25 enrichis.
  */
 export const MATCHING_CONFIG: MatchingConfig = {
-  version: 'v1',
-  nameWeight: 0.6,
+  version: 'v2',
+  nameWeight: 0.65,
   distanceWeight: 0.25,
-  categoryWeight: 0.15,
+  categoryWeight: 0.1,
   maxDistanceM: 300,
   highThreshold: 0.85,
   lowThreshold: 0.55,

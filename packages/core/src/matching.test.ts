@@ -119,8 +119,10 @@ describe('selectMatch', () => {
   });
 
   it('renvoie ambiguous entre les deux seuils', () => {
-    // Le bon nom, la bonne catégorie, mais à 200 m : confiance 0,833, sous le
-    // seuil haut. C'est exactement le cas qu'un humain doit trancher — deux
+    // Le bon nom, la bonne catégorie, mais à 200 m : confiance 0,7032 sous
+    // les poids v2 — nom 0,80 plafonné (patronyme unique) soit 0,52, plus
+    // 0,0833 de proximité, plus 0,10 de catégorie. Sous le seuil haut, donc
+    // c'est exactement le cas qu'un humain doit trancher — deux
     // établissements du même artisan, ou deux artisans homonymes du quartier ?
     const loin = candidate({ latitude: 47.2231, longitude: -1.5601 });
     const outcome = selectMatch(subject, [loin], plombier, MATCHING_CONFIG);

@@ -52,9 +52,10 @@ describe('buildEnrichmentRow', () => {
    * Candidat volontairement ambigu : même patronyme et même adresse, mais une
    * catégorie Google qui ne recoupe pas le métier.
    *
-   * Mesuré : confiance 0,7188 — nom 0,80 (plafond patronyme unique), soit
-   * 0,48, plus 0,2388 de proximité, plus 0 de catégorie. C'est entre
-   * `lowThreshold` (0,55) et `highThreshold` (0,85), donc `ambiguous`.
+   * Mesuré sous les poids v2 : confiance 0,7588 — nom 0,80 (plafond
+   * patronyme unique), soit 0,52, plus 0,2388 de proximité, plus 0 de
+   * catégorie. C'est entre `lowThreshold` (0,55) et `highThreshold` (0,85),
+   * donc `ambiguous`.
    */
   function ambigu(): MapsCandidate {
     return candidate({ name: 'Allard Multiservices', category: 'Entreprise de rénovation' });
