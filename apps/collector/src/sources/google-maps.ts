@@ -24,6 +24,19 @@ export class BlockedError extends Error {
 export interface MapsSource {
   search(query: string): Promise<MapsCandidate[]>;
   close(): Promise<void>;
+  /**
+   * Pages Google chargées depuis la création de la source.
+   *
+   * C'est le volume réellement envoyé à Google, et il n'a rien d'égal au
+   * nombre de prospects traités : un prospect coûte une navigation de
+   * recherche, plus une par fiche ouverte. Le plafond journalier compte des
+   * prospects, parce que lui seul se relit depuis la base après un
+   * redémarrage ; ce compteur-ci rend le coût réel visible plutôt que deviné.
+   *
+   * En lecture seule : `close()` ne le remet pas à zéro, la source restant la
+   * même après un cycle de fermeture.
+   */
+  readonly navigations: number;
 }
 
 export interface GoogleMapsOptions {
@@ -210,6 +223,9 @@ export function createGoogleMapsSource(options: GoogleMapsOptions): MapsSource {
   // délai artificiel avant qu'aucune requête n'ait encore été envoyée.
   let lastNavigationAt = -Infinity;
 
+  /** Incrémenté dans `throttleNavigation`, seul passage obligé avant un `goto`. */
+  let navigations = 0;
+
   /**
    * Étrangle CHAQUE navigation vers Google — celle de `search()` comme celle
    * d'une fiche dans `openPlace()` — sur un seul et même compteur.
@@ -228,6 +244,12 @@ export function createGoogleMapsSource(options: GoogleMapsOptions): MapsSource {
     const wait = randomDelay() - elapsed;
     if (wait > 0) await sleep(wait);
     lastNavigationAt = Date.now();
+    // Compté ici, donc avant le `goto` qui suit : le compteur mesure les
+    // requêtes parties vers Google, et une navigation qui échoue en a bel et
+    // bien produit une. La compter après coup sous-estimerait précisément le
+    // volume envoyé les jours où Google répond mal — le moment où ce chiffre
+    // compte le plus.
+    navigations += 1;
   }
 
   async function ensureContext(): Promise<BrowserContext> {
@@ -259,6 +281,12 @@ export function createGoogleMapsSource(options: GoogleMapsOptions): MapsSource {
   }
 
   return {
+    // Accesseur plutôt que champ : un champ mutable public laisserait
+    // l'appelant réécrire le compteur qu'il est censé lire.
+    get navigations(): number {
+      return navigations;
+    },
+
     async search(query: string): Promise<MapsCandidate[]> {
       const ctx = await ensureContext();
       const page = await ctx.newPage();

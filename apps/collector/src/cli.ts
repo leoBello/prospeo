@@ -1,10 +1,12 @@
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { getTrade } from '@prospeo/core';
+import { getTrade, MATCHING_CONFIG } from '@prospeo/core';
 import { loadConfig } from './config.js';
 import { createClient } from './supabase.js';
+import { createGoogleMapsSource } from './sources/google-maps.js';
 import { planScoreWrite } from './stages/classify-score.js';
 import { makeUpsertProspect, runDiscover } from './stages/discover.js';
+import { runEnrich, type EnrichProspect } from './stages/enrich.js';
 import { probeUrl, shouldProbe } from './stages/probe.js';
 
 // `.env` vit a la racine du depot. Ni tsx ni Node ne le chargent tout seuls :
@@ -19,16 +21,32 @@ prospeo <commande> [options]
 
 Commandes
   discover --trade <slug> --postal-code <cp>   Ingère les établissements Sirene
+  enrich --trade <slug>                        Apparie les fiches Google Maps
   probe                                        Sonde les URL déclarées
   score                                        Classe et note les prospects
 
 Options
-  --limit <n>   Plafond d'enregistrements traités
-  --force       Resonde même les URL encore fraîches
+  --limit <n>          Plafond d'enregistrements traités
+  --force              Resonde même les URL encore fraîches
+  --retry-not-found    Rejoue les prospects déjà classés introuvables
 `;
 
 /** Taille de page des lectures Supabase (PostgREST plafonne a max_rows = 1000). */
 const PAGE_SIZE = 500;
+
+/**
+ * Plafond de prospects enrichis par jour.
+ *
+ * Il compte des **prospects**, pas des requêtes envoyées à Google, et l'écart
+ * n'est pas anodin : un prospect coûte une navigation de recherche, plus une
+ * par fiche ouverte — jusqu'à six. C'est pourtant ce compteur-là qu'on
+ * retient, parce que c'est le seul qui survive à un redémarrage : il se relit
+ * depuis la base, alors qu'un compteur de navigations exigerait une table.
+ *
+ * Le volume réellement envoyé à Google est donc rapporté séparément en fin de
+ * run, via `source.navigations`, pour rester visible plutôt que deviné.
+ */
+const DAILY_CAP = 300;
 
 /**
  * Une page de la lecture de `score`. Extrait dans une fonction pour que le
@@ -47,7 +65,7 @@ function fetchScorePage(client: ReturnType<typeof createClient>, from: number) {
 }
 
 /** Commandes reconnues. Les étages sont branchés par les tâches 9 à 11. */
-const COMMANDS = ['discover', 'probe', 'score'] as const;
+const COMMANDS = ['discover', 'enrich', 'probe', 'score'] as const;
 
 function flag(argv: string[], name: string): string | undefined {
   const index = argv.indexOf(`--${name}`);
@@ -110,6 +128,112 @@ async function main(argv: string[]): Promise<number> {
       process.stdout.write(
         `discover ${trade.slug} ${postalCode} : ${report.upserted}/${report.seen} enregistrés\n`,
       );
+      return 0;
+    }
+    case 'enrich': {
+      const slug = flag(argv, 'trade');
+      if (slug === undefined) {
+        process.stderr.write('enrich exige --trade\n');
+        return 1;
+      }
+      const trade = getTrade(slug);
+      if (trade === undefined) {
+        process.stderr.write(`Métier inconnu : ${slug}\n`);
+        return 1;
+      }
+
+      const config = loadConfig(process.env);
+      const client = createClient(config);
+
+      // Prospects sans enrichissement, ou dont le dernier run a été bloqué.
+      const enriched = new Map<string, string>();
+      for (let from = 0; ; from += PAGE_SIZE) {
+        const { data, error } = await client
+          .from('prospect_enrichment')
+          .select('prospect_id, status')
+          .order('prospect_id')
+          .range(from, from + PAGE_SIZE - 1);
+        if (error) throw new Error(error.message);
+        for (const row of data ?? []) enriched.set(row.prospect_id, row.status);
+        if ((data ?? []).length < PAGE_SIZE) break;
+      }
+
+      const prospects: EnrichProspect[] = [];
+      for (let from = 0; ; from += PAGE_SIZE) {
+        const { data, error } = await client
+          .from('prospect')
+          .select('id, denomination, denomination_usuelle, city, address, latitude, longitude')
+          .eq('trade_slug', trade.slug)
+          .order('id')
+          .range(from, from + PAGE_SIZE - 1);
+        if (error) throw new Error(error.message);
+        for (const row of data ?? []) {
+          const status = enriched.get(row.id);
+          // `not_found` n'est pas rejoué automatiquement : c'est un verdict,
+          // pas un échec. `--retry-not-found` le rouvre explicitement.
+          if (status === 'ok' || status === 'ambiguous') continue;
+          if (status === 'not_found' && !argv.includes('--retry-not-found')) continue;
+          prospects.push({
+            id: row.id,
+            denomination: row.denomination,
+            denominationUsuelle: row.denomination_usuelle,
+            city: row.city,
+            address: row.address,
+            latitude: row.latitude,
+            longitude: row.longitude,
+          });
+        }
+        if ((data ?? []).length < PAGE_SIZE) break;
+      }
+
+      // Plafond journalier : compté depuis la base, donc respecté même après
+      // un redémarrage du processus.
+      const since = new Date();
+      since.setHours(0, 0, 0, 0);
+      const { count, error: countError } = await client
+        .from('prospect_enrichment')
+        .select('prospect_id', { count: 'exact', head: true })
+        .gte('enriched_at', since.toISOString());
+      if (countError) throw new Error(countError.message);
+      const dailyRemaining = Math.max(0, DAILY_CAP - (count ?? 0));
+
+      const source = createGoogleMapsSource({
+        userDataDir: process.env.PLAYWRIGHT_USER_DATA_DIR ?? '.playwright-profile',
+      });
+
+      let report;
+      try {
+        report = await runEnrich({
+          prospects,
+          trade,
+          config: MATCHING_CONFIG,
+          source,
+          dailyRemaining,
+          upsert: async (row) => {
+            const { error } = await client
+              .from('prospect_enrichment')
+              .upsert(row, { onConflict: 'prospect_id' });
+            if (error) throw new Error(error.message);
+          },
+        });
+      } finally {
+        await source.close();
+      }
+
+      process.stdout.write(
+        `enrich ${trade.slug} : ${report.ok} appariés, ${report.ambiguous} à trancher, ` +
+          `${report.notFound} introuvables, ${report.failed} en échec ` +
+          `(${source.navigations} pages Google chargées)\n`,
+      );
+      if (report.stoppedByCap) {
+        process.stdout.write(`Plafond journalier de ${DAILY_CAP} prospects atteint.\n`);
+      }
+      if (report.blocked) {
+        process.stderr.write('Arrêt : Google a interposé une vérification.\n');
+        // Code 2, distinct du 1 des erreurs d'usage : une automatisation doit
+        // pouvoir reconnaître un blocage anti-bot sans lire stderr.
+        return 2;
+      }
       return 0;
     }
     case 'probe': {

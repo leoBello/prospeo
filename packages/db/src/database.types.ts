@@ -149,6 +149,7 @@ export type Database = {
       }
       prospect_enrichment: {
         Row: {
+          candidates: Json
           declared_url: string | null
           enriched_at: string
           maps_url: string | null
@@ -166,6 +167,7 @@ export type Database = {
           status: Database["public"]["Enums"]["enrichment_status"]
         }
         Insert: {
+          candidates?: Json
           declared_url?: string | null
           enriched_at?: string
           maps_url?: string | null
@@ -183,6 +185,7 @@ export type Database = {
           status: Database["public"]["Enums"]["enrichment_status"]
         }
         Update: {
+          candidates?: Json
           declared_url?: string | null
           enriched_at?: string
           maps_url?: string | null
