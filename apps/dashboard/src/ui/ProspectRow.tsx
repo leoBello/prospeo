@@ -1,4 +1,5 @@
 import type { WorkRow } from '../domain/prospect.js';
+import { dataWarnings } from '../domain/coherence.js';
 import { Reason } from './Reason.js';
 import { ScoreBar } from './ScoreBar.js';
 import styles from './ProspectRow.module.css';
@@ -21,6 +22,7 @@ interface Props {
 export function ProspectRow({ row, selected, currentRulesetVersion, onSelect }: Props) {
   const { prospect } = row;
   const nom = prospect.denominationUsuelle ?? prospect.denomination;
+  const warnings = dataWarnings(prospect, currentRulesetVersion);
 
   return (
     <li>
@@ -42,7 +44,7 @@ export function ProspectRow({ row, selected, currentRulesetVersion, onSelect }: 
             {prospect.postalCode} {prospect.city} · <Reason fragments={row.reason} />
           </span>
         </span>
-        <ScoreBar score={prospect.score} currentRulesetVersion={currentRulesetVersion} />
+        <ScoreBar score={prospect.score} warnings={warnings} />
       </button>
     </li>
   );

@@ -1,6 +1,8 @@
 import type { ScoreView } from '../domain/prospect.js';
-import { SCORE_BAR_GROUPS, isScoreStale, scoreSegments } from '../domain/score.js';
+import type { DataWarning } from '../domain/coherence.js';
+import { SCORE_BAR_GROUPS, scoreSegments } from '../domain/score.js';
 import type { ScoreBarGroup } from '../domain/score.js';
+import { WarningBadge } from './WarningList.js';
 import { useT } from './preferences.js';
 import styles from './ScoreBar.module.css';
 
@@ -19,15 +21,22 @@ const CLE_GROUPE = {
 interface Props {
   /** `null` quand aucun `prospect_score` n'existe — pas quand le total vaut 0. */
   score: ScoreView | null;
-  /** Version du barème de `packages/core`, pour détecter un score périmé. */
-  currentRulesetVersion: string;
+  /**
+   * Les écarts détectés sur ce prospect, calculés en amont.
+   *
+   * Passés en propriété plutôt que recalculés ici : la barre n'a accès qu'au
+   * score, alors que les écarts se lisent en confrontant trois tables. Les
+   * déduire d'ici obligerait à lui passer le prospect entier pour n'en
+   * afficher qu'un chiffre.
+   */
+  warnings?: DataWarning[];
 }
 
 /**
  * La barre segmentée de la liste (§9.3) : de quoi un score est fait, et non
  * seulement combien il vaut.
  */
-export function ScoreBar({ score, currentRulesetVersion }: Props) {
+export function ScoreBar({ score, warnings = [] }: Props) {
   const t = useT();
 
   if (score === null) {
@@ -42,7 +51,6 @@ export function ScoreBar({ score, currentRulesetVersion }: Props) {
   }
 
   const segments = scoreSegments(score.breakdown, score.total);
-  const perime = isScoreStale(score.rulesetVersion, currentRulesetVersion);
 
   // La description sonore remplace la barre pour qui ne la voit pas : la
   // couleur ne porte jamais seule une information (§ accessibilité).
@@ -73,11 +81,7 @@ export function ScoreBar({ score, currentRulesetVersion }: Props) {
           ))}
       </span>
       <span className={styles.total}>{score.total}</span>
-      {perime ? (
-        <span className={styles.stale} title={t('score.stale.hint')}>
-          {t('score.stale', { stored: score.rulesetVersion, current: currentRulesetVersion })}
-        </span>
-      ) : null}
+      <WarningBadge warnings={warnings} />
     </span>
   );
 }

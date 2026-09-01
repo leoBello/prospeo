@@ -127,7 +127,44 @@ describe('TodayScreen', () => {
 
     await user.keyboard('{ArrowDown}');
     expect(
-      within(screen.getByRole('complementary')).getByText(/version antérieure du barème/),
+      within(screen.getByRole('complementary')).getByText(/barème v1, quand le barème en vigueur/),
     ).toBeDefined();
+  });
+
+  it('signale une categorie de presence dementie par le site declare', async () => {
+    // Le cas d'AUBERT SERVICES en base : categorie « aucune presence web »
+    // valant +35, alors que l'enrichissement rapporte un vrai site. Sans ce
+    // signalement, la premiere ligne de la file de travail est un prospect
+    // disqualifie presente comme le meilleur.
+    const user = userEvent.setup();
+    rendre([
+      vue('a', {
+        score: score(30),
+        presence: {
+          category: 'none',
+          finalUrl: null,
+          httpStatus: null,
+          domainAvailable: null,
+          probedAt: null,
+        },
+        enrichment: {
+          status: 'ok',
+          phoneE164: null,
+          phoneKind: null,
+          rating: null,
+          reviewCount: null,
+          declaredUrl: 'https://aubert-services.fr/serrurier-nantes/',
+          matchedName: 'Aubert Services',
+          matchConfidence: 0.99,
+          enrichedAt: '2026-09-01T14:02:45Z',
+        },
+      }),
+    ]);
+
+    await user.keyboard('{ArrowDown}');
+    const panneau = screen.getByRole('complementary');
+    expect(within(panneau).getByText(/démentie par le site déclaré/)).toBeDefined();
+    // Et l'ecart est visible sans ouvrir le panneau.
+    expect(screen.getAllByText('!').length).toBeGreaterThan(0);
   });
 });

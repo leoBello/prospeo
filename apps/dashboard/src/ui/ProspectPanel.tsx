@@ -1,7 +1,9 @@
 import { minHeadcount } from '@prospeo/core';
 import type { ProspectView } from '../domain/prospect.js';
-import { groupBreakdown, isScoreStale } from '../domain/score.js';
+import { dataWarnings } from '../domain/coherence.js';
+import { groupBreakdown } from '../domain/score.js';
 import type { TranslationKey } from '../i18n/translate.js';
+import { WarningList } from './WarningList.js';
 import { useT } from './preferences.js';
 import styles from './ProspectPanel.module.css';
 
@@ -70,6 +72,7 @@ export function ProspectPanel({ prospect, position, currentRulesetVersion, onClo
   const nom = prospect.denominationUsuelle ?? prospect.denomination;
   const enrichment = prospect.enrichment;
   const score = prospect.score;
+  const warnings = dataWarnings(prospect, currentRulesetVersion);
 
   return (
     <aside className={styles.panel} aria-label={nom}>
@@ -86,6 +89,8 @@ export function ProspectPanel({ prospect, position, currentRulesetVersion, onClo
           ×
         </button>
       </header>
+
+      <WarningList warnings={warnings} />
 
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>{t('panel.section.identity')}</h3>
@@ -185,9 +190,6 @@ export function ProspectPanel({ prospect, position, currentRulesetVersion, onClo
           <p className={styles.absent}>{t('score.absent.hint')}</p>
         ) : (
           <>
-            {isScoreStale(score.rulesetVersion, currentRulesetVersion) ? (
-              <p className={styles.stale}>{t('score.stale.hint')}</p>
-            ) : null}
             {/* Le reçu détaillé du §9.3 : le calcul ligne par ligne, groupé
                 par bloc, points signés, total en pied. Le panneau sert à
                 comprendre et à régler — l'argumentaire commercial relève du

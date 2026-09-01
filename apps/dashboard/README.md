@@ -67,6 +67,33 @@ Aucun code de ce paquet ne doit remplacer un satellite absent par un objet
 vide ou par des zéros. C'est la règle la plus facile à casser par
 commodité, et la seule dont la violation ne produit aucune erreur.
 
+## Ce que la base se contredit
+
+Le dashboard lit des tables alimentées par des étages indépendants qui ne
+tournent pas au même moment. `classify` déduit une catégorie de ce qu'`enrich`
+a trouvé ; `score` chiffre ce que `classify` a conclu. Rien n'oblige ces
+étages à être passés dans cet ordre sur un prospect donné, **et rien en base
+ne marque qu'ils ne l'ont pas été.**
+
+`src/domain/coherence.ts` confronte les trois tables et refuse de présenter un
+chiffre douteux comme un chiffre sûr. Trois écarts, du plus urgent au moins
+urgent :
+
+| Écart | Ce qu'il signifie |
+|---|---|
+| `presence_contradicted` | catégorie `none` (+35) alors qu'une URL est déclarée — le prospect est probablement `has_site` (−100), donc du mauvais côté du seuil |
+| `score_predates_enrichment` | `computed_at` antérieur à `enriched_at` : le score ignore le téléphone, la note et le site trouvés depuis |
+| `score_stale_ruleset` | score calculé sous une autre version du barème |
+
+Relevé le 1ᵉʳ septembre 2026 : **les 25 prospects scorés portent les deux
+derniers écarts, et 4 portent le premier.** Autrement dit, aucun score en base
+n'est actuellement digne de confiance. Ces écarts se corrigent en rejouant
+`classify` puis `score` dans le collector ; le dashboard les constate, il ne
+les répare pas.
+
+Les 114 prospects sans satellite n'en portent aucun : une absence n'est pas
+une incohérence, et les couvrir d'avertissements noierait les vrais.
+
 ## Structure
 
 | Dossier | Contenu |

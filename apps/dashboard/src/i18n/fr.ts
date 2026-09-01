@@ -73,9 +73,17 @@ export const fr = {
   'score.absent.hint':
     'Ce prospect n’a pas de score, ce qui n’est pas la même chose qu’un score de zéro.',
   'score.outOf': '{total} / 100',
-  'score.stale': 'barème {stored}, courant {current}',
-  'score.stale.hint':
-    'Le score affiché a été calculé avec une version antérieure du barème. Il ne reflète pas les règles en vigueur.',
+  'warning.badge': '{count} signalements',
+  'warning.badge_one': '1 signalement',
+  'warning.title': 'Signalements',
+  'warning.hint':
+    'Ces écarts se corrigent en rejouant les étages du collector. Cet écran les constate, il ne les répare pas.',
+  'warning.presenceContradicted':
+    'Catégorie « aucune présence web » démentie par le site déclaré {url} — le score est probablement inversé, pas seulement dépassé.',
+  'warning.scorePredatesEnrichment':
+    'Score calculé avant l’enrichissement Google : il ignore le téléphone, la note et le site découverts depuis.',
+  'warning.staleRuleset':
+    'Score calculé avec le barème {stored}, quand le barème en vigueur est le {current}.',
   'score.total': 'Total',
   'score.group.presence': 'Présence web',
   'score.group.vitalite': 'Vitalité',

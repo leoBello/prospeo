@@ -106,16 +106,6 @@
   font-size: var(--text-sm);
 }
 
-.stale {
-  margin: 0 0 var(--space-3);
-  font-size: var(--text-xs);
-  color: var(--color-warning);
-  border: 1px solid currentColor;
-  border-radius: var(--radius-sm);
-  padding: var(--space-2);
-  line-height: 1.5;
-}
-
 .scoreGroup {
   margin-bottom: var(--space-3);
 }

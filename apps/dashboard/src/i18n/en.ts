@@ -73,9 +73,17 @@ export const en: Record<keyof typeof fr, string> = {
   'score.absent': 'not scored yet',
   'score.absent.hint': 'This prospect has no score, which is not the same as a score of zero.',
   'score.outOf': '{total} / 100',
-  'score.stale': 'ruleset {stored}, current {current}',
-  'score.stale.hint':
-    'This score was computed with an earlier version of the ruleset. It does not reflect the current rules.',
+  'warning.badge': '{count} flags',
+  'warning.badge_one': '1 flag',
+  'warning.title': 'Flags',
+  'warning.hint':
+    'These gaps are fixed by replaying the collector stages. This screen reports them; it does not repair them.',
+  'warning.presenceContradicted':
+    'The “no web presence” category is contradicted by the declared site {url} — the score is likely inverted, not merely out of date.',
+  'warning.scorePredatesEnrichment':
+    'Score computed before the Google enrichment: it ignores the phone, rating and website found since.',
+  'warning.staleRuleset':
+    'Score computed with ruleset {stored}, while the ruleset in force is {current}.',
   'score.total': 'Total',
   'score.group.presence': 'Web presence',
   'score.group.vitalite': 'Vitality',
