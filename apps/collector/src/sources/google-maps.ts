@@ -73,10 +73,17 @@ const SELECTORS = {
  * et un téléphone « Numéro de téléphone: +33 2 85 52 26 00 ». Conserver le
  * préfixe le ferait remonter tel quel dans la fiche de prospection, et
  * apparaître dans le message envoyé à l'artisan.
+ *
+ * On ancre sur les deux libellés réellement observés plutôt que sur un
+ * préfixe borné en longueur avant le premier deux-points : une adresse comme
+ * « ZA de la Distribution : Lot 12 » contient elle-même un deux-points, et un
+ * préfixe générique y couperait le début. Un libellé inconnu laisse la
+ * valeur intacte — le comportement sûr, un préfixe non retiré coûtant moins
+ * qu'une adresse tronquée.
  */
 function stripAriaLabel(value: string | null): string | null {
   if (value === null) return null;
-  const cleaned = value.replace(/^[^:]{0,40}:\s*/, '').trim();
+  const cleaned = value.replace(/^(?:Adresse|Numéro de téléphone)\s*:\s*/i, '').trim();
   return cleaned === '' ? null : cleaned;
 }
 
@@ -89,13 +96,35 @@ function assertNotBlocked(url: string): void {
   if (url.includes('/sorry/') || url.includes('/recaptcha/')) throw new BlockedError(url);
 }
 
+/**
+ * Une chaîne vide, ou uniquement faite d'espaces, n'est pas une donnée :
+ * c'est l'absence d'une donnée — typiquement un élément attaché au DOM mais
+ * pas encore peuplé, la même course que `readPlacePanel` corrige déjà en
+ * attendant `placeName`. Les confondre est dangereux plus loin : `mergePlace`
+ * fait `detail.name ?? card.name`, et `??` ne rejette que `null` — une
+ * chaîne vide écraserait donc silencieusement une valeur valide lue sur la
+ * carte, `toMapsCandidate` rejetterait la fiche faute de nom, et le candidat
+ * disparaîtrait sans trace. On coupe donc ce risque à la source, avant toute
+ * fusion, plutôt qu'au symptôme.
+ *
+ * Équivalent local du `trimmed` de `google-maps-normalize.ts`, non exporté
+ * par ce module pur : le dupliquer ici évite de coupler le module pilotant
+ * Playwright à un détail interne du module de conversion.
+ */
+function emptyToNull(value: string | null): string | null {
+  if (value === null) return null;
+  const trimmed = value.trim();
+  return trimmed === '' ? null : trimmed;
+}
+
 /** `Locator` et `Page` exposent tous deux `locator()` : un seul helper suffit. */
 async function textOf(scope: Page | Locator, selector: string): Promise<string | null> {
-  return scope
+  const raw = await scope
     .locator(selector)
     .first()
     .textContent()
     .catch(() => null);
+  return emptyToNull(raw);
 }
 
 async function attrOf(
@@ -103,11 +132,12 @@ async function attrOf(
   selector: string,
   attribute: string,
 ): Promise<string | null> {
-  return scope
+  const raw = await scope
     .locator(selector)
     .first()
     .getAttribute(attribute)
     .catch(() => null);
+  return emptyToNull(raw);
 }
 
 async function readPlacePanel(page: Page): Promise<RawMapsPlace | null> {
@@ -175,6 +205,31 @@ export function createGoogleMapsSource(options: GoogleMapsOptions): MapsSource {
     return settings.minDelayMs + Math.floor(Math.random() * span);
   }
 
+  // `-Infinity` fait que le premier appel du processus calcule une attente
+  // négative : la toute première navigation part donc immédiatement, sans
+  // délai artificiel avant qu'aucune requête n'ait encore été envoyée.
+  let lastNavigationAt = -Infinity;
+
+  /**
+   * Étrangle CHAQUE navigation vers Google — celle de `search()` comme celle
+   * d'une fiche dans `openPlace()` — sur un seul et même compteur.
+   *
+   * Le rythme anti-bot se mesure aux requêtes envoyées à Google, pas aux
+   * fiches retenues en sortie. Un délai placé seulement entre deux ouvertures
+   * de fiche à l'intérieur d'une même recherche laisserait passer sans
+   * aucune pause toute suite de recherches à résultat unique — le cas le
+   * plus fréquent en interrogeant par raison sociale exacte — et l'étage
+   * suivant enchaînerait alors des centaines de requêtes à pleine vitesse.
+   * Un étranglement qui ne couvre qu'une partie des chemins ne protège de
+   * rien.
+   */
+  async function throttleNavigation(): Promise<void> {
+    const elapsed = Date.now() - lastNavigationAt;
+    const wait = randomDelay() - elapsed;
+    if (wait > 0) await sleep(wait);
+    lastNavigationAt = Date.now();
+  }
+
   async function ensureContext(): Promise<BrowserContext> {
     if (context !== null) return context;
     context = await chromium.launchPersistentContext(settings.userDataDir, {
@@ -188,6 +243,7 @@ export function createGoogleMapsSource(options: GoogleMapsOptions): MapsSource {
   async function openPlace(ctx: BrowserContext, placeUrl: string): Promise<RawMapsPlace | null> {
     const page = await ctx.newPage();
     try {
+      await throttleNavigation();
       await page.goto(placeUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 });
       assertNotBlocked(page.url());
       return await readPlacePanel(page);
@@ -208,6 +264,7 @@ export function createGoogleMapsSource(options: GoogleMapsOptions): MapsSource {
       const page = await ctx.newPage();
       try {
         const url = `https://www.google.com/maps/search/${encodeURIComponent(query)}?hl=fr`;
+        await throttleNavigation();
         await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
         assertNotBlocked(page.url());
 
@@ -268,7 +325,9 @@ export function createGoogleMapsSource(options: GoogleMapsOptions): MapsSource {
         // plafond journalier.
         const candidates: MapsCandidate[] = [];
         for (const raw of raws) {
-          await sleep(randomDelay());
+          // Le délai lui-même est appliqué dans `openPlace`, par
+          // `throttleNavigation`, juste avant son `page.goto` : c'est là,
+          // et non ici, que la requête part réellement vers Google.
           const detail = await openPlace(ctx, raw.placeUrl);
           const candidate = toMapsCandidate(mergePlace(raw, detail));
           if (candidate !== null) candidates.push(candidate);
@@ -280,6 +339,11 @@ export function createGoogleMapsSource(options: GoogleMapsOptions): MapsSource {
     },
 
     async close(): Promise<void> {
+      // La source redevient utilisable après cet appel : `context` retombe à
+      // `null`, et un `search()` ultérieur relancera silencieusement un
+      // navigateur complet plutôt que d'échouer. Ce n'est pas un bug — juste
+      // un coût, celui d'un démarrage de navigateur — mais un appelant qui
+      // ferme en fin de run doit savoir qu'un appel égaré ne casse rien.
       await context?.close();
       context = null;
     },
