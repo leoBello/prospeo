@@ -1,13 +1,15 @@
+import { resolveNs } from 'node:dns/promises';
 import { existsSync } from 'node:fs';
 import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
-import { getTrade, MATCHING_CONFIG, nafMatchesTrade } from '@prospeo/core';
+import { domainCandidates, getTrade, MATCHING_CONFIG, nafMatchesTrade } from '@prospeo/core';
 import { loadConfig } from './config.js';
 import { createClient } from './supabase.js';
 import { createGoogleMapsSource } from './sources/google-maps.js';
 import { fetchStatusBySiret } from './sources/recherche-entreprises.js';
 import { planScoreWrite } from './stages/classify-score.js';
 import { makeUpsertProspect, runDiscover } from './stages/discover.js';
+import { checkDomainAvailability, rdapStatus } from './stages/domains.js';
 import { runEnrich, type EnrichProspect, type ReviewCandidate } from './stages/enrich.js';
 import { probeUrl, shouldProbe } from './stages/probe.js';
 import { runReconcile, type ReconcileProspect } from './stages/reconcile.js';
@@ -30,6 +32,7 @@ Commandes
   probe                                        Sonde les URL déclarées
   score                                        Classe et note les prospects
   reconcile                                    Revérifie l'état Sirene des prospects
+  domains                                      Cherche un nom de domaine libre
 
 Options
   --limit <n>          Plafond d'enregistrements traités
@@ -82,7 +85,7 @@ function fetchScorePage(client: ReturnType<typeof createClient>, from: number) {
 }
 
 /** Commandes reconnues. Les étages sont branchés par les tâches 9 à 11. */
-const COMMANDS = ['discover', 'enrich', 'review', 'probe', 'score', 'reconcile'] as const;
+const COMMANDS = ['discover', 'enrich', 'review', 'probe', 'score', 'reconcile', 'domains'] as const;
 
 function flag(argv: string[], name: string): string | undefined {
   const index = argv.indexOf(`--${name}`);
@@ -703,6 +706,81 @@ async function main(argv: string[]): Promise<number> {
         // `--force-deletions`.
         return 1;
       }
+      return 0;
+    }
+    case 'domains': {
+      const config = loadConfig(process.env);
+      const client = createClient(config);
+
+      // Seuls les prospects sans domaine propre : proposer un nom à qui en a
+      // déjà un n'a aucun sens.
+      const rows: { prospect_id: string; denomination: string; trade_slug: string }[] = [];
+      for (let from = 0; ; from += PAGE_SIZE) {
+        const { data, error } = await client
+          .from('web_presence')
+          .select('prospect_id, prospect(denomination, trade_slug)')
+          .in('category', ['none', 'social_only', 'directory_only'])
+          .is('domain_checked_at', null)
+          .order('prospect_id')
+          .range(from, from + PAGE_SIZE - 1);
+        if (error) throw new Error(error.message);
+        for (const row of data ?? []) {
+          const p = (Array.isArray(row.prospect) ? row.prospect[0] : row.prospect) as
+            | Record<string, unknown>
+            | null;
+          if (p === null) continue;
+          rows.push({
+            prospect_id: row.prospect_id,
+            denomination: p.denomination as string,
+            trade_slug: p.trade_slug as string,
+          });
+        }
+        if ((data ?? []).length < PAGE_SIZE) break;
+      }
+
+      const deps = {
+        resolve: (name: string): Promise<string[]> => resolveNs(name),
+        rdap: (name: string): Promise<number> => rdapStatus(name),
+      };
+
+      let checked = 0;
+      for (const row of rows) {
+        const trade = getTrade(row.trade_slug);
+        if (trade === undefined) continue;
+        const candidates = domainCandidates(row.denomination, trade);
+
+        // On cherche un candidat libre, pas le verdict du dernier essayé.
+        // `false` ne se dit que si TOUS ont été tranchés et pris ; il suffit
+        // d'un seul « je ne sais pas » pour que le champ reste `null`.
+        let available: boolean | null = candidates.length === 0 ? null : false;
+        for (const name of candidates) {
+          const verdict = await checkDomainAvailability(name, deps);
+          if (verdict === true) {
+            available = true;
+            break;
+          }
+          if (verdict === null) available = null;
+        }
+
+        const { error } = await client.from('web_presence').upsert(
+          {
+            prospect_id: row.prospect_id,
+            domain_available: available,
+            domain_candidates: candidates,
+            domain_checked_at: new Date().toISOString(),
+          },
+          { onConflict: 'prospect_id' },
+        );
+        if (error) {
+          process.stderr.write(`domains: échec sur ${row.prospect_id} — ${error.message}
+`);
+          continue;
+        }
+        checked += 1;
+      }
+
+      process.stdout.write(`domains : ${checked} prospects vérifiés
+`);
       return 0;
     }
     default:

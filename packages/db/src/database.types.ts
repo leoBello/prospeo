@@ -284,6 +284,7 @@ export type Database = {
           category: Database["public"]["Enums"]["web_presence_category"] | null
           domain_available: boolean | null
           domain_candidates: Json
+          domain_checked_at: string | null
           final_url: string | null
           has_viewport_meta: boolean | null
           http_status: number | null
@@ -298,6 +299,7 @@ export type Database = {
           category?: Database["public"]["Enums"]["web_presence_category"] | null
           domain_available?: boolean | null
           domain_candidates?: Json
+          domain_checked_at?: string | null
           final_url?: string | null
           has_viewport_meta?: boolean | null
           http_status?: number | null
@@ -312,6 +314,7 @@ export type Database = {
           category?: Database["public"]["Enums"]["web_presence_category"] | null
           domain_available?: boolean | null
           domain_candidates?: Json
+          domain_checked_at?: string | null
           final_url?: string | null
           has_viewport_meta?: boolean | null
           http_status?: number | null

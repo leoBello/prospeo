@@ -8,3 +8,4 @@ export * from './web-presence.js';
 export * from './scoring.js';
 export * from './matching.js';
 export * from './naf.js';
+export * from './domain-name.js';
