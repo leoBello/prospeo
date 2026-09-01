@@ -165,3 +165,54 @@ export function siteContentSchema(trade: Trade) {
 }
 
 export type SiteContent = z.infer<ReturnType<typeof siteContentSchema>>;
+
+/**
+ * Le même contrat, en JSON Schema.
+ *
+ * **Pourquoi un second encodage.** Les sorties structurées de l'API attendent
+ * un JSON Schema. Le helper `zodOutputFormat` du SDK n'accepte que des schémas
+ * `zod/v4`, quand ce dépôt est écrit contre l'API classique de zod 3 — la
+ * convertir partout pour un seul appel serait un chantier sans rapport avec
+ * celui-ci, et toucherait `config.ts` du dashboard comme du collector.
+ *
+ * **Ce n'est pas une duplication.** Les deux encodages dérivent des MÊMES
+ * constantes : `REDACTION_LIMITS` pour les bornes, `trade.prestations` pour la
+ * liste close. Aucune valeur n'est recopiée, donc aucune ne peut diverger — un
+ * test compare d'ailleurs les deux encodages champ par champ.
+ *
+ * Le zod reste l'autorité : c'est lui qui valide la réponse REÇUE. Le JSON
+ * Schema ne fait que dire à l'API ce qu'elle doit contraindre à l'écriture.
+ * Une contrainte que l'API n'appliquerait pas est donc rattrapée derrière,
+ * jamais laissée passer.
+ */
+export function siteRedactionJsonSchema(trade: Trade): Record<string, unknown> {
+  const codes = trade.prestations.map((p) => p.code);
+  if (codes.length === 0) {
+    throw new Error(`Le métier « ${trade.slug} » n'a aucune prestation : voir trades.ts.`);
+  }
+  return {
+    type: 'object',
+    properties: {
+      accroche: {
+        type: 'string',
+        minLength: REDACTION_LIMITS.accroche.min,
+        maxLength: REDACTION_LIMITS.accroche.max,
+      },
+      presentation: {
+        type: 'string',
+        minLength: REDACTION_LIMITS.presentation.min,
+        maxLength: REDACTION_LIMITS.presentation.max,
+      },
+      prestations: {
+        type: 'array',
+        items: { type: 'string', enum: codes },
+        minItems: REDACTION_LIMITS.prestations.min,
+        maxItems: REDACTION_LIMITS.prestations.max,
+      },
+    },
+    required: ['accroche', 'presentation', 'prestations'],
+    // Exigé par les sorties structurées, et c'est aussi ce qui ferme la porte
+    // au modèle qui ajouterait spontanément « anneesExperience ».
+    additionalProperties: false,
+  };
+}

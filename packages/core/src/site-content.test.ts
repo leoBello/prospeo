@@ -3,6 +3,7 @@ import {
   REDACTION_LIMITS,
   SITE_CONTENT_VERSION,
   siteContentSchema,
+  siteRedactionJsonSchema,
   siteRedactionSchema,
 } from './site-content.js';
 import { getTrade } from './trades.js';
@@ -130,5 +131,38 @@ describe('siteContentSchema', () => {
       redaction: REDACTION,
     });
     expect(r.success).toBe(false);
+  });
+});
+
+describe('siteRedactionJsonSchema', () => {
+  it('dit la même chose que le schéma zod', () => {
+    // Deux encodages du même contrat : le zod valide la réponse reçue, le JSON
+    // Schema dit à l'API ce qu'elle doit contraindre à l'écriture. Ils ne se
+    // recopient pas — ils dérivent des mêmes constantes — mais rien
+    // n'empêcherait quelqu'un de modifier l'un en oubliant l'autre. Ce test
+    // est ce qui l'empêche.
+    const js = siteRedactionJsonSchema(PLOMBIER) as {
+      properties: Record<string, Record<string, unknown>>;
+      required: string[];
+      additionalProperties: boolean;
+    };
+
+    expect(Object.keys(js.properties).sort()).toEqual(
+      Object.keys(siteRedactionSchema(PLOMBIER).shape).sort(),
+    );
+    expect(js.required.sort()).toEqual(['accroche', 'presentation', 'prestations']);
+    expect(js.additionalProperties).toBe(false);
+
+    expect(js.properties['accroche']?.maxLength).toBe(REDACTION_LIMITS.accroche.max);
+    expect(js.properties['presentation']?.minLength).toBe(REDACTION_LIMITS.presentation.min);
+    expect(js.properties['prestations']?.minItems).toBe(REDACTION_LIMITS.prestations.min);
+  });
+
+  it('énumère exactement la liste close du métier', () => {
+    const items = (siteRedactionJsonSchema(SERRURIER) as {
+      properties: { prestations: { items: { enum: string[] } } };
+    }).properties.prestations.items.enum;
+    expect(items).toEqual(SERRURIER.prestations.map((p) => p.code));
+    expect(items).not.toContain('chauffe-eau');
   });
 });

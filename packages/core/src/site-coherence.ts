@@ -29,8 +29,15 @@ export interface IncoherenceContenu {
  * base ne permettrait de la trancher. Elle s'en tient aux CHIFFRES, qui sont
  * exactement la classe d'affirmations que la base peut confirmer ou démentir,
  * et accessoirement celle qu'un client vérifie en un coup d'œil.
+ *
+ * La signature ne réclame que `faits` et `redaction` — les deux seules parties
+ * qu'elle lit. Exiger un `SiteContent` entier obligerait `generate` à
+ * fabriquer un bloc `version` qui ne sert à rien ici, et masquerait ce dont la
+ * fonction dépend réellement.
  */
-export function verifierCoherence(contenu: SiteContent): IncoherenceContenu[] {
+export function verifierCoherence(
+  contenu: Pick<SiteContent, 'faits' | 'redaction'>,
+): IncoherenceContenu[] {
   const ecarts: IncoherenceContenu[] = [];
   const champs = [
     { champ: 'redaction.accroche' as const, texte: contenu.redaction.accroche },
