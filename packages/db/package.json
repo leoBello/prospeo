@@ -1,0 +1,12 @@
+{
+  "name": "@prospeo/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "echo 'no tests' && exit 0",
+    "typecheck": "tsc --noEmit"
+  }
+}

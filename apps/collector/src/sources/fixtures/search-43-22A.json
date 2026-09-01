@@ -1,0 +1,108 @@
+{
+  "results": [
+    {
+      "siren": "111111111",
+      "nom_complet": "SARL PLOMBERIE MARTIN",
+      "nom_raison_sociale": "PLOMBERIE MARTIN",
+      "statut_diffusion": "O",
+      "date_creation": "2016-03-01",
+      "tranche_effectif_salarie": "02",
+      "complements": { "est_entrepreneur_individuel": false },
+      "matching_etablissements": [
+        {
+          "siret": "11111111100017",
+          "adresse": "12 RUE DE LA PAIX 44000 NANTES",
+          "code_postal": "44000",
+          "libelle_commune": "NANTES",
+          "latitude": "47.2184",
+          "longitude": "-1.5536",
+          "activite_principale": "43.22A",
+          "etat_administratif": "A",
+          "statut_diffusion_etablissement": "O",
+          "est_siege": true,
+          "nom_commercial": "Plomberie Martin",
+          "liste_enseignes": ["PLOMBERIE MARTIN"]
+        }
+      ]
+    },
+    {
+      "siren": "222222222",
+      "nom_complet": "PLOMBERIE FERMEE",
+      "nom_raison_sociale": "PLOMBERIE FERMEE",
+      "statut_diffusion": "O",
+      "date_creation": "2010-01-01",
+      "tranche_effectif_salarie": "NN",
+      "complements": { "est_entrepreneur_individuel": true },
+      "matching_etablissements": [
+        {
+          "siret": "22222222200011",
+          "adresse": "5 RUE MORTE 44000 NANTES",
+          "code_postal": "44000",
+          "libelle_commune": "NANTES",
+          "latitude": "47.21",
+          "longitude": "-1.55",
+          "activite_principale": "43.22A",
+          "etat_administratif": "F",
+          "statut_diffusion_etablissement": "O",
+          "est_siege": true,
+          "nom_commercial": null,
+          "liste_enseignes": null
+        }
+      ]
+    },
+    {
+      "siren": "333333333",
+      "nom_complet": "PLOMBERIE MASQUEE",
+      "nom_raison_sociale": "PLOMBERIE MASQUEE",
+      "statut_diffusion": "P",
+      "date_creation": "2012-01-01",
+      "tranche_effectif_salarie": "01",
+      "complements": { "est_entrepreneur_individuel": true },
+      "matching_etablissements": [
+        {
+          "siret": "33333333300019",
+          "adresse": "1 RUE SECRETE 44000 NANTES",
+          "code_postal": "44000",
+          "libelle_commune": "NANTES",
+          "latitude": "47.22",
+          "longitude": "-1.56",
+          "activite_principale": "43.22A",
+          "etat_administratif": "A",
+          "statut_diffusion_etablissement": "O",
+          "est_siege": true,
+          "nom_commercial": null,
+          "liste_enseignes": null
+        }
+      ]
+    },
+    {
+      "siren": "444444444",
+      "nom_complet": "ETS DIFFUSION ETAB MASQUEE",
+      "nom_raison_sociale": "ETS DIFFUSION ETAB MASQUEE",
+      "statut_diffusion": "O",
+      "date_creation": "2014-01-01",
+      "tranche_effectif_salarie": "01",
+      "complements": { "est_entrepreneur_individuel": false },
+      "matching_etablissements": [
+        {
+          "siret": "44444444400015",
+          "adresse": "9 RUE CACHEE 44000 NANTES",
+          "code_postal": "44000",
+          "libelle_commune": "NANTES",
+          "latitude": "47.23",
+          "longitude": "-1.57",
+          "activite_principale": "43.22A",
+          "etat_administratif": "A",
+          "statut_diffusion_etablissement": "N",
+          "est_siege": true,
+          "nom_commercial": null,
+          "liste_enseignes": null
+        }
+      ]
+    }
+  ],
+  "total_results": 4,
+  "page": 1,
+  "per_page": 25,
+  "total_pages": 1
+}
