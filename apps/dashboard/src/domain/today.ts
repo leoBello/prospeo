@@ -121,6 +121,49 @@ export function responseRate(input: { contacted: number; replied: number | null 
   return { known: true, value: input.replied / input.contacted };
 }
 
+/**
+ * Statuts qui prouvent qu'un échange a réellement eu lieu.
+ *
+ * `a_contacter` en est exclu : c'est une intention, pas un contact. L'y
+ * inclure gonflerait le seul indicateur qui mesure l'activité réelle, et le
+ * ferait au moment précis où l'on cherche à savoir si la prospection a
+ * démarré.
+ */
+const STATUTS_CONTACTES = new Set(['contacte', 'relance', 'interesse', 'gagne', 'perdu']);
+
+export interface Kpis {
+  inBase: number;
+  contacted: number;
+  interested: number;
+  responseRate: Measure;
+}
+
+/**
+ * La bande d'indicateurs du §9.2, dérivée du même instantané que les listes.
+ *
+ * Les trois premiers comptent des lignes réelles. Le quatrième reste
+ * indisponible : voir `responseRate`. La spec annonçait que ces chiffres
+ * seraient proches de zéro les premières semaines ; ils y sont, et l'écran le
+ * dit plutôt que de le maquiller.
+ */
+export function computeKpis(prospects: ProspectView[]): Kpis {
+  let contacted = 0;
+  let interested = 0;
+  for (const p of prospects) {
+    if (p.pipeline === null) continue;
+    if (STATUTS_CONTACTES.has(p.pipeline.status)) contacted += 1;
+    if (p.pipeline.status === 'interesse') interested += 1;
+  }
+  return {
+    inBase: prospects.length,
+    contacted,
+    interested,
+    // `replied: null` et non `0` : le schéma ne permet pas de compter les
+    // réponses, ce qui n'est pas la même chose que n'en avoir reçu aucune.
+    responseRate: responseRate({ contacted, replied: null }),
+  };
+}
+
 export interface TodayLists {
   followUps: WorkList;
   newHighScore: WorkList;

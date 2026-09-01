@@ -3,6 +3,7 @@ import type { ProspectView } from './prospect.js';
 import {
   MAX_ROWS_PER_LIST,
   buildToday,
+  computeKpis,
   followUpReason,
   highlightLines,
   qualificationGaps,
@@ -181,6 +182,36 @@ describe('responseRate', () => {
     // `interaction` ne distingue pas un échange reçu d'un échange émis : le
     // numérateur n'existe pas dans le schéma actuel.
     expect(responseRate({ contacted: 20, replied: null }).known).toBe(false);
+  });
+});
+
+describe('computeKpis', () => {
+  const pipeline = (status: NonNullable<ProspectView['pipeline']>['status']) => ({
+    status,
+    nextActionAt: null,
+    updatedAt: '2026-08-30T10:00:00Z',
+  });
+
+  it('compte en base tous les prospects, y compris ceux qui n ont aucun satellite', () => {
+    const kpis = computeKpis([vue({ id: 'a' }), vue({ id: 'b', score: scoreDe(50) })]);
+    expect(kpis.inBase).toBe(2);
+  });
+
+  it('ne compte pas comme contacte un prospect seulement marque a contacter', () => {
+    // Marquer n'est pas contacter. Le confondre gonflerait le seul indicateur
+    // qui mesure l'activite reelle.
+    const kpis = computeKpis([
+      vue({ id: 'marque', pipeline: pipeline('a_contacter') }),
+      vue({ id: 'appele', pipeline: pipeline('contacte') }),
+    ]);
+    expect(kpis.contacted).toBe(1);
+  });
+
+  it('rend le taux de reponse indisponible tant que la table de suivi est vide', () => {
+    const kpis = computeKpis([vue({ id: 'a' })]);
+    expect(kpis.contacted).toBe(0);
+    expect(kpis.interested).toBe(0);
+    expect(kpis.responseRate.known).toBe(false);
   });
 });
 
