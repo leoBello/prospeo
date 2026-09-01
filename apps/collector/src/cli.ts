@@ -12,7 +12,7 @@ import { makeUpsertProspect, runDiscover } from './stages/discover.js';
 import { checkDomainAvailability, rdapStatus } from './stages/domains.js';
 import { runEnrich, type EnrichProspect, type ReviewCandidate } from './stages/enrich.js';
 import { probeUrl, shouldProbe } from './stages/probe.js';
-import { runReconcile, type ReconcileProspect } from './stages/reconcile.js';
+import { reconcileExitCode, runReconcile, type ReconcileProspect } from './stages/reconcile.js';
 import { applyReviewDecision, type ReviewDecision } from './stages/review.js';
 
 // `.env` vit a la racine du depot. Ni tsx ni Node ne le chargent tout seuls :
@@ -38,12 +38,26 @@ Options
   --limit <n>          Plafond d'enregistrements traités
   --force              (probe) Resonde même les URL encore fraîches
   --retry-not-found    Rejoue les prospects déjà classés introuvables
+  --dry-run            (reconcile) Décide sans rien écrire, puis affiche le
+                       décompte par action. Sort en 0, sauf si l'API n'a
+                       répondu pour aucun SIRET.
   --force-deletions <n>
-                       (reconcile) Autorise n suppressions que le garde-fou a
-                       refusées. Le nombre est exigé : une dérogation sans
-                       borne, collée dans une tâche planifiée, ne protégerait
-                       plus jamais. La suppression est irréversible et emporte
+                       (reconcile) Exécute la vague de suppressions si, et
+                       seulement si, elle en compte exactement n. Ce n'est pas
+                       un plafond : tout écart, au-dessus comme en dessous,
+                       rend la main au garde-fou. Un plafond confortable se
+                       colle une fois dans une tâche planifiée et ne protège
+                       plus jamais ; un nombre exact oblige à avoir regardé.
+                       La suppression est irréversible et emporte
                        enrichissements, scores et historique.
+
+Supprimer des prospects, en deux temps
+  1. prospeo reconcile --dry-run
+     Ne touche à rien et affiche « n à supprimer ». Vérifier que ce nombre a
+     un sens : une API en panne rend « absent » toute la base.
+  2. prospeo reconcile --force-deletions <ce nombre exact>
+     Rejoue le run et exécute les suppressions. Si le nombre a bougé entre
+     les deux passes, la dérogation ne vaut plus et rien n'est supprimé.
 `;
 
 /** Taille de page des lectures Supabase (PostgREST plafonne a max_rows = 1000). */
@@ -627,11 +641,17 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     }
     case 'reconcile': {
-      // `--force-deletions` exige un nombre, et ce n'est pas une coquetterie :
-      // un interrupteur nu serait une protection de façade, désarmée pour
-      // toujours dès qu'on l'aurait collé une fois dans une tâche planifiée.
-      // En demandant combien de suppressions l'opérateur a vérifiées, on rend
-      // la dérogation caduque dès que la réalité s'en écarte.
+      // `--dry-run` exécute le premier temps — décider — et s'arrête avant la
+      // moindre écriture. C'est lui qui donne le nombre exact à déclarer
+      // ensuite dans `--force-deletions`.
+      const dryRun = argv.includes('--dry-run');
+
+      // `--force-deletions` exige le nombre **exact** de suppressions
+      // constatées, et ce n'est pas une coquetterie : un plafond confortable se
+      // colle une fois dans une tâche planifiée et ne protège plus jamais —
+      // `999999` désarmait la protection à jamais, exactement comme
+      // l'interrupteur nu qu'il remplaçait. Un nombre exact oblige à avoir
+      // regardé, et devient faux dès que la situation change.
       let deletionBudget: number | undefined;
       if (argv.includes('--force-deletions')) {
         const raw = flag(argv, 'force-deletions');
@@ -672,41 +692,62 @@ async function main(argv: string[]): Promise<number> {
         // prospects malgré le garde-fou ». Les confondre ferait vider la base à
         // qui voulait seulement resonder.
         forcedDeletionBudget: deletionBudget,
+        dryRun,
         remove: async (id) => {
           // Les dépendances partent en cascade : c'est la définition même de
           // « ne pas conserver ».
           const { error } = await client.from('prospect').delete().eq('id', id);
           if (error) throw new Error(error.message);
         },
-        close: async (id) => {
-          const { error } = await client.from('prospect').update({ is_closed: true }).eq('id', id);
-          if (error) throw new Error(error.message);
-        },
-        touch: async (id) => {
+        // Drapeau de cessation et horodatage dans un seul `update` : une
+        // écriture par prospect au lieu de deux, et surtout `false` s'écrit
+        // aussi. Tant que seul `true` partait, une cessation enregistrée par
+        // erreur restait vraie pour toujours, même après correction de la fiche
+        // Sirene, et le barème rendait 0 sans recours.
+        setClosed: async (id, closed) => {
           const { error } = await client
             .from('prospect')
-            .update({ reconciled_at: new Date().toISOString() })
+            .update({ is_closed: closed, reconciled_at: new Date().toISOString() })
             .eq('id', id);
           if (error) throw new Error(error.message);
         },
       });
 
+      if (dryRun) {
+        process.stdout.write(
+          `reconcile (--dry-run, aucune écriture) : ${report.decided.keep} à conserver, ` +
+            `${report.decided.close} à clore, ${report.decided.delete} à supprimer, ` +
+            `${report.failedReads} lectures en échec\n`,
+        );
+        // Le nombre à reporter tel quel : `--force-deletions` exige l'égalité.
+        if (report.decided.delete > 0) {
+          process.stdout.write(
+            `reconcile : pour exécuter ces suppressions, relancer avec ` +
+              `--force-deletions ${report.decided.delete}\n`,
+          );
+        }
+        return reconcileExitCode(report, prospects.length);
+      }
+
+      // Les suppressions refusées sont mentionnées sur stdout aussi : qui ne
+      // lit que cette ligne verrait « 0 supprimés » sans comprendre pourquoi.
+      const refus =
+        report.refusedDeletions > 0 ? ` (${report.refusedDeletions} refusées par le garde-fou)` : '';
       process.stdout.write(
         `reconcile : ${report.kept} conservés, ${report.closed} cessés, ` +
-          `${report.deleted} supprimés, ${report.failed} en échec\n`,
+          `${report.deleted} supprimés${refus}, ${report.failedReads} lectures en échec, ` +
+          `${report.failedWrites} écritures en échec\n`,
       );
       if (report.refusedDeletions > 0) {
         process.stderr.write(
           `reconcile : ${report.refusedDeletions} suppressions refusées par le garde-fou.\n`,
         );
-        // Sortie non nulle : un run qui a renoncé à sa moitié destructrice
-        // n'est pas un succès. Une automatisation doit s'en apercevoir sans
-        // lire stderr, et l'opérateur doit revenir décider — soit que l'API
-        // était en panne, soit que la vague est légitime et se rejoue avec
-        // `--force-deletions`.
-        return 1;
       }
-      return 0;
+      // Sortie non nulle sur deux motifs, et le second est le plus discret : un
+      // run qui a renoncé à sa moitié destructrice n'est pas un succès, et un
+      // run qui n'a rien pu décider n'a rien vérifié du tout. Une automatisation
+      // doit s'en apercevoir sans lire stderr.
+      return reconcileExitCode(report, prospects.length);
     }
     case 'domains': {
       const config = loadConfig(process.env);
