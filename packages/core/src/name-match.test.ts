@@ -326,3 +326,84 @@ describe('configuration des métiers', () => {
     expect(plombier.keywords[0]).toBe('plomberie');
   });
 });
+
+describe('bestNameMatch — un mot repris entier n est pas une agglutination', () => {
+  const generic = ['plomberie', 'plombier', 'chauffage', 'depannage'];
+
+  it('ne donne pas un score parfait a un patronyme repris seul par la fiche', () => {
+    // Trouve sur Nantes entiere : « MORGAN AUFFRET », plombier, apparie
+    // automatiquement a la fiche « Morgan » — un magasin de vetements a
+    // 113 m. Le nom valait 1,00 alors que toutes les mesures honnetes
+    // disaient 0,50.
+    //
+    // La cause : l inclusion agglutinee, exemptee du plafond de couverture
+    // pour sauver « rgservices » ~ « rg services ». Mais « morgan » ne
+    // recouvre qu UN SEUL jeton de « morgan auffret » — rien n a ete recolle,
+    // c est une simple inclusion, et c est le cas meme que le plafond du
+    // patronyme unique existe pour refuser.
+    //
+    // La forme est la plus courante de l artisanat francais : l immense
+    // majorite des prospects sont enregistres « Prenom NOM ».
+    for (const [source, fiche] of [
+      ['MORGAN AUFFRET', 'Morgan'],
+      ['JEAN DUPONT', 'Dupont'],
+      ['SOPHIE BERNARD', 'Bernard'],
+      ['MARTIN RENOVATION', 'Martin'],
+    ] as const) {
+      const score = bestNameMatch(nameVariants(source, null), fiche, generic).score;
+      // Le seuil qui compte est celui de la fusion : meme a distance nulle et
+      // categorie concordante, cela doit rester sous 0,85.
+      expect(0.65 * score + 0.35).toBeLessThan(0.85);
+    }
+  });
+
+  it('rattrape toujours une enseigne recollee, qui couvre PLUSIEURS jetons', () => {
+    // Le garde-fou du test precedent : « rgservices » recouvre « rg » ET
+    // « services », deux jetons entiers. La, quelque chose a bien ete
+    // agglutine, et c est ce qui fait preuve.
+    const match = bestNameMatch(
+      nameVariants('GHAITH RAHALI (RGSERVICES)', 'RGSERVICES'),
+      'Plombier Nantes RG Services',
+      generic,
+    );
+    expect(match.score).toBeGreaterThan(0.75);
+  });
+});
+
+describe('nameVariants — les autres separateurs de Sirene', () => {
+  it('separe l enseigne du nom du gerant sur un tiret espace', () => {
+    // Cas reel de Nantes : « AQUATIO - VINCENT COMBE ». AQUATIO est
+    // l enseigne, Vincent Combe le gerant, et Google ne connait que
+    // « Aquatio ». Colles en une seule variante, les deux ne s apparient a
+    // rien de propre — c est ce qui poussait l appariement a compenser par
+    // des mesures d inclusion trop permissives.
+    expect(nameVariants('AQUATIO - VINCENT COMBE', null)).toEqual(
+      expect.arrayContaining(['aquatio', 'vincent combe']),
+    );
+  });
+
+  it('ne coupe pas un trait d union interne a un mot', () => {
+    // « CHAUFFE-EAU » est un seul mot. Couper sur tous les tirets le
+    // scinderait en « chauffe » et « eau », et ferait de deux moities de mot
+    // deux identites.
+    expect(nameVariants('NANTES CHAUFFE-EAU', null)).toEqual(['nantes chauffe eau']);
+  });
+
+  it('separe des enseignes multiples enumerees par virgules', () => {
+    // Cas reel : quatre enseignes dans une seule parenthese. Agglutinees,
+    // elles formaient une chaine de soixante caracteres qui ne ressemblait a
+    // aucune fiche Google.
+    const variants = nameVariants(
+      "FRANCK BERNARD (NANTES CHAUFFE-EAU, PLOMBERIE ALADIN, BERNARD FRANCK)",
+      null,
+    );
+    expect(variants).toEqual(
+      expect.arrayContaining([
+        'franck bernard',
+        'nantes chauffe eau',
+        'plomberie aladin',
+        'bernard franck',
+      ]),
+    );
+  });
+});
