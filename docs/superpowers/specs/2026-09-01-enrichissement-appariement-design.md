@@ -347,16 +347,38 @@ argument, « vous devriez prendre un domaine » n'en est pas un.
 
 ### 9.1 Les scores périmés
 
-Quand `buildScoreRow` renvoie `null`, l'étage `score` compte le prospect en
-attente et passe — en laissant en place le score et la catégorie du passage
-précédent, sans marqueur d'obsolescence. Inerte jusqu'ici, ce trou s'ouvre au
-premier run de `enrich`, qui renseignera `declared_url` sur des prospects
-déjà notés.
+`score` relit et renote déjà toute la base à chaque exécution : il ne porte
+aucun prédicat de fraîcheur, et c'est bien ainsi — le principe « ne traiter
+que ce qui ne l'est pas encore » vaut pour les étages lents et réseau, pas
+pour un calcul pur et instantané.
 
-**Correction : `classify` et `score` recalculent toute la base à chaque
-exécution**, sans prédicat de fraîcheur. Le principe « ne traiter que ce qui
-ne l'est pas encore » existe pour les étages lents et réseau ; l'appliquer à
-un calcul pur et instantané ne produit que des scores obsolètes silencieux.
+Le trou est ailleurs, et il est plus étroit. Quand `buildScoreRow` renvoie
+`null` — un domaine propre est déclaré mais pas encore sondé — l'étage compte
+le prospect en attente et **passe sans rien écrire**. La ligne
+`prospect_score` du passage précédent reste donc en place, ainsi que la
+catégorie, sans marqueur d'obsolescence.
+
+Inerte jusqu'ici, parce que `pending` vaut toujours 0 faute d'enrichissement.
+Le premier run de `enrich` renseignera `declared_url` sur des prospects déjà
+notés `none` à 20 points, et ces 20 points survivront à la découverte qu'ils
+ont un site.
+
+**Correction : quand un prospect devient « en attente de sonde », son score
+et sa catégorie sont effacés.** C'est la même règle que celle appliquée deux
+fois au socle — ne jamais laisser en base une valeur qui affirme ce qu'on ne
+sait plus. « En attente » doit se lire comme une absence, pas comme un
+ancien score qu'aucun signe ne distingue d'un score frais.
+
+### 9.1 bis Fenêtre de fraîcheur de `probe`
+
+`probe` resonde toutes les URL déclarées à chaque exécution, sans condition.
+Aujourd'hui la liste est vide ; après `enrich` elle comptera une centaine
+d'entrées, resondées intégralement à chaque passage.
+
+Resonder est voulu — un site meurt entre deux runs, et c'est précisément ce
+qu'on cherche. Mais une **fenêtre de fraîcheur de 7 jours** évite de
+retélécharger cent sites pour reconstater l'évidence. Un drapeau
+`--force` la contourne.
 
 ### 9.2 Le NAF interrogé mais jamais validé
 
@@ -444,7 +466,8 @@ Rappel du socle : régénérer les types après chaque `db:push`.
 
 ## 14. Ordre de livraison
 
-1. Corrections du socle — recalcul intégral, code de sortie, drapeau NAF.
+1. Corrections du socle — effacement du score en attente, fenêtre de
+   fraîcheur de `probe`.
 2. Appariement pur dans `packages/core`, avec ses cas réels.
 3. Source Google Maps et ses fixtures.
 4. Étage `enrich`.
