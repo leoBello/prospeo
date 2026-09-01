@@ -20,7 +20,7 @@ describe('parseRating', () => {
     expect(parseRating('47')).toBeNull();
   });
 
-  it('rejette une note negative au lieu de la tronquer', () => {
+  it('rejette une note négative au lieu de la tronquer', () => {
     expect(parseRating('-1')).toBeNull();
   });
 
@@ -48,6 +48,24 @@ describe('parseReviewCount', () => {
   it('rend null sans chiffre', () => {
     expect(parseReviewCount(null)).toBeNull();
     expect(parseReviewCount('Aucun avis')).toBeNull();
+  });
+
+  // La virgule est une marque décimale en français, pas un séparateur de
+  // milliers : quand une note et un nombre d'avis se côtoient dans la même
+  // chaîne, seul le contenu des parenthèses (ou, à défaut, le groupe de
+  // chiffres en tête de chaîne) désigne le nombre d'avis. Les confondre
+  // produirait une valeur plausible mais fausse sur un champ qui alimente
+  // le barème de qualification.
+  it('ignore la note qui précède les parenthèses', () => {
+    expect(parseReviewCount('4,7 (128)')).toBe(128);
+  });
+
+  it('lit le groupe de chiffres en tête même suivi de la note', () => {
+    expect(parseReviewCount('128 avis · 4,7')).toBe(128);
+  });
+
+  it('rejette une note isolée plutôt que de la lire comme un nombre d avis', () => {
+    expect(parseReviewCount('4,7')).toBeNull();
   });
 });
 
