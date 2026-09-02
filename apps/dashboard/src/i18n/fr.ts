@@ -336,6 +336,13 @@ export const fr = {
   'gabarit.actif.controle.echec': 'Contrôle en échec le {date}',
   'gabarit.actif.controle.echecSansDetail': 'Contrôle en échec, sans détail enregistré.',
   'gabarit.actif.revenir': 'Revenir au gabarit par défaut',
+  // Affichée seulement quand TOUS les métiers déclarent leur propre
+  // `templateRepo` : `templateRepoFor` résout d'abord celui du métier, si
+  // bien que le gabarit désigné ici ne gouverne alors aucun métier existant.
+  // L'écran est juste et servira au troisième métier — le taire serait la
+  // seule faute.
+  'gabarit.actif.aucunMetier':
+    'Aucun métier actuel n’est gouverné par ce gabarit : les deux métiers déclarent chacun le leur, qui l’emporte. Il s’appliquera au premier métier sans exception.',
 
   // L'infobulle que le brief demande d'afficher, pas seulement d'implémenter :
   // sans elle, personne ne comprend pourquoi un métier ayant son propre
@@ -352,8 +359,14 @@ export const fr = {
   'gabarit.designer.soumettre': 'Désigner ce dépôt',
 
   'gabarit.verifier.label': 'Vérifier',
+  // Le motif dit ce qui EST, pas ce qui viendra : aucun code du collector
+  // n'exécute ce contrôle, et les seuls écrivains de `checked_at` /
+  // `check_ok` les mettent à nul. Promettre « au prochain passage »
+  // envoyait l'opérateur relancer le collector pour revoir « jamais
+  // contrôlé » — une remédiation qui n'existe pas, pire qu'un « indisponible »
+  // générique. Voir docs/design/HANDOFF.md, qui documente déjà le manque.
   'gabarit.verifier.raison':
-    'Le contrôle est fait par le collector à son prochain passage : accessibilité du dépôt, marquage « template », présence de src/content/site.json.',
+    'Le contrôle automatique n’est pas encore écrit — ni ici, ni dans le collector. Il devra vérifier l’accessibilité du dépôt, son marquage « template » et la présence de src/content/site.json. En attendant, « jamais contrôlé » restera affiché.',
 
   'gabarit.metiers.titre': 'Exceptions par métier',
   'gabarit.metiers.aide':

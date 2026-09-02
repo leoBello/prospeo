@@ -52,6 +52,39 @@ function rendre(props: Partial<Parameters<typeof GabaritScreen>[0]> = {}) {
   );
 }
 
+const PHRASE_AUCUN_METIER =
+  'Aucun métier actuel n’est gouverné par ce gabarit : les deux métiers déclarent chacun le leur, qui l’emporte. Il s’appliquera au premier métier sans exception.';
+
+describe('GabaritScreen — la portee reelle du gabarit designe', () => {
+  it('dit que le gabarit ne gouverne aucun metier quand TOUS en declarent un', () => {
+    // `templateRepoFor` resout d'abord le `templateRepo` du metier : quand
+    // tous les metiers en declarent un, ce qu'on designe ici n'atteint
+    // personne. `gabarit.subtitle` affirme pourtant qu'une designation
+    // « substitue » le gabarit livre — faux pour 100 % du trafic actuel.
+    // L'ecran reste juste et servira au troisieme metier ; le taire serait la
+    // seule faute.
+    rendre({
+      template: template({ repoFullName: 'org/gabarit-generique' }),
+      trades: [
+        trade({ slug: 'a', label: 'A', templateRepo: 'org/a' }),
+        trade({ slug: 'b', label: 'B', templateRepo: 'org/b' }),
+      ],
+    });
+    expect(screen.getByText(PHRASE_AUCUN_METIER)).toBeDefined();
+  });
+
+  it('se tait des qu UN metier herite — le gabarit designe gouverne alors quelque chose', () => {
+    rendre({
+      template: template({ repoFullName: 'org/gabarit-generique' }),
+      trades: [
+        trade({ slug: 'a', label: 'A', templateRepo: 'org/a' }),
+        trade({ slug: 'b', label: 'B' }),
+      ],
+    });
+    expect(screen.queryByText(PHRASE_AUCUN_METIER)).toBeNull();
+  });
+});
+
 describe('GabaritScreen', () => {
   it('rend le rail de navigation transmis, sans quoi il disparaitrait de l ecran', () => {
     rendre({ nav: <div data-testid="rail-nav">rail</div> });
@@ -115,9 +148,14 @@ describe('GabaritScreen', () => {
     expect(zone).not.toBeNull();
     expect(zone?.querySelector('button')?.textContent).toContain('Vérifier');
     await user.hover(screen.getByText('Bientôt'));
-    expect(
-      await screen.findByText(/le collector à son prochain passage/, {}, ATTENTE_SURVOL),
-    ).toBeDefined();
+    // Le motif dit que le controle N'EST PAS ECRIT, et non qu'il tournera au
+    // prochain passage du collector : aucun code du collector ne l'execute,
+    // et les seuls ecrivains de `checked_at` / `check_ok` les mettent a nul.
+    // Un motif qui promet une remediation inexistante est pire qu'un
+    // « indisponible » generique.
+    const raison = await screen.findByText(/n’est pas encore écrit/, {}, ATTENTE_SURVOL);
+    expect(raison).toBeDefined();
+    expect(raison.textContent).not.toMatch(/prochain passage/);
   });
 
   it('reflete la prop trades, pas une liste recopiee dans l ecran', () => {

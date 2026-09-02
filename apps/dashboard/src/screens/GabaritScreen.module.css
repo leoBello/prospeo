@@ -186,3 +186,12 @@
   color: var(--color-danger);
   font-size: var(--text-sm);
 }
+
+/* La portée réelle du gabarit désigné, quand elle est nulle : une note, pas
+   une alerte — rien n'est en panne, c'est une limite de la configuration
+   actuelle des métiers. */
+.aucunMetier {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}

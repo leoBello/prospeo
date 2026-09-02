@@ -30,7 +30,8 @@
 | Table `deployment_event` | `supabase/migrations/20260902100000_deployment_event.sql` | livré |
 | Table `site_template` (gabarit actif, ligne singleton) | `supabase/migrations/20260902110000_site_template.sql` | livré |
 | `EventSink` — puits d'événements qui n'interrompt jamais l'étage | `apps/collector/src/stages/events.ts` | livré |
-| `publish` et `deploy` émettent leurs événements | `apps/collector/src/stages/publish.ts`, `apps/collector/src/stages/deploy.ts` | livré |
+| `publish`, `deploy` et `unpublish` émettent leurs événements | `apps/collector/src/stages/publish.ts`, `deploy.ts`, `unpublish.ts` | livré — `unpublish` instrumenté à la revue de fin de lot, voir plus bas |
+| `duration_ms` réellement mesurée | mêmes fichiers | livré — voir plus bas |
 | `publish` lit le gabarit actif en base (niveau 2 de la résolution) | `apps/collector/src/site-template.ts` (`lireGabaritActif`, `gabaritDefautPourPublication`) | livré — voir la trouvaille plus bas |
 | Navigation entre écrans | `apps/dashboard/src/App.tsx`, `src/ui/Nav.tsx` | livré |
 | `EtapesPiste` | `src/ui/EtapesPiste.tsx` | livré |
@@ -47,6 +48,35 @@ pleine et un badge « En ligne » pour `etapeCourante === null` avec
 `etat === 'en_ligne'` (docstring du composant), `HistoriqueTab` affiche un
 `EmptyState` daté sur le dernier jalon connu de `prospect_site` plutôt qu'un
 vide muet. Ne pas le lire comme un bug le jour où ça s'affiche ainsi.
+
+### Corrigé à la revue de fin de lot : deux colonnes que personne ne remplissait
+
+**`duration_ms` est désormais mesurée.** Aucun des onze appels à `emit` ne la
+passait, alors que `DeploiementsScreen` ship une colonne « Durée » complète
+(en-tête, largeur fixe, `dureeParts()`, clés i18n) et que `HistoriqueTab`
+affiche une durée par ligne. En production, chaque ligne aurait lu « non
+renseigné » à jamais — la doctrine du vide nommé retournée contre elle-même :
+« non renseigné » dit *la durée de ce prospect est inconnue*, quand le fait
+était *rien ne mesure les durées*. Les étapes sont chronométrées une par une
+sur l'horloge injectée (`deps.maintenant()`, mandataire dans `PublishDeps`,
+`DeployDeps` et `UnpublishDeps`), échecs compris.
+
+**Ce qui reste sans durée, et c'est voulu** : le `depot/ignore` d'un `publish`
+qui saute un prospect inchangé, et le `build/demarre` d'un déploiement encore
+en cours. Le premier n'a rien fait ; le second marque un commencement, dont la
+durée n'existe pas — le build se poursuit après la fin du run. `null` est la
+réponse honnête dans les deux cas, et « non renseigné » y est le bon
+affichage.
+
+**`retrait` n'est plus une étape que rien n'émet.** Elle figurait dans
+l'énumération `deployment_step`, dans `ORDRE_ETAPES`, dans les deux catalogues
+de traduction et dans deux composants — et `unpublish.ts` ne prenait aucun
+`EventSink`. `publish` et `deploy` avaient été instrumentés, pas lui. Il émet
+désormais `retrait/reussi` avec son motif (refus ou péremption — la table ne
+garde rien d'autre qui les distingue), et `retrait/echoue` quand le garde-fou
+bloque une suppression ou qu'une suppression Vercel rate. **Le mode
+`--dry-run` n'émet rien** : journaliser un retrait qui n'a pas eu lieu ferait
+de la table un récit de travail imaginaire.
 
 ## Ce que la réécriture a fait tomber — trois fois, pas une
 
@@ -120,7 +150,7 @@ Ce sont deux usages différents de ceux du lot 1 — le journal de
 | Zone | Fichier | Ce qui manque | Débloqué par |
 |---|---|---|---|
 | Bouton « Redéployer » | `src/ui/PanelActions.tsx` | `publish` et `deploy` ne s'appellent que depuis le collector en ligne de commande. Aucun déclencheur côté dashboard — voir la décision d'architecture juste en dessous. | Une file d'attente en base, si le besoin se confirme |
-| Bouton « Vérifier » (le dépôt gabarit est-il accessible ? marqué « template » ? contient-il `src/content/site.json` ?) | `src/screens/GabaritScreen.tsx` | Le contrôle exige un jeton GitHub, qui n'a rien à faire dans un bundle navigateur. `site_template` porte déjà les trois colonnes du verdict (`checked_at`, `check_ok`, `check_detail`) — lues par `GabaritScreen`, purgées à chaque nouvelle désignation par `designerGabarit` (`src/data/mutations.ts`). **Mais à la fin de ce lot, aucun code du collector ne les écrit** : `cli.ts` appelle `lireGabaritActif` pour choisir quel dépôt cloner à la publication, rien de plus — aucune passe de contrôle GitHub n'existe encore côté collector. | Une passe de contrôle à écrire dans le collector ; hors périmètre de ce lot |
+| Bouton « Vérifier » (le dépôt gabarit est-il accessible ? marqué « template » ? contient-il `src/content/site.json` ?) | `src/screens/GabaritScreen.tsx` | Le contrôle exige un jeton GitHub, qui n'a rien à faire dans un bundle navigateur. `site_template` porte déjà les trois colonnes du verdict (`checked_at`, `check_ok`, `check_detail`) — lues par `GabaritScreen`, purgées à chaque nouvelle désignation par `designerGabarit` (`src/data/mutations.ts`). **Mais à la fin de ce lot, aucun code du collector ne les écrit** : `cli.ts` appelle `lireGabaritActif` pour choisir quel dépôt cloner à la publication, rien de plus — aucune passe de contrôle GitHub n'existe encore côté collector. **Le motif affiché sous `Bientot` le dit maintenant** (`gabarit.verifier.raison`) : il annonçait auparavant que le contrôle « est fait par le collector à son prochain passage », ce qui envoyait l'opérateur relancer le collector pour revoir « jamais contrôlé » — une remédiation qui n'existe pas, pire qu'un « indisponible » générique. | Une passe de contrôle à écrire dans le collector ; hors périmètre de ce lot |
 
 **Ce qui a disparu du recensement.** `HistoriqueTab.tsx` annonçait un journal
 pas-à-pas sous `Bientot` faute de table d'événements. `deployment_event`
@@ -192,6 +222,17 @@ reste **une décision pour un humain**, pas quelque chose que ce lot tranche :
    qui ne déclareraient pas leur propre `templateRepo` — auquel cas
    `GabaritScreen` mérite une mention de cette portée réduite, au-delà de
    l'infobulle qui affiche déjà l'ordre de résolution.
+
+**La mention de la seconde branche est écrite** (revue de fin de lot). La
+carte « Gabarit actif » rend une phrase — `gabarit.actif.aucunMetier` — dès
+que **tous** les métiers de `trades` déclarent un `templateRepo`, c'est-à-dire
+exactement quand le gabarit désigné ne gouverne aucun métier existant.
+`gabarit.subtitle` affirme qu'une désignation « substitue » le gabarit livré
+avec l'application ; c'est faux pour 100 % du trafic actuel, et l'écran le dit
+maintenant au lieu de le laisser croire. La phrase disparaît d'elle-même dès
+qu'un métier hérite. **`trades.ts` n'a pas été touché** : quels métiers
+déclarent leur propre gabarit reste la décision humaine ci-dessus, et le choix
+1 la fait disparaître sans qu'aucun code ne change.
 
 ## Ce qui n'est pas encore maquetté ni construit
 

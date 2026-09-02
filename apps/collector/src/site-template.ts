@@ -1,6 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@prospeo/db';
-import { templateRepoFor, type Trade } from '@prospeo/core';
 
 /**
  * Le repli de niveau 2 et 3 de `templateRepoFor` (tâche 6, lot 2).
@@ -17,26 +16,6 @@ export function gabaritDefautPourPublication(
   envDefaut: string | undefined,
 ): string | undefined {
   return gabaritBase ?? envDefaut;
-}
-
-/**
- * Les trois niveaux de résolution assemblés — pour les tests, uniquement.
- *
- * En production, ce ne sont jamais deux appels côte à côte : `cli.ts` calcule
- * `gabaritDefautPourPublication(...)` une seule fois pour tout le lot, et
- * c'est `runPublish` (apps/collector/src/stages/publish.ts, inchangé) qui
- * appelle `templateRepoFor(trade, deps.templateRepoDefaut)` séparément, pour
- * CHAQUE prospect selon son propre métier. Cette fonction rejoue les deux à
- * la suite pour permettre à un seul test de prouver que l'ensemble respecte
- * la priorité du métier — le point que `cli.ts`, non testé, ne peut pas
- * garantir lui-même.
- */
-export function resoudreTemplateRepo(
-  trade: Trade,
-  gabaritBase: string | undefined,
-  envDefaut: string | undefined,
-): string {
-  return templateRepoFor(trade, gabaritDefautPourPublication(gabaritBase, envDefaut));
 }
 
 /**

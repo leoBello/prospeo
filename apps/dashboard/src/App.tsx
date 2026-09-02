@@ -80,28 +80,6 @@ function Authenticated({ client }: { client: SupabaseClient<Database> }) {
     [client, gabaritReload],
   );
 
-  if (state.status === 'loading') {
-    // `aria-live` : le changement d'état est annoncé, sans quoi un lecteur
-    // d'écran resterait sur l'écran précédent sans rien signaler.
-    return (
-      <p className={styles.status} aria-live="polite">
-        {t('app.loading')}
-      </p>
-    );
-  }
-
-  if (state.status === 'error') {
-    return (
-      <div className={styles.status} role="alert">
-        <h1>{t('app.error.title')}</h1>
-        <p>{state.message}</p>
-        <button type="button" onClick={state.reload}>
-          {t('app.error.retry')}
-        </button>
-      </div>
-    );
-  }
-
   // L'écran « Gabarit » (D10, chantier n°10) : branché sur l'écran réel,
   // comme « Déploiements » ci-dessous. `TRADES` vient de `@prospeo/core` —
   // jamais une liste recopiée dans l'écran.
@@ -191,6 +169,52 @@ function Authenticated({ client }: { client: SupabaseClient<Database> }) {
         deployments={deploymentsState.deployments}
         onSignOut={() => void signOut()}
         nav={nav}
+      />
+    );
+  }
+
+  // Les gardes de `useProspects` viennent APRÈS les deux branches ci-dessus,
+  // et non avant : ni « Gabarit » ni « Déploiements » ne consomment
+  // `prospects`. Placées plus haut, elles réduisaient l'application entière à
+  // une boîte d'erreur sans rail de navigation dès qu'une lecture de
+  // prospects échouait — impossible d'atteindre l'écran de déploiement,
+  // c'est-à-dire précisément celui qu'on ouvre quand quelque chose ne va pas.
+  // Et chaque chargement à froid de `#/deploiements` clignotait sans rail le
+  // temps d'une lecture paginée sans rapport (relevé de revue, lot 2).
+  if (state.status === 'loading') {
+    // `aria-live` : le changement d'état est annoncé, sans quoi un lecteur
+    // d'écran resterait sur l'écran précédent sans rien signaler.
+    return (
+      <AppShell
+        nav={nav}
+        onSignOut={() => void signOut()}
+        panel={null}
+        list={
+          <p className={styles.status} aria-live="polite">
+            {t('app.loading')}
+          </p>
+        }
+      />
+    );
+  }
+
+  if (state.status === 'error') {
+    // Le rail SURVIT à la lecture ratée : c'est ce qui laisse rejoindre un
+    // écran qui, lui, n'a pas besoin des prospects.
+    return (
+      <AppShell
+        nav={nav}
+        onSignOut={() => void signOut()}
+        panel={null}
+        list={
+          <div className={styles.status} role="alert">
+            <h1>{t('app.error.title')}</h1>
+            <p>{state.message}</p>
+            <button type="button" onClick={state.reload}>
+              {t('app.error.retry')}
+            </button>
+          </div>
+        }
       />
     );
   }

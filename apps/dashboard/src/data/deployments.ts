@@ -50,6 +50,23 @@ export const DEPLOYMENT_SELECT = [
   'deployment_event(step,outcome,detail,duration_ms,occurred_at)',
 ].join(',');
 
+/**
+ * Plafond d'événements ramenés PAR PROSPECT.
+ *
+ * `fetchAllRows` pagine les lignes `prospect` ; il ne voit rien du volume
+ * EMBARQUÉ, si bien que la relation `deployment_event` était lue sans borne.
+ * Or `runPublish` écrit au moins deux lignes par prospect éligible et par
+ * run : le journal grossit à chaque passage du cron, et l'écran, qui n'a
+ * besoin que du dernier événement de chaque étape, tirait tout ce qui a
+ * jamais été enregistré, pour chaque prospect, à chaque visite.
+ *
+ * Trente pour six étapes : largement de quoi couvrir plusieurs rejeux par
+ * étape, tout en bornant la lecture. Combiné au tri décroissant ci-dessous,
+ * ce sont bien les événements les PLUS RÉCENTS qui sont conservés — ceux dont
+ * la dérivation d'état dépend.
+ */
+const MAX_EVENEMENTS_PAR_PROSPECT = 30;
+
 /** Construit le lecteur de tranches attendu par `fetchAllRows` — voir `prospectRangeReader`. */
 export function deploymentRangeReader(client: Client): RangeReader<unknown> {
   return (from, to) =>
@@ -57,6 +74,13 @@ export function deploymentRangeReader(client: Client): RangeReader<unknown> {
       .from('prospect')
       .select(DEPLOYMENT_SELECT)
       .order('id', { ascending: true })
+      // Modificateurs EMBARQUÉS (PostgREST) : ils portent sur la relation, pas
+      // sur les lignes `prospect`. Décroissant + plafond = les plus récents.
+      // `toDeploymentEvents` et les fonctions du domaine ne supposent aucun
+      // ordre — elles comparent les horodatages elles-mêmes — donc ce tri ne
+      // sert qu'à choisir CE QUI est gardé, pas à leur épargner un tri.
+      .order('occurred_at', { referencedTable: 'deployment_event', ascending: false })
+      .limit(MAX_EVENEMENTS_PAR_PROSPECT, { referencedTable: 'deployment_event' })
       .range(from, to) as unknown as ReturnType<RangeReader<unknown>>;
 }
 

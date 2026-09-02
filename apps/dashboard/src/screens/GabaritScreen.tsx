@@ -54,14 +54,31 @@ function OrdreResolution() {
 
 function GabaritActifCard({
   template,
+  trades,
   onDesigner,
   enCours,
 }: {
   template: SiteTemplateView;
+  trades: readonly Trade[];
   onDesigner: (repoFullName: string | null, branch: string) => void;
   enCours: boolean;
 }) {
   const t = useT();
+  /**
+   * Le gabarit désigné ici ne gouverne AUCUN métier existant.
+   *
+   * `templateRepoFor` résout d'abord le `templateRepo` du métier ; quand tous
+   * les métiers en déclarent un, ce qu'on désigne sur cet écran n'atteint
+   * personne. L'écran reste juste — il gouvernera le troisième métier — mais
+   * ne pas le dire laisserait croire à un changement effectif, quand
+   * `gabarit.subtitle` affirme déjà qu'une désignation « substitue » le
+   * gabarit livré. Calculé depuis `trades` reçu en prop, jamais depuis une
+   * liste recopiée : c'est `trades.ts` qui fait foi, et c'est un choix humain
+   * consigné dans `docs/design/HANDOFF.md`.
+   */
+  const aucunMetierGouverne =
+    trades.length > 0 && trades.every((trade) => trade.templateRepo !== undefined);
+
   return (
     <Card titre={t('gabarit.actif.titre')} extra={<OrdreResolution />}>
       {template.repoFullName === null ? (
@@ -103,6 +120,9 @@ function GabaritActifCard({
           </button>
         </>
       )}
+      {aucunMetierGouverne ? (
+        <p className={styles.aucunMetier}>{t('gabarit.actif.aucunMetier')}</p>
+      ) : null}
     </Card>
   );
 }
@@ -158,8 +178,11 @@ function DesignerCard({
           />
         </div>
         {/* Le contrôle réel exige un jeton GitHub, qui n'a rien à faire dans
-            ce bundle : c'est le collector qui vérifie, à son prochain
-            passage. Voir docs/design/HANDOFF.md. */}
+            ce bundle — mais il n'est écrit NULLE PART pour autant : aucun code
+            du collector ne le fait, et les seuls écrivains de `checked_at` /
+            `check_ok` les mettent à nul. Le motif de `Bientot` dit donc ce
+            manque, et non un prochain passage qui ne viendra pas. Voir
+            docs/design/HANDOFF.md. */}
         <Bientot raison={t('gabarit.verifier.raison')}>
           <button type="button" className={styles.verifier}>
             {t('gabarit.verifier.label')}
@@ -214,9 +237,16 @@ interface Props {
  * et qu'il contient `src/content/site.json` exige un jeton GitHub, qui n'a
  * rien à faire dans un bundle navigateur. L'écran affiche donc le dernier
  * verdict connu et sa date (`checked_at`, `check_ok`, `check_detail`), et le
- * bouton « Vérifier » reste inerte sous `Bientot` — sa ligne dans
- * `docs/design/HANDOFF.md` dit pourquoi : le contrôle est fait par le
- * collector à son prochain passage.
+ * bouton « Vérifier » reste inerte sous `Bientot`. Le motif affiché dit que
+ * ce contrôle n'est pas encore écrit — car il ne l'est nulle part : aucun
+ * code du collector ne l'exécute, et `docs/design/HANDOFF.md` documente déjà
+ * ce manque. Une raison qui promettrait « au prochain passage » enverrait
+ * l'opérateur relancer le collector pour revoir « jamais contrôlé ».
+ *
+ * **Il ne gouverne rien aujourd'hui, et le dit** (`gabarit.actif.aucunMetier`) :
+ * les deux métiers de `trades.ts` déclarent chacun leur `templateRepo`, que
+ * `templateRepoFor` résout en premier. L'écran est correct et servira au
+ * troisième métier ; le livrer est juste, ne pas le dire ne l'est pas.
  *
  * **L'ordre de résolution est affiché, pas seulement implémenté**
  * (`OrdreResolution`) : le gabarit du métier (`trades.ts`), puis le gabarit
@@ -264,7 +294,12 @@ export function GabaritScreen({ template, trades, onDesigner, onSignOut = () => 
           </div>
 
           <div className={styles.pile}>
-            <GabaritActifCard template={template} onDesigner={designer} enCours={enCours} />
+            <GabaritActifCard
+              template={template}
+              trades={trades}
+              onDesigner={designer}
+              enCours={enCours}
+            />
             <DesignerCard onDesigner={designer} enCours={enCours} />
 
             <Card titre={t('gabarit.metiers.titre')}>

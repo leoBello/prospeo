@@ -304,6 +304,8 @@ export const en: Record<keyof typeof fr, string> = {
   'gabarit.actif.controle.echec': 'Check failed on {date}',
   'gabarit.actif.controle.echecSansDetail': 'Check failed, with no detail recorded.',
   'gabarit.actif.revenir': 'Revert to the default template',
+  'gabarit.actif.aucunMetier':
+    'No current trade is governed by this template: both trades declare their own, which wins. It will apply to the first trade without an exception.',
 
   'gabarit.ordre.titre': 'Resolution order',
   'gabarit.ordre.detail':
@@ -318,7 +320,7 @@ export const en: Record<keyof typeof fr, string> = {
 
   'gabarit.verifier.label': 'Check',
   'gabarit.verifier.raison':
-    'The check runs on the collector’s next pass: repository reachable, marked as a template, contains src/content/site.json.',
+    'The automatic check has not been written yet — neither here nor in the collector. It will have to verify that the repository is reachable, marked as a template, and contains src/content/site.json. Until then, "never checked" is what this card will keep showing.',
 
   'gabarit.metiers.titre': 'Exceptions by trade',
   'gabarit.metiers.aide':

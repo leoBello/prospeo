@@ -1,6 +1,27 @@
 import { describe, expect, it } from 'vitest';
 import { getTrade, templateRepoFor, type Trade } from '@prospeo/core';
-import { gabaritDefautPourPublication, lireGabaritActif, resoudreTemplateRepo } from './site-template.js';
+import { gabaritDefautPourPublication, lireGabaritActif } from './site-template.js';
+
+/**
+ * Les trois niveaux de résolution assemblés.
+ *
+ * Vit ICI et non dans le module de production : son docstring d'origine
+ * reconnaissait lui-même n'exister que pour les tests, et `cli.ts` ne
+ * l'appelait pas. En production ce ne sont jamais deux appels côte à côte —
+ * `cli.ts` calcule `gabaritDefautPourPublication(...)` une seule fois pour
+ * tout le lot, et c'est `runPublish` qui appelle `templateRepoFor(trade,
+ * deps.templateRepoDefaut)` séparément, pour CHAQUE prospect selon son
+ * métier. On rejoue les deux à la suite pour qu'un seul test prouve que
+ * l'ensemble respecte la priorité du métier — le point que `cli.ts`, non
+ * testé, ne peut pas garantir lui-même.
+ */
+function resoudreTemplateRepo(
+  trade: Trade,
+  gabaritBase: string | undefined,
+  envDefaut: string | undefined,
+): string {
+  return templateRepoFor(trade, gabaritDefautPourPublication(gabaritBase, envDefaut));
+}
 
 /** Métier sans gabarit déclaré — les deux métiers réels en déclarent un. */
 const METIER_SANS_GABARIT: Trade = {
@@ -62,16 +83,16 @@ describe('resoudreTemplateRepo — les trois niveaux ensemble', () => {
     );
   });
 
-  it('délègue effectivement à templateRepoFor (pas de logique dupliquée)', () => {
-    // Filet de sécurité : si `resoudreTemplateRepo` se mettait à réimplémenter
-    // la priorité au lieu d'appeler `templateRepoFor`, ce test le remarquerait
-    // en cas de désaccord entre les deux calculs.
+  it('le gabarit du métier est bien celui que trades.ts déclare, pas un repli', () => {
+    // L'assertion d'origine comparait `resoudreTemplateRepo(...)` à
+    // `templateRepoFor(plombier, gabaritDefautPourPublication(...))` : les
+    // deux membres évaluaient LA MÊME expression, si bien qu'elle passait
+    // aussi bien sous un code correct que sous un code fautif. Une valeur
+    // littérale, elle, ne peut pas suivre la faute.
     const plombier = getTrade('plombier');
     if (plombier === undefined) throw new Error('métier de test introuvable');
-    const defaut = gabaritDefautPourPublication('org/base', 'org/env');
-    expect(resoudreTemplateRepo(plombier, 'org/base', 'org/env')).toBe(
-      templateRepoFor(plombier, defaut),
-    );
+    expect(plombier.templateRepo).toBe('plombier');
+    expect(templateRepoFor(plombier, 'org/ignore')).toBe('plombier');
   });
 });
 
