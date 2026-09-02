@@ -16,6 +16,15 @@ interface Props {
    * pas un champ inerte qui ressemble à un champ actif.
    */
   search?: ReactNode;
+  /**
+   * Le compteur de série (tâche 8, lot 3) : optionnel comme `search`, et pour
+   * la même raison — `BarreHaut` l'affiche sans rien connaître du jeu.
+   * `TodayScreen` en rend `null` tant que l'historique ne permet pas de
+   * trancher (voir `SerieEnTete`, `ui/BandeProgression.tsx`) ; rien
+   * n'apparaît alors à sa place, comme pour `search` sur les écrans qui n'en
+   * fournissent pas.
+   */
+  serie?: ReactNode;
   onSignOut: () => void;
 }
 
@@ -56,7 +65,7 @@ function IconeCompte() {
  * inventée, rien ici ne connaissant l'identité de la personne connectée
  * (décision du pilote, lot 3 tâche 2).
  */
-export function BarreHaut({ search, onSignOut }: Props) {
+export function BarreHaut({ search, serie, onSignOut }: Props) {
   const { t, theme, setTheme, locale, setLocale } = usePreferences();
   const libelleCompte = t('account.button');
 
@@ -65,6 +74,7 @@ export function BarreHaut({ search, onSignOut }: Props) {
       <span className={styles.marque}>{t('app.name')}</span>
       <div className={styles.espace} />
       {search}
+      {serie}
       <Popover.Root>
         <Popover.Trigger className={styles.compte} aria-label={libelleCompte}>
           <IconeCompte />

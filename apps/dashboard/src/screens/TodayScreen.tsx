@@ -3,16 +3,17 @@ import type { ReactNode } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@prospeo/db';
 import type { ProspectView, WorkList } from '../domain/prospect.js';
-import { buildToday, computeKpis, matchesQuery } from '../domain/today.js';
+import { buildToday, matchesQuery } from '../domain/today.js';
 import type { TranslationKey } from '../i18n/translate.js';
 import { AppShell } from '../ui/AppShell.js';
-import { KpiBand } from '../ui/KpiBand.js';
+import { BandeProgression, SerieEnTete } from '../ui/BandeProgression.js';
 import { ProspectPanel } from '../ui/ProspectPanel.js';
 import type { ProspectPanelPosition } from '../ui/ProspectPanel.js';
 import type { PanelActions } from '../ui/actions.js';
 import { WorkListSection } from '../ui/WorkListSection.js';
 import { useListNavigation } from '../ui/useListNavigation.js';
 import { useDeploymentEvents } from '../data/useDeploymentEvents.js';
+import { useJeu } from '../data/useJeu.js';
 import { useT } from '../ui/preferences.js';
 import { estMac } from '../ui/plateforme.js';
 import styles from './TodayScreen.module.css';
@@ -92,10 +93,20 @@ export function TodayScreen({
   // raison — deux absences que `today.empty.search` et `today.empty.*` ne
   // doivent pas confondre (voir `clefAbsence` ci-dessous).
   const todaySansRecherche = useMemo(() => buildToday(prospects, instant), [prospects, instant]);
-  // Les indicateurs portent sur la base entière, jamais sur la recherche :
-  // « En base » doit rester 139 pendant qu'on tape, pas se réduire au nombre
-  // de lignes qui correspondent au texte tapé.
-  const kpis = useMemo(() => computeKpis(prospects), [prospects]);
+
+  /**
+   * Le jeu (D5, tâche 8) : objectif du jour, palier, jalons — voir
+   * `ui/BandeProgression.tsx`.
+   *
+   * `useJeu` (tâche 7) exige un client non nul, contrairement à
+   * `useDeploymentEvents` ci-dessous : ses seuls appelants jusqu'ici
+   * (`Authenticated`, via `useDeployments`/`useSiteTemplate`) en fournissent
+   * toujours un réel. Cet écran, lui, se monte aussi dans des tests sans
+   * client (comme `actions` ci-dessus) — la coercition de type qui suit est
+   * sans risque : `enabled` retombe alors à `false`, et `fetchJeu` n'est
+   * jamais appelé.
+   */
+  const jeuState = useJeu(client as SupabaseClient<Database>, client !== null);
 
   /**
    * Choisit le texte d'un vide de liste : celui de la recherche sans
@@ -235,6 +246,7 @@ export function TodayScreen({
       onSignOut={onSignOut}
       nav={nav}
       search={champRecherche}
+      serie={<SerieEnTete jeu={jeuState} />}
       list={
         <>
           <div className={styles.intro}>
@@ -242,7 +254,7 @@ export function TodayScreen({
             <p className={styles.subtitle}>{t('today.subtitle')}</p>
           </div>
 
-          <KpiBand kpis={kpis} />
+          <BandeProgression jeu={jeuState} />
 
           <p className={styles.hint}>{t('list.keyboardHint')}</p>
 

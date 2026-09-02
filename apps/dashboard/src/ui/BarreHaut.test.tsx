@@ -97,4 +97,20 @@ describe('BarreHaut', () => {
     );
     expect(screen.getByRole('searchbox', { name: 'recherche de test' })).toBeDefined();
   });
+
+  it('n affiche aucun compteur de serie quand l ecran appelant n en fournit pas', () => {
+    // Meme raison que `search` : `TodayScreen` (tache 8) rend `null` tant que
+    // l'historique ne permet pas de trancher (voir `SerieEnTete`,
+    // ui/BandeProgression.tsx), et `BarreHaut` ne doit alors rien afficher a
+    // sa place — ni pastille grise, ni espace vide reserve.
+    const { container } = renderWithPreferences(<BarreHaut onSignOut={vi.fn()} />);
+    expect(container.querySelector('[data-ton]')).toBeNull();
+  });
+
+  it('affiche le compteur de serie fourni par l ecran appelant, sans en connaitre le fonctionnement', () => {
+    renderWithPreferences(
+      <BarreHaut onSignOut={vi.fn()} serie={<span data-ton="alerte">6 jours</span>} />,
+    );
+    expect(screen.getByText('6 jours')).toBeDefined();
+  });
 });

@@ -45,11 +45,6 @@ export const en: Record<keyof typeof fr, string> = {
   'today.title': 'Today',
   'today.subtitle': 'What the database knows, and what it does not know yet.',
 
-  'today.kpi.inBase': 'In database',
-  'today.kpi.contacted': 'Contacted',
-  'today.kpi.interested': 'Interested',
-  'today.kpi.qualified': 'Scored',
-
   'today.section.followUps': 'Follow-ups due',
   'today.section.newHighScore': 'New high-scoring prospects',
 
@@ -66,6 +61,41 @@ export const en: Record<keyof typeof fr, string> = {
   'today.reason.followUp.undated': 'follow-up with no date set',
 
   'today.reason.separator': ' · ',
+
+  'jeu.objectif.titre': "Today's goal",
+  'jeu.objectif.valeur': '{count} follow-ups honored',
+  'jeu.objectif.valeur_one': '{count} follow-up honored',
+  'jeu.objectif.hint':
+    'Median follow-ups honored per day, over the last fourteen full calendar days — not an imposed number.',
+  'jeu.objectif.insuffisant.titre': 'Not enough history yet',
+  'jeu.objectif.insuffisant.detail':
+    'No full calendar day has been observed yet: no reliable median can be derived from it. This goal will appear once there is one.',
+
+  'jeu.palier.titre': 'Tier {numero}',
+  'jeu.palier.points': '{points} / {seuil} points',
+  'jeu.palier.incomplet': 'Minimum total: follow-ups honored are not counted in this score yet.',
+  'jeu.palier.poids.relanceTenue': '+{points} pts · follow-up honored',
+  'jeu.palier.poids.siteMisEnLigne': '+{points} pts · site published',
+  'jeu.palier.poids.rendezVousObtenu': '+{points} pts · meeting obtained',
+
+  'jeu.badge.premiere_relance_tenue': 'First follow-up honored',
+  'jeu.badge.premier_site_en_ligne': 'First site online',
+  'jeu.badge.premier_rendez_vous': 'First meeting',
+  'jeu.badge.serie_sept_jours': 'Seven-day streak',
+  'jeu.badge.etat.obtenu': 'Earned',
+  'jeu.badge.etat.verrouille': 'Locked',
+  'jeu.badge.etat.non_mesurable': 'Not measurable',
+  'jeu.badge.nonMesurable.hint':
+    'No action can unlock this badge today: the measurement it needs has no reliable server-side source yet.',
+
+  'jeu.serie.titre': 'Current streak',
+  'jeu.serie.jours': '{count} days in a row',
+  'jeu.serie.jours_one': '{count} day in a row',
+  'jeu.serie.auMoins': 'At least {count} days in a row',
+  'jeu.serie.hint': 'Consecutive calendar days with at least one follow-up honored.',
+
+  'jeu.chargement': 'Loading the game panel…',
+  'jeu.erreur': 'The game panel could not load: {message}',
 
   'score.absent': 'not scored yet',
   'score.absent.hint': 'This prospect has no score, which is not the same as a score of zero.',

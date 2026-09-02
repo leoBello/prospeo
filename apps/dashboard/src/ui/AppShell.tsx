@@ -22,6 +22,8 @@ interface Props {
    * `BarreHaut` sans rien en connaître.
    */
   search?: ReactNode;
+  /** Le compteur de série de la barre du haut (tâche 8, lot 3) — transmis à `BarreHaut` sans rien en connaître, même patron que `search`. */
+  serie?: ReactNode;
   onSignOut: () => void;
 }
 
@@ -35,12 +37,12 @@ interface Props {
  * l'autre, et il évite l'aller-retour vers une page de détail à chaque
  * prospect.
  */
-export function AppShell({ list, panel, nav, search, onSignOut }: Props) {
+export function AppShell({ list, panel, nav, search, serie, onSignOut }: Props) {
   return (
     <div className={styles.shell}>
       {nav}
       <div className={styles.main}>
-        <BarreHaut search={search} onSignOut={onSignOut} />
+        <BarreHaut search={search} serie={serie} onSignOut={onSignOut} />
 
         <div className={styles.body}>
           <main className={styles.list}>{list}</main>

@@ -3,7 +3,6 @@ import type { ProspectView } from './prospect.js';
 import {
   MAX_ROWS_PER_LIST,
   buildToday,
-  computeKpis,
   followUpReason,
   highlightLines,
   matchesQuery,
@@ -106,47 +105,6 @@ describe('highlightLines', () => {
       2,
     );
     expect(lignes.map((l) => l.code)).toEqual(['presence_none', 'reputation']);
-  });
-});
-
-describe('computeKpis', () => {
-  const pipeline = (status: NonNullable<ProspectView['pipeline']>['status']) => ({
-    status,
-    nextActionAt: null,
-    updatedAt: '2026-08-30T10:00:00Z',
-  });
-
-  it('compte en base tous les prospects, y compris ceux qui n ont aucun satellite', () => {
-    const kpis = computeKpis([vue({ id: 'a' }), vue({ id: 'b', score: scoreDe(50) })]);
-    expect(kpis.inBase).toBe(2);
-  });
-
-  it('ne compte pas comme contacte un prospect seulement marque a contacter', () => {
-    // Marquer n'est pas contacter. Le confondre gonflerait le seul indicateur
-    // qui mesure l'activite reelle.
-    const kpis = computeKpis([
-      vue({ id: 'marque', pipeline: pipeline('a_contacter') }),
-      vue({ id: 'appele', pipeline: pipeline('contacte') }),
-    ]);
-    expect(kpis.contacted).toBe(1);
-  });
-
-  it('compte comme qualifie tout prospect portant un score, quel qu en soit le total', () => {
-    // Y compris un score de zero : c'est un jugement rendu, pas une absence de
-    // jugement. C'est la distinction meme que cet indicateur sert a mesurer.
-    const kpis = computeKpis([
-      vue({ id: 'nul', score: scoreDe(0) }),
-      vue({ id: 'haut', score: scoreDe(90) }),
-      vue({ id: 'sans' }),
-    ]);
-    expect(kpis.qualified).toBe(2);
-    expect(kpis.inBase).toBe(3);
-  });
-
-  it('laisse les compteurs de suivi a zero tant que la table est vide', () => {
-    const kpis = computeKpis([vue({ id: 'a' })]);
-    expect(kpis.contacted).toBe(0);
-    expect(kpis.interested).toBe(0);
   });
 });
 

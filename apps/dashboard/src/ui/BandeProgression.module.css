@@ -1,0 +1,134 @@
+/*
+ * La bande de progression (maquette, Main.dc.html ~108-165) : objectif,
+ * palier, jalons, en une seule rangée sous le titre « Aujourd'hui ». Prend
+ * la place de `KpiBand.module.css`, retiré avec cette tâche.
+ */
+.bande {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+@media (max-width: 900px) {
+  .bande {
+    flex-direction: column;
+  }
+}
+
+.statut,
+.statutErreur {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.statutErreur {
+  color: var(--color-warning);
+}
+
+.objectif {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  flex: none;
+  min-width: 160px;
+  cursor: default;
+}
+
+.objectifTitre {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.objectifValeur {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+/* `EmptyState` (kit/Card) occupe la même colonne que `.objectif` quand
+   l'objectif n'est pas encore connu — pas de règle spécifique nécessaire ici,
+   ses propres styles suffisent. */
+
+.palier {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  padding-left: var(--space-4);
+  border-left: 1px solid var(--color-border);
+}
+
+.palierEntete {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.palierPoints {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-faint);
+}
+
+.barre {
+  height: 7px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-2);
+  overflow: hidden;
+}
+
+.barreRemplie {
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: var(--radius-pill);
+}
+
+.palierNote {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.poids {
+  display: flex;
+  gap: var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+  flex-wrap: wrap;
+}
+
+.jalons {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  padding-left: var(--space-4);
+  border-left: 1px solid var(--color-border);
+}
+
+.jalon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.jalonEtat {
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+}

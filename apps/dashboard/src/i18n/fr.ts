@@ -53,11 +53,6 @@ export const fr = {
   'today.title': "Aujourd'hui",
   'today.subtitle': 'Ce que la base sait, et ce qu’elle ne sait pas encore.',
 
-  'today.kpi.inBase': 'En base',
-  'today.kpi.contacted': 'Contactés',
-  'today.kpi.interested': 'Intéressés',
-  'today.kpi.qualified': 'Qualifiés',
-
   'today.section.followUps': 'Relances dues',
   'today.section.newHighScore': 'Nouveaux prospects à fort score',
 
@@ -78,6 +73,45 @@ export const fr = {
   'today.reason.followUp.undated': 'relance sans date prévue',
 
   'today.reason.separator': ' · ',
+
+  // Lot 3, tâche 8 — la bande de progression qui remplace `KpiBand` sous le
+  // titre « Aujourd'hui », et le compteur de série de la barre du haut. Voir
+  // `ui/BandeProgression.tsx` pour la doctrine des quatre absences distinctes
+  // que ces clés portent à l'écran.
+  'jeu.objectif.titre': 'Objectif du jour',
+  'jeu.objectif.valeur': '{count} relances tenues',
+  'jeu.objectif.valeur_one': '{count} relance tenue',
+  'jeu.objectif.hint':
+    'Médiane des relances tenues par jour, sur les quatorze derniers jours civils complets — pas un chiffre imposé.',
+  'jeu.objectif.insuffisant.titre': 'Historique encore insuffisant',
+  'jeu.objectif.insuffisant.detail':
+    'Pas encore un jour civil complet observé : aucune médiane fiable ne peut s’en déduire. Cet objectif apparaîtra dès qu’il y en aura un.',
+
+  'jeu.palier.titre': 'Palier {numero}',
+  'jeu.palier.points': '{points} / {seuil} points',
+  'jeu.palier.incomplet': 'Total minimal : les relances tenues ne sont pas encore comptées dans ce score.',
+  'jeu.palier.poids.relanceTenue': '+{points} pts · relance tenue',
+  'jeu.palier.poids.siteMisEnLigne': '+{points} pts · site mis en ligne',
+  'jeu.palier.poids.rendezVousObtenu': '+{points} pts · rendez-vous obtenu',
+
+  'jeu.badge.premiere_relance_tenue': 'Première relance tenue',
+  'jeu.badge.premier_site_en_ligne': 'Premier site en ligne',
+  'jeu.badge.premier_rendez_vous': 'Premier rendez-vous',
+  'jeu.badge.serie_sept_jours': 'Série de sept jours',
+  'jeu.badge.etat.obtenu': 'Obtenu',
+  'jeu.badge.etat.verrouille': 'Verrouillé',
+  'jeu.badge.etat.non_mesurable': 'Non mesurable',
+  'jeu.badge.nonMesurable.hint':
+    'Aucun geste ne peut débloquer ce badge aujourd’hui : la mesure qu’il demande n’a pas encore de source fiable côté serveur.',
+
+  'jeu.serie.titre': 'Série en cours',
+  'jeu.serie.jours': '{count} jours d’affilée',
+  'jeu.serie.jours_one': '{count} jour d’affilée',
+  'jeu.serie.auMoins': 'Au moins {count} jours d’affilée',
+  'jeu.serie.hint': 'Jours civils consécutifs avec au moins une relance tenue.',
+
+  'jeu.chargement': 'Chargement du tableau de jeu…',
+  'jeu.erreur': 'Le tableau de jeu n’a pas pu se charger : {message}',
 
   'score.absent': 'pas encore scoré',
   'score.absent.hint':

@@ -87,53 +87,6 @@ export function highlightLines(breakdown: ScoreLine[], max = MAX_REASON_LINES): 
 }
 
 /**
- * Statuts qui prouvent qu'un échange a réellement eu lieu.
- *
- * `a_contacter` en est exclu : c'est une intention, pas un contact. L'y
- * inclure gonflerait le seul indicateur qui mesure l'activité réelle, et le
- * ferait au moment précis où l'on cherche à savoir si la prospection a
- * démarré.
- */
-const STATUTS_CONTACTES = new Set(['contacte', 'relance', 'interesse', 'gagne', 'perdu']);
-
-export interface Kpis {
-  inBase: number;
-  /**
-   * Prospects portant un `prospect_score`.
-   *
-   * Cet indicateur remplace le taux de réponse du §9.2, qui n'est pas
-   * mesurable : `interaction` enregistre le canal d'un échange, jamais son
-   * sens, et le numérateur d'un taux de réponse n'existe donc pas dans le
-   * schéma. Une tuile inerte à demeure valait moins que le seul chiffre qui
-   * dise où en est vraiment la base : 25 sur 139 au 1er septembre 2026.
-   */
-  qualified: number;
-  contacted: number;
-  interested: number;
-}
-
-/**
- * La bande d'indicateurs du §9.2.
- *
- * Dérivée du même instantané que les listes, donc toujours cohérente avec
- * elles. La spec annonçait que ces chiffres seraient proches de zéro les
- * premières semaines ; ils y sont, et l'écran l'affiche plutôt que de le
- * maquiller.
- */
-export function computeKpis(prospects: ProspectView[]): Kpis {
-  let qualified = 0;
-  let contacted = 0;
-  let interested = 0;
-  for (const p of prospects) {
-    if (p.score !== null) qualified += 1;
-    if (p.pipeline === null) continue;
-    if (STATUTS_CONTACTES.has(p.pipeline.status)) contacted += 1;
-    if (p.pipeline.status === 'interesse') interested += 1;
-  }
-  return { inBase: prospects.length, qualified, contacted, interested };
-}
-
-/**
  * Neutralise casse et diacritiques, pour que « nantes » retrouve « NANTES »
  * comme « Nântes » : la dénomination vient de sources externes (INSEE,
  * Google) qui ne garantissent aucune normalisation commune.
