@@ -34,6 +34,8 @@ function fausseDeps(options: {
   events?: EventSink;
   attendreUrl?: (projectId: string) => Promise<string | null>;
   vercel?: Partial<VercelClient>;
+  /** Horloge de test — sert de chronomètre à `duration_ms` (tâche « durées mesurées »). */
+  maintenant?: () => Date;
 } = {}) {
   const journal: string[] = [];
   const projetsEnregistres: Record<string, string> = {};
@@ -70,6 +72,7 @@ function fausseDeps(options: {
       urlsEnregistrees[prospectId] = url;
     },
     attendreUrl: options.attendreUrl ?? (async () => null),
+    maintenant: options.maintenant ?? (() => new Date()),
   };
 
   return { deps, journal, projetsEnregistres, urlsEnregistrees, vercel };
@@ -182,6 +185,55 @@ describe('runDeploy', () => {
     expect(events).toContainEqual(
       expect.objectContaining({ prospectId: 'p2', step: 'en_ligne', outcome: 'reussi' }),
     );
+  });
+
+  it('MESURE la durée de chaque étape, séparément, au lieu de les laisser nulles', async () => {
+    // `duration_ms` n'était renseignée par aucun appelant : l'écran affichait
+    // une colonne « Durée » dont chaque ligne lisait « non renseigné » à
+    // jamais. Le chronomètre repart à chaque étape, sans quoi la durée ne
+    // dirait plus LAQUELLE a coûté le temps — la question même qu'on pose à
+    // cette colonne.
+    //
+    // L'horloge avance de 100 ms à chaque lecture. `runDeploy` la lit au
+    // départ, puis une fois par borne d'étape.
+    let t = new Date('2026-09-01T12:00:00Z').getTime();
+    const horloge = () => {
+      const instant = new Date(t);
+      t += 100;
+      return instant;
+    };
+    const { sink, events } = fauxEvents();
+    const { deps } = fausseDeps({
+      events: sink,
+      maintenant: horloge,
+      vercel: { async urlProduction() { return 'https://x.vercel.app'; } },
+    });
+
+    await runDeploy([{ prospectId: 'p1', repoFullName: 'org/depot1', vercelProjectId: null }], deps);
+
+    // Les trois étapes portent une durée MESURÉE, chacune la sienne.
+    for (const etape of ['projet', 'build', 'en_ligne'] as const) {
+      const e = events.find((x) => x.step === etape && x.outcome === 'reussi');
+      expect(e, etape).toBeDefined();
+      expect(e?.durationMs, etape).toBe(100);
+    }
+  });
+
+  it('n’invente AUCUNE durée sur un « build/demarre » — la durée d’un commencement n’existe pas', async () => {
+    // Le build se poursuit après la fin du run : le temps déjà passé à
+    // attendre n'est pas la durée du build. `null` est la réponse honnête.
+    const { sink, events } = fauxEvents();
+    const { deps } = fausseDeps({ events: sink });
+
+    const report = await runDeploy(
+      [{ prospectId: 'p1', repoFullName: 'org/depot1', vercelProjectId: 'proj-1' }],
+      deps,
+    );
+
+    expect(report.pending).toBe(1);
+    const demarre = events.find((e) => e.step === 'build' && e.outcome === 'demarre');
+    expect(demarre).toBeDefined();
+    expect(demarre?.durationMs ?? null).toBeNull();
   });
 
   it('rend un rapport vide sur un lot vide', async () => {

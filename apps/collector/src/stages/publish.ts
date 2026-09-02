@@ -167,7 +167,17 @@ export interface PublishDeps {
   templateRepoDefaut?: string | undefined;
   lireEtat(prospectId: string): Promise<EtatSite | null>;
   enregistrer(prospectId: string, etat: EtatSiteEcrit): Promise<void>;
-  /** Injectée plutôt que `new Date()` : une date de publication se teste. */
+  /**
+   * Injectée plutôt que `new Date()` : une date de publication se teste.
+   *
+   * Sert aussi de CHRONOMÈTRE pour `duration_ms` (voir plus bas) : la colonne
+   * existait, l'écran l'affichait, et aucun appelant ne la renseignait — si
+   * bien que chaque ligne lisait « non renseigné » à jamais. C'est une
+   * absence mal nommée : le vrai fait n'était pas « la durée de ce prospect
+   * est inconnue » mais « rien ne mesure les durées ». Une horloge déjà
+   * injectée vaut mieux qu'un `Date.now()` en dur : la mesure se teste au
+   * lieu de se constater.
+   */
   maintenant(): Date;
 }
 
@@ -242,6 +252,14 @@ export async function runPublish(
     const depot = nomDepot(contenu.faits);
     const empreinte = empreinteContenu(contenu);
 
+    // Départ du chronomètre de l'étape « depot » : il couvre TOUT ce que
+    // cette étape fait réellement — la lecture de l'état, l'appel GitHub, et
+    // l'écriture en base — parce que c'est ce temps-là qu'un opérateur veut
+    // comparer d'un prospect à l'autre. Il est pris avant le `try` pour que
+    // le `catch` mesure lui aussi : savoir qu'un échec est survenu au bout de
+    // trois cents secondes plutôt que de trois est la moitié du diagnostic.
+    const debutDepot = deps.maintenant().getTime();
+
     try {
       const etat = await deps.lireEtat(prospectId);
       const action = decidePublish(etat, empreinte);
@@ -250,6 +268,10 @@ export async function runPublish(
         // délibérément sauté ce prospect est une information. Sans elle, le
         // journal se lirait comme un trou identique à celui d'un prospect que
         // ce run n'aurait jamais examiné.
+        // Aucune `durationMs` : ce run n'a rien fait pour ce prospect. Une
+        // durée sur un « ignoré » mesurerait le temps de constater qu'il n'y
+        // avait rien à faire, ce qui n'est pas la même grandeur que celle
+        // qu'affichent les autres lignes. `null` est ici la réponse honnête.
         await deps.events.emit({
           prospectId,
           step: 'depot',
@@ -318,7 +340,13 @@ export async function runPublish(
 
       // Le dépôt existe et le contenu y est écrit : « depot » aboutit ici,
       // qu'il s'agisse d'une création ou d'une mise à jour.
-      await deps.events.emit({ prospectId, step: 'depot', outcome: 'reussi', detail: repoFullName });
+      await deps.events.emit({
+        prospectId,
+        step: 'depot',
+        outcome: 'reussi',
+        detail: repoFullName,
+        durationMs: deps.maintenant().getTime() - debutDepot,
+      });
 
       if (action === 'create') report.created += 1;
       else report.updated += 1;
@@ -330,7 +358,13 @@ export async function runPublish(
       console.error(`publish : échec sur ${prospectId} (${depot}) — ${detail}`);
       // Émis puis on continue la boucle : un échec sur un prospect ne doit
       // pas empêcher le journal — ni la publication — des suivants.
-      await deps.events.emit({ prospectId, step: 'depot', outcome: 'echoue', detail });
+      await deps.events.emit({
+        prospectId,
+        step: 'depot',
+        outcome: 'echoue',
+        detail,
+        durationMs: deps.maintenant().getTime() - debutDepot,
+      });
       report.failed += 1;
     }
   }

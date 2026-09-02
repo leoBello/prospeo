@@ -61,6 +61,17 @@ export interface DeployDeps {
    * `cli.ts` y branche la boucle de scrutation réelle.
    */
   attendreUrl(projectId: string): Promise<string | null>;
+  /**
+   * Horloge injectée — CHRONOMÈTRE des étapes, pour `duration_ms`.
+   *
+   * Même parti que `PublishDeps.maintenant` : la colonne existait et l'écran
+   * l'affichait, mais aucun appelant ne la renseignait — toutes les lignes
+   * lisaient « non renseigné » à jamais, ce qui nommait mal l'absence (le
+   * fait n'était pas « la durée de ce prospect est inconnue » mais « rien ne
+   * mesure les durées »). Injectée plutôt que `Date.now()` en dur : la mesure
+   * se teste au lieu de se constater.
+   */
+  maintenant(): Date;
 }
 
 /**
@@ -87,6 +98,11 @@ export async function runDeploy(
     // granularité que l'écran de suivi doit pouvoir montrer, pas un simple
     // « ça a raté quelque part ».
     let etape: 'projet' | 'build' | 'en_ligne' = 'projet';
+    // Chronomètre de l'ÉTAPE en cours, remis à zéro à chaque changement
+    // d'étape ci-dessous : une durée qui couvrirait les trois étapes ne
+    // dirait plus laquelle a coûté le temps, ce qui est précisément la
+    // question qu'on pose à cette colonne.
+    let debutEtape = deps.maintenant().getTime();
 
     try {
       let projectId = site.vercelProjectId;
@@ -103,10 +119,12 @@ export async function runDeploy(
           step: 'projet',
           outcome: 'reussi',
           detail: projectId,
+          durationMs: deps.maintenant().getTime() - debutEtape,
         });
       }
 
       etape = 'build';
+      debutEtape = deps.maintenant().getTime();
       let url = await deps.vercel.urlProduction(projectId);
       if (url === null) {
         // Vercel ne déploie pas le HEAD d'un dépôt qu'on vient de lier : il
@@ -118,17 +136,33 @@ export async function runDeploy(
           // L'état intermédiaire réel : un build démarré sans URL n'est pas
           // un trou dans le journal, c'est un `build`/`demarre` sans
           // `reussi` correspondant. Le prochain run reprendra la ligne.
+          // Aucune `durationMs` : un « démarré » marque un COMMENCEMENT, et
+          // la durée d'un commencement n'existe pas. Le temps déjà passé à
+          // attendre n'est pas la durée du build — celui-ci se poursuit
+          // après la fin du run. `null` est la réponse honnête.
           await deps.events.emit({ prospectId, step: 'build', outcome: 'demarre' });
           report.pending += 1;
           process.stdout.write(`deploy : ${nom} en construction, à reprendre au prochain run\n`);
           continue;
         }
       }
-      await deps.events.emit({ prospectId, step: 'build', outcome: 'reussi' });
+      await deps.events.emit({
+        prospectId,
+        step: 'build',
+        outcome: 'reussi',
+        durationMs: deps.maintenant().getTime() - debutEtape,
+      });
 
       etape = 'en_ligne';
+      debutEtape = deps.maintenant().getTime();
       await deps.enregistrerUrl(prospectId, url);
-      await deps.events.emit({ prospectId, step: 'en_ligne', outcome: 'reussi', detail: url });
+      await deps.events.emit({
+        prospectId,
+        step: 'en_ligne',
+        outcome: 'reussi',
+        detail: url,
+        durationMs: deps.maintenant().getTime() - debutEtape,
+      });
       report.deployed += 1;
       process.stdout.write(`deploy : ${url}\n`);
     } catch (erreur) {
@@ -137,7 +171,15 @@ export async function runDeploy(
       console.error(`deploy : échec sur ${prospectId} (${repoFullName}) — ${detail}`);
       // C'est la raison d'être de la tâche : cette ligne partait autrefois
       // sur `stderr` seul, et la base n'en gardait rien.
-      await deps.events.emit({ prospectId, step: etape, outcome: 'echoue', detail });
+      // Mesurée elle aussi : savoir qu'un échec est survenu au bout de trois
+      // cents secondes plutôt que de trois est la moitié du diagnostic.
+      await deps.events.emit({
+        prospectId,
+        step: etape,
+        outcome: 'echoue',
+        detail,
+        durationMs: deps.maintenant().getTime() - debutEtape,
+      });
       report.failed += 1;
     }
   }

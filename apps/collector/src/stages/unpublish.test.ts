@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { DeploymentEvent } from './events.js';
 import {
   decideUnpublish,
   PEREMPTION_JOURS,
@@ -102,10 +103,22 @@ describe('projetSupprimable', () => {
   });
 });
 
-/** Dépendances de test : journalise, ne sort jamais sur le réseau. */
-function fausseDeps(sites: SiteEnLigne[], enregistres?: string[]) {
+/**
+ * Dépendances de test : journalise, ne sort jamais sur le réseau.
+ *
+ * `horloge` sert de chronomètre à `duration_ms` : par défaut elle est figée
+ * sur `NOW` (durée mesurée nulle, ce qui est le cas des tests qui n'observent
+ * pas la durée) ; un test qui veut prouver la MESURE la fait avancer.
+ */
+function fausseDeps(sites: SiteEnLigne[], enregistres?: string[], horloge: () => Date = () => NOW) {
   const journal: string[] = [];
+  const events: DeploymentEvent[] = [];
   const deps: UnpublishDeps = {
+    events: {
+      async emit(e) {
+        events.push(e);
+      },
+    },
     async lireSitesEnLigne() {
       return sites;
     },
@@ -123,9 +136,9 @@ function fausseDeps(sites: SiteEnLigne[], enregistres?: string[]) {
     async marquerDepublie(prospectId) {
       journal.push(`marquer:${prospectId}`);
     },
-    maintenant: () => NOW,
+    maintenant: horloge,
   };
-  return { deps, journal };
+  return { deps, journal, events };
 }
 
 describe('runUnpublish', () => {
@@ -203,6 +216,84 @@ describe('runUnpublish', () => {
     // la base doit continuer de le dire.
     expect(journal).not.toContain('marquer:pa');
     expect(journal).toContain('marquer:pb');
+  });
+});
+
+describe('runUnpublish — le journal de l etape « retrait »', () => {
+  it('emet retrait/reussi avec le motif, distinct entre refus et peremption', async () => {
+    // `retrait` figurait dans l'enumeration de la base, dans l'ordre du
+    // pipeline et dans les deux catalogues de traduction, et RIEN ne
+    // l'emettait : `publish` et `deploy` avaient ete instrumentes, pas
+    // `unpublish`.
+    const refus = { ...publieIlYA(1), prospectId: 'pr', pipelineStatus: 'ne_pas_contacter' as const, vercelProjectId: 'prj_r' };
+    const perime = { ...publieIlYA(200), prospectId: 'pp', vercelProjectId: 'prj_p' };
+    const { deps, events } = fausseDeps([refus, perime]);
+
+    await runUnpublish(deps, { dryRun: false });
+
+    expect(events.map((e) => [e.prospectId, e.step, e.outcome])).toEqual([
+      ['pr', 'retrait', 'reussi'],
+      ['pp', 'retrait', 'reussi'],
+    ]);
+    // Le motif est la SEULE chose qui distingue les deux, des mois plus tard.
+    expect(events[0]!.detail).toBe('refus du prospect (ne_pas_contacter ou perdu)');
+    expect(events[1]!.detail).toBe('péremption à 90 jours sans réponse');
+  });
+
+  it('n emet RIEN en simulation — un retrait qui n a pas eu lieu ne se journalise pas', async () => {
+    const site = { ...publieIlYA(1), pipelineStatus: 'ne_pas_contacter' as const };
+    const { deps, events } = fausseDeps([site]);
+    await runUnpublish(deps, { dryRun: true });
+    expect(events).toEqual([]);
+  });
+
+  it('n emet rien pour un site qu on garde — aucun travail, aucun fait', async () => {
+    const { deps, events } = fausseDeps([publieIlYA(1)]);
+    const r = await runUnpublish(deps, { dryRun: false });
+    expect(r.decided.garder).toBe(1);
+    expect(events).toEqual([]);
+  });
+
+  it('emet retrait/echoue quand le garde-fou bloque — le site est toujours en ligne', async () => {
+    const site = { ...publieIlYA(200), vercelProjectId: 'prj_inconnu' };
+    const { deps, events } = fausseDeps([site], ['prj_1', 'prj_2']);
+    await runUnpublish(deps, { dryRun: false });
+
+    expect(events).toHaveLength(1);
+    expect(events[0]!.outcome).toBe('echoue');
+    expect(events[0]!.step).toBe('retrait');
+    expect(events[0]!.detail).toContain('garde-fou');
+    expect(events[0]!.detail).toContain('prj_inconnu');
+  });
+
+  it('emet retrait/echoue avec la cause quand la suppression Vercel echoue', async () => {
+    const site = { ...publieIlYA(200), vercelProjectId: 'prj_a' };
+    const { deps, events } = fausseDeps([site]);
+    deps.supprimerProjet = async () => {
+      throw new Error('Vercel : 500');
+    };
+    await runUnpublish(deps, { dryRun: false });
+
+    expect(events).toHaveLength(1);
+    expect(events[0]!.outcome).toBe('echoue');
+    expect(events[0]!.detail).toBe('Vercel : 500');
+  });
+
+  it('MESURE la duree du retrait au lieu de la laisser nulle', async () => {
+    // Horloge qui avance de 400 ms a chaque lecture : la duree emise est
+    // l'ecart entre la lecture d'entree et celle de l'emission, donc 400.
+    let t = NOW.getTime();
+    const horloge = () => {
+      const instant = new Date(t);
+      t += 400;
+      return instant;
+    };
+    const site = { ...publieIlYA(1), pipelineStatus: 'ne_pas_contacter' as const, vercelProjectId: null };
+    const { deps, events } = fausseDeps([site], undefined, horloge);
+    await runUnpublish(deps, { dryRun: false });
+
+    expect(events).toHaveLength(1);
+    expect(events[0]!.durationMs).toBe(400);
   });
 });
 

@@ -202,8 +202,18 @@ function fauxEvents() {
   return { sink, events };
 }
 
-/** Dépendances de test : enregistre les appels, ne sort jamais sur le réseau. */
-function fausseDeps(etats: Record<string, EtatSite> = {}, events: EventSink = NULL_SINK) {
+/**
+ * Dépendances de test : enregistre les appels, ne sort jamais sur le réseau.
+ *
+ * `horloge` sert à la fois de date de publication et de CHRONOMÈTRE pour
+ * `duration_ms`. Figée par défaut (durée mesurée nulle) ; un test qui veut
+ * prouver la mesure la fait avancer.
+ */
+function fausseDeps(
+  etats: Record<string, EtatSite> = {},
+  events: EventSink = NULL_SINK,
+  horloge: () => Date = () => new Date('2026-09-01T12:00:00Z'),
+) {
   const journal: string[] = [];
   const ecrits: Record<string, Record<string, unknown>> = {};
   const deps: PublishDeps = {
@@ -232,7 +242,7 @@ function fausseDeps(etats: Record<string, EtatSite> = {}, events: EventSink = NU
       journal.push(`enregistrer:${id}`);
       ecrits[id] = etat as unknown as Record<string, unknown>;
     },
-    maintenant: () => new Date('2026-09-01T12:00:00Z'),
+    maintenant: horloge,
   };
   return { deps, journal, ecrits };
 }
@@ -421,6 +431,69 @@ describe('runPublish', () => {
     expect(events).toContainEqual(
       expect.objectContaining({ prospectId: 'p1', step: 'depot', outcome: 'ignore' }),
     );
+  });
+
+  it('MESURE la durée de l’étape « depot » au lieu de la laisser nulle', async () => {
+    // La colonne `duration_ms` existait, l'écran affichait une colonne
+    // « Durée », et AUCUN appelant ne la renseignait : toutes les lignes
+    // lisaient « non renseigné » à jamais. C'était une absence mal nommée —
+    // le fait n'était pas « la durée de ce prospect est inconnue » mais
+    // « rien ne mesure les durées ».
+    //
+    // Horloge qui avance de 250 ms à chaque lecture : la première est prise
+    // au départ du chronomètre, la seconde par `enregistrer` (via
+    // `deps.maintenant()` dans `runPublish`), la troisième à l'émission.
+    let t = new Date('2026-09-01T12:00:00Z').getTime();
+    const horloge = () => {
+      const instant = new Date(t);
+      t += 250;
+      return instant;
+    };
+    const { sink, events } = fauxEvents();
+    const { deps } = fausseDeps({}, sink, horloge);
+
+    await runPublish([UN], deps);
+
+    const depot = events.find((e) => e.step === 'depot' && e.outcome === 'reussi');
+    expect(depot?.durationMs).toBe(500);
+  });
+
+  it('n’invente AUCUNE durée pour un prospect ignoré — il n’a rien fait', async () => {
+    // Un `skip` n'a pas de durée : mesurer le temps de constater qu'il n'y
+    // avait rien à faire n'est pas la même grandeur que celle qu'affichent
+    // les autres lignes. `null` est ici la réponse honnête, et c'est bien
+    // « non renseigné » que l'écran doit montrer.
+    const empreinte = empreinteContenu(CONTENU);
+    const { sink, events } = fauxEvents();
+    const { deps } = fausseDeps(
+      { p1: { repoFullName: 'org/dos-services-51000900400035', empreinte } },
+      sink,
+    );
+
+    await runPublish([UN], deps);
+
+    const ignore = events.find((e) => e.outcome === 'ignore');
+    expect(ignore).toBeDefined();
+    expect(ignore?.durationMs ?? null).toBeNull();
+  });
+
+  it('mesure aussi la durée d’un échec — trois secondes ou trois cents ne se diagnostiquent pas pareil', async () => {
+    let t = new Date('2026-09-01T12:00:00Z').getTime();
+    const horloge = () => {
+      const instant = new Date(t);
+      t += 1000;
+      return instant;
+    };
+    const { sink, events } = fauxEvents();
+    const { deps } = fausseDeps({}, sink, horloge);
+    deps.github.creerDepuisModele = async () => {
+      throw new Error('GitHub création : 403 — refusé');
+    };
+
+    await runPublish([UN], deps);
+
+    const echec = events.find((e) => e.step === 'depot' && e.outcome === 'echoue');
+    expect(echec?.durationMs).toBe(1000);
   });
 
   it('émet echoue avec un detail qui nomme le motif quand l’éditeur n’est pas renseigné', async () => {

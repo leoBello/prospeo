@@ -1859,6 +1859,7 @@ async function main(argv: string[]): Promise<number> {
         // Le déclenchement double est sans conséquence : l'API Vercel
         // dédoublonne les déploiements identiques faute de `forceNew`.
         attendreUrl: (projectId) => attendreUrl(vercel, projectId),
+        maintenant: () => new Date(),
       };
 
       const report = await runDeploy(sites, deps);
@@ -1941,6 +1942,10 @@ async function main(argv: string[]): Promise<number> {
           if (error) throw new Error(error.message);
         },
         maintenant: () => new Date(),
+        // Le vrai puits, jamais `NULL_SINK` : celui-là est réservé aux tests
+        // d'étage. Sans cette ligne, l'étape `retrait` resterait ce qu'elle
+        // était — une étape que rien n'émet.
+        events: createEventSink(client),
       };
 
       const report = await runUnpublish(deps, { dryRun });
