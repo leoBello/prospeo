@@ -1,0 +1,22 @@
+.zone {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+/*
+ * Le contenu reste lisible, pas fantomatique : on doit voir ce qui arrive.
+ * 0.55 laisse la structure perceptible tout en la distinguant sans ambiguite
+ * de ce qui fonctionne.
+ */
+.contenu {
+  flex: 1;
+  min-width: 0;
+  opacity: 0.55;
+}
+
+.marqueur {
+  flex: none;
+  cursor: help;
+}

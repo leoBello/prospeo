@@ -1,58 +1,19 @@
-import { minHeadcount } from '@prospeo/core';
+import { Tabs } from '@base-ui/react/tabs';
+import { getTrade } from '@prospeo/core';
 import type { ProspectView } from '../domain/prospect.js';
 import { dataWarnings } from '../domain/coherence.js';
-import { groupBreakdown } from '../domain/score.js';
-import type { TranslationKey } from '../i18n/translate.js';
 import { MessagesSection } from './MessagesSection.js';
 import { PipelineSection } from './PipelineSection.js';
 import { SiteSection } from './SiteSection.js';
 import { WarningList } from './WarningList.js';
-import type { PanelActions } from './actions.js';
+import { FicheTab } from './panel/FicheTab.js';
+import { HistoriqueTab } from './panel/HistoriqueTab.js';
+import { PanelActions } from './PanelActions.js';
+import { Badge } from './kit/Badge.js';
+import { StatusBadge } from './kit/StatusBadge.js';
+import type { PanelActions as Actions } from './actions.js';
 import { useT } from './preferences.js';
 import styles from './ProspectPanel.module.css';
-
-const CLE_GROUPE: Record<string, TranslationKey> = {
-  presence: 'score.group.presence',
-  vitalite: 'score.group.vitalite',
-  joignabilite: 'score.group.joignabilite',
-  disqualifiant: 'score.group.disqualifiant',
-};
-
-const CLE_ENRICHISSEMENT: Record<string, TranslationKey> = {
-  ok: 'enrichment.ok',
-  not_found: 'enrichment.not_found',
-  ambiguous: 'enrichment.ambiguous',
-  blocked: 'enrichment.blocked',
-};
-
-/**
- * Une donnée et son absence.
- *
- * `absentKey` nomme *pourquoi* la valeur manque, et les raisons ne se valent
- * pas : « pas encore collecté » désigne un étage qui n'est pas passé, « non
- * publié par la source » un fait acquis sur lequel il est inutile de
- * revenir. Un tiret unique confondrait les deux, et un champ vide se lirait
- * comme un défaut d'affichage.
- */
-function Field({
-  labelKey,
-  value,
-  absentKey,
-}: {
-  labelKey: TranslationKey;
-  value: string | null;
-  absentKey: TranslationKey;
-}) {
-  const t = useT();
-  return (
-    <div className={styles.field}>
-      <dt className={styles.fieldLabel}>{t(labelKey)}</dt>
-      <dd className={styles.fieldValue}>
-        {value === null ? <span className={styles.absent}>{t(absentKey)}</span> : value}
-      </dd>
-    </div>
-  );
-}
 
 interface Props {
   prospect: ProspectView | null;
@@ -61,16 +22,28 @@ interface Props {
    *
    * `null` rend la fiche strictement consultable, et c'est ce que montent les
    * tests des sections de lecture : un composant qui fabriquerait lui-même son
-   * client Supabase ne pourrait plus se rendre sans réseau, et l'écran entier
-   * cesserait d'être éprouvable.
+   * client Supabase ne pourrait plus se rendre sans réseau.
    */
-  actions?: PanelActions | null;
+  actions?: Actions | null;
   /** Rang affiché dans la file, pour situer le parcours au clavier. */
   position: { index: number; total: number } | null;
   currentRulesetVersion: string;
   onClose: () => void;
 }
 
+/**
+ * La fiche d'un prospect, en quatre onglets.
+ *
+ * **D1 du chantier n°6.** Les sept sections empilées de la version précédente
+ * ne sont pas sept sujets : ce sont quatre moments distincts du travail. On
+ * consulte l'identité avant d'appeler, la rédaction quand on doute du site,
+ * les messages quand on rappelle, l'historique quand on ne se souvient plus.
+ * Les empiler supposait qu'on ait besoin des quatre en même temps, ce qui
+ * n'arrive jamais.
+ *
+ * La signature du composant est inchangée : `TodayScreen` n'a pas bougé, et un
+ * `git revert` de cette tâche restaure l'écran précédent sans rien d'autre.
+ */
 export function ProspectPanel({
   prospect,
   position,
@@ -89,20 +62,36 @@ export function ProspectPanel({
   }
 
   const nom = prospect.denominationUsuelle ?? prospect.denomination;
-  const enrichment = prospect.enrichment;
-  const score = prospect.score;
   const warnings = dataWarnings(prospect, currentRulesetVersion);
+  const enLigne =
+    prospect.site !== null &&
+    prospect.site.deploymentUrl !== null &&
+    prospect.site.unpublishedAt === null;
 
   return (
     <aside className={styles.panel} aria-label={nom}>
       <header className={styles.header}>
         <div>
-          <h2 className={styles.name}>{nom}</h2>
           {position !== null ? (
             <span className={styles.position}>
               {t('panel.position', { index: position.index, total: position.total })}
             </span>
           ) : null}
+          <h2 className={styles.name}>{nom}</h2>
+          <div className={styles.badges}>
+            <StatusBadge status={prospect.pipeline?.status ?? null} />
+            {enLigne ? (
+              <Badge ton="succes" point>
+                {t('site.badge.online')}
+              </Badge>
+            ) : null}
+            {/* Le libellé du métier, jamais son slug : « plombier » est une
+                clé de `trades.ts`, pas un mot d'interface — et un métier à
+                deux mots s'afficherait « couvreur-zingueur ». Repli sur le
+                slug si le métier est inconnu du catalogue : un identifiant
+                lisible vaut mieux qu'un badge vide. */}
+            <Badge>{getTrade(prospect.tradeSlug)?.label ?? prospect.tradeSlug}</Badge>
+          </div>
         </div>
         <button type="button" className={styles.close} onClick={onClose} aria-label={t('panel.close')}>
           ×
@@ -111,172 +100,59 @@ export function ProspectPanel({
 
       <WarningList warnings={warnings} />
 
-      <section className={styles.section}>
-        <h3 className={styles.sectionTitle}>{t('panel.section.identity')}</h3>
-        <dl className={styles.fields}>
-          <Field labelKey="field.siret" value={prospect.siret} absentKey="value.unknown" />
-          <Field
-            labelKey="field.address"
-            value={`${prospect.address}`}
-            absentKey="value.unknown"
+      <PanelActions prospect={prospect} />
+
+      <Tabs.Root defaultValue="fiche">
+        <Tabs.List className={styles.onglets}>
+          <Tabs.Tab className={styles.onglet} value="fiche">
+            {t('panel.tab.fiche')}
+          </Tabs.Tab>
+          <Tabs.Tab className={styles.onglet} value="site">
+            {t('panel.tab.site')}
+          </Tabs.Tab>
+          <Tabs.Tab className={styles.onglet} value="messages">
+            {t('panel.tab.messages')}
+          </Tabs.Tab>
+          <Tabs.Tab className={styles.onglet} value="historique">
+            {t('panel.tab.historique')}
+          </Tabs.Tab>
+        </Tabs.List>
+
+        <Tabs.Panel className={styles.panneau} value="fiche">
+          <FicheTab prospect={prospect} />
+        </Tabs.Panel>
+
+        <Tabs.Panel className={styles.panneau} value="site">
+          <SiteSection
+            site={prospect.site}
+            onRejeter={actions === null ? null : () => actions.rejeterRedaction(prospect.id)}
+            onAnnulerRejet={actions === null ? null : () => actions.annulerRejet(prospect.id)}
           />
-          <Field
-            labelKey="field.created"
-            value={prospect.dateCreation}
-            absentKey="value.unknown"
-          />
-          <Field
-            labelKey="field.staff"
-            value={
-              // `minHeadcount` rend `null` pour les codes « unité non
-              // employeuse » ou « inconnu » : les afficher « 0 salarié »
-              // inventerait un fait que l'INSEE ne fournit pas.
-              minHeadcount(prospect.effectifCode) === null
+        </Tabs.Panel>
+
+        <Tabs.Panel className={styles.panneau} value="messages">
+          <MessagesSection messages={prospect.messages} />
+        </Tabs.Panel>
+
+        <Tabs.Panel className={styles.panneau} value="historique">
+          <HistoriqueTab prospect={prospect} />
+          <PipelineSection
+            pipeline={prospect.pipeline}
+            // « En ligne » veut dire déployé ET non retiré : une ligne conserve
+            // son `deployment_url` après dépublication, et l'avertissement sur
+            // le retrait différé n'aurait alors plus lieu d'être.
+            siteEnLigne={enLigne}
+            onDefinirStatut={
+              actions === null
                 ? null
-                : t('unit.employees', { count: minHeadcount(prospect.effectifCode) ?? 0 })
+                : (status, nextActionAt) => actions.definirStatut(prospect.id, status, nextActionAt)
             }
-            absentKey="value.unknown"
+            onJournaliser={
+              actions === null ? null : (kind, body) => actions.journaliser(prospect.id, kind, body)
+            }
           />
-        </dl>
-      </section>
-
-      <section className={styles.section}>
-        <h3 className={styles.sectionTitle}>{t('panel.section.contact')}</h3>
-        {enrichment === null ? (
-          <p className={styles.absent}>{t('enrichment.absent')}</p>
-        ) : (
-          <>
-            <p className={styles.status}>
-              {t(CLE_ENRICHISSEMENT[enrichment.status] ?? 'enrichment.absent')}
-            </p>
-            <dl className={styles.fields}>
-              <Field
-                labelKey="field.phone"
-                value={
-                  enrichment.phoneE164 === null
-                    ? null
-                    : `${enrichment.phoneE164}${
-                        enrichment.phoneKind === null
-                          ? ''
-                          : ` (${t(enrichment.phoneKind === 'mobile' ? 'value.mobile' : 'value.landline')})`
-                      }`
-                }
-                absentKey="value.notCollected"
-              />
-              <Field
-                labelKey="field.rating"
-                value={enrichment.rating === null ? null : enrichment.rating.toFixed(1)}
-                absentKey="value.notCollected"
-              />
-              <Field
-                labelKey="field.reviewCount"
-                value={enrichment.reviewCount === null ? null : String(enrichment.reviewCount)}
-                // Google ne publie plus le nombre d'avis : ce n'est pas un
-                // étage manquant, c'est une donnée que la source a retirée.
-                absentKey="value.notPublished"
-              />
-              <Field
-                labelKey="field.matchedName"
-                value={enrichment.matchedName}
-                absentKey="value.notCollected"
-              />
-              <Field
-                labelKey="field.matchConfidence"
-                // Affichée parce que `matchedName` ne vaut que ce qu'elle
-                // vaut : sous le seuil haut, la fiche Google rattachée est un
-                // pari, et c'est au téléphone qu'un faux appariement se paie
-                // — l'interlocuteur appelé par le nom d'une autre entreprise.
-                value={
-                  enrichment.matchConfidence === null
-                    ? null
-                    : `${Math.round(enrichment.matchConfidence * 100)} %`
-                }
-                absentKey="value.notCollected"
-              />
-              <Field
-                labelKey="field.declaredUrl"
-                value={enrichment.declaredUrl}
-                absentKey="value.notCollected"
-              />
-            </dl>
-          </>
-        )}
-      </section>
-
-      <section className={styles.section}>
-        <h3 className={styles.sectionTitle}>{t('panel.section.web')}</h3>
-        {prospect.presence === null ? (
-          <p className={styles.absent}>{t('presence.absent')}</p>
-        ) : (
-          <p className={styles.status}>
-            {prospect.presence.category === null
-              ? t('presence.absent')
-              : t(`presence.${prospect.presence.category}`)}
-          </p>
-        )}
-      </section>
-
-      <SiteSection
-        site={prospect.site}
-        onRejeter={actions === null ? null : () => actions.rejeterRedaction(prospect.id)}
-        onAnnulerRejet={actions === null ? null : () => actions.annulerRejet(prospect.id)}
-      />
-
-      <MessagesSection messages={prospect.messages} />
-
-      <PipelineSection
-        pipeline={prospect.pipeline}
-        // « En ligne » veut dire déployé ET non retiré : une ligne conserve son
-        // `deployment_url` après dépublication, et l'avertissement sur le
-        // retrait différé n'aurait alors plus lieu d'être.
-        siteEnLigne={
-          prospect.site !== null &&
-          prospect.site.deploymentUrl !== null &&
-          prospect.site.unpublishedAt === null
-        }
-        onDefinirStatut={
-          actions === null
-            ? null
-            : (status, nextActionAt) => actions.definirStatut(prospect.id, status, nextActionAt)
-        }
-        onJournaliser={
-          actions === null ? null : (kind, body) => actions.journaliser(prospect.id, kind, body)
-        }
-      />
-
-      <section className={styles.section}>
-        <h3 className={styles.sectionTitle}>{t('panel.section.score')}</h3>
-        {score === null ? (
-          <p className={styles.absent}>{t('score.absent.hint')}</p>
-        ) : (
-          <>
-            {/* Le reçu détaillé du §9.3 : le calcul ligne par ligne, groupé
-                par bloc, points signés, total en pied. Le panneau sert à
-                comprendre et à régler — l'argumentaire commercial relève du
-                générateur de message. */}
-            {groupBreakdown(score.breakdown).map((groupe) => (
-              <div key={groupe.group} className={styles.scoreGroup}>
-                <h4 className={styles.scoreGroupTitle}>
-                  {t(CLE_GROUPE[groupe.group] ?? 'score.group.presence')}
-                </h4>
-                {groupe.lines.map((ligne) => (
-                  <div key={ligne.code} className={styles.scoreLine}>
-                    <span>{ligne.label}</span>
-                    <span className={ligne.points >= 0 ? styles.positif : styles.negatif}>
-                      {ligne.points >= 0 ? '+' : ''}
-                      {ligne.points}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ))}
-            <div className={styles.scoreTotal}>
-              <span>{t('score.total')}</span>
-              <span>{t('score.outOf', { total: score.total })}</span>
-            </div>
-          </>
-        )}
-      </section>
+        </Tabs.Panel>
+      </Tabs.Root>
     </aside>
   );
 }

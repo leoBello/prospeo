@@ -1,46 +1,45 @@
 /*
- * Tokens de couleur et d'espacement.
+ * Tokens de couleur, d'espacement et de typographie.
  *
- * Tout est déclaré en variables dès le départ, y compris ce dont un seul
- * thème se sert : la bascule sombre / clair du §9.4 ne change que ces
- * valeurs, jamais un composant. Des couleurs écrites en dur dans les
- * composants transformeraient l'ajout du thème clair en reprise de chaque
- * fichier — c'est-à-dire, en pratique, en thème clair jamais livré.
+ * Tout est déclaré en variables, y compris ce dont un seul thème se sert : la
+ * bascule sombre / clair ne change que ces valeurs, jamais un composant. Des
+ * couleurs écrites en dur transformeraient l'ajout du thème clair en reprise
+ * de chaque fichier — c'est-à-dire, en pratique, en thème clair jamais livré.
  *
- * Les valeurs viennent du tableau du §9.4 et n'ont pas été retouchées.
+ * La palette suit la direction « Cockpit » (D11 du chantier n°6).
  *
- * RÉSERVE MESURÉE, non corrigée ici : `--color-text-muted` n'atteint pas le
- * rapport de contraste AA de 4,5:1 pour du texte normal, dans les deux
- * thèmes — #6b7280 sur #171a21 mesure 3,60:1, #8a8a8a sur #ffffff mesure
- * 3,45:1. Ce n'est pas anodin, parce que cette couleur porte la « raison de
- * présence » de chaque ligne, que le §9.2 tient pour essentielle.
- * Les valeurs du §9.4 étant arbitrées, elles sont conservées telles quelles
- * et l'écart est remonté plutôt que corrigé unilatéralement. Atteindraient
- * AA sans changer la teinte : #949ba9 en sombre (6,24:1) et #6f6f6f en clair
- * (5,02:1).
+ * RÉSERVE LEVÉE : `--color-text-muted` valait #6b7280, soit 3,60:1 sur la
+ * surface sombre — sous le seuil AA de 4,5:1, sur la couleur qui porte la
+ * raison de présence de chaque ligne. Le chantier n°6 (D7) la tranche.
+ * `theme.test.ts` mesure désormais les deux thèmes à chaque exécution.
  */
 
 :root {
   color-scheme: dark;
 
-  --color-bg: #0f1115;
-  --color-surface: #171a21;
-  --color-border: #262b35;
-  --color-text: #d5d9e0;
-  --color-text-muted: #6b7280;
-  --color-accent: #5b8cff;
+  --color-bg: #0b0d12;
+  --color-surface: #14171f;
+  --color-surface-2: #1a1e28;
+  --color-surface-3: #232936;
+  --color-border: #252b38;
+  --color-border-strong: #333c4e;
+  --color-text: #e4e8f0;
+  --color-text-muted: #98a1b4;
+  --color-text-faint: #6b7488;
+  --color-accent: #6d92ff;
 
   /* Teintes dérivées de l'accent pour les trois blocs de la barre de score.
-     Un seul accent, décliné en intensité : le §9.4 réserve la couleur au
-     score et aux actions primaires. */
+     Un seul accent, décliné en intensité. */
   --color-seg-presence: var(--color-accent);
-  --color-seg-vitalite: #4a6dc4;
-  --color-seg-joignabilite: #354a80;
-  --color-seg-empty: #212630;
+  --color-seg-vitalite: #5a7de0;
+  --color-seg-joignabilite: #3f568f;
+  --color-seg-empty: #232936;
 
   /* Réservés aux états, jamais décoratifs. */
-  --color-danger: #ff6b6b;
-  --color-warning: #e0a33a;
+  --color-success: #4fd1a5;
+  --color-danger: #ff7a85;
+  --color-warning: #f0b45c;
+  --color-info: #a78bfa;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -51,20 +50,29 @@
 
   --radius-sm: 4px;
   --radius-md: 6px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
 
-  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+  /* D6 — trois familles. La chasse fixe n'est pas un ornement : sans elle les
+     colonnes de score ne s'alignent pas d'une ligne à l'autre. */
+  --font-display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+  --font-ui: 'Instrument Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --text-xs: 11px;
   --text-sm: 12px;
   --text-md: 13px;
   --text-lg: 15px;
   --text-xl: 20px;
+  --text-2xl: 24px;
 
-  /* Échelle d'empilement explicite : trois couches suffisent ici, et les
-     nommer évite la surenchère de z-index qui s'installe sinon. */
   --z-panel: 10;
   --z-overlay: 20;
+  --z-tooltip: 30;
+
+  /* L'ombre d'un calque flottant se lit contre son fond : dense sur le thème
+     sombre, presque effacée sur le clair, où la même densité ferait une tache. */
+  --shadow-popup: 0 8px 24px rgb(0 0 0 / 45%);
 }
 
 :root[data-theme='light'] {
@@ -72,9 +80,13 @@
 
   --color-bg: #fafafa;
   --color-surface: #ffffff;
+  --color-surface-2: #f4f4f6;
+  --color-surface-3: #e9e9ee;
   --color-border: #e8e8e8;
+  --color-border-strong: #cfcfd6;
   --color-text: #1a1a1a;
-  --color-text-muted: #8a8a8a;
+  --color-text-muted: #6f6f6f;
+  --color-text-faint: #8a8a8a;
   --color-accent: #4f46e5;
 
   --color-seg-presence: var(--color-accent);
@@ -82,8 +94,12 @@
   --color-seg-joignabilite: #c9c5f7;
   --color-seg-empty: #ececf0;
 
+  --color-success: #0f7a5a;
   --color-danger: #c23b3b;
   --color-warning: #a06a10;
+  --color-info: #6d4bd8;
+
+  --shadow-popup: 0 8px 24px rgb(0 0 0 / 12%);
 }
 
 * {
@@ -100,7 +116,7 @@ body {
   margin: 0;
   background: var(--color-bg);
   color: var(--color-text);
-  font-family: var(--font-sans);
+  font-family: var(--font-ui);
   font-size: var(--text-md);
   /* Interlignage resserré assumé (§9.4) : l'usage réel consiste à trier des
      centaines de lignes, et une mise en page plus aérée montrait moitié moins

@@ -1,0 +1,179 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+  <style>
+    :root {
+      --bg: #0b0d12; --surface: #14171f; --surface2: #1a1e28; --surface3: #232936;
+      --border: #252b38; --border2: #333c4e;
+      --text: #e4e8f0; --muted: #98a1b4; --faint: #6b7488;
+      --blue: #6d92ff; --mint: #4fd1a5; --amber: #f0b45c; --rose: #ff7a85; --violet: #a78bfa;
+      --display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+      --ui: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
+      --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--ui); font-size: 13px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+    a { color: var(--blue); text-decoration: none; }
+    a:hover { color: #8fabff; }
+    h1, h2, h3 { margin: 0; font-family: var(--display); font-weight: 600; letter-spacing: -0.02em; }
+    button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+    .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+    .tip { position: relative; display: inline-flex; }
+    .tip > .tipBody {
+      position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%) translateY(3px);
+      background: #030509; border: 1px solid var(--border2); color: var(--text);
+      padding: 7px 10px; border-radius: 8px; font-size: 11.5px; line-height: 1.4; width: max-content; max-width: 250px;
+      opacity: 0; pointer-events: none; transition: opacity 140ms ease, transform 140ms ease; z-index: 40;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.55);
+    }
+    .tip:hover > .tipBody { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .tipK { color: var(--faint); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 2px; }
+
+    .badge { display: inline-flex; align-items: center; gap: 5px; height: 21px; padding: 0 8px; border-radius: 999px;
+      font-size: 10.5px; font-weight: 600; border: 1px solid transparent; white-space: nowrap; }
+    .badge .dot { width: 5px; height: 5px; border-radius: 999px; background: currentColor; flex: none; }
+    .b-mint { color: #86e3c1; background: rgba(79,209,165,0.13); border-color: rgba(79,209,165,0.28); }
+    .b-amber { color: #f5cd92; background: rgba(240,180,92,0.13); border-color: rgba(240,180,92,0.28); }
+    .b-violet { color: #c4b5fd; background: rgba(167,139,250,0.13); border-color: rgba(167,139,250,0.3); }
+    .b-mute { color: var(--muted); background: rgba(152,161,180,0.10); border-color: var(--border2); }
+
+    .btn { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 14px; border-radius: 9px; border: 1px solid var(--border2); font-size: 12.5px; }
+    .btn-p { background: var(--blue); color: #0b0d12; border-color: var(--blue); font-weight: 600; }
+
+    .field { display: flex; align-items: center; height: 38px; padding: 0 12px; border: 1px solid var(--border2); border-radius: 9px; background: var(--surface2); font-size: 13px; }
+  </style>
+</helmet>
+
+<div style="width: 760px; height: 900px; background: var(--bg); display: flex; flex-direction: column; overflow: hidden">
+
+  <div style="flex: 1; min-height: 0; overflow: hidden; padding: 24px 26px">
+
+    <h1 style="font-size: 22px">Gabarit des sites</h1>
+    <p style="margin: 6px 0 0; color: var(--muted); font-size: 12.5px; max-width: 560px">Chaque site publié est engendré depuis un dépôt GitHub marqué « template ». En désigner un ici le substitue au gabarit livré avec l'application, sans toucher au code.</p>
+
+    <!-- l'état actif, en premier : c'est la question qu'on vient poser -->
+    <div style="margin-top: 20px; background: var(--surface); border: 1px solid rgba(167,139,250,0.3); border-radius: 14px; padding: 18px">
+      <div style="display: flex; align-items: flex-start; gap: 14px">
+        <div style="width: 40px; height: 40px; border-radius: 11px; background: rgba(167,139,250,0.13); color: var(--violet); display: flex; align-items: center; justify-content: center; flex: none">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-4 1.5-4-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.3 4.3 0 0 0-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 0 0-6 0C6.8 2.8 5.8 3.1 5.8 3.1a4.3 4.3 0 0 0-.1 3.2A4.6 4.6 0 0 0 4.4 9.5c0 4.6 2.7 5.7 5.5 6-.4.4-.5.9-.5 1.6V21"/></svg>
+        </div>
+        <div style="flex: 1; min-width: 0">
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+            <span style="font-family: var(--mono); font-size: 14px; font-weight: 500">prospeo/gabarit-agence-v2</span>
+            <span class="badge b-violet"><span class="dot"></span>Actif</span>
+            <div class="tip">
+              <span class="badge b-amber">Remplace le gabarit par défaut</span>
+              <span class="tipBody"><span class="tipK">Substitution</span>Tant que ce dépôt est actif, l'application ignore le gabarit livré avec elle. Le retirer rétablit le gabarit par défaut au déploiement suivant — les sites déjà en ligne ne bougent pas.</span>
+            </div>
+          </div>
+          <div style="display: flex; gap: 16px; margin-top: 9px; font-size: 12px; color: var(--muted)">
+            <span>Branche <span class="num" style="color: var(--text)">main</span></span>
+            <span>Dernier commit <span class="num" style="color: var(--text)">7c1e4a0</span> · il y a 3 h</span>
+            <span><span class="num" style="color: var(--text)">24</span> sites engendrés</span>
+          </div>
+          <div style="display: flex; gap: 8px; margin-top: 14px">
+            <button class="btn" style="height: 30px; font-size: 12px">Prévisualiser</button>
+            <button class="btn" style="height: 30px; font-size: 12px">Ouvrir sur GitHub</button>
+            <button class="btn" style="height: 30px; font-size: 12px; border-color: rgba(255,122,133,0.35); color: #ffa8b0">Revenir au gabarit par défaut</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ajouter un dépôt : les contrôles sont visibles avant de valider -->
+    <div style="margin-top: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px">
+      <h3 style="font-size: 13px; margin-bottom: 3px">Désigner un autre dépôt</h3>
+      <p style="margin: 0 0 14px; font-size: 12px; color: var(--muted)">Le dépôt doit appartenir à l'organisation et être marqué « Template repository » sur GitHub.</p>
+
+      <div style="display: flex; gap: 8px">
+        <div class="field" style="flex: 1; color: var(--text); font-family: var(--mono); gap: 0">
+          <span style="color: var(--faint)">prospeo /</span><span style="margin-left: 5px">gabarit-artisan-2026</span><span style="width: 1px; height: 16px; background: var(--blue); margin-left: 2px"></span>
+        </div>
+        <div class="field" style="width: 130px; color: var(--muted); font-family: var(--mono); justify-content: space-between">main <span style="color: var(--faint)">▾</span></div>
+        <button class="btn btn-p">Vérifier</button>
+      </div>
+
+      <!-- les vérifications, énoncées : un refus dit lequel a manqué -->
+      <div style="margin-top: 14px; display: flex; flex-direction: column; gap: 8px">
+        <div style="display: flex; align-items: center; gap: 9px; font-size: 12.5px">
+          <span style="width: 17px; height: 17px; border-radius: 999px; background: rgba(79,209,165,0.15); color: var(--mint); display: flex; align-items: center; justify-content: center; flex: none">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          </span>
+          <span>Dépôt accessible avec le jeton enregistré</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 9px; font-size: 12.5px">
+          <span style="width: 17px; height: 17px; border-radius: 999px; background: rgba(79,209,165,0.15); color: var(--mint); display: flex; align-items: center; justify-content: center; flex: none">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          </span>
+          <span>Marqué comme dépôt modèle</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 9px; font-size: 12.5px">
+          <span style="width: 17px; height: 17px; border-radius: 999px; background: rgba(79,209,165,0.15); color: var(--mint); display: flex; align-items: center; justify-content: center; flex: none">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          </span>
+          <span>Contient <span class="num" style="color: var(--muted)">src/content/site.json</span> au schéma attendu</span>
+        </div>
+        <div class="tip" style="display: flex; align-items: center; gap: 9px; font-size: 12.5px; width: 100%">
+          <span style="width: 17px; height: 17px; border-radius: 999px; background: rgba(240,180,92,0.15); color: var(--amber); display: flex; align-items: center; justify-content: center; flex: none">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 7v6M12 16.5v.5"/></svg>
+          </span>
+          <span style="color: #f5cd92">Aucune mention d'éditeur trouvée dans le pied de page</span>
+          <span class="tipBody" style="left: 20px; transform: none"><span class="tipK">Bloquant à la publication</span>Un site publié au nom d'un tiers doit nommer son véritable éditeur et offrir un moyen d'en demander le retrait. La publication est refusée tant que cette mention manque.</span>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 8px; margin-top: 16px">
+        <button class="btn btn-p" style="opacity: 0.45">Activer ce gabarit</button>
+        <span style="font-size: 11.5px; color: var(--faint); align-self: center">Un contrôle bloquant reste à lever.</span>
+      </div>
+    </div>
+
+    <!-- exceptions par métier -->
+    <div style="margin-top: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px">
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 3px">
+        <h3 style="font-size: 13px">Exceptions par métier</h3>
+        <div class="tip">
+          <span style="width: 15px; height: 15px; border-radius: 999px; border: 1px solid var(--border2); color: var(--faint); font-size: 10px; display: flex; align-items: center; justify-content: center">?</span>
+          <span class="tipBody"><span class="tipK">Ordre de résolution</span>Le gabarit du métier l'emporte sur le gabarit actif, qui l'emporte lui-même sur celui livré avec l'application.</span>
+        </div>
+      </div>
+      <p style="margin: 0 0 13px; font-size: 12px; color: var(--muted)">Un métier peut garder son propre modèle. Sans exception, il reçoit le gabarit actif.</p>
+
+      <div style="display: flex; flex-direction: column; gap: 7px">
+        <div style="display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px">
+          <span style="width: 26px; height: 26px; border-radius: 8px; background: rgba(109,146,255,0.13); color: var(--blue); display: flex; align-items: center; justify-content: center; flex: none">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l5-5M9 9l6 6"/><path d="M14 4l6 6-3 3-6-6z"/></svg>
+          </span>
+          <span style="flex: 1; font-size: 12.5px; font-weight: 500">Plombier</span>
+          <span class="num" style="font-size: 12px; color: var(--muted)">78 prospects</span>
+          <span class="badge b-violet">gabarit-agence-v2</span>
+          <span style="font-size: 11.5px; color: var(--faint); width: 78px; text-align: right">hérite de l'actif</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px">
+          <span style="width: 26px; height: 26px; border-radius: 8px; background: rgba(240,180,92,0.13); color: var(--amber); display: flex; align-items: center; justify-content: center; flex: none">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="12" r="4"/><path d="M12 12h9M18 12v4M15 12v3"/></svg>
+          </span>
+          <span style="flex: 1; font-size: 12.5px; font-weight: 500">Serrurier</span>
+          <span class="num" style="font-size: 12px; color: var(--muted)">61 prospects</span>
+          <span class="badge b-mute">serrurier</span>
+          <span style="font-size: 11.5px; color: var(--amber); width: 78px; text-align: right">exception</span>
+        </div>
+      </div>
+    </div>
+
+    <p style="margin: 16px 0 0; font-size: 11.5px; color: var(--faint); line-height: 1.6">
+      Changer de gabarit n'affecte que les déploiements à venir. Les <span class="num">22</span> sites déjà en ligne conservent le modèle avec lequel ils ont été construits ; les redéployer les fera passer au gabarit actif.
+    </p>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

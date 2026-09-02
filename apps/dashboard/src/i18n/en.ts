@@ -61,7 +61,6 @@ export const en: Record<keyof typeof fr, string> = {
 
   'score.absent': 'not scored yet',
   'score.absent.hint': 'This prospect has no score, which is not the same as a score of zero.',
-  'score.outOf': '{total} / 100',
   'warning.badge': '{count} flags',
   'warning.badge_one': '1 flag',
   'warning.title': 'Flags',
@@ -73,12 +72,15 @@ export const en: Record<keyof typeof fr, string> = {
     'Score computed before the Google enrichment: it ignores the phone, rating and website found since.',
   'warning.staleRuleset':
     'Score computed with ruleset {stored}, while the ruleset in force is {current}.',
-  'score.total': 'Total',
-  'score.group.presence': 'Web presence',
+  'score.group.presence': 'Presence',
   'score.group.vitalite': 'Vitality',
   'score.group.joignabilite': 'Reachability',
   'score.group.disqualifiant': 'Disqualifiers',
   'score.bar.label': 'Score {total} out of 100: {detail}',
+  'score.gauge.aria': 'Score of {total} out of 100',
+  'score.outOfShort': 'out of 100',
+  'score.receipt.open': 'Show the line-by-line receipt',
+  'score.receipt.close': 'Hide the receipt',
 
   'presence.none': 'No web presence',
   'presence.social_only': 'Social page, no website',
@@ -91,15 +93,24 @@ export const en: Record<keyof typeof fr, string> = {
   'enrichment.not_found': 'No Google listing found',
   'enrichment.ambiguous': 'Match to be decided',
   'enrichment.blocked': 'Enrichment blocked by Google',
-  'enrichment.absent': 'Not enriched yet',
+  'enrichment.absent': 'No contact details: the "enrich" stage has not run on this prospect.',
+  'enrichment.reviews.hint':
+    'Google stopped publishing review counts in August 2026. Re-running enrichment will not fill this field.',
+  'enrichment.confidence.hint':
+    'Confidence in the match with the Google listing. Below the high threshold the match is a bet — and a wrong match is paid for on the phone.',
 
   'panel.close': 'Close panel',
-  'panel.empty': 'Select a prospect to see its record.',
+  'panel.empty': 'Choose a prospect to see its record.',
   'panel.section.identity': 'Identity',
   'panel.section.contact': 'Contact details',
   'panel.section.web': 'Web presence',
   'panel.section.score': 'Score breakdown',
   'panel.position': '{index} of {total}',
+
+  'panel.tab.fiche': 'Details',
+  'panel.tab.site': 'Site',
+  'panel.tab.messages': 'Messages',
+  'panel.tab.historique': 'History',
 
   'field.siret': 'SIRET',
   'field.address': 'Address',
@@ -125,6 +136,8 @@ export const en: Record<keyof typeof fr, string> = {
   'panel.section.site': 'Generated site',
   'panel.section.messages': 'Sales messages',
   'panel.section.pipeline': 'Follow-up',
+
+  'site.badge.online': 'Site online',
 
   'site.absent': 'No copy yet: the "generate" stage has not run on this prospect.',
   'site.notPublished': 'Copy written, nothing published yet.',
@@ -162,7 +175,6 @@ export const en: Record<keyof typeof fr, string> = {
   'pipeline.label': 'Status',
   'pipeline.absent': 'Never contacted',
   'pipeline.updated': 'Updated on {date}',
-  'pipeline.nextAction': 'Next action',
   'pipeline.status.a_contacter': 'To contact',
   'pipeline.status.contacte': 'Contacted',
   'pipeline.status.relance': 'Followed up',
@@ -186,9 +198,29 @@ export const en: Record<keyof typeof fr, string> = {
 
   'action.pending': 'Saving…',
   'action.failed': 'Write refused: {message}',
+  'action.call': 'Call {phone}',
+  'action.noPhone': 'No number collected',
+  'action.openSite': 'Open the site',
+  'action.redeploy': 'Redeploy',
+  'action.redeploy.reason':
+    'Triggering a deployment from the interface ships with batch 2. Today `publish` and `deploy` are only callable from the command-line collector.',
 
   'unit.prospects': '{count} prospects',
   'unit.prospects_one': '{count} prospect',
   'unit.employees': 'at least {count} employees',
   'unit.employees_one': 'at least {count} employee',
+
+  'bientot.label': 'Soon',
+  'bientot.aria': 'Upcoming feature',
+
+  'histo.discovered': 'Added to the base',
+  'histo.generated': 'Copy generated',
+  'histo.published': 'Site published',
+  'histo.unpublished': 'Site taken down',
+  'histo.rejected': 'Copy rejected',
+  'histo.detail.title': 'Step-by-step deployment log',
+  'histo.detail.reason':
+    'Every deployment step will be dated here: repository created, project opened, build, go-live.',
+  'histo.detail.blocked':
+    'No events table exists: `prospect_site` holds a current state, not a history. Nothing can be dated step by step before the §4.1 migration.',
 };

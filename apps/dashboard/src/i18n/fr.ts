@@ -61,7 +61,6 @@ export const fr = {
   'score.absent': 'pas encore scoré',
   'score.absent.hint':
     'Ce prospect n’a pas de score, ce qui n’est pas la même chose qu’un score de zéro.',
-  'score.outOf': '{total} / 100',
   'warning.badge': '{count} signalements',
   'warning.badge_one': '1 signalement',
   'warning.title': 'Signalements',
@@ -73,12 +72,15 @@ export const fr = {
     'Score calculé avant l’enrichissement Google : il ignore le téléphone, la note et le site découverts depuis.',
   'warning.staleRuleset':
     'Score calculé avec le barème {stored}, quand le barème en vigueur est le {current}.',
-  'score.total': 'Total',
-  'score.group.presence': 'Présence web',
+  'score.group.presence': 'Présence',
   'score.group.vitalite': 'Vitalité',
   'score.group.joignabilite': 'Joignabilité',
   'score.group.disqualifiant': 'Disqualifiants',
   'score.bar.label': 'Score {total} sur 100 : {detail}',
+  'score.gauge.aria': 'Score de {total} sur 100',
+  'score.outOfShort': 'sur 100',
+  'score.receipt.open': 'Voir le reçu ligne par ligne',
+  'score.receipt.close': 'Masquer le reçu',
 
   'presence.none': 'Aucune présence web',
   'presence.social_only': 'Page sociale, aucun site',
@@ -91,15 +93,31 @@ export const fr = {
   'enrichment.not_found': 'Aucune fiche Google trouvée',
   'enrichment.ambiguous': 'Appariement à trancher',
   'enrichment.blocked': 'Enrichissement bloqué par Google',
-  'enrichment.absent': 'Pas encore enrichi',
+  // Aligné sur le patron déjà établi par `site.absent` et `messages.absent` :
+  // nommer l'étage du pipeline qui n'est pas encore passé, pas juste dire
+  // « pas encore ». C'est ce texte que `FicheTab` affiche pour distinguer
+  // « l'étage enrich n'a pas tourné » de « la source n'a rien publié ».
+  'enrichment.absent': 'Aucune coordonnée : l’étage « enrich » n’est pas passé sur ce prospect.',
+  'enrichment.reviews.hint':
+    'Google ne publie plus le nombre d’avis depuis août 2026. Relancer l’enrichissement ne remplira pas ce champ.',
+  'enrichment.confidence.hint':
+    'Confiance de l’appariement avec la fiche Google. Sous le seuil haut, le rattachement est un pari — et c’est au téléphone qu’un faux appariement se paie.',
 
   'panel.close': 'Fermer le panneau',
-  'panel.empty': 'Sélectionnez un prospect pour afficher sa fiche.',
+  // « Choisir » et non « Sélectionner » : c'est le mot du geste, pas celui de
+  // l'interface — on ne « sélectionne » pas un client au téléphone.
+  'panel.empty': 'Choisir un prospect pour afficher sa fiche.',
   'panel.section.identity': 'Identité',
   'panel.section.contact': 'Coordonnées',
   'panel.section.web': 'Présence web',
   'panel.section.score': 'Détail du score',
   'panel.position': '{index} sur {total}',
+
+  // Chantier n°6 : les quatre onglets du panneau, un par moment du travail.
+  'panel.tab.fiche': 'Fiche',
+  'panel.tab.site': 'Site',
+  'panel.tab.messages': 'Messages',
+  'panel.tab.historique': 'Historique',
 
   'field.siret': 'SIRET',
   'field.address': 'Adresse',
@@ -126,6 +144,10 @@ export const fr = {
   'panel.section.site': 'Site généré',
   'panel.section.messages': 'Messages de vente',
   'panel.section.pipeline': 'Suivi',
+
+  // Le badge d'en-tête, distinct de `site.online` : celui-ci porte une date
+  // et vit dans l'onglet Site, celui-là tient dans un badge de trois mots.
+  'site.badge.online': 'Site en ligne',
 
   'site.absent': 'Aucune rédaction : l’étage « generate » n’est pas passé sur ce prospect.',
   'site.notPublished': 'Rédaction écrite, rien n’est encore publié.',
@@ -164,7 +186,6 @@ export const fr = {
   'pipeline.label': 'Statut',
   'pipeline.absent': 'Jamais contacté',
   'pipeline.updated': 'Mis à jour le {date}',
-  'pipeline.nextAction': 'Prochaine action',
   'pipeline.status.a_contacter': 'À contacter',
   'pipeline.status.contacte': 'Contacté',
   'pipeline.status.relance': 'Relancé',
@@ -188,9 +209,33 @@ export const fr = {
 
   'action.pending': 'Enregistrement…',
   'action.failed': 'Écriture refusée : {message}',
+  'action.call': 'Appeler {phone}',
+  'action.noPhone': 'Aucun numéro collecté',
+  'action.openSite': 'Voir le site',
+  'action.redeploy': 'Redéployer',
+  'action.redeploy.reason':
+    'Le déclenchement d’un déploiement depuis l’interface arrive avec le lot 2. Aujourd’hui, `publish` et `deploy` ne s’appellent que depuis le collector en ligne de commande.',
 
   'unit.prospects': '{count} prospects',
   'unit.prospects_one': '{count} prospect',
   'unit.employees': 'au moins {count} salariés',
   'unit.employees_one': 'au moins {count} salarié',
+
+  'bientot.label': 'Bientôt',
+  'bientot.aria': 'Fonctionnalité à venir',
+
+  'histo.discovered': 'Découvert en base',
+  'histo.generated': 'Rédaction générée',
+  'histo.published': 'Site publié',
+  'histo.unpublished': 'Site retiré',
+  'histo.rejected': 'Rédaction refusée',
+  'histo.detail.title': 'Journal détaillé des étapes',
+  // Deux textes et non un seul : le visible dit CE QUI VIENT, l'infobulle dit
+  // CE QUI BLOQUE. Les deux portaient la même phrase, si bien que survoler le
+  // marqueur « Bientôt » révélait une phrase déjà lisible deux centimètres
+  // plus haut — un geste pour rien, et une infobulle qui n'apprend rien.
+  'histo.detail.reason':
+    'Chaque étape de déploiement sera datée ici : dépôt créé, projet ouvert, build, mise en ligne.',
+  'histo.detail.blocked':
+    'Aucune table d’événements n’existe : `prospect_site` ne porte qu’un état courant, pas un historique. Rien ne peut donc être daté étape par étape avant la migration §4.1.',
 } as const;

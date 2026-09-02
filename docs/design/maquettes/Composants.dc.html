@@ -1,0 +1,259 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+  <style>
+    :root {
+      --bg: #0b0d12; --surface: #14171f; --surface2: #1a1e28; --surface3: #232936;
+      --border: #252b38; --border2: #333c4e;
+      --text: #e4e8f0; --muted: #98a1b4; --faint: #6b7488;
+      --blue: #6d92ff; --mint: #4fd1a5; --amber: #f0b45c; --rose: #ff7a85; --violet: #a78bfa;
+      --display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+      --ui: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
+      --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--ui); font-size: 13px; line-height: 1.45; }
+    a { color: var(--blue); text-decoration: none; }
+    a:hover { color: #8fabff; }
+    h1, h2, h3 { margin: 0; font-family: var(--display); font-weight: 600; letter-spacing: -0.02em; }
+    button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+    .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+    .sect { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+    .sectT { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--faint); font-weight: 600; margin-bottom: 13px; }
+
+    .tip { position: relative; display: inline-flex; }
+    .tip > .tipBody {
+      position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%) translateY(3px);
+      background: #030509; border: 1px solid var(--border2); color: var(--text);
+      padding: 7px 10px; border-radius: 8px; font-size: 11.5px; line-height: 1.4; width: max-content; max-width: 220px;
+      opacity: 0; pointer-events: none; transition: opacity 140ms ease, transform 140ms ease; z-index: 40;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.55);
+    }
+    .tip:hover > .tipBody { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .tipK { color: var(--faint); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 2px; }
+
+    .badge { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; border-radius: 999px;
+      font-size: 11px; font-weight: 600; border: 1px solid transparent; white-space: nowrap; }
+    .badge .dot { width: 5px; height: 5px; border-radius: 999px; background: currentColor; flex: none; }
+    .b-blue { color: #a9c2ff; background: rgba(109,146,255,0.13); border-color: rgba(109,146,255,0.28); }
+    .b-mint { color: #86e3c1; background: rgba(79,209,165,0.13); border-color: rgba(79,209,165,0.28); }
+    .b-amber { color: #f5cd92; background: rgba(240,180,92,0.13); border-color: rgba(240,180,92,0.28); }
+    .b-rose { color: #ffa8b0; background: rgba(255,122,133,0.13); border-color: rgba(255,122,133,0.28); }
+    .b-violet { color: #c4b5fd; background: rgba(167,139,250,0.13); border-color: rgba(167,139,250,0.3); }
+    .b-mute { color: var(--muted); background: rgba(152,161,180,0.10); border-color: var(--border2); }
+
+    .btn { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 14px; border-radius: 9px; border: 1px solid var(--border2); font-size: 12.5px; }
+    .btn-p { background: var(--blue); color: #0b0d12; border-color: var(--blue); font-weight: 600; }
+    .btn-d { border-color: rgba(255,122,133,0.35); color: #ffa8b0; }
+    .btn-off { opacity: 0.4; }
+    .btn-sm { height: 28px; padding: 0 11px; font-size: 12px; border-radius: 8px; }
+
+    .swatch { height: 46px; border-radius: 9px; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: flex-end; padding: 5px 7px; }
+    .swatchN { font-family: var(--mono); font-size: 9.5px; }
+
+    .seg { width: 34px; height: 5px; border-radius: 999px; background: #232936; }
+    .seg-ok { background: var(--mint); }
+    .seg-run { background: linear-gradient(90deg, var(--blue) 50%, #232936 50%); background-size: 200% 100%; animation: slide 1.4s linear infinite; }
+    .seg-fail { background: var(--rose); }
+    @keyframes slide { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+  </style>
+</helmet>
+
+<div style="width: 1200px; height: 1000px; background: var(--bg); overflow: hidden; padding: 24px 26px">
+
+  <div style="margin-bottom: 18px">
+    <h1 style="font-size: 22px">Vocabulaire d'interface</h1>
+    <p style="margin: 5px 0 0; color: var(--muted); font-size: 12.5px">Les pièces qui manquent aujourd'hui. Chacune existe pour dire un état, jamais pour décorer.</p>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px">
+
+    <!-- fondations -->
+    <div class="sect">
+      <div class="sectT">Fondations — couleur</div>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px">
+        <div class="swatch" style="background: #0b0d12"><span class="swatchN" style="color: var(--muted)">#0b0d12</span></div>
+        <div class="swatch" style="background: #14171f"><span class="swatchN" style="color: var(--muted)">#14171f</span></div>
+        <div class="swatch" style="background: #232936"><span class="swatchN" style="color: var(--muted)">#232936</span></div>
+        <div class="swatch" style="background: #6d92ff"><span class="swatchN" style="color: #0b0d12">#6d92ff</span></div>
+        <div class="swatch" style="background: #4fd1a5"><span class="swatchN" style="color: #0b0d12">#4fd1a5</span></div>
+        <div class="swatch" style="background: #a78bfa"><span class="swatchN" style="color: #0b0d12">#a78bfa</span></div>
+        <div class="swatch" style="background: #f0b45c"><span class="swatchN" style="color: #0b0d12">#f0b45c</span></div>
+        <div class="swatch" style="background: #ff7a85"><span class="swatchN" style="color: #0b0d12">#ff7a85</span></div>
+        <div class="swatch" style="background: #98a1b4"><span class="swatchN" style="color: #0b0d12">#98a1b4</span></div>
+      </div>
+      <p style="margin: 11px 0 0; font-size: 11px; color: var(--faint); line-height: 1.55">Le gris de texte secondaire passe de <span class="num">#6b7280</span> à <span class="num">#98a1b4</span> : l'ancien mesurait 3,6:1 sur la surface, sous le seuil AA que le fichier de thème signalait déjà.</p>
+    </div>
+
+    <div class="sect">
+      <div class="sectT">Fondations — typographie</div>
+      <div style="font-family: var(--display); font-size: 26px; font-weight: 600; letter-spacing: -0.025em; line-height: 1.15">Bricolage Grotesque</div>
+      <div style="font-size: 11px; color: var(--faint); margin-bottom: 12px">Titres et grands nombres · 600 / 700</div>
+      <div style="font-size: 17px; font-weight: 500">Instrument Sans</div>
+      <div style="font-size: 11px; color: var(--faint); margin-bottom: 12px">Interface et copie · 400 / 500 / 600</div>
+      <div class="num" style="font-size: 16px">0123456789 · +33 6 12</div>
+      <div style="font-size: 11px; color: var(--faint)">JetBrains Mono · scores, SIRET, durées, identifiants</div>
+      <p style="margin: 11px 0 0; font-size: 11px; color: var(--faint); line-height: 1.55">Tout chiffre comparable d'une ligne à l'autre passe en chasse fixe : sans cela les colonnes de score ne s'alignent pas.</p>
+    </div>
+
+    <div class="sect">
+      <div class="sectT">Statuts du pipeline</div>
+      <div style="display: flex; flex-wrap: wrap; gap: 6px">
+        <span class="badge b-mute"><span class="dot"></span>À contacter</span>
+        <span class="badge b-blue"><span class="dot"></span>Contacté</span>
+        <span class="badge b-amber"><span class="dot"></span>Relancé</span>
+        <span class="badge b-violet"><span class="dot"></span>Intéressé</span>
+        <span class="badge b-mint"><span class="dot"></span>Gagné</span>
+        <span class="badge b-rose"><span class="dot"></span>Perdu</span>
+        <span class="badge" style="color: #ffa8b0; background: rgba(255,122,133,0.06); border: 1px dashed rgba(255,122,133,0.5)">Ne pas contacter</span>
+      </div>
+      <p style="margin: 12px 0 0; font-size: 11px; color: var(--faint); line-height: 1.55">Chaque pastille porte un point ET un mot : la couleur seule ne doit jamais être le seul indicateur d'un état. « Ne pas contacter » est le seul en trait discontinu — c'est une obligation, pas une étape.</p>
+    </div>
+
+    <!-- badges factuels -->
+    <div class="sect">
+      <div class="sectT">Badges de fait</div>
+      <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px">
+        <span class="badge b-rose">Pas de site déclaré</span>
+        <span class="badge b-amber">Site hors service</span>
+        <span class="badge b-mute">Réseaux sociaux seuls</span>
+        <span class="badge b-mint">Site en ligne</span>
+        <span class="badge b-mute">Plombier</span>
+        <span class="badge b-mint">Google · 94 %</span>
+        <span class="badge b-amber">Péremption <span class="num">3</span> j</span>
+        <span class="badge b-violet">gabarit-agence-v2</span>
+      </div>
+      <div class="sectT" style="margin-bottom: 9px">Compteurs</div>
+      <div style="display: flex; gap: 6px; align-items: center">
+        <span class="badge b-rose"><span class="num">3</span></span>
+        <span class="badge b-mute"><span class="num">12</span></span>
+        <span class="badge b-blue"><span class="num">99+</span></span>
+        <span style="position: relative; width: 30px; height: 30px; border-radius: 9px; background: var(--surface3); border: 1px solid var(--border2)">
+          <span style="position: absolute; top: -4px; right: -4px; min-width: 15px; height: 15px; padding: 0 4px; border-radius: 999px; background: var(--rose); color: #0b0d12; font-family: var(--mono); font-size: 9.5px; font-weight: 700; display: flex; align-items: center; justify-content: center">2</span>
+        </span>
+      </div>
+    </div>
+
+    <!-- infobulles -->
+    <div class="sect">
+      <div class="sectT">Infobulles — survolez</div>
+      <div style="display: flex; flex-direction: column; gap: 16px; padding-top: 22px">
+        <div class="tip" style="align-self: flex-start">
+          <span class="badge b-rose">Pas de site déclaré</span>
+          <span class="tipBody"><span class="tipK">Motif de qualification</span>Aucun site trouvé, aucune URL déclarée. Le signal le plus lourd du barème : +30 points.</span>
+        </div>
+        <div class="tip" style="align-self: flex-start">
+          <span style="font-size: 12.5px; color: var(--muted); border-bottom: 1px dotted var(--border2)">non publié par la source</span>
+          <span class="tipBody"><span class="tipK">Ce n'est pas un trou de collecte</span>Google ne publie plus le nombre d'avis depuis août 2026. Relancer l'enrichissement ne le remplira pas.</span>
+        </div>
+        <div class="tip" style="align-self: flex-start">
+          <span style="width: 16px; height: 16px; border-radius: 999px; border: 1px solid var(--border2); color: var(--faint); font-size: 10px; display: flex; align-items: center; justify-content: center">?</span>
+          <span class="tipBody"><span class="tipK">Ordre de résolution</span>Le gabarit du métier l'emporte sur le gabarit actif, qui l'emporte sur celui livré avec l'application.</span>
+        </div>
+      </div>
+      <p style="margin: 14px 0 0; font-size: 11px; color: var(--faint); line-height: 1.55">L'infobulle porte le <i>pourquoi</i>, jamais une information dont la décision dépend. Ce qui compte reste visible.</p>
+    </div>
+
+    <!-- boutons -->
+    <div class="sect">
+      <div class="sectT">Actions</div>
+      <div style="display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 10px">
+        <button class="btn btn-p">Appeler</button>
+        <button class="btn">Voir le site</button>
+        <button class="btn btn-d">Rejeter</button>
+        <button class="btn btn-off">Activer</button>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 12px">
+        <button class="btn btn-sm">Prévisualiser</button>
+        <button class="btn btn-sm">Rejouer</button>
+        <button class="btn btn-sm" style="width: 28px; padding: 0; justify-content: center">⋯</button>
+      </div>
+      <div class="sectT" style="margin-bottom: 9px">Champs</div>
+      <div style="display: flex; flex-direction: column; gap: 7px">
+        <div style="display: flex; align-items: center; height: 34px; padding: 0 11px; border: 1px solid var(--border2); border-radius: 9px; background: var(--surface2); font-family: var(--mono); font-size: 12.5px"><span style="color: var(--faint)">prospeo /</span><span style="margin-left: 5px">gabarit-artisan</span><span style="width: 1px; height: 15px; background: var(--blue); margin-left: 2px"></span></div>
+        <div style="display: flex; align-items: center; justify-content: space-between; height: 34px; padding: 0 11px; border: 1px solid var(--border2); border-radius: 9px; background: var(--surface2); font-size: 12.5px; color: var(--muted)">Relancé <span style="color: var(--faint)">▾</span></div>
+      </div>
+    </div>
+
+    <!-- jauges -->
+    <div class="sect">
+      <div class="sectT">Score et progression</div>
+      <div style="display: flex; align-items: center; gap: 18px; margin-bottom: 14px">
+        <div style="position: relative; width: 66px; height: 66px; flex: none">
+          <svg width="66" height="66" viewBox="0 0 66 66">
+            <circle cx="33" cy="33" r="27" fill="none" stroke="#232936" stroke-width="7"/>
+            <circle cx="33" cy="33" r="27" fill="none" stroke="#6d92ff" stroke-width="7" stroke-linecap="round" stroke-dasharray="169.6" stroke-dashoffset="44.1" transform="rotate(-90 33 33)"/>
+          </svg>
+          <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center">
+            <span class="num" style="font-size: 20px; font-weight: 700; letter-spacing: -0.03em">74</span>
+          </div>
+        </div>
+        <div style="flex: 1">
+          <div style="display: flex; gap: 2px; margin-bottom: 9px">
+            <span style="display: block; width: 18px; height: 6px; border-radius: 2px; background: #6d92ff"></span>
+            <span style="display: block; width: 15px; height: 6px; border-radius: 2px; background: #5a7de0"></span>
+            <span style="display: block; width: 10px; height: 6px; border-radius: 2px; background: #3f568f"></span>
+            <span style="display: block; width: 13px; height: 6px; border-radius: 2px; background: #232936"></span>
+          </div>
+          <div style="height: 7px; border-radius: 999px; background: #232936; overflow: hidden; margin-bottom: 8px"><div style="width: 68%; height: 100%; background: linear-gradient(90deg, #6d92ff, #4fd1a5)"></div></div>
+          <div style="font-size: 11px; color: var(--faint)">Piste compacte de liste · barre de palier</div>
+        </div>
+      </div>
+      <div class="sectT" style="margin-bottom: 9px">Pistes de déploiement</div>
+      <div style="display: flex; flex-direction: column; gap: 7px">
+        <div style="display: flex; align-items: center; gap: 9px"><span style="display: flex; gap: 3px"><span class="seg seg-ok"></span><span class="seg seg-ok"></span><span class="seg seg-ok"></span><span class="seg seg-run"></span><span class="seg"></span></span><span style="font-size: 11.5px; color: var(--muted)">en cours</span></div>
+        <div style="display: flex; align-items: center; gap: 9px"><span style="display: flex; gap: 3px"><span class="seg seg-ok"></span><span class="seg seg-ok"></span><span class="seg seg-ok"></span><span class="seg seg-fail"></span><span class="seg"></span></span><span style="font-size: 11.5px; color: #ffa8b0">échec au build</span></div>
+        <div style="display: flex; align-items: center; gap: 9px"><span style="display: flex; gap: 3px"><span class="seg seg-ok"></span><span class="seg seg-ok"></span><span class="seg seg-ok"></span><span class="seg seg-ok"></span><span class="seg seg-ok"></span></span><span style="font-size: 11.5px; color: #86e3c1">en ligne</span></div>
+      </div>
+    </div>
+
+    <!-- cartes -->
+    <div class="sect">
+      <div class="sectT">Cartes</div>
+      <div style="background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 13px; margin-bottom: 9px">
+        <div style="display: flex; align-items: center; gap: 7px; margin-bottom: 10px; color: var(--muted)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V8l7-5 7 5v13"/></svg>
+          <span style="font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 600">Carte de faits</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 6px"><span style="color: var(--muted)">SIRET</span><span class="num">812 456 789 00023</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12.5px"><span style="color: var(--muted)">Créée</span><span class="num">12/03/2019</span></div>
+      </div>
+      <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 13px; display: flex; align-items: center; gap: 12px; margin-bottom: 9px">
+        <div style="width: 34px; height: 34px; border-radius: 10px; background: rgba(79,209,165,0.13); color: var(--mint); display: flex; align-items: center; justify-content: center; flex: none">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+        </div>
+        <div><div class="num" style="font-size: 20px; font-weight: 700; line-height: 1.1">22</div><div style="font-size: 11px; color: var(--muted)">carte de chiffre</div></div>
+      </div>
+      <div style="padding: 11px 13px; border-radius: 12px; background: rgba(240,180,92,0.07); border: 1px solid rgba(240,180,92,0.28); font-size: 12px; color: #f5cd92">Carte d'alerte — un fait qui appelle une décision.</div>
+    </div>
+
+    <!-- états vides -->
+    <div class="sect">
+      <div class="sectT">Absences et vides</div>
+      <div style="display: flex; flex-direction: column; gap: 9px; margin-bottom: 14px">
+        <div style="display: flex; justify-content: space-between; font-size: 12.5px"><span style="color: var(--muted)">Pas encore collecté</span><span style="color: var(--faint); font-style: italic">non collecté</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12.5px"><span style="color: var(--muted)">Retiré par la source</span><span style="color: var(--faint); font-style: italic">non publié</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12.5px"><span style="color: var(--muted)">Jamais scoré</span><span style="color: var(--faint); font-style: italic">étage non passé</span></div>
+      </div>
+      <div style="border: 1px dashed var(--border2); border-radius: 12px; padding: 20px 14px; text-align: center">
+        <div style="color: var(--faint); margin-bottom: 8px; display: flex; justify-content: center">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg>
+        </div>
+        <div style="font-size: 12.5px; font-weight: 600; margin-bottom: 3px">Aucune relance due</div>
+        <div style="font-size: 11.5px; color: var(--muted); line-height: 1.55">Les engagements de rappel tenus disparaissent d'ici. Rien à faire aujourd'hui.</div>
+      </div>
+      <p style="margin: 12px 0 0; font-size: 11px; color: var(--faint); line-height: 1.55">Quatre prospects sur cinq n'ont ni enrichissement, ni score. L'absence est l'état le plus fréquent de l'application : elle se nomme, elle ne s'efface pas en gris pâle.</p>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
