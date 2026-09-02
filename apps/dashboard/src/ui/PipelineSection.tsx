@@ -3,9 +3,21 @@ import { estUnRefus } from '@prospeo/core';
 import type { Enums } from '@prospeo/db';
 import type { PipelineView } from '../domain/prospect.js';
 import type { TranslationKey } from '../i18n/translate.js';
+import type { EchecDefinirStatut } from './actions.js';
 import { useT } from './preferences.js';
 import { jour } from './SiteSection.js';
 import styles from './ProspectPanel.module.css';
+
+/**
+ * L'erreur affichée par cette section, quelle que soit l'action qui l'a
+ * produite — `definirStatut` rend un `EchecDefinirStatut` structuré (relevé
+ * de revue, tâche 5), `journaliser` une simple chaîne. Une seule union locale
+ * plutôt que deux états : les deux actions partagent la même zone d'affichage
+ * et ne peuvent jamais être en échec toutes les deux à la fois.
+ */
+type ErreurSection =
+  | ({ readonly source: 'statut' } & EchecDefinirStatut)
+  | { readonly source: 'interaction'; readonly message: string };
 
 const STATUTS: readonly Enums<'pipeline_status'>[] = [
   'a_contacter',
@@ -27,7 +39,10 @@ interface Props {
   /** Site en ligne : conditionne l'avertissement sur la dépublication différée. */
   siteEnLigne: boolean;
   onDefinirStatut:
-    | ((status: Enums<'pipeline_status'>, nextActionAt: string | null) => Promise<string | null>)
+    | ((
+        status: Enums<'pipeline_status'>,
+        nextActionAt: string | null,
+      ) => Promise<EchecDefinirStatut | null>)
     | null;
   onJournaliser:
     | ((kind: Enums<'interaction_kind'>, body: string | null) => Promise<string | null>)
@@ -51,7 +66,7 @@ export function PipelineSection({
 }: Props) {
   const t = useT();
   const [enCours, setEnCours] = useState(false);
-  const [erreur, setErreur] = useState<string | null>(null);
+  const [erreur, setErreur] = useState<ErreurSection | null>(null);
   const [consigne, setConsigne] = useState(false);
   const [canal, setCanal] = useState<Enums<'interaction_kind'>>('appel');
   const [note, setNote] = useState('');
@@ -63,7 +78,7 @@ export function PipelineSection({
     setEnCours(true);
     setErreur(null);
     void onDefinirStatut(valeur as Enums<'pipeline_status'>, pipeline?.nextActionAt ?? null)
-      .then(setErreur)
+      .then((echec) => setErreur(echec === null ? null : { source: 'statut', ...echec }))
       .finally(() => setEnCours(false));
   };
 
@@ -74,7 +89,7 @@ export function PipelineSection({
     setConsigne(false);
     void onJournaliser(canal, note)
       .then((message) => {
-        setErreur(message);
+        setErreur(message === null ? null : { source: 'interaction', message });
         if (message === null) {
           setNote('');
           setConsigne(true);
@@ -153,7 +168,13 @@ export function PipelineSection({
 
       {erreur !== null ? (
         <p className={styles.error} role="alert">
-          {t('action.failed', { message: erreur })}
+          {/* Un échec `historique` a quand même écrit le statut : le dire
+              avec `action.failed` ferait croire à un clic sans effet, alors
+              que c'est le comptage pour le jeu (tâche 6) qui manque, pas le
+              statut lui-même. */}
+          {erreur.source === 'statut' && erreur.etape === 'historique'
+            ? t('pipeline.historyFailed', { message: erreur.message })
+            : t('action.failed', { message: erreur.message })}
         </p>
       ) : null}
     </section>

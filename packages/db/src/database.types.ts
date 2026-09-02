@@ -125,6 +125,41 @@ export type Database = {
           },
         ]
       }
+      pipeline_event: {
+        Row: {
+          id: number
+          next_action_at: string | null
+          occurred_at: string
+          origin: Database["public"]["Enums"]["pipeline_event_origin"]
+          prospect_id: string
+          status: Database["public"]["Enums"]["pipeline_status"]
+        }
+        Insert: {
+          id?: never
+          next_action_at?: string | null
+          occurred_at?: string
+          origin?: Database["public"]["Enums"]["pipeline_event_origin"]
+          prospect_id: string
+          status: Database["public"]["Enums"]["pipeline_status"]
+        }
+        Update: {
+          id?: never
+          next_action_at?: string | null
+          occurred_at?: string
+          origin?: Database["public"]["Enums"]["pipeline_event_origin"]
+          prospect_id?: string
+          status?: Database["public"]["Enums"]["pipeline_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_event_prospect_id_fkey"
+            columns: ["prospect_id"]
+            isOneToOne: false
+            referencedRelation: "prospect"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       prospect: {
         Row: {
           address: string
@@ -489,6 +524,7 @@ export type Database = {
         | "retrait"
       enrichment_status: "ok" | "not_found" | "ambiguous" | "blocked"
       interaction_kind: "appel" | "whatsapp" | "email" | "sms" | "note"
+      pipeline_event_origin: "observe" | "amorcage"
       pipeline_status:
         | "a_contacter"
         | "contacte"
@@ -518,12 +554,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -547,11 +583,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -572,11 +608,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -597,11 +633,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -614,11 +650,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -641,6 +677,7 @@ export const Constants = {
       ],
       enrichment_status: ["ok", "not_found", "ambiguous", "blocked"],
       interaction_kind: ["appel", "whatsapp", "email", "sms", "note"],
+      pipeline_event_origin: ["observe", "amorcage"],
       pipeline_status: [
         "a_contacter",
         "contacte",

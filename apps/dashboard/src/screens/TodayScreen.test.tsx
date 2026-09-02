@@ -44,20 +44,66 @@ const score = (total: number, version = 'v2') => ({
 });
 
 /**
+ * Un builder inerte, poli avec toute requête qu'il ne lui appartient pas de
+ * connaître — depuis la tâche 8, `TodayScreen` appelle aussi `useJeu` avec le
+ * même client que ces tests fabriquent pour `deployment_event` seul (comme
+ * `Authenticated` le fait déjà en production, un seul client réel pour tout
+ * l'écran). Sans ce filet, les requêtes `pipeline_event`/`interaction` du jeu
+ * heurteraient un builder taillé pour une seule chaîne bien plus étroite.
+ * Chaîne quelconque, résolution vide ou nulle : le jeu retombe alors sur un
+ * historique au repos, sans jamais fausser les tests qui portent, eux, sur le
+ * journal de déploiement d'un prospect précis.
+ */
+function builderJeuNeutre(): unknown {
+  const builder = {
+    select() {
+      return builder;
+    },
+    eq() {
+      return builder;
+    },
+    gte() {
+      return builder;
+    },
+    lt() {
+      return builder;
+    },
+    or() {
+      return builder;
+    },
+    order() {
+      return builder;
+    },
+    range() {
+      return Promise.resolve({ data: [], error: null });
+    },
+    then(resolve: (v: unknown) => void) {
+      resolve({ data: null, error: null, count: 0 });
+    },
+  };
+  return builder;
+}
+
+/**
  * Client simulé pour `deployment_event` — tâche 11, le câblage du journal.
  *
  * Reproduit uniquement la chaîne que `fetchEventsFor` (data/deployments.ts)
  * appelle : `from('deployment_event').select(...).eq('prospect_id', id)
- * .order('occurred_at', ...)`. `appels` enregistre chaque table demandée,
- * pour la preuve négative (aucune lecture sans sélection).
+ * .order('occurred_at', ...)`. `appels` enregistre chaque table demandée pour
+ * cette chaîne précise, pour la preuve négative (aucune lecture sans
+ * sélection) — les requêtes du jeu (tâche 8), de forme différente
+ * (`select('*', {count, head})`), sont détournées vers `builderJeuNeutre` et
+ * n'y figurent jamais (voir son docstring).
  */
 function fakeEventsClient(lignes: Record<string, unknown>[]) {
   const appels: string[] = [];
   const client = {
     from(table: string) {
-      appels.push(table);
+      if (table !== 'deployment_event') return builderJeuNeutre();
       return {
-        select() {
+        select(_colonnes?: string, options?: unknown) {
+          if (options !== undefined) return builderJeuNeutre(); // le compte "sites en ligne" du jeu.
+          appels.push(table);
           return {
             eq() {
               return {
@@ -97,9 +143,11 @@ function fakeEventsClientControlee() {
   const attentes: { prospectId: string; resolve: (lignes: Record<string, unknown>[]) => void }[] = [];
   const client = {
     from(table: string) {
-      appels.push(table);
+      if (table !== 'deployment_event') return builderJeuNeutre();
       return {
-        select() {
+        select(_colonnes?: string, options?: unknown) {
+          if (options !== undefined) return builderJeuNeutre(); // le compte "sites en ligne" du jeu.
+          appels.push(table);
           return {
             eq(_colonne: string, prospectId: string) {
               return {
@@ -127,9 +175,11 @@ function fakeEventsClientErreur(message: string) {
   const appels: string[] = [];
   const client = {
     from(table: string) {
-      appels.push(table);
+      if (table !== 'deployment_event') return builderJeuNeutre();
       return {
-        select() {
+        select(_colonnes?: string, options?: unknown) {
+          if (options !== undefined) return builderJeuNeutre(); // le compte "sites en ligne" du jeu.
+          appels.push(table);
           return {
             eq() {
               return {
@@ -170,16 +220,18 @@ function rendre(prospects: ProspectView[]) {
 }
 
 describe('TodayScreen', () => {
-  it('rend l ecart entre prospects decouverts et prospects juges lisible sans lister ces derniers', () => {
-    // Sur la base reelle, 114 prospects sur 139 n'ont aucun score. Ils n'ont
-    // pas de ligne — aucune action n'est possible dessus — mais l'ecart doit
-    // sauter aux yeux, sans quoi l'ecran laisse croire que la base compte
-    // deux entreprises.
+  it('n inscrit pas un prospect sans score dans une file de travail', () => {
+    // Sur la base reelle, 10 prospects sur 139 n'ont aucun score (releve du
+    // 2 septembre 2026). Ils n'ont
+    // pas de ligne — aucune action n'est possible dessus. L'ancien couple
+    // « Qualifies » / « En base » qui portait cet ecart a ete retire de la
+    // bande de progression (voir le rapport de la tache 8, alignement sur la
+    // largeur reelle) : plus rien sur cet ecran ne compte ces prospects, mais
+    // le fait qu'un prospect non score reste invisible dans les FILES DE
+    // TRAVAIL, lui, continue d'etre verifie ici, et l'est aussi au niveau du
+    // domaine (`today.test.ts`, « n inscrit un prospect sans score dans
+    // aucune file de travail »).
     rendre([vue('a'), vue('b', { score: score(30) })]);
-    const bande = screen.getByText('Qualifiés').closest('div');
-    expect(bande?.textContent).toContain('1');
-    expect(screen.getByText('En base').closest('div')?.textContent).toContain('2');
-    // Le prospect sans score n'apparait dans aucune file de travail.
     expect(screen.queryByText('ENTREPRISE a')).toBeNull();
   });
 
@@ -309,6 +361,155 @@ describe('TodayScreen', () => {
     expect(within(panneau).getByText(/démentie par le site déclaré/)).toBeDefined();
     // Et l'ecart est visible sans ouvrir le panneau.
     expect(screen.getAllByText('!').length).toBeGreaterThan(0);
+  });
+});
+
+describe('TodayScreen — la recherche de la barre du haut (lot 3, tache 2)', () => {
+  it('filtre reellement les listes de travail affichees', async () => {
+    const user = userEvent.setup();
+    rendre([
+      vue('alpha', { denomination: 'PLOMBERIE ALPHA', score: score(90) }),
+      vue('beta', { denomination: 'SERRURERIE BETA', score: score(80) }),
+    ]);
+
+    expect(screen.getByText('PLOMBERIE ALPHA')).toBeDefined();
+    expect(screen.getByText('SERRURERIE BETA')).toBeDefined();
+
+    const champ = screen.getByRole('searchbox', { name: /Filtrer les listes du jour/ });
+    await user.type(champ, 'alpha');
+
+    expect(screen.getByText('PLOMBERIE ALPHA')).toBeDefined();
+    expect(screen.queryByText('SERRURERIE BETA')).toBeNull();
+  });
+
+  it('le raccourci clavier donne reellement le focus au champ de recherche', async () => {
+    const user = userEvent.setup();
+    rendre([vue('a', { score: score(90) })]);
+
+    const champ = screen.getByRole('searchbox');
+    expect(document.activeElement).not.toBe(champ);
+
+    await user.keyboard('{Control>}k{/Control}');
+
+    expect(document.activeElement).toBe(champ);
+  });
+
+  it('affiche le raccourci qui fonctionne reellement sur la plateforme detectee', () => {
+    rendre([vue('a', { score: score(90) })]);
+    // `⌘K` sur macOS, `Ctrl+K` ailleurs (ui/plateforme.ts) : jamais l'un a la
+    // place de l'autre, et jamais un texte different des deux.
+    expect(screen.getByText(/^(⌘K|Ctrl\+K)$/)).toBeDefined();
+  });
+
+  it('taper dans le champ ne deplace pas la selection de la liste et ne ferme pas le panneau', async () => {
+    const user = userEvent.setup();
+    rendre([vue('haut', { score: score(90) }), vue('bas', { score: score(50) })]);
+
+    await user.keyboard('{ArrowDown}');
+    expect(
+      within(screen.getByRole('complementary')).getByRole('heading', { level: 2 }).textContent,
+    ).toBe('ENTREPRISE haut');
+
+    const champ = screen.getByRole('searchbox');
+    await user.click(champ);
+    // `shouldIgnoreKeyboard` (ui/list-navigation.ts) ignore deja les fleches
+    // et Echap venant d'un <input> ; ce test prouve que ca tient depuis le
+    // vrai champ de recherche, et pas seulement en theorie.
+    await user.keyboard('{ArrowDown}{Escape}');
+
+    expect(
+      within(screen.getByRole('complementary')).getByRole('heading', { level: 2 }).textContent,
+    ).toBe('ENTREPRISE haut');
+  });
+
+  it('dit qu aucune ligne ne correspond a la recherche, distinctement d une liste vide pour une autre raison', async () => {
+    const user = userEvent.setup();
+    rendre([vue('a', { score: score(90) })]);
+
+    const champ = screen.getByRole('searchbox');
+    await user.type(champ, 'aucune-entreprise-ne-porte-ce-nom');
+
+    expect(screen.getByText('Aucune ligne ne correspond à votre recherche.')).toBeDefined();
+    // Distinct du texte d'un vide "naturel" (aucun prospect score) : la
+    // recherche ne doit pas emprunter ce message-la, ni l'inverse.
+    expect(screen.queryByText('Aucun prospect scoré pour le moment.')).toBeNull();
+  });
+
+  it('garde le texte d un vide naturel quand la recherche est vide, sans jamais parler de recherche', () => {
+    // Aucune relance due, aucune frappe dans le champ : le vide vient de
+    // l'etat reel de la base, pas d'une recherche qui l'aurait cause.
+    rendre([vue('a')]);
+    expect(screen.queryByText('Aucune ligne ne correspond à votre recherche.')).toBeNull();
+  });
+});
+
+describe('TodayScreen — le panneau reste coherent avec la recherche (correctif de revue, lot 3 tache 2)', () => {
+  it('garde le panneau ouvert sur le prospect selectionne quand la recherche l exclut, et nomme l absence de rang', async () => {
+    const user = userEvent.setup();
+    rendre([
+      vue('alpha', { denomination: 'PLOMBERIE ALPHA', score: score(90) }),
+      vue('beta', { denomination: 'SERRURERIE BETA', score: score(80) }),
+    ]);
+
+    // Selectionne alpha (score le plus haut, premier de la liste).
+    await user.keyboard('{ArrowDown}');
+    const panneauAvant = screen.getByRole('complementary');
+    expect(within(panneauAvant).getByRole('heading', { level: 2 }).textContent).toBe('PLOMBERIE ALPHA');
+    expect(within(panneauAvant).getByText('1 sur 2')).toBeDefined();
+
+    // La recherche exclut alpha (mais laisse beta) : la ligne selectionnee
+    // disparait de la liste affichee sans que la selection ne bouge.
+    const champ = screen.getByRole('searchbox');
+    await user.type(champ, 'beta');
+
+    // Le panneau reste monte et affiche toujours la meme fiche — taper dans
+    // la recherche ne detruit pas la fiche qu'on lisait.
+    const panneauApres = screen.getByRole('complementary');
+    expect(within(panneauApres).getByRole('heading', { level: 2 }).textContent).toBe('PLOMBERIE ALPHA');
+    // Le rang n'a plus de sens relativement a une liste qui ne contient plus
+    // la ligne : aucun texte de la forme "N sur M" ne doit rester.
+    expect(within(panneauApres).queryByText(/^\d+ sur \d+$/)).toBeNull();
+    // Et l'absence se nomme, plutot que de laisser un trou silencieux.
+    expect(within(panneauApres).getByText('Hors du filtre de recherche en cours')).toBeDefined();
+  });
+
+  it('n affiche nulle part 0 sur 0 quand le filtre du prospect ouvert ne laisse plus aucune ligne', async () => {
+    const user = userEvent.setup();
+    rendre([vue('alpha', { denomination: 'PLOMBERIE ALPHA', score: score(90) })]);
+
+    await user.keyboard('{ArrowDown}');
+    expect(screen.getByRole('complementary')).toBeDefined();
+
+    const champ = screen.getByRole('searchbox');
+    await user.type(champ, 'aucune-entreprise-ne-porte-ce-nom');
+
+    const panneau = screen.getByRole('complementary');
+    expect(within(panneau).getByRole('heading', { level: 2 }).textContent).toBe('PLOMBERIE ALPHA');
+    // Nulle part sur l'ecran, ni dans le panneau ni ailleurs.
+    expect(screen.queryByText('0 sur 0')).toBeNull();
+    expect(within(panneau).queryByText(/^\d+ sur \d+$/)).toBeNull();
+    expect(within(panneau).getByText('Hors du filtre de recherche en cours')).toBeDefined();
+  });
+
+  it('rend un rang correct, relatif a la liste filtree, quand le prospect ouvert y figure toujours', async () => {
+    const user = userEvent.setup();
+    rendre([
+      vue('alpha', { denomination: 'PLOMBERIE ALPHA', score: score(90) }),
+      vue('beta', { denomination: 'SERRURERIE BETA', score: score(80) }),
+    ]);
+
+    await user.keyboard('{ArrowDown}');
+    const champ = screen.getByRole('searchbox');
+    // Exclut beta, laisse alpha : la liste filtree ne contient plus qu une
+    // ligne, et le prospect ouvert y figure toujours.
+    await user.type(champ, 'alpha');
+
+    const panneau = screen.getByRole('complementary');
+    expect(within(panneau).getByRole('heading', { level: 2 }).textContent).toBe('PLOMBERIE ALPHA');
+    // "1 sur 1", relatif a la liste FILTREE — pas "1 sur 2" de la liste
+    // complete.
+    expect(within(panneau).getByText('1 sur 1')).toBeDefined();
+    expect(within(panneau).queryByText('Hors du filtre de recherche en cours')).toBeNull();
   });
 });
 

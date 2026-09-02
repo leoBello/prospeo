@@ -18,6 +18,11 @@
 
 .title {
   margin: 0;
+  /* Titre d'écran : la maquette le confie à la fonte d'affichage, comme tous
+     les h1-h4 (règle globale de Main.dc.html) — jusqu'ici seule la jauge de
+     score l'employait, et l'écran entier lisait en Instrument Sans. */
+  font-family: var(--font-display);
+  font-weight: 600;
   font-size: var(--text-xl);
   letter-spacing: -0.02em;
 }
@@ -57,7 +62,11 @@
   /* 44 px de haut : cible tactile minimale. */
   min-height: 44px;
   background: var(--color-accent);
-  color: #fff;
+  /* `var(--color-bg)` et non un blanc en dur : sur l'accent du thème sombre
+     (#6d92ff, clair), un texte blanc passait sous le seuil de contraste ; et
+     un blanc figé ne bascule pas avec le thème. Le fond de page joue ici le
+     rôle d'encre, comme les boutons primaires de la maquette. */
+  color: var(--color-bg);
   border: none;
   border-radius: var(--radius-sm);
   font-weight: 600;

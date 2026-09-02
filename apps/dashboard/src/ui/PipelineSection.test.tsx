@@ -126,6 +126,39 @@ describe('PipelineSection', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('permission denied');
   });
 
+  it('signale un échec de l’ÉTAT du pipeline avec le message générique — rien n’a changé', async () => {
+    // `EchecDefinirStatut.etape === 'etat'` : la première écriture a échoué,
+    // rien n'a bougé en base. Le message générique (« Écriture refusée ») dit
+    // juste : personne ne s'attend à autre chose.
+    const definir = vi.fn(async () => ({ etape: 'etat' as const, message: 'RLS' }));
+    renderWithPreferences(
+      <PipelineSection pipeline={null} siteEnLigne={false} onDefinirStatut={definir} onJournaliser={null} />,
+    );
+
+    await userEvent.selectOptions(screen.getByRole('combobox'), 'interesse');
+    const alerte = await screen.findByRole('alert');
+    expect(alerte.textContent).toContain('RLS');
+    expect(alerte.textContent).toContain('Écriture refusée');
+  });
+
+  it('distingue un échec de l’HISTORIQUE — le statut, lui, a bien été enregistré (relevé de revue, tâche 5)', async () => {
+    // `EchecDefinirStatut.etape === 'historique'` : la première écriture a
+    // réussi, `prospect_pipeline` porte déjà le nouveau statut. Un message
+    // générique laisserait croire à un clic sans effet ; la clé dédiée dit ce
+    // qui compte vraiment — le statut a pris, seul le comptage pour le jeu
+    // (tâche 6) manque.
+    const definir = vi.fn(async () => ({ etape: 'historique' as const, message: 'HS' }));
+    renderWithPreferences(
+      <PipelineSection pipeline={null} siteEnLigne={false} onDefinirStatut={definir} onJournaliser={null} />,
+    );
+
+    await userEvent.selectOptions(screen.getByRole('combobox'), 'interesse');
+    const alerte = await screen.findByRole('alert');
+    expect(alerte.textContent).toContain('HS');
+    expect(alerte.textContent).toContain('ne sera pas compté');
+    expect(alerte.textContent).not.toContain('Écriture refusée');
+  });
+
   it('reste consultable sans aucune écriture branchée', () => {
     renderWithPreferences(<PipelineSection pipeline={null} siteEnLigne={false} {...rien} />);
     expect(screen.queryByRole('button')).toBeNull();

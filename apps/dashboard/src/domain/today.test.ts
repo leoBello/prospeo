@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { ProspectView } from './prospect.js';
-import { MAX_ROWS_PER_LIST, buildToday, computeKpis, followUpReason, highlightLines } from './today.js';
+import {
+  MAX_ROWS_PER_LIST,
+  buildToday,
+  followUpReason,
+  highlightLines,
+  matchesQuery,
+} from './today.js';
 
 const AUJOURDHUI = new Date('2026-09-01T09:00:00');
 
@@ -102,47 +108,6 @@ describe('highlightLines', () => {
   });
 });
 
-describe('computeKpis', () => {
-  const pipeline = (status: NonNullable<ProspectView['pipeline']>['status']) => ({
-    status,
-    nextActionAt: null,
-    updatedAt: '2026-08-30T10:00:00Z',
-  });
-
-  it('compte en base tous les prospects, y compris ceux qui n ont aucun satellite', () => {
-    const kpis = computeKpis([vue({ id: 'a' }), vue({ id: 'b', score: scoreDe(50) })]);
-    expect(kpis.inBase).toBe(2);
-  });
-
-  it('ne compte pas comme contacte un prospect seulement marque a contacter', () => {
-    // Marquer n'est pas contacter. Le confondre gonflerait le seul indicateur
-    // qui mesure l'activite reelle.
-    const kpis = computeKpis([
-      vue({ id: 'marque', pipeline: pipeline('a_contacter') }),
-      vue({ id: 'appele', pipeline: pipeline('contacte') }),
-    ]);
-    expect(kpis.contacted).toBe(1);
-  });
-
-  it('compte comme qualifie tout prospect portant un score, quel qu en soit le total', () => {
-    // Y compris un score de zero : c'est un jugement rendu, pas une absence de
-    // jugement. C'est la distinction meme que cet indicateur sert a mesurer.
-    const kpis = computeKpis([
-      vue({ id: 'nul', score: scoreDe(0) }),
-      vue({ id: 'haut', score: scoreDe(90) }),
-      vue({ id: 'sans' }),
-    ]);
-    expect(kpis.qualified).toBe(2);
-    expect(kpis.inBase).toBe(3);
-  });
-
-  it('laisse les compteurs de suivi a zero tant que la table est vide', () => {
-    const kpis = computeKpis([vue({ id: 'a' })]);
-    expect(kpis.contacted).toBe(0);
-    expect(kpis.interested).toBe(0);
-  });
-});
-
 describe('buildToday', () => {
   const enAttente = [vue({ id: 'x1' }), vue({ id: 'x2' })];
   const scores = [
@@ -156,11 +121,13 @@ describe('buildToday', () => {
   });
 
   it('n inscrit un prospect sans score dans aucune file de travail', () => {
-    // 114 prospects sur 139 sont dans ce cas. Les faire tomber a zero les
+    // 10 prospects sur 139 sont dans ce cas (releve du 2 septembre 2026,
+    // apres qu'une campagne de scoring a couvert la majorite de la base).
+    // Les faire tomber a zero les
     // placerait en bas d'une liste ou ils n'ont rien a faire ; leur donner une
     // file a eux couterait douze arrets aux fleches pour des lignes sur
-    // lesquelles aucune action n'est possible. Leur nombre est porte par
-    // l'indicateur « qualifies », pas par des lignes.
+    // lesquelles aucune action n'est possible. Leur nombre n'est plus compte
+    // nulle part sur cet ecran (voir le rapport de la tache 8).
     const today = buildToday([...enAttente, ...scores], AUJOURDHUI);
     const affiches = [...today.followUps.items, ...today.newHighScore.items].map(
       (r) => r.prospect.id,
@@ -241,5 +208,38 @@ describe('buildToday', () => {
         expect(ligne.reason.length).toBeGreaterThan(0);
       }
     }
+  });
+});
+
+describe('matchesQuery', () => {
+  it('retrouve un prospect par sa denomination, insensible a la casse', () => {
+    const p = vue({ id: 'a', denomination: 'AUBERT SERVICES' });
+    expect(matchesQuery(p, 'aubert')).toBe(true);
+    expect(matchesQuery(p, 'AUBERT')).toBe(true);
+  });
+
+  it('retrouve un prospect par son nom usuel quand la denomination legale ne correspond pas', () => {
+    const p = vue({
+      id: 'a',
+      denomination: 'SARL DURAND ET FILS',
+      denominationUsuelle: 'Plomberie Durand',
+    });
+    expect(matchesQuery(p, 'plomberie durand')).toBe(true);
+  });
+
+  it('ignore les accents, la denomination ne les normalisant pas elle meme', () => {
+    const p = vue({ id: 'a', denomination: 'ÉLECTRICITÉ NANTAISE' });
+    expect(matchesQuery(p, 'electricite')).toBe(true);
+  });
+
+  it('rejette un prospect qui ne correspond a rien', () => {
+    const p = vue({ id: 'a', denomination: 'AUBERT SERVICES' });
+    expect(matchesQuery(p, 'plombier')).toBe(false);
+  });
+
+  it('une recherche vide ou faite uniquement d espaces laisse passer tout le monde', () => {
+    const p = vue({ id: 'a', denomination: 'AUBERT SERVICES' });
+    expect(matchesQuery(p, '')).toBe(true);
+    expect(matchesQuery(p, '   ')).toBe(true);
   });
 });

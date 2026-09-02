@@ -16,12 +16,22 @@ import {
  * Une erreur à ce niveau ne se voit pas autrement : Supabase répond sans
  * broncher à un `update` qui ne touche aucune ligne.
  */
-function fakeClient(erreur: { message: string } | null = null) {
+/**
+ * `erreurParTable` cible l'échec sur UNE table précise, sans toucher aux
+ * autres — indispensable pour `definirStatut`, qui écrit désormais sur DEUX
+ * tables et dont l'échec partiel (la seconde réussit sans la première, ou
+ * l'inverse) est justement ce que ce fichier doit prouver. `erreur` reste le
+ * réglage global déjà utilisé par les autres suites, pour ne rien casser.
+ */
+function fakeClient(
+  erreur: { message: string } | null = null,
+  erreurParTable: Record<string, { message: string }> = {},
+) {
   const appels: { table: string; verbe: string; valeurs: unknown; filtre?: [string, string]; options?: unknown }[] = [];
-  const reponse = Promise.resolve({ error: erreur });
 
   const client = {
     from(table: string) {
+      const reponse = Promise.resolve({ error: erreurParTable[table] ?? erreur });
       return {
         update(valeurs: unknown) {
           const appel = { table, verbe: 'update', valeurs };
@@ -108,6 +118,81 @@ describe('definirStatut', () => {
     const { client, appels } = fakeClient();
     await definirStatut(client, 'p1', 'relance', '2026-09-15');
     expect((appels[0]?.valeurs as Record<string, unknown>)['next_action_at']).toBe('2026-09-15');
+  });
+
+  it('écrit AUSSI l’historique dans pipeline_event, après l’état, dans la même opération', async () => {
+    // Tâche 5 : un changement de statut sans sa ligne d'historique rendrait
+    // le jeu (tâche 6) faux en silence — `rendezVousObtenus` et
+    // `relancesTenues` ne lisent QUE `pipeline_event`.
+    const { client, appels } = fakeClient();
+    const resultat = await definirStatut(client, 'p1', 'interesse', '2026-09-20');
+
+    expect(appels).toHaveLength(2);
+    expect(appels[0]?.table).toBe('prospect_pipeline');
+    expect(appels[1]?.table).toBe('pipeline_event');
+    expect(appels[1]?.verbe).toBe('insert');
+    expect(resultat).toBeNull();
+  });
+
+  it('porte dans l’historique le statut demandé et la next_action_at qui entre en vigueur avec CE changement', async () => {
+    // Pas `null` par défaut, pas une autre valeur : celle qui accompagne
+    // précisément ce changement de statut — voir `FaitPipeline.nextActionAt`
+    // dans `domain/jeu.ts`.
+    const { client, appels } = fakeClient();
+    await definirStatut(client, 'p1', 'relance', '2026-09-15');
+
+    const valeurs = appels[1]?.valeurs as Record<string, unknown>;
+    expect(valeurs['prospect_id']).toBe('p1');
+    expect(valeurs['status']).toBe('relance');
+    expect(valeurs['next_action_at']).toBe('2026-09-15');
+  });
+
+  it('ne marque jamais une écriture réelle comme un "amorcage"', async () => {
+    // 'amorcage' est réservé à la reconstitution unique faite par la
+    // migration de la tâche 4 (`domain/jeu.ts`, `OrigineEvenementPipeline`).
+    // Une écriture qui part de ce fichier observe un fait réel : ce ne peut
+    // être qu''observe'.
+    const { client, appels } = fakeClient();
+    await definirStatut(client, 'p1', 'interesse', null);
+    expect((appels[1]?.valeurs as Record<string, unknown>)['origin']).toBe('observe');
+  });
+
+  it('n’horodate pas l’historique depuis le navigateur', async () => {
+    // Même raison que `journaliserInteraction` : `occurred_at` reste au
+    // défaut de la base (`now()`), pour ne pas exposer une horloge de poste
+    // décalée.
+    const { client, appels } = fakeClient();
+    await definirStatut(client, 'p1', 'interesse', null);
+    expect(appels[1]?.valeurs).not.toHaveProperty('occurred_at');
+  });
+
+  it('n’écrit PAS l’historique quand l’état a échoué — l’échec net n’entraîne pas une écriture partielle', async () => {
+    const { client, appels } = fakeClient(null, { prospect_pipeline: { message: 'RLS' } });
+    const resultat = await definirStatut(client, 'p1', 'interesse', null);
+
+    expect(appels).toHaveLength(1);
+    expect(appels[0]?.table).toBe('prospect_pipeline');
+    // Résultat STRUCTURÉ, pas une chaîne composée par ce fichier : `etape`
+    // dit à l'appelant lequel des deux écrits a échoué, à charge pour lui de
+    // le traduire (relevé de revue — voir `EchecDefinirStatut`).
+    expect(resultat).toEqual({ etape: 'etat', message: 'RLS' });
+  });
+
+  it('signale — et n’avale PAS — un échec de l’historique une fois l’état déjà écrit, en nommant l’étape qui a échoué', async () => {
+    // Le cœur de la tâche : une divergence silencieuse (état changé, jeu
+    // resté aveugle à ce changement) est le pire des trois résultats
+    // possibles. L'échec doit se voir, et dire LEQUEL des deux écrits a
+    // échoué — sans quoi l'opérateur ne sait pas si son geste a pris.
+    const { client, appels } = fakeClient(null, { pipeline_event: { message: 'HS' } });
+    const resultat = await definirStatut(client, 'p1', 'interesse', null);
+
+    // L'état, lui, a bien été écrit : ce n'est pas la première écriture qui
+    // a échoué, sans quoi la seconde n'aurait jamais dû être tentée.
+    expect(appels).toHaveLength(2);
+    expect(appels[0]?.table).toBe('prospect_pipeline');
+    expect(appels[1]?.table).toBe('pipeline_event');
+
+    expect(resultat).toEqual({ etape: 'historique', message: 'HS' });
   });
 });
 

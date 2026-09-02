@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { usePreferences } from './preferences.js';
+import { BarreHaut } from './BarreHaut.js';
 import styles from './AppShell.module.css';
 
 interface Props {
@@ -15,6 +15,15 @@ interface Props {
    * continuent de passer sans rail.
    */
   nav?: ReactNode;
+  /**
+   * Le champ de recherche de la barre du haut, optionnel comme `nav` et pour
+   * la même raison : seul l'écran appelant sait quoi filtrer et le construit
+   * lui-même (aujourd'hui, `TodayScreen` seul). `AppShell` le transmet à
+   * `BarreHaut` sans rien en connaître.
+   */
+  search?: ReactNode;
+  /** Le compteur de série de la barre du haut (tâche 8, lot 3) — transmis à `BarreHaut` sans rien en connaître, même patron que `search`. */
+  serie?: ReactNode;
   onSignOut: () => void;
 }
 
@@ -28,35 +37,12 @@ interface Props {
  * l'autre, et il évite l'aller-retour vers une page de détail à chaque
  * prospect.
  */
-export function AppShell({ list, panel, nav, onSignOut }: Props) {
-  const { t, theme, setTheme, locale, setLocale } = usePreferences();
-
+export function AppShell({ list, panel, nav, search, serie, onSignOut }: Props) {
   return (
     <div className={styles.shell}>
       {nav}
       <div className={styles.main}>
-        <header className={styles.header}>
-          <span className={styles.brand}>{t('app.name')}</span>
-          <div className={styles.actions}>
-            <button
-              type="button"
-              className={styles.action}
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            >
-              {t(theme === 'dark' ? 'theme.toLight' : 'theme.toDark')}
-            </button>
-            <button
-              type="button"
-              className={styles.action}
-              onClick={() => setLocale(locale === 'fr' ? 'en' : 'fr')}
-            >
-              {t('locale.switch')}
-            </button>
-            <button type="button" className={styles.action} onClick={onSignOut}>
-              {t('nav.signOut')}
-            </button>
-          </div>
-        </header>
+        <BarreHaut search={search} serie={serie} onSignOut={onSignOut} />
 
         <div className={styles.body}>
           <main className={styles.list}>{list}</main>

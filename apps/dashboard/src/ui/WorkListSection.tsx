@@ -1,6 +1,7 @@
 import type { WorkList } from '../domain/prospect.js';
 import type { TranslationKey } from '../i18n/translate.js';
 import { ProspectRow } from './ProspectRow.js';
+import { Badge } from './kit/Badge.js';
 import { useT } from './preferences.js';
 import styles from './WorkListSection.module.css';
 
@@ -35,7 +36,21 @@ export function WorkListSection({
     <section className={styles.section}>
       <div className={styles.header}>
         <h2 className={styles.title}>{t(titleKey)}</h2>
-        <span className={styles.count}>{t('unit.prospects', { count: list.totalCount })}</span>
+        {/*
+         * Le compteur porte `totalCount` et non le nombre de lignes rendues
+         * (voir le commentaire de tête). Il garde le mot « prospect(s) » —
+         * la maquette n'affiche qu'un chiffre nu dans une pastille, mais une
+         * pastille ne porte jamais une information par sa seule forme (§
+         * accessibilité) ; un chiffre seul serait imprononçable pour un
+         * lecteur d'écran et illisible hors contexte.
+         *
+         * Ton toujours neutre, y compris pour « Relances dues » que la
+         * maquette teinte en rose : cette teinte n'ajouterait qu'une
+         * information portée par la seule couleur, ce que ce dépôt interdit
+         * ailleurs (StatusBadge, ScoreBar). Ce n'est pas un oubli.
+         */}
+        <Badge ton="neutre">{t('unit.prospects', { count: list.totalCount })}</Badge>
+        <div className={styles.rule} aria-hidden="true" />
       </div>
 
       {list.items.length === 0 ? (

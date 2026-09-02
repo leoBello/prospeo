@@ -16,6 +16,10 @@ import type { PanelActions as Actions } from './actions.js';
 import { useT } from './preferences.js';
 import styles from './ProspectPanel.module.css';
 
+export type ProspectPanelPosition =
+  | { kind: 'rang'; index: number; total: number }
+  | { kind: 'horsFiltre' };
+
 interface Props {
   prospect: ProspectView | null;
   /**
@@ -46,8 +50,18 @@ interface Props {
   chargementEvenements?: boolean;
   /** Rejoue la lecture des événements après un échec. */
   onReessayerEvenements?: () => void;
-  /** Rang affiché dans la file, pour situer le parcours au clavier. */
-  position: { index: number; total: number } | null;
+  /**
+   * Rang affiché dans la file, pour situer le parcours au clavier.
+   *
+   * Union discriminée plutôt qu'un objet `{ index, total }` seul : depuis le
+   * lot 3 (recherche de la barre du haut), le prospect ouvert peut ne plus
+   * figurer dans les `ids` filtrés — sélectionné avant que la recherche ne
+   * l'exclue. Un rang calculé quand même donnerait « 0 sur 0 » ou un rang
+   * relatif à une liste qui ne contient plus la ligne : un fait qu'aucun code
+   * ne rend vrai. `horsFiltre` nomme cette absence au lieu de mentir par un
+   * chiffre, et reste distincte de `null` (aucune sélection du tout).
+   */
+  position: ProspectPanelPosition | null;
   currentRulesetVersion: string;
   onClose: () => void;
 }
@@ -99,7 +113,9 @@ export function ProspectPanel({
         <div>
           {position !== null ? (
             <span className={styles.position}>
-              {t('panel.position', { index: position.index, total: position.total })}
+              {position.kind === 'rang'
+                ? t('panel.position', { index: position.index, total: position.total })
+                : t('panel.position.horsFiltre')}
             </span>
           ) : null}
           <h2 className={styles.name}>{nom}</h2>

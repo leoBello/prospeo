@@ -101,8 +101,13 @@
 
 .name {
   margin: 0;
-  font-size: var(--text-lg);
-  letter-spacing: -0.01em;
+  /* Le titre du panneau : la maquette l'écrit en fonte d'affichage, à 24 px
+     (--text-2xl) — jusqu'ici il héritait de la fonte d'interface à 15 px,
+     signalé en revue finale du lot 1 et jamais repris. */
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  letter-spacing: -0.025em;
 }
 
 .position {

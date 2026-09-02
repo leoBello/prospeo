@@ -5,11 +5,20 @@
   padding: var(--space-4);
 }
 
+/*
+ * Correctif de revue (passe responsive) : sans `flex-wrap`, titre + `.extra`
+ * (un ou plusieurs badges) refusaient de se replier — repéré sur la carte
+ * « Coordonnées » du panneau (~330px à mi-largeur de `ProspectPanel` à
+ * 1440px de fenêtre, moins encore en dessous) : « Fiche Google appariée » +
+ * « 90 % » + le titre ne tenaient pas sur une ligne, et les pastilles
+ * sortaient du cadre de la carte plutot que d'aller a la ligne.
+ */
 .entete {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   margin-bottom: var(--space-3);
+  flex-wrap: wrap;
 }
 
 .titre {
@@ -19,10 +28,31 @@
   letter-spacing: 0.07em;
   color: var(--color-text-muted);
   font-weight: 600;
+  /* Sans ce plancher explicite a 0, le titre — un enfant flex — refuse de
+     ceder la moindre place avant que `.extra` ne soit pousse hors cadre :
+     c'est lui qui doit rendre la main en premier pour que le repli ci-dessus
+     ait un effet. */
+  min-width: 0;
 }
 
 .extra {
   margin-left: auto;
+}
+
+/*
+ * Regroupe plusieurs pastilles dans `.extra` (Card.tsx) — `FicheTab.tsx`
+ * l'utilise pour le statut d'enrichissement et la confiance d'appariement.
+ * Distincte de `.badges` (ProspectPanel.module.css) : cette dernière est
+ * dessinee pour l'en-tete du PANNEAU, bien plus large qu'une carte, et porte
+ * un `margin-top` sans objet ici — l'emprunter faisait deborder les
+ * pastilles de la carte « Coordonnees » (voir le commentaire de `.entete`
+ * ci-dessus).
+ */
+.extraGroup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .field {

@@ -1,0 +1,95 @@
+/*
+ * Reprend la hauteur et l'alignement de l'en-tête de la maquette
+ * (Main.dc.html, `<header style="height: 52px; …">`), auparavant absents :
+ * l'ancien en-tête d'`AppShell` était une simple rangée de boutons en texte
+ * nu, sans cette barre.
+ */
+.barre {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  height: 52px;
+  flex: none;
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+/*
+ * Correctif de revue (passe responsive) : marque + recherche (`.recherche`,
+ * TodayScreen.module.css, plancher de 230px) + série + compte, sur une seule
+ * ligne fixe de 52px sans le moindre repli, débordaient déjà de la barre à
+ * la largeur d'un téléphone (390px, moins 56px de rail) — bien avant que la
+ * recherche n'ait cédé le moindre pixel. `.recherche` cède son plancher sous
+ * ce même seuil (voir son fichier) ; la barre elle-même passe ici sur deux
+ * lignes si la place manque encore, plutôt que de couper quoi que ce soit.
+ * Fenêtre et non conteneur : `BarreHaut` occupe toute la largeur de `.main`
+ * qu'un panneau ouvert ou fermé, ce n'est jamais la colonne étroite sous
+ * `ProspectPanel` qui est en cause ici.
+ */
+@media (max-width: 640px) {
+  .barre {
+    height: auto;
+    min-height: 52px;
+    flex-wrap: wrap;
+    row-gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+  }
+}
+
+.marque {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--text-lg);
+  letter-spacing: -0.02em;
+}
+
+/* Pousse la recherche (si l'écran en fournit une) et le compte à droite. */
+.espace {
+  flex: 1;
+}
+
+.compte {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  transition: color 160ms ease, border-color 160ms ease;
+}
+
+.compte:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+}
+
+.popup {
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  padding: var(--space-1);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-popup);
+  z-index: var(--z-tooltip);
+}
+
+.item {
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: none;
+  border: none;
+  color: var(--color-text);
+  font-size: var(--text-sm);
+}
+
+.item:hover {
+  background: var(--color-surface);
+}

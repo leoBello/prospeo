@@ -2,7 +2,7 @@ import type { Enums } from '@prospeo/db';
 import type { TranslationKey } from '../../i18n/translate.js';
 import { useT } from '../preferences.js';
 import { Badge } from './Badge.js';
-import type { BadgeTon } from './Badge.js';
+import type { BadgeTaille, BadgeTon } from './Badge.js';
 
 type Statut = Enums<'pipeline_status'>;
 
@@ -36,15 +36,22 @@ const CLE: Record<Statut, TranslationKey> = {
 /**
  * Le statut de suivi, ou son absence.
  *
- * `null` n'est pas un cas dégénéré : au 1ᵉʳ septembre 2026, 114 prospects sur
+ * `null` n'est pas un cas dégénéré : au 2 septembre 2026, 137 prospects sur
  * 139 n'ont aucune ligne dans `prospect_pipeline`. « Jamais contacté » est
  * donc l'affichage le plus fréquent, et il doit se lire comme un état.
  */
-export function StatusBadge({ status }: { status: Statut | null }) {
+export function StatusBadge({
+  status,
+  taille,
+}: {
+  status: Statut | null;
+  /** Transmise telle quelle à `Badge` ; `undefined` y retombe sur `normale`. */
+  taille?: BadgeTaille;
+}) {
   const t = useT();
-  if (status === null) return <Badge ton="neutre">{t('pipeline.absent')}</Badge>;
+  if (status === null) return <Badge ton="neutre" taille={taille}>{t('pipeline.absent')}</Badge>;
   return (
-    <Badge ton={TON[status]} point discontinu={status === 'ne_pas_contacter'}>
+    <Badge ton={TON[status]} taille={taille} point discontinu={status === 'ne_pas_contacter'}>
       {t(CLE[status])}
     </Badge>
   );

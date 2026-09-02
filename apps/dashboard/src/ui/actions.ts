@@ -6,6 +6,10 @@ import {
   journaliserInteraction,
   rejeterRedaction,
 } from '../data/mutations.js';
+import type { EchecDefinirStatut } from '../data/mutations.js';
+
+/** Réexporté pour que l'écran (`PipelineSection.tsx`) n'ait jamais à importer `data/` directement. */
+export type { EchecDefinirStatut };
 
 /**
  * Les écritures de la fiche, sous la forme que l'interface consomme.
@@ -17,16 +21,23 @@ import {
  * collector et que l'injection de `fetch` dans `github.ts`.
  *
  * Chaque rappel rend `null` en cas de succès et le message d'erreur sinon —
- * jamais d'exception, que chaque bouton devrait alors rattraper.
+ * jamais d'exception, que chaque bouton devrait alors rattraper. `definirStatut`
+ * fait exception à la forme (pas au principe) : voir `EchecDefinirStatut`.
  */
 export interface PanelActions {
   rejeterRedaction(prospectId: string): Promise<string | null>;
   annulerRejet(prospectId: string): Promise<string | null>;
+  /**
+   * Rend `null` en cas de succès total, sinon un `EchecDefinirStatut` —
+   * jamais une chaîne : `data/mutations.ts` explique pourquoi une chaîne
+   * composée par l'application serait un texte d'interface écrit en dur.
+   * C'est ici, à la frontière ui/données, que `etape` doit être traduit.
+   */
   definirStatut(
     prospectId: string,
     status: Enums<'pipeline_status'>,
     nextActionAt: string | null,
-  ): Promise<string | null>;
+  ): Promise<EchecDefinirStatut | null>;
   journaliser(
     prospectId: string,
     kind: Enums<'interaction_kind'>,
@@ -35,7 +46,7 @@ export interface PanelActions {
 }
 
 /**
- * Branche les écritures sur le client, et relit après chaque succès.
+ * Branche les écritures sur le client, et relit dès que l'ÉTAT a changé.
  *
  * **La relecture n'est pas un confort.** L'écran entier dérive d'une seule
  * lecture — les indicateurs, les files de travail et la fiche décrivent le
@@ -44,9 +55,20 @@ export interface PanelActions {
  * un prospect passé à `ne_pas_contacter` resterait compté parmi les relances
  * dues.
  *
- * On ne relit qu'après un SUCCÈS : une écriture refusée n'a rien changé, et
- * relire alors ferait clignoter tout l'écran pour rien tout en effaçant le
- * message d'erreur que l'utilisateur n'a pas encore lu.
+ * Pour `rejeterRedaction`, `annulerRejet` et `journaliser`, la règle reste
+ * celle d'origine : on ne relit qu'après un SUCCÈS, car une écriture refusée
+ * n'y change RIEN — chacune n'écrit qu'une seule table, en un seul appel.
+ *
+ * **`definirStatut` ne suit plus cette règle**, et c'est délibéré : depuis la
+ * tâche 5, cette écriture en touche DEUX (`prospect_pipeline` puis
+ * `pipeline_event`), et un `EchecDefinirStatut` dont l'`etape` est
+ * `'historique'` signifie que la PREMIÈRE a déjà réussi — l'état en base a
+ * changé, quand bien même la fonction rend un échec. Ne relire que sur `null`
+ * laisserait alors la fiche afficher l'ANCIEN statut alors que la base porte
+ * le NOUVEAU : un fait qu'aucun code ne rendrait vrai, exactement ce que ce
+ * lot proscrit. Relire dans ce cas ne fait donc que rattraper la fiche sur un
+ * changement déjà survenu ; le message d'erreur, lui, est toujours rendu à
+ * l'appelant, qui reste libre de l'afficher — relire n'efface rien.
  */
 export function makePanelActions(
   client: SupabaseClient<Database>,
@@ -60,11 +82,22 @@ export function makePanelActions(
     return erreur;
   };
 
+  const definirStatutPuisRelire = async (
+    prospectId: string,
+    status: Enums<'pipeline_status'>,
+    nextActionAt: string | null,
+  ): Promise<EchecDefinirStatut | null> => {
+    const echec = await definirStatut(client, prospectId, status, nextActionAt);
+    // Succès total, ou échec de la seule ligne d'historique : dans les deux
+    // cas `prospect_pipeline` a déjà été écrit, et la fiche doit le refléter.
+    if (echec === null || echec.etape === 'historique') reload();
+    return echec;
+  };
+
   return {
     rejeterRedaction: (id) => puisRelire(rejeterRedaction(client, id)),
     annulerRejet: (id) => puisRelire(annulerRejet(client, id)),
-    definirStatut: (id, status, nextActionAt) =>
-      puisRelire(definirStatut(client, id, status, nextActionAt)),
+    definirStatut: definirStatutPuisRelire,
     journaliser: (id, kind, body) => puisRelire(journaliserInteraction(client, id, kind, body)),
   };
 }

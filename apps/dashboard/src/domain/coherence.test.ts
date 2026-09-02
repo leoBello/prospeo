@@ -152,8 +152,13 @@ describe('dataWarnings', () => {
   });
 
   it('ne reproche rien a un prospect simplement pas encore qualifie', () => {
-    // 114 prospects sur 139 n'ont aucun satellite. L'absence n'est pas une
-    // incoherence, et les couvrir d'avertissements noierait les vrais.
+    // Une part des prospects n'a encore aucun satellite (enrichissement,
+    // presence, score). Le decompte combine du 1er septembre 2026 (114 sur
+    // 139) est perime et n'a pas ete revérifié pour ce lot (voir HANDOFF.md,
+    // "les chiffres perimes" - seuls le score seul et la ligne de pipeline
+    // ont ete recomptes au 2 septembre 2026, a 10 et 137 sur 139). L'absence
+    // n'est pas une incoherence, et les couvrir d'avertissements noierait
+    // les vrais.
     expect(kinds(vue())).toEqual([]);
   });
 

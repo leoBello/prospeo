@@ -29,6 +29,20 @@ artboard, pages, et les notes qui les commentent.
 
 ---
 
+## Ces maquettes sont contraignantes
+
+`Composants.dc.html` n'est pas une planche d'illustration : c'est le
+**vocabulaire d'interface du projet**, et
+[`../GUIDELINES.md`](../GUIDELINES.md) en fait une règle. Tout composant neuf
+en part, et un composant **important** passe par une maquette approuvée avant
+d'être écrit — les critères y sont énoncés.
+
+Raison courte : **aucun test de ce dépôt ne voit une mise en page.** `jsdom`
+ne calcule ni largeur, ni hauteur, ni débordement. La maquette est le seul
+contrôle qui les voie, et le chantier n°6 l'a appris trois fois.
+
+---
+
 ## Statut des données affichées
 
 **Tout ce qui est affiché est un échantillon.** Les noms d'entreprises, SIRET,
@@ -54,15 +68,25 @@ part par construction.
 
 ## Rouvrir et modifier
 
-Un `.dc.html` n'est **pas** une page autonome : il ne s'ouvre pas dans un
-navigateur. C'est la source d'un artboard, qui a besoin de l'éditeur pour se
-rendre.
+Un `.dc.html` n'est **pas** une page autonome : il est enveloppé dans `<x-dc>`,
+range ses feuilles et ses polices dans `<helmet>`, et — pour `Main.dc.html` —
+porte des gabarits (`{{ x }}`), des conditions (`<sc-if>`) et des boucles
+(`<sc-for>`) que l'éditeur de canvas résolvait. Ouvrir la source dans un
+navigateur ne montre donc rien.
 
-- **Consulter ou retoucher visuellement** : le canvas en ligne qui portait ces
-  artboards a été supprimé — il n'y a plus de lien à ouvrir. Reconstruire le
-  canvas depuis les sources (ci-dessous) est le seul chemin qui reste.
-- **Repartir des sources** : les huit fichiers et `canvas.json` de ce dossier
-  suffisent à reconstruire le canvas — c'est exactement ce dont ils sont issus.
+- **Regarder une maquette** : `node docs/design/maquettes/aplatir.mjs` écrit
+  dans `rendu/` une version statique de chacune des huit, ouvrable directement.
+  C'est une **lecture, pas une seconde vérité** : les `.dc.html` restent la
+  référence, et `rendu/` se régénère plutôt qu'il ne s'entretient. Le script
+  n'a aucune dépendance — il exécute la classe de logique de `Main` avec les
+  réglages par défaut (`accent`, `gamification: affirmee`) et neutralise les
+  gestionnaires de clic, qui n'ont plus de moteur derrière eux. **Les onglets
+  de la fiche ne sont donc pas cliquables dans le rendu** ; l'onglet montré est
+  celui de l'état initial, `Fiche`.
+- **Retoucher visuellement** : le canvas en ligne qui portait ces artboards a
+  été supprimé — il n'y a plus de lien à ouvrir. Les huit fichiers et
+  `canvas.json` suffisent à le reconstruire ; c'est exactement ce dont ils sont
+  issus.
 
 Les fichiers sont du HTML lisible et modifiable à la main : styles en ligne,
 SVG dessinés (aucune icône de bibliothèque, aucun emoji), et pour `Main.dc.html`

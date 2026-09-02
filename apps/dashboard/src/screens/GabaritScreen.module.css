@@ -4,6 +4,11 @@
 
 .title {
   margin: 0;
+  /* Titre d'écran : la maquette le confie à la fonte d'affichage, comme tous
+     les h1-h4 (règle globale de Main.dc.html) — jusqu'ici seule la jauge de
+     score l'employait, et l'écran entier lisait en Instrument Sans. */
+  font-family: var(--font-display);
+  font-weight: 600;
   font-size: var(--text-xl);
   letter-spacing: -0.02em;
 }
@@ -44,6 +49,12 @@
   font-family: var(--font-mono);
   font-size: var(--text-lg);
   font-weight: 500;
+  /* Un nom de dépôt complet (« organisation/nom-du-gabarit-tres-long ») est
+     une seule chaîne sans espace : sans repli de mot, elle déborde du cadre
+     de la carte au lieu de retourner à la ligne — `.actifEntete` a beau
+     savoir replier (`flex-wrap`), il ne replie qu'ENTRE les éléments, pas
+     l'intérieur d'un mot qui dépasserait déjà seul la largeur de la carte. */
+  overflow-wrap: anywhere;
 }
 
 .actifMeta {

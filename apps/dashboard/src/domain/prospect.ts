@@ -6,8 +6,11 @@ import type { TranslationKey, TranslationParams } from '../i18n/translate.js';
  * Vue d'un prospect telle que l'interface la consomme.
  *
  * Les quatre satellites sont `null` quand la ligne n'existe pas en base, et
- * ce `null` est porteur de sens : au 1ᵉʳ septembre 2026, 114 prospects sur 139
- * n'ont ni enrichissement, ni présence web, ni score. Aucun code de cette
+ * ce `null` est porteur de sens. Au 1ᵉʳ septembre 2026, 114 prospects sur 139
+ * n'avaient ni enrichissement, ni présence web, ni score ; ce décompte
+ * combiné n'a pas été revérifié depuis (voir `docs/design/HANDOFF.md`, lot 3
+ * — seuls le score seul et la ligne de pipeline ont été recomptés au
+ * 2 septembre 2026, à 10 et 137 sur 139 respectivement). Aucun code de cette
  * couche ne doit remplacer un satellite absent par un objet vide ou par des
  * zéros — un prospect non scoré n'est pas un prospect à zéro, et la
  * distinction remonte jusqu'à l'écran.

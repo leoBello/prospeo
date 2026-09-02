@@ -21,6 +21,20 @@ export const fr = {
   'theme.toLight': 'Passer au thème clair',
   'locale.switch': 'English',
 
+  // Lot 3, tâche 2 — le bouton de compte qui replie thème, langue et
+  // déconnexion. Un libellé traduit, jamais des initiales inventées : rien
+  // ici ne connaît l'identité de la personne connectée.
+  'account.button': 'Préférences du compte',
+
+  // Le champ dit explicitement ce qu'il filtre — les listes de travail déjà
+  // affichées sur cet écran — et jamais les 139 prospects de la base, hors
+  // périmètre du chantier (décision du pilote, lot 3 tâche 2).
+  'header.search.label': 'Filtrer les listes du jour (relances dues, nouveaux prospects à fort score)',
+  // `{modifier}` vaut « ⌘ » ou « Ctrl+ » selon la plateforme détectée
+  // (`ui/plateforme.ts`) : afficher ⌘K sur Windows serait une promesse que
+  // rien ne tient.
+  'header.search.shortcut': '{modifier}K',
+
   'auth.title': 'Prospeo',
   'auth.subtitle': 'Connexion au tableau de bord de prospection',
   'auth.email': 'Adresse e-mail',
@@ -39,17 +53,17 @@ export const fr = {
   'today.title': "Aujourd'hui",
   'today.subtitle': 'Ce que la base sait, et ce qu’elle ne sait pas encore.',
 
-  'today.kpi.inBase': 'En base',
-  'today.kpi.contacted': 'Contactés',
-  'today.kpi.interested': 'Intéressés',
-  'today.kpi.qualified': 'Qualifiés',
-
   'today.section.followUps': 'Relances dues',
   'today.section.newHighScore': 'Nouveaux prospects à fort score',
 
   'today.empty.followUps':
     'Aucune relance : la table de suivi ne contient encore aucune ligne. Aucun écrivain ne l’alimente à ce jour.',
   'today.empty.newHighScore': 'Aucun prospect scoré pour le moment.',
+  // Distincte des deux ci-dessus : une recherche sans résultat ne dit rien
+  // sur l'état réel des relances ou des nouveaux prospects, seulement sur ce
+  // qui a été tapé. Les confondre ferait croire, une fois la recherche
+  // effacée, que la liste avait toujours été vide.
+  'today.empty.search': 'Aucune ligne ne correspond à votre recherche.',
 
   'today.reason.followUp.today': 'relance prévue aujourd’hui',
   'today.reason.followUp.late': 'relance en retard de {days} j',
@@ -59,6 +73,79 @@ export const fr = {
   'today.reason.followUp.undated': 'relance sans date prévue',
 
   'today.reason.separator': ' · ',
+
+  // Lot 3, tâche 8 — la bande de progression qui remplace `KpiBand` sous le
+  // titre « Aujourd'hui », et le compteur de série de la barre du haut. Voir
+  // `ui/BandeProgression.tsx` pour la doctrine des quatre absences distinctes
+  // que ces clés portent à l'écran.
+  'jeu.objectif.titre': 'Objectif du jour',
+  'jeu.objectif.valeur': '{count} relances tenues',
+  'jeu.objectif.valeur_one': '{count} relance tenue',
+  'jeu.objectif.hint':
+    'Médiane des relances tenues par jour, sur les quatorze derniers jours civils complets — pas un chiffre imposé.',
+  'jeu.objectif.insuffisant.titre': 'Historique encore insuffisant',
+  'jeu.objectif.insuffisant.detail':
+    'Pas encore un jour civil complet observé : aucune médiane fiable ne peut s’en déduire. Cet objectif apparaîtra dès qu’il y en aura un.',
+  // Correctif de revue (tâche 8) — deuxième motif d'objectif inconnu,
+  // distinct du précédent : ici l'historique NE MANQUE PAS, la médiane a
+  // bien pu être calculée, elle vaut zéro. Le texte ne prétend donc jamais
+  // qu'il manque des données ; il dit sur quoi l'objectif se fonde (des
+  // jours avec relance tenue) et pourquoi il n'y en a pas assez pour en
+  // proposer un — voir `MotifObjectifInconnu`, domain/jeu.ts.
+  'jeu.objectif.medianeNulle.titre': "Pas encore d'objectif à proposer",
+  'jeu.objectif.medianeNulle.detail':
+    'L’objectif se fonde sur les jours où au moins une relance a été tenue : il n’y en a pas encore assez pour en proposer un.',
+  // Le dénominateur de l'anneau (maquette, ~« / 15 ») quand l'objectif est
+  // connu, et son repli textuel — jamais un nombre — quand il ne l'est pas
+  // encore (refonte, tâche 8, second passage). Sert les deux motifs
+  // d'objectif inconnu : aucun des deux ne fournit de dénominateur chiffré.
+  'jeu.objectif.denominateur': '/ {objectif}',
+  'jeu.objectif.denominateur.inconnu': 'pas encore',
+
+  'jeu.palier.titre': 'Palier {numero}',
+  // Noms de la maquette (Main.dc.html ~l.127) — voir `NOMS_PALIER`,
+  // `ui/BandeProgression.tsx` : arbitrage du propriétaire, tâche 8, troisième
+  // passage. `avecNom` porte le palier COURANT (le mot « Palier » + le nom) ;
+  // les noms nus (`nom.1`, `nom.2`) servent seuls pour le palier SUIVANT,
+  // comme la maquette écrit « Closer » sans le répéter.
+  'jeu.palier.nom.1': 'Prospecteur',
+  'jeu.palier.nom.2': 'Closer',
+  'jeu.palier.avecNom': 'Palier {nom}',
+  'jeu.palier.fleche': '→',
+  'jeu.palier.points': '{points} / {seuil} points',
+  'jeu.palier.incomplet': 'Total minimal : les relances tenues ne sont pas encore comptées dans ce score.',
+  'jeu.palier.poids.relanceTenue': '+{points} pts · relance tenue',
+  'jeu.palier.poids.siteMisEnLigne': '+{points} pts · site mis en ligne',
+  'jeu.palier.poids.rendezVousObtenu': '+{points} pts · rendez-vous obtenu',
+
+  'jeu.badge.premiere_relance_tenue': 'Première relance tenue',
+  'jeu.badge.premier_site_en_ligne': 'Premier site en ligne',
+  'jeu.badge.premier_rendez_vous': 'Premier rendez-vous',
+  'jeu.badge.serie_sept_jours': 'Série de sept jours',
+  'jeu.badge.etat.obtenu': 'Obtenu',
+  'jeu.badge.etat.verrouille': 'Verrouillé',
+  'jeu.badge.etat.non_mesurable': 'Non mesurable',
+  'jeu.badge.nonMesurable.hint':
+    'Aucun geste ne peut débloquer ce badge aujourd’hui : la mesure qu’il demande n’a pas encore de source fiable côté serveur.',
+  // La pastille (refonte, tâche 8) ne porte plus aucun mot visible : c'est
+  // son `aria-label`, composé ici, qui nomme le jalon ET son état — la règle
+  // du dépôt pour toute pastille à infobulle (voir `BadgeJalon`,
+  // `ui/BandeProgression.tsx`).
+  'jeu.badge.aria': '{etat} — {nom}',
+
+  'jeu.serie.titre': 'Série en cours',
+  // Raccourci à la maquette (Main.dc.html ~l.94 : « 6 jours ») — correctif de
+  // revue, tâche 8, troisième passage : le sens complet vit dans `hint`
+  // ci-dessous, le répéter dans le badge était une redite. « Au moins »
+  // reste sur `auMoins` : ce n'est pas une fioriture, c'est la seule
+  // formulation que le code puisse garantir quand `borneAtteinte` est vrai.
+  'jeu.serie.jours': '{count} jours',
+  'jeu.serie.jours_one': '{count} jour',
+  'jeu.serie.auMoins': 'Au moins {count} jours',
+  'jeu.serie.hint': 'Jours civils consécutifs avec au moins une relance tenue.',
+
+  'jeu.chargement': 'Chargement du tableau de jeu…',
+  'jeu.erreur': 'Le tableau de jeu n’a pas pu se charger : {message}',
 
   'score.absent': 'pas encore scoré',
   'score.absent.hint':
@@ -114,6 +201,11 @@ export const fr = {
   'panel.section.web': 'Présence web',
   'panel.section.score': 'Détail du score',
   'panel.position': '{index} sur {total}',
+  // Lot 3, tâche 2 (correctif de revue) : le prospect ouvert avant une
+  // recherche qui l'exclut reste affiché, mais son rang dans la liste
+  // filtrée n'existe plus — ceci le dit, plutôt qu'un « 0 sur 0 » ou un rang
+  // faux calculé quand même.
+  'panel.position.horsFiltre': 'Hors du filtre de recherche en cours',
 
   // Chantier n°6 : les quatre onglets du panneau, un par moment du travail.
   'panel.tab.fiche': 'Fiche',
@@ -197,6 +289,8 @@ export const fr = {
   'pipeline.status.ne_pas_contacter': 'Ne pas contacter',
   'pipeline.refusalWarning':
     'Le statut est enregistré, mais le site reste en ligne jusqu’au prochain « prospeo unpublish » : ce tableau de bord ne détient aucun jeton Vercel, et n’en détiendra pas.',
+  'pipeline.historyFailed':
+    'Le statut est enregistré, mais ce changement ne sera pas compté : {message}',
 
   'interaction.title': 'Consigner un échange',
   'interaction.kind': 'Canal',

@@ -4,6 +4,11 @@
 
 .title {
   margin: 0;
+  /* Titre d'écran : la maquette le confie à la fonte d'affichage, comme tous
+     les h1-h4 (règle globale de Main.dc.html) — jusqu'ici seule la jauge de
+     score l'employait, et l'écran entier lisait en Instrument Sans. */
+  font-family: var(--font-display);
+  font-weight: 600;
   font-size: var(--text-xl);
   letter-spacing: -0.02em;
 }
@@ -97,6 +102,22 @@
 .filtreCompte {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Correctif de revue (passe responsive) : les cinq colonnes fixes
+ * (`.enteteGabarit` 150px + `.entetePiste` 175px + `.enteteEtat` 160px +
+ * `.enteteDuree` 70px + `.enteteAdresse` 190px, soit 745px, plus quatre
+ * espacements de `.entetes`/`.ligne`) ne cèdent jamais — `flex: none` — et
+ * `.enteteProspect`/`.identite` ont beau porter `min-width: 0`, ils ne
+ * peuvent pas compenser : le tableau entier refusait donc de descendre sous
+ * ~825px et débordait tel quel de la colonne de liste sous 1024px de
+ * fenêtre (aucun défilement horizontal propre ne le contenait). `overflow-x`
+ * borne ce débordement au tableau seul plutôt que de le laisser déborder de
+ * l'écran.
+ */
+.tableau {
+  overflow-x: auto;
 }
 
 /* En-têtes de colonnes — décoratifs (aria-hidden), les libellés réels sont

@@ -27,7 +27,11 @@
 }
 
 .total {
-  font-family: var(--font-display);
+  /* La maquette écrit ce chiffre en chasse fixe (`.num`), comme tous les
+     autres nombres de l'écran — pas en fonte d'affichage : la chasse fixe
+     est ce qui aligne les colonnes de score d'une ligne à l'autre (D6,
+     commentaire de theme.css), un rôle que Bricolage Grotesque ne tient pas. */
+  font-family: var(--font-mono);
   font-size: 26px;
   font-weight: 700;
   line-height: 1;
@@ -61,8 +65,18 @@
   margin-bottom: 5px;
 }
 
+/*
+ * Enfant flex de `.groupeTete`, lui-même dans un `.groupe` déjà réduit à un
+ * tiers de `.groupes` (trois groupes côte à côte) — jusqu'à ~55px de large
+ * dans la carte « Coordonnées » à mi-largeur du panneau. « Joignabilité »/
+ * « Reachability », le plus long des libellés (score.group.*), n'y tenait
+ * pas sur une seule ligne et débordait faute de repli : `overflow-wrap`
+ * l'autorise à couper au besoin, comme `.fieldValue` le fait déjà plus haut
+ * dans ce même genre de carte (Card.module.css) pour la même raison.
+ */
 .groupeNom {
   color: var(--color-text-muted);
+  overflow-wrap: anywhere;
 }
 
 .groupePoints {

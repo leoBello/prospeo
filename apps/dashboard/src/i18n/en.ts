@@ -23,6 +23,11 @@ export const en: Record<keyof typeof fr, string> = {
   'theme.toLight': 'Switch to light theme',
   'locale.switch': 'Français',
 
+  'account.button': 'Account preferences',
+
+  'header.search.label': 'Filter today’s lists (follow-ups due, new high-scoring prospects)',
+  'header.search.shortcut': '{modifier}K',
+
   'auth.title': 'Prospeo',
   'auth.subtitle': 'Sign in to the prospecting dashboard',
   'auth.email': 'Email address',
@@ -40,17 +45,13 @@ export const en: Record<keyof typeof fr, string> = {
   'today.title': 'Today',
   'today.subtitle': 'What the database knows, and what it does not know yet.',
 
-  'today.kpi.inBase': 'In database',
-  'today.kpi.contacted': 'Contacted',
-  'today.kpi.interested': 'Interested',
-  'today.kpi.qualified': 'Scored',
-
   'today.section.followUps': 'Follow-ups due',
   'today.section.newHighScore': 'New high-scoring prospects',
 
   'today.empty.followUps':
     'No follow-up: the pipeline table holds no rows yet. Nothing writes to it so far.',
   'today.empty.newHighScore': 'No scored prospect yet.',
+  'today.empty.search': 'No row matches your search.',
 
   'today.reason.followUp.today': 'follow-up due today',
   'today.reason.followUp.late': 'follow-up {days} days overdue',
@@ -60,6 +61,51 @@ export const en: Record<keyof typeof fr, string> = {
   'today.reason.followUp.undated': 'follow-up with no date set',
 
   'today.reason.separator': ' · ',
+
+  'jeu.objectif.titre': "Today's goal",
+  'jeu.objectif.valeur': '{count} follow-ups honored',
+  'jeu.objectif.valeur_one': '{count} follow-up honored',
+  'jeu.objectif.hint':
+    'Median follow-ups honored per day, over the last fourteen full calendar days — not an imposed number.',
+  'jeu.objectif.insuffisant.titre': 'Not enough history yet',
+  'jeu.objectif.insuffisant.detail':
+    'No full calendar day has been observed yet: no reliable median can be derived from it. This goal will appear once there is one.',
+  'jeu.objectif.medianeNulle.titre': 'No goal to suggest yet',
+  'jeu.objectif.medianeNulle.detail':
+    'The goal is based on days with at least one follow-up honored: there are not enough of those yet to suggest one.',
+  'jeu.objectif.denominateur': '/ {objectif}',
+  'jeu.objectif.denominateur.inconnu': 'not yet',
+
+  'jeu.palier.titre': 'Tier {numero}',
+  'jeu.palier.nom.1': 'Prospector',
+  'jeu.palier.nom.2': 'Closer',
+  'jeu.palier.avecNom': 'Tier {nom}',
+  'jeu.palier.fleche': '→',
+  'jeu.palier.points': '{points} / {seuil} points',
+  'jeu.palier.incomplet': 'Minimum total: follow-ups honored are not counted in this score yet.',
+  'jeu.palier.poids.relanceTenue': '+{points} pts · follow-up honored',
+  'jeu.palier.poids.siteMisEnLigne': '+{points} pts · site published',
+  'jeu.palier.poids.rendezVousObtenu': '+{points} pts · meeting obtained',
+
+  'jeu.badge.premiere_relance_tenue': 'First follow-up honored',
+  'jeu.badge.premier_site_en_ligne': 'First site online',
+  'jeu.badge.premier_rendez_vous': 'First meeting',
+  'jeu.badge.serie_sept_jours': 'Seven-day streak',
+  'jeu.badge.etat.obtenu': 'Earned',
+  'jeu.badge.etat.verrouille': 'Locked',
+  'jeu.badge.etat.non_mesurable': 'Not measurable',
+  'jeu.badge.nonMesurable.hint':
+    'No action can unlock this badge today: the measurement it needs has no reliable server-side source yet.',
+  'jeu.badge.aria': '{etat} — {nom}',
+
+  'jeu.serie.titre': 'Current streak',
+  'jeu.serie.jours': '{count} days',
+  'jeu.serie.jours_one': '{count} day',
+  'jeu.serie.auMoins': 'At least {count} days',
+  'jeu.serie.hint': 'Consecutive calendar days with at least one follow-up honored.',
+
+  'jeu.chargement': 'Loading the game panel…',
+  'jeu.erreur': 'The game panel could not load: {message}',
 
   'score.absent': 'not scored yet',
   'score.absent.hint': 'This prospect has no score, which is not the same as a score of zero.',
@@ -108,6 +154,7 @@ export const en: Record<keyof typeof fr, string> = {
   'panel.section.web': 'Web presence',
   'panel.section.score': 'Score breakdown',
   'panel.position': '{index} of {total}',
+  'panel.position.horsFiltre': 'Outside the current search filter',
 
   'panel.tab.fiche': 'Details',
   'panel.tab.site': 'Site',
@@ -186,6 +233,8 @@ export const en: Record<keyof typeof fr, string> = {
   'pipeline.status.ne_pas_contacter': 'Do not contact',
   'pipeline.refusalWarning':
     'The status is saved, but the site stays online until the next "prospeo unpublish": this dashboard holds no Vercel token, and never will.',
+  'pipeline.historyFailed':
+    'The status is saved, but this change will not be counted: {message}',
 
   'interaction.title': 'Log an exchange',
   'interaction.kind': 'Channel',

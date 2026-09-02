@@ -19,8 +19,9 @@ const score = (patch: Partial<ScoreView> = {}): ScoreView => ({
 
 describe('ScoreBar', () => {
   it('affiche une absence de score comme une absence, et non comme un zero', () => {
-    // 114 prospects sur 139 sont dans ce cas. Un « 0 » les ferait lire comme
-    // des prospects jugés sans valeur, alors qu'ils n'ont pas été jugés.
+    // 10 prospects sur 139 sont dans ce cas (releve du 2 septembre 2026). Un
+    // « 0 » les ferait lire comme des prospects jugés sans valeur, alors
+    // qu'ils n'ont pas été jugés.
     renderWithPreferences(<ScoreBar score={null} />);
     expect(screen.getByText('pas encore scoré')).toBeDefined();
     expect(screen.queryByText('0')).toBeNull();

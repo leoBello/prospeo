@@ -5,11 +5,37 @@
 // et `fileURLToPath` de Node refuse alors cette instance. Ce test ne monte
 // rien, ne lit qu'un fichier — l'environnement `node` lui rend le `URL`
 // natif dont `new URL('./theme.css', import.meta.url)` a besoin.
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const css = readFileSync(fileURLToPath(new URL('./theme.css', import.meta.url)), 'utf8');
+
+// `theme.test.ts` vit dans `src/ui/` : la racine du code applicatif, celle
+// dont dependent tous les ecrans et composants, est son parent.
+const racineSrc = dirname(fileURLToPath(new URL('.', import.meta.url)));
+
+/**
+ * Parcourt `dir` recursivement et retourne le chemin de chaque fichier dont
+ * le nom se termine par `suffixe`.
+ *
+ * Ecrite a la main plutot que via `readdirSync(dir, { recursive: true })` :
+ * la variante recursive de Node existe, mais un test cense prouver qu'un
+ * parcours de fichiers ne s'est pas silencieusement vide doit rester lisible
+ * ligne a ligne, sans compter sur le comportement d'une option recente.
+ */
+function listerFichiers(dir: string, suffixe: string, acc: string[] = []): string[] {
+  for (const entree of readdirSync(dir, { withFileTypes: true })) {
+    const chemin = join(dir, entree.name);
+    if (entree.isDirectory()) {
+      listerFichiers(chemin, suffixe, acc);
+    } else if (entree.name.endsWith(suffixe)) {
+      acc.push(chemin);
+    }
+  }
+  return acc;
+}
 
 /**
  * Luminance relative WCAG d'une couleur hexadécimale.
@@ -69,5 +95,55 @@ describe('theme.css', () => {
     for (const t of ['--color-bg', '--color-surface', '--color-border', '--color-text', '--color-accent', '--color-danger', '--color-warning']) {
       expect(css).toContain(`${t}:`);
     }
+  });
+
+  it('sert la fonte d affichage a plus d un fichier (tache 1 du lot 3)', () => {
+    const feuillesDeStyle = listerFichiers(racineSrc, '.module.css');
+
+    // Garde-fou : si le parcours casse (mauvais dossier, extension mal
+    // ecrite), `feuillesDeStyle` tombe a zero et l'assertion du dessous
+    // passerait vide silencieusement — 0 fichier employant la fonte ne serait
+    // alors jamais distingue d'un parcours qui n'a rien lu. Le nombre reel de
+    // feuilles CSS du dashboard (plus d'une vingtaine) sert de seuil.
+    expect(feuillesDeStyle.length).toBeGreaterThan(15);
+
+    const consommateurs = feuillesDeStyle.filter((chemin) =>
+      readFileSync(chemin, 'utf8').includes('var(--font-display)'),
+    );
+
+    // Avant la tache 1, seul `ScoreCompact.module.css` la consommait : la
+    // fonte etait telechargee a chaque page pour un unique usage. Le lot
+    // l'etend aux titres d'ecran et au titre du panneau prospect.
+    expect(consommateurs.length).toBeGreaterThan(1);
+  });
+
+  it('ne laisse aucun token declare sans consommateur', () => {
+
+    const fichiersSource = [...listerFichiers(racineSrc, '.module.css'), ...listerFichiers(racineSrc, '.tsx')];
+
+    // Meme garde-fou que ci-dessus : sans lui, un parcours casse (zero
+    // fichier lu) ferait passer TOUS les tokens pour orphelins, ou pire,
+    // TOUS pour consommes selon la forme du bug — dans les deux cas en
+    // silence plutot qu'en echec net.
+    expect(fichiersSource.length).toBeGreaterThan(30);
+
+    const contenus = fichiersSource.map((chemin) => readFileSync(chemin, 'utf8'));
+    // `--font-ui` n'a pas de consommateur hors theme.css : c'est la police du
+    // `body`, la base dont tout le reste herite. Sa propre feuille compte.
+    contenus.push(css);
+
+    const tokensDeclares = [
+      ...new Set(
+        [...css.matchAll(/(--[a-z0-9-]+):/g)]
+          .map((m) => m[1])
+          .filter((nom): nom is string => nom !== undefined),
+      ),
+    ];
+
+    const orphelins = tokensDeclares.filter(
+      (tok) => !contenus.some((contenu) => contenu.includes(`var(${tok})`)),
+    );
+
+    expect(orphelins).toEqual([]);
   });
 });

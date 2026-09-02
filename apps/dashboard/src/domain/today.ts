@@ -87,50 +87,30 @@ export function highlightLines(breakdown: ScoreLine[], max = MAX_REASON_LINES): 
 }
 
 /**
- * Statuts qui prouvent qu'un échange a réellement eu lieu.
- *
- * `a_contacter` en est exclu : c'est une intention, pas un contact. L'y
- * inclure gonflerait le seul indicateur qui mesure l'activité réelle, et le
- * ferait au moment précis où l'on cherche à savoir si la prospection a
- * démarré.
+ * Neutralise casse et diacritiques, pour que « nantes » retrouve « NANTES »
+ * comme « Nântes » : la dénomination vient de sources externes (INSEE,
+ * Google) qui ne garantissent aucune normalisation commune.
  */
-const STATUTS_CONTACTES = new Set(['contacte', 'relance', 'interesse', 'gagne', 'perdu']);
-
-export interface Kpis {
-  inBase: number;
-  /**
-   * Prospects portant un `prospect_score`.
-   *
-   * Cet indicateur remplace le taux de réponse du §9.2, qui n'est pas
-   * mesurable : `interaction` enregistre le canal d'un échange, jamais son
-   * sens, et le numérateur d'un taux de réponse n'existe donc pas dans le
-   * schéma. Une tuile inerte à demeure valait moins que le seul chiffre qui
-   * dise où en est vraiment la base : 25 sur 139 au 1er septembre 2026.
-   */
-  qualified: number;
-  contacted: number;
-  interested: number;
+function normalise(texte: string): string {
+  return texte.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 }
 
 /**
- * La bande d'indicateurs du §9.2.
+ * Un prospect correspond-il au texte tapé dans la recherche de la barre du
+ * haut ?
  *
- * Dérivée du même instantané que les listes, donc toujours cohérente avec
- * elles. La spec annonçait que ces chiffres seraient proches de zéro les
- * premières semaines ; ils y sont, et l'écran l'affiche plutôt que de le
- * maquiller.
+ * Comparé à la dénomination et, quand il existe, au nom usuel : c'est ce
+ * qu'un opérateur reconnaît en cherchant une fiche précise parmi les listes
+ * de travail déjà affichées. Cette recherche ne porte QUE sur elles — jamais
+ * sur les 139 prospects de la base, hors périmètre du chantier (décision du
+ * pilote, lot 3 tâche 2) — d'où son emploi dans `buildToday`, jamais ailleurs.
  */
-export function computeKpis(prospects: ProspectView[]): Kpis {
-  let qualified = 0;
-  let contacted = 0;
-  let interested = 0;
-  for (const p of prospects) {
-    if (p.score !== null) qualified += 1;
-    if (p.pipeline === null) continue;
-    if (STATUTS_CONTACTES.has(p.pipeline.status)) contacted += 1;
-    if (p.pipeline.status === 'interesse') interested += 1;
-  }
-  return { inBase: prospects.length, qualified, contacted, interested };
+export function matchesQuery(prospect: ProspectView, query: string): boolean {
+  const cible = normalise(query.trim());
+  if (cible === '') return true;
+  return [prospect.denomination, prospect.denominationUsuelle ?? ''].some((texte) =>
+    normalise(texte).includes(cible),
+  );
 }
 
 export interface TodayLists {
@@ -152,9 +132,11 @@ function estClos(prospect: ProspectView): boolean {
  * Les prospects sans score n'y figurent pas. Ils sont pourtant les quatre
  * cinquièmes de la base, et ce n'est pas un oubli : une ligne sans score
  * n'offre aucune action, et douze d'entre elles en tête d'écran coûteraient
- * douze arrêts aux flèches pour rien. Ce qui compte de ces prospects, c'est
- * leur *nombre* — porté par l'indicateur « qualifiés », qui met l'écart 25 /
- * 139 sous les yeux. Leur parcours relèvera de l'écran Exploration.
+ * douze arrêts aux flèches pour rien. Cette page ne compte plus leur nombre
+ * nulle part — l'ancien couple « En base » / « Qualifiés » de la bande de
+ * progression a été retiré pour tenir dans la largeur réelle de la colonne
+ * (voir le rapport de la tâche 8, alignement sur la maquette). Leur parcours
+ * relèvera de l'écran Exploration.
  */
 export function buildToday(prospects: ProspectView[], now: Date): TodayLists {
   const followUps: Array<WorkRow & { echeance: number | null }> = [];

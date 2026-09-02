@@ -64,19 +64,75 @@ export async function annulerRejet(client: Client, prospectId: string): Promise<
 }
 
 /**
- * Fixe le statut d'un prospect dans le pipeline.
+ * L'issue de `definirStatut` : `null` en cas de succès total, sinon LAQUELLE
+ * des deux écritures a échoué, et le message brut de Supabase pour celle-là.
  *
- * `upsert` et non `update` : la table est VIDE — aucune ligne n'existe pour
- * aucun prospect au 2 septembre 2026, faute d'écrivain. Un `update` ne
- * toucherait donc rien, sans erreur, et le premier clic sur chaque prospect
- * serait silencieusement perdu.
+ * Une chaîne composée par l'application (par ex. `pipeline_event: …`) serait
+ * un texte d'INTERFACE écrit en dur — c'est l'application qui le rédigerait,
+ * en anglais, pour porter une information au lecteur, exactement ce que ce
+ * fichier ne fait nulle part ailleurs (relevé de revue). Sa seule exception
+ * documentée est de RELAYER le message brut d'une erreur externe, jamais
+ * d'en composer un nouveau. `etape` donne donc à l'appelant, sous forme de
+ * donnée, ce qu'une chaîne composée lui aurait donné sous forme de texte —
+ * charge à lui de la traduire avec une clé `t()` dédiée.
+ */
+export type EchecDefinirStatut = {
+  readonly etape: 'etat' | 'historique';
+  readonly message: string;
+};
+
+/**
+ * Fixe le statut d'un prospect dans le pipeline, ET consigne le changement
+ * dans `pipeline_event` (tâche 4) — la seule matière que `domain/jeu.ts`
+ * (tâche 6) peut lire pour dater un rendez-vous obtenu ou une relance tenue.
+ * Sans cette seconde écriture, la table resterait vide pour toujours et le
+ * jeu ne lirait jamais que zéro.
+ *
+ * `upsert` et non `update` sur `prospect_pipeline` : la table est VIDE —
+ * aucune ligne n'existe pour aucun prospect au 2 septembre 2026, faute
+ * d'écrivain. Un `update` ne toucherait donc rien, sans erreur, et le premier
+ * clic sur chaque prospect serait silencieusement perdu.
+ *
+ * **Deux écritures, aucune transaction.** Le client Supabase (clé anonyme,
+ * navigateur) n'en offre pas : il faut donc décider d'un ordre et d'un sort
+ * pour l'échec partiel, plutôt que les laisser diverger en silence — le pire
+ * des trois résultats possibles (voir l'en-tête du fichier).
+ *
+ * **Ordre retenu : l'état (`prospect_pipeline`) d'abord, l'historique
+ * (`pipeline_event`) ensuite.**
+ * - L'état est ce que lit tout le reste de l'écran — la fiche, les colonnes,
+ *   les files de relance. Le faire réussir en premier garantit qu'aucune
+ *   ligne d'historique ne peut jamais affirmer une transition que la fiche
+ *   ne montre pas : c'est l'ORDRE INVERSE qui aurait pu faire mentir la
+ *   fiche (une ligne d'historique posée, puis l'état resté à l'ancien).
+ * - L'`upsert` est de plus IDEMPOTENT (`onConflict: 'prospect_id'`) : un
+ *   opérateur qui retente le même geste après un échec de l'historique ne
+ *   fait que réécrire le même état. L'`insert` de `pipeline_event`, lui,
+ *   EMPILE — le rejouer après un vrai succès créerait un doublon. Faire
+ *   réussir l'idempotent en premier limite donc le risque de doublon à la
+ *   seule écriture qu'on choisit de rejouer.
+ *
+ * **Si le premier échoue** (l'état) : l'historique n'est PAS tenté. Rien n'a
+ * changé nulle part — ce n'est pas un échec partiel mais un échec net, rendu
+ * tel quel (`{ etape: 'etat', message }`, le message brut de Supabase comme
+ * les autres fonctions de ce fichier).
+ *
+ * **Si le second échoue** (l'historique, une fois l'état déjà écrit) : le
+ * geste de l'opérateur A PRIS, contrairement à ce qu'un message d'erreur nu
+ * lui ferait croire. L'avaler ferait dériver le jeu en silence (un
+ * rendez-vous ou une relance qui n'existera jamais) ; le confondre avec un
+ * échec de l'état pousserait à réessayer sans nécessité, ou à douter d'un
+ * changement qui a pourtant eu lieu. `{ etape: 'historique', message }`
+ * porte donc cette distinction à l'appelant. C'est aussi lui — `ui/actions.ts`
+ * — qui doit alors RELIRE malgré l'échec : l'état a changé, la fiche ne doit
+ * pas rester sur l'ancien statut.
  */
 export async function definirStatut(
   client: Client,
   prospectId: string,
   status: Enums<'pipeline_status'>,
   nextActionAt: string | null,
-): Promise<string | null> {
+): Promise<EchecDefinirStatut | null> {
   const { error } = await client.from('prospect_pipeline').upsert(
     {
       prospect_id: prospectId,
@@ -86,7 +142,26 @@ export async function definirStatut(
     },
     { onConflict: 'prospect_id' },
   );
-  return error === null ? null : error.message;
+  if (error !== null) return { etape: 'etat', message: error.message };
+
+  const { error: erreurHistorique } = await client.from('pipeline_event').insert({
+    prospect_id: prospectId,
+    status,
+    // La date qui ENTRE EN VIGUEUR avec CE changement précis, et non celle
+    // qui l'a précédé — voir `FaitPipeline.nextActionAt` dans `domain/jeu.ts`.
+    next_action_at: nextActionAt,
+    // 'observe' est déjà le défaut de la colonne ; l'écrire explicitement
+    // rend l'invariant vérifiable ici même si ce défaut venait à changer, et
+    // affirme noir sur blanc qu'une écriture réelle n'est JAMAIS un
+    // 'amorcage' — la valeur que seule la migration de la tâche 4 a posée,
+    // une fois, pour reconstituer un historique qui n'existait pas.
+    origin: 'observe',
+    // `occurred_at` reste au défaut de la base (`now()`), comme dans
+    // `journaliserInteraction` : l'écrire ici exposerait l'horloge du poste.
+  });
+  if (erreurHistorique !== null) return { etape: 'historique', message: erreurHistorique.message };
+
+  return null;
 }
 
 /**
