@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DirectionB — maquette Prospeo</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+  <style>
+    :root {
+      --bg: #0b0d12; --surface: #14171f; --surface2: #1a1e28;
+      --border: #252b38; --border2: #333c4e;
+      --text: #e4e8f0; --muted: #98a1b4; --faint: #6b7488;
+      --blue: #6d92ff; --mint: #4fd1a5; --amber: #f0b45c; --rose: #ff7a85; --violet: #a78bfa;
+      --display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+      --ui: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
+      --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--ui); font-size: 13px; line-height: 1.45; }
+    a { color: var(--blue); text-decoration: none; }
+    a:hover { color: #8fabff; }
+    h1, h2, h3 { margin: 0; font-family: var(--display); font-weight: 600; letter-spacing: -0.02em; }
+    .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+    .badge { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; border-radius: 999px;
+      font-size: 11px; font-weight: 600; border: 1px solid transparent; }
+    .badge .dot { width: 5px; height: 5px; border-radius: 999px; background: currentColor; flex: none; }
+    .b-blue { color: #a9c2ff; background: rgba(109,146,255,0.13); border-color: rgba(109,146,255,0.28); }
+    .b-mint { color: #86e3c1; background: rgba(79,209,165,0.13); border-color: rgba(79,209,165,0.28); }
+    .b-amber { color: #f5cd92; background: rgba(240,180,92,0.13); border-color: rgba(240,180,92,0.28); }
+    .b-rose { color: #ffa8b0; background: rgba(255,122,133,0.13); border-color: rgba(255,122,133,0.28); }
+    .card { background: var(--surface2); border: 1px solid var(--border); border-radius: 13px; padding: 14px; }
+    .kv { display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px; }
+    .kv > span:first-child { color: var(--muted); }
+  </style>
+<style>body { margin: 0; background: #0b0d12; }</style>
+</head>
+<body>
+<div style="width: 560px; height: 880px; background: var(--bg); display: flex; flex-direction: column; overflow: hidden">
+
+  <div style="padding: 9px 14px; border-bottom: 1px solid var(--border); background: var(--surface); display: flex; align-items: center; gap: 8px">
+    <span style="width: 7px; height: 7px; border-radius: 999px; background: var(--violet)"></span>
+    <span style="font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); font-weight: 600">Direction B — Cockpit gamifié</span>
+  </div>
+
+  <div style="flex: 1; min-height: 0; overflow: hidden; padding: 20px 22px">
+
+    <div style="display: flex; align-items: flex-start; gap: 14px">
+      <div style="flex: 1; min-width: 0">
+        <h1 style="font-size: 21px">Plomberie Guérin &amp; Fils</h1>
+        <div style="display: flex; gap: 6px; margin-top: 9px; flex-wrap: wrap">
+          <span class="badge b-amber"><span class="dot"></span>Relancé</span>
+          <span class="badge b-mint"><span class="dot"></span>Site en ligne</span>
+          <span class="badge b-rose">Pas de site déclaré</span>
+        </div>
+      </div>
+      <div style="position: relative; width: 78px; height: 78px; flex: none">
+        <svg width="78" height="78" viewBox="0 0 78 78">
+          <circle cx="39" cy="39" r="32" fill="none" stroke="#232936" stroke-width="8"/>
+          <circle cx="39" cy="39" r="32" fill="none" stroke="url(#g)" stroke-width="8" stroke-linecap="round" stroke-dasharray="201" stroke-dashoffset="52" transform="rotate(-90 39 39)"/>
+          <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6d92ff"/><stop offset="1" stop-color="#a78bfa"/></linearGradient></defs>
+        </svg>
+        <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center">
+          <span class="num" style="font-size: 25px; font-weight: 700; line-height: 1; letter-spacing: -0.03em">74</span>
+          <span style="font-size: 9px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.07em">sur 100</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- la valeur du prospect, dite en une ligne -->
+    <div style="margin-top: 16px; padding: 11px 13px; border-radius: 12px; background: linear-gradient(100deg, rgba(109,146,255,0.10), rgba(167,139,250,0.06)); border: 1px solid rgba(109,146,255,0.22); display: flex; align-items: center; gap: 10px">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a9c2ff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>
+      <span style="font-size: 12.5px">Prospect du <b>quart supérieur</b> — <span class="num">+120 pts</span> si son site passe en ligne aujourd'hui.</span>
+    </div>
+
+    <div style="display: flex; gap: 7px; margin-top: 14px">
+      <button style="flex: 1; height: 34px; border-radius: 9px; background: var(--blue); color: #0b0d12; border: none; font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer">Appeler 06 12 34 56 78</button>
+      <button style="height: 34px; padding: 0 13px; border-radius: 9px; background: transparent; color: var(--text); border: 1px solid var(--border2); font: inherit; font-size: 12.5px; cursor: pointer">Site</button>
+    </div>
+
+    <div style="display: flex; gap: 3px; margin-top: 18px; border-bottom: 1px solid var(--border)">
+      <span style="padding: 0 12px 8px; font-size: 12.5px; font-weight: 600; border-bottom: 2px solid var(--blue); margin-bottom: -1px">Fiche</span>
+      <span style="padding: 0 12px 8px; font-size: 12.5px; color: var(--muted)">Site</span>
+      <span style="padding: 0 12px 8px; font-size: 12.5px; color: var(--muted)">Messages</span>
+      <span style="padding: 0 12px 8px; font-size: 12.5px; color: var(--muted)">Historique</span>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 16px">
+      <div class="card">
+        <div style="font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 600; margin-bottom: 10px">Identité</div>
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <div class="kv"><span>SIRET</span><span class="num" style="font-size: 11.5px">812…00023</span></div>
+          <div class="kv"><span>Créée</span><span class="num">2019</span></div>
+          <div class="kv"><span>Effectif</span><span>3 à 5</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <div style="font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 600; margin-bottom: 10px">Joignabilité</div>
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <div class="kv"><span>Mobile</span><span class="num" style="font-size: 11.5px">06 12 34 56 78</span></div>
+          <div class="kv"><span>Note</span><span class="num">4,6 ★</span></div>
+          <div class="kv"><span>Avis</span><span style="color: var(--faint); font-style: italic; font-size: 11.5px">non publié</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 10px">
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px">
+        <span style="font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 600">Composition du score</span>
+        <span style="flex: 1"></span>
+        <span style="font-size: 11.5px; color: var(--blue)">Reçu ligne par ligne ▾</span>
+      </div>
+      <div style="display: flex; gap: 9px">
+        <div style="flex: 1">
+          <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 5px"><span style="color: var(--muted)">Présence</span><span class="num" style="font-weight: 700">30</span></div>
+          <div style="height: 6px; border-radius: 999px; background: #232936; overflow: hidden"><div style="width: 100%; height: 100%; background: var(--blue)"></div></div>
+        </div>
+        <div style="flex: 1">
+          <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 5px"><span style="color: var(--muted)">Vitalité</span><span class="num" style="font-weight: 700">26</span></div>
+          <div style="height: 6px; border-radius: 999px; background: #232936; overflow: hidden"><div style="width: 74%; height: 100%; background: #5a7de0"></div></div>
+        </div>
+        <div style="flex: 1">
+          <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 5px"><span style="color: var(--muted)">Joignab.</span><span class="num" style="font-weight: 700">18</span></div>
+          <div style="height: 6px; border-radius: 999px; background: #232936; overflow: hidden"><div style="width: 51%; height: 100%; background: #3f568f"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top: 10px; padding: 12px 13px; border-radius: 12px; background: rgba(79,209,165,0.07); border: 1px solid rgba(79,209,165,0.25); display: flex; align-items: center; gap: 10px">
+      <span class="badge b-mint"><span class="dot"></span>En ligne</span>
+      <a href="#" style="font-size: 12px">plomberie-guerin-812…app</a>
+      <span style="flex: 1"></span>
+      <span class="badge b-amber"><span class="num">89</span> j</span>
+    </div>
+
+    <div style="margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--faint); line-height: 1.65">
+      <b style="color: var(--muted); font-weight: 600">Le pari.</b> Le score devient une jauge, l'écran dit ce que vaut l'action et ce qu'elle rapporte. Bricolage Grotesque donne du caractère aux chiffres. Risque : le jeu doit rester adossé à des faits, sinon il devient du bruit.
+    </div>
+  </div>
+</div>
+</body>
+</html>
