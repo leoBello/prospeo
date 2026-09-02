@@ -211,11 +211,27 @@
   color: var(--color-text-muted);
 }
 
-/* Le nom du palier courant, la flèche, le nom du suivant (maquette, ~l.127) — voir `libellePalierComplet`/`libellePalierCourt`, BandeProgression.tsx. */
+/*
+ * Le nom du palier courant, la flèche, le nom du suivant (maquette, ~l.127) —
+ * voir `libellePalierComplet`/`libellePalierCourt`, BandeProgression.tsx.
+ *
+ * Correctif de revue (passe responsive) : ce conteneur était `display: flex`
+ * avec `text-overflow: ellipsis` posé dessus — une combinaison sans effet,
+ * l'ellipse n'agissant que sur un conteneur BLOC. Ses trois enfants flex
+ * (`.palierActuel`/`.palierFleche`/`.palierSuivant`) refusaient donc de
+ * rétrécir sous leur texte, débordaient de la cellule et venaient chevaucher
+ * `.palierPoints` — repéré sur « Palier Prospecteur → Clos », tranché net,
+ * chevauchant « 320 / 500 points ». `display: block` (plutôt que flex)
+ * restaure un vrai conteneur de bloc : ses enfants, de simples éléments en
+ * ligne, s'y alignent nativement sur la même ligne de base sans qu'aucun
+ * flex ne soit nécessaire, et l'ellipse s'applique enfin pour de vrai.
+ * `flex: 1; min-width: 0` (au lieu du seul `min-width: 0` d'avant) le fait
+ * cette fois RÉELLEMENT rétrécir dans `.palierEntete`, pendant que
+ * `.palierPoints` (ci-dessous) garde `flex: none`.
+ */
 .palierProgression {
-  display: flex;
-  align-items: baseline;
-  gap: 5px;
+  display: block;
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -227,8 +243,11 @@
   font-weight: 600;
 }
 
+/* `margin: 0 5px` remplace le `gap: 5px` du flex disparu ci-dessus : la
+   flèche reste équidistante du nom courant et du suivant. */
 .palierFleche {
   color: var(--color-text-faint);
+  margin: 0 5px;
 }
 
 .palierSuivant {

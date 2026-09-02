@@ -10,6 +10,7 @@ import { Tooltip } from '../kit/Tooltip.js';
 import { ScoreCompact } from '../ScoreCompact.js';
 import { useT } from '../preferences.js';
 import styles from '../ProspectPanel.module.css';
+import cardStyles from '../kit/Card.module.css';
 
 /**
  * Le ton de chaque catégorie de présence web.
@@ -114,10 +115,14 @@ export function FicheTab({ prospect }: { prospect: ProspectView }) {
         titre={t('panel.section.contact')}
         extra={
           enrichment === null ? undefined : (
-            // `styles.badges` (déjà utilisé dans l'en-tête du panneau) aligne
-            // plusieurs pastilles sur une ligne : le statut d'enrichissement
-            // et, quand elle existe, la confiance d'appariement.
-            <span className={styles.badges}>
+            // `cardStyles.extraGroup` (Card.module.css) aligne plusieurs
+            // pastilles sur une ligne, avec repli — le statut
+            // d'enrichissement et, quand elle existe, la confiance
+            // d'appariement. Pas `styles.badges` (ProspectPanel.module.css) :
+            // cette classe est dessinée pour l'en-tête du PANNEAU, bien plus
+            // large qu'une carte, et porte un `margin-top` sans objet ici
+            // (voir le commentaire de `.extraGroup`, Card.module.css).
+            <span className={cardStyles.extraGroup}>
               <Badge ton={TON_ENRICHISSEMENT[enrichment.status]}>
                 {t(CLE_ENRICHISSEMENT[enrichment.status])}
               </Badge>

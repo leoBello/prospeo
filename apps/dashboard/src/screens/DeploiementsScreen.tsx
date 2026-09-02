@@ -326,7 +326,12 @@ export function DeploiementsScreen({ deployments, onSignOut = () => {}, nav }: P
           ) : lignes.length === 0 ? (
             <EmptyState titre={t('deploiements.empty.filtre.titre')} detail={t('deploiements.empty.filtre.detail')} />
           ) : (
-            <>
+            // `.tableau` : les six colonnes ne descendent jamais sous ~825px
+            // (cinq d'entre elles sont des largeurs fixes) — ce wrapper leur
+            // donne un défilement horizontal propre sous 1024px de fenêtre
+            // plutôt que de laisser le tableau déborder de la colonne de
+            // liste (voir le commentaire de `.tableau`, DeploiementsScreen.module.css).
+            <div className={styles.tableau}>
               <div className={styles.entetes} aria-hidden="true">
                 <span className={styles.enteteProspect}>{t('deploiements.colonnes.prospect')}</span>
                 <span className={styles.enteteGabarit}>{t('deploiements.colonnes.gabarit')}</span>
@@ -340,7 +345,7 @@ export function DeploiementsScreen({ deployments, onSignOut = () => {}, nav }: P
                   <Ligne key={d.prospectId} d={d} />
                 ))}
               </ul>
-            </>
+            </div>
           )}
         </>
       }

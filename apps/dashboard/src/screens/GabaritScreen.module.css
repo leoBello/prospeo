@@ -49,6 +49,12 @@
   font-family: var(--font-mono);
   font-size: var(--text-lg);
   font-weight: 500;
+  /* Un nom de dépôt complet (« organisation/nom-du-gabarit-tres-long ») est
+     une seule chaîne sans espace : sans repli de mot, elle déborde du cadre
+     de la carte au lieu de retourner à la ligne — `.actifEntete` a beau
+     savoir replier (`flex-wrap`), il ne replie qu'ENTRE les éléments, pas
+     l'intérieur d'un mot qui dépasserait déjà seul la largeur de la carte. */
+  overflow-wrap: anywhere;
 }
 
 .actifMeta {

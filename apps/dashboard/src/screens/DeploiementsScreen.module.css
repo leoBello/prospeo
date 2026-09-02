@@ -104,6 +104,22 @@
   font-variant-numeric: tabular-nums;
 }
 
+/*
+ * Correctif de revue (passe responsive) : les cinq colonnes fixes
+ * (`.enteteGabarit` 150px + `.entetePiste` 175px + `.enteteEtat` 160px +
+ * `.enteteDuree` 70px + `.enteteAdresse` 190px, soit 745px, plus quatre
+ * espacements de `.entetes`/`.ligne`) ne cèdent jamais — `flex: none` — et
+ * `.enteteProspect`/`.identite` ont beau porter `min-width: 0`, ils ne
+ * peuvent pas compenser : le tableau entier refusait donc de descendre sous
+ * ~825px et débordait tel quel de la colonne de liste sous 1024px de
+ * fenêtre (aucun défilement horizontal propre ne le contenait). `overflow-x`
+ * borne ce débordement au tableau seul plutôt que de le laisser déborder de
+ * l'écran.
+ */
+.tableau {
+  overflow-x: auto;
+}
+
 /* En-têtes de colonnes — décoratifs (aria-hidden), les libellés réels sont
    ceux de chaque cellule, lus par un lecteur d'écran ligne par ligne. */
 .entetes {

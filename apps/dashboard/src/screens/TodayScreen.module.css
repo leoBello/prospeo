@@ -43,6 +43,18 @@
   color: var(--color-text-faint);
 }
 
+/* Correctif de revue (passe responsive) : ce plancher de 230px, tenable à
+   toutes les largeurs de bureau, ne l'est plus à côté de la marque, de la
+   série et du compte sur un téléphone (390px) — voir le commentaire de
+   `.barre`, BarreHaut.module.css, qui traite le repli de la barre elle-même
+   sous le même seuil. */
+@media (max-width: 640px) {
+  .recherche {
+    flex: 1 1 120px;
+    min-width: 0;
+  }
+}
+
 .rechercheChamp {
   flex: 1;
   min-width: 0;

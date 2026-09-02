@@ -57,7 +57,17 @@
   min-width: 0;
 }
 
+/*
+ * Correctif de revue (passe responsive) : enfant flex de `.topLine` sans
+ * `flex: 1; min-width: 0`, ce nom refusait de rétrécir sous la largeur de
+ * son propre texte (le minimum automatique d'un enfant flex reste son
+ * contenu tant que rien ne l'autorise à descendre plus bas) — l'ellipse
+ * était donc posée mais ne se déclenchait jamais, et un nom long débordait
+ * de la ligne au lieu de se tronquer devant le badge de statut.
+ */
 .name {
+  flex: 1;
+  min-width: 0;
   font-size: var(--text-md);
   font-weight: 500;
   color: var(--color-text);
