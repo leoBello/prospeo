@@ -29,6 +29,18 @@
   border-style: dashed;
 }
 
+/*
+ * Taille compacte (maquette, methode `ligne()`) : une ligne de liste tolere
+ * des centaines d'occurrences a l'ecran (§9.4), le panneau une seule. Les
+ * dimensions viennent telles quelles de la maquette plutot que d'une echelle
+ * inventee ici.
+ */
+.badge[data-taille='compacte'] {
+  height: 19px;
+  padding: 0 7px;
+  font-size: 10px;
+}
+
 .badge[data-ton='neutre'] {
   color: var(--color-text-muted);
   background: color-mix(in srgb, var(--color-text-muted) 10%, transparent);

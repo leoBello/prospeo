@@ -4,7 +4,7 @@
 
 .header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--space-2);
   padding: 0 var(--space-3) var(--space-2);
 }
@@ -19,14 +19,14 @@
 }
 
 /*
- * Le compteur annonce le nombre reel, pas le nombre de lignes affichees.
- * Une liste plafonnee a douze cacherait sinon cent prospects derriere un
- * titre rassurant.
+ * Le filet occupe toute la largeur restante apres le titre et le compteur
+ * (maquette) : `flex: 1` plutot qu'une largeur fixe, pour rester correct
+ * quelle que soit la longueur du titre traduit.
  */
-.count {
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-  font-variant-numeric: tabular-nums;
+.rule {
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
 }
 
 /*

@@ -74,6 +74,14 @@ describe('ProspectRow', () => {
     expect(screen.getByText('Jamais contacté')).toBeDefined();
   });
 
+  it('rend le badge de statut en taille compacte, celle de la maquette pour une ligne', () => {
+    // Le panneau (22px/11px) et la ligne (19px/10px, methode `ligne()` de la
+    // maquette) n'utilisent pas la meme taille : sans ce choix, le badge
+    // depasse la hauteur du nom et gonfle chaque ligne de 8px (§9.4).
+    const { container } = rendre(ligne());
+    expect(container.querySelector('[data-taille="compacte"]')).not.toBeNull();
+  });
+
   it('rend la raison de presence, fragment traduit et fragment brut compris', () => {
     rendre(ligne());
     expect(screen.getByText(/relance en retard de 3 j/)).toBeDefined();

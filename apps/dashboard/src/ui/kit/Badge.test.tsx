@@ -15,6 +15,18 @@ describe('Badge', () => {
     const { container } = renderWithPreferences(<Badge>Plombier</Badge>);
     expect(container.querySelector('[data-ton="neutre"]')).not.toBeNull();
   });
+
+  it('retombe sur la taille normale quand aucune n est donnee', () => {
+    // Aucun appelant existant (panneau, tableaux) ne doit changer de rendu
+    // pour ce seul ajout de prop.
+    const { container } = renderWithPreferences(<Badge>Plombier</Badge>);
+    expect(container.querySelector('[data-taille="normale"]')).not.toBeNull();
+  });
+
+  it('accepte une taille compacte, pour la ligne de liste', () => {
+    const { container } = renderWithPreferences(<Badge taille="compacte">Relancé</Badge>);
+    expect(container.querySelector('[data-taille="compacte"]')).not.toBeNull();
+  });
 });
 
 describe('StatusBadge', () => {
@@ -35,5 +47,15 @@ describe('StatusBadge', () => {
     // La forme doit le dire avant la couleur, pour qui ne la distingue pas.
     const { container } = renderWithPreferences(<StatusBadge status="ne_pas_contacter" />);
     expect(container.querySelector('[data-discontinu="true"]')).not.toBeNull();
+  });
+
+  it('transmet la taille compacte a Badge, pour la ligne de liste', () => {
+    const { container } = renderWithPreferences(<StatusBadge status="relance" taille="compacte" />);
+    expect(container.querySelector('[data-taille="compacte"]')).not.toBeNull();
+  });
+
+  it('retombe sur la taille normale sans la prop, comme tous les appelants existants', () => {
+    const { container } = renderWithPreferences(<StatusBadge status="relance" />);
+    expect(container.querySelector('[data-taille="normale"]')).not.toBeNull();
   });
 });

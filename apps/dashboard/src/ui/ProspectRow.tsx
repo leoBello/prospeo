@@ -53,8 +53,12 @@ export function ProspectRow({ row, selected, currentRulesetVersion, onSelect }: 
           <span className={styles.topLine}>
             <span className={styles.name}>{nom}</span>
             {/* `pipeline` est `null` pour 114 prospects sur 139 : ce n'est
-                pas un cas dégénéré à contourner, `StatusBadge` le nomme. */}
-            <StatusBadge status={prospect.pipeline?.status ?? null} />
+                pas un cas dégénéré à contourner, `StatusBadge` le nomme.
+                `taille="compacte"` : dimensions de la maquette pour une
+                ligne (19px/10px), plus petites que celles du panneau — sans
+                quoi le badge, plus haut que le nom, gonflait la ligne de
+                8px (voir le calcul de densité du rapport). */}
+            <StatusBadge status={prospect.pipeline?.status ?? null} taille="compacte" />
           </span>
           <span className={styles.meta}>
             <Reason fragments={row.reason} />
