@@ -8,6 +8,7 @@ import type { TranslationKey } from '../i18n/translate.js';
 import { AppShell } from '../ui/AppShell.js';
 import { KpiBand } from '../ui/KpiBand.js';
 import { ProspectPanel } from '../ui/ProspectPanel.js';
+import type { ProspectPanelPosition } from '../ui/ProspectPanel.js';
 import type { PanelActions } from '../ui/actions.js';
 import { WorkListSection } from '../ui/WorkListSection.js';
 import { useListNavigation } from '../ui/useListNavigation.js';
@@ -209,10 +210,25 @@ export function TodayScreen({
     }
   }, [selectedId]);
 
-  const position =
+  /**
+   * Le rang affiché dans le panneau, relatif aux `ids` COURANTS (déjà
+   * filtrés par la recherche).
+   *
+   * Un prospect ouvert avant que la recherche ne l'exclue reste sélectionné
+   * — `useListNavigation` ne le sait pas et ne ferme rien, exactement le
+   * réflexe déjà pris par `navigate` pour une ligne disparue (voir
+   * `ui/list-navigation.ts`) — mais son rang dans une liste qui ne le
+   * contient plus n'existe pas : `ids.indexOf` rendrait -1, soit un rang
+   * « 0 sur N », ou pire « 0 sur 0 » si le filtre ne laisse plus personne.
+   * `horsFiltre` nomme cette absence au lieu de mentir par un chiffre.
+   */
+  const rang = selectedId === null ? -1 : ids.indexOf(selectedId);
+  const position: ProspectPanelPosition | null =
     selectedId === null
       ? null
-      : { index: ids.indexOf(selectedId) + 1, total: ids.length };
+      : rang === -1
+        ? { kind: 'horsFiltre' }
+        : { kind: 'rang', index: rang + 1, total: ids.length };
 
   return (
     <AppShell

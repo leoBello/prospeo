@@ -34,12 +34,17 @@ describe('BarreHaut', () => {
     expect(screen.queryByRole('button', { name: 'Se déconnecter' })).toBeNull();
   });
 
-  it('rend les trois commandes atteignables au clavier une fois le bouton de compte ouvert', async () => {
+  it('ouvre les trois commandes au clavier seul, sans souris', async () => {
     const user = userEvent.setup();
     renderWithPreferences(<BarreHaut onSignOut={vi.fn()} />);
 
+    // `Tab` seul, pas `user.click` : c'est la preuve que le bouton de compte
+    // est atteignable au clavier, pas seulement que c'est un <button>.
+    await user.tab();
     const compte = screen.getByRole('button', { name: 'Préférences du compte' });
-    await user.click(compte);
+    expect(document.activeElement).toBe(compte);
+
+    await user.keyboard('{Enter}');
 
     expect(await screen.findByRole('button', { name: 'Passer au thème clair' })).toBeDefined();
     expect(screen.getByRole('button', { name: 'English' })).toBeDefined();

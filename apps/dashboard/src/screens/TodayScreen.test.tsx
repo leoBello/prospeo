@@ -397,6 +397,76 @@ describe('TodayScreen — la recherche de la barre du haut (lot 3, tache 2)', ()
   });
 });
 
+describe('TodayScreen — le panneau reste coherent avec la recherche (correctif de revue, lot 3 tache 2)', () => {
+  it('garde le panneau ouvert sur le prospect selectionne quand la recherche l exclut, et nomme l absence de rang', async () => {
+    const user = userEvent.setup();
+    rendre([
+      vue('alpha', { denomination: 'PLOMBERIE ALPHA', score: score(90) }),
+      vue('beta', { denomination: 'SERRURERIE BETA', score: score(80) }),
+    ]);
+
+    // Selectionne alpha (score le plus haut, premier de la liste).
+    await user.keyboard('{ArrowDown}');
+    const panneauAvant = screen.getByRole('complementary');
+    expect(within(panneauAvant).getByRole('heading', { level: 2 }).textContent).toBe('PLOMBERIE ALPHA');
+    expect(within(panneauAvant).getByText('1 sur 2')).toBeDefined();
+
+    // La recherche exclut alpha (mais laisse beta) : la ligne selectionnee
+    // disparait de la liste affichee sans que la selection ne bouge.
+    const champ = screen.getByRole('searchbox');
+    await user.type(champ, 'beta');
+
+    // Le panneau reste monte et affiche toujours la meme fiche — taper dans
+    // la recherche ne detruit pas la fiche qu'on lisait.
+    const panneauApres = screen.getByRole('complementary');
+    expect(within(panneauApres).getByRole('heading', { level: 2 }).textContent).toBe('PLOMBERIE ALPHA');
+    // Le rang n'a plus de sens relativement a une liste qui ne contient plus
+    // la ligne : aucun texte de la forme "N sur M" ne doit rester.
+    expect(within(panneauApres).queryByText(/^\d+ sur \d+$/)).toBeNull();
+    // Et l'absence se nomme, plutot que de laisser un trou silencieux.
+    expect(within(panneauApres).getByText('Hors du filtre de recherche en cours')).toBeDefined();
+  });
+
+  it('n affiche nulle part 0 sur 0 quand le filtre du prospect ouvert ne laisse plus aucune ligne', async () => {
+    const user = userEvent.setup();
+    rendre([vue('alpha', { denomination: 'PLOMBERIE ALPHA', score: score(90) })]);
+
+    await user.keyboard('{ArrowDown}');
+    expect(screen.getByRole('complementary')).toBeDefined();
+
+    const champ = screen.getByRole('searchbox');
+    await user.type(champ, 'aucune-entreprise-ne-porte-ce-nom');
+
+    const panneau = screen.getByRole('complementary');
+    expect(within(panneau).getByRole('heading', { level: 2 }).textContent).toBe('PLOMBERIE ALPHA');
+    // Nulle part sur l'ecran, ni dans le panneau ni ailleurs.
+    expect(screen.queryByText('0 sur 0')).toBeNull();
+    expect(within(panneau).queryByText(/^\d+ sur \d+$/)).toBeNull();
+    expect(within(panneau).getByText('Hors du filtre de recherche en cours')).toBeDefined();
+  });
+
+  it('rend un rang correct, relatif a la liste filtree, quand le prospect ouvert y figure toujours', async () => {
+    const user = userEvent.setup();
+    rendre([
+      vue('alpha', { denomination: 'PLOMBERIE ALPHA', score: score(90) }),
+      vue('beta', { denomination: 'SERRURERIE BETA', score: score(80) }),
+    ]);
+
+    await user.keyboard('{ArrowDown}');
+    const champ = screen.getByRole('searchbox');
+    // Exclut beta, laisse alpha : la liste filtree ne contient plus qu une
+    // ligne, et le prospect ouvert y figure toujours.
+    await user.type(champ, 'alpha');
+
+    const panneau = screen.getByRole('complementary');
+    expect(within(panneau).getByRole('heading', { level: 2 }).textContent).toBe('PLOMBERIE ALPHA');
+    // "1 sur 1", relatif a la liste FILTREE — pas "1 sur 2" de la liste
+    // complete.
+    expect(within(panneau).getByText('1 sur 1')).toBeDefined();
+    expect(within(panneau).queryByText('Hors du filtre de recherche en cours')).toBeNull();
+  });
+});
+
 describe('TodayScreen — le journal de deploiement (tache 11)', () => {
   it('ne lit aucun evenement tant qu aucun prospect n est ouvert', () => {
     // La table ne doit jamais etre interrogee si le panneau n'est pas

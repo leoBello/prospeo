@@ -133,6 +133,11 @@ export const fr = {
   'panel.section.web': 'Présence web',
   'panel.section.score': 'Détail du score',
   'panel.position': '{index} sur {total}',
+  // Lot 3, tâche 2 (correctif de revue) : le prospect ouvert avant une
+  // recherche qui l'exclut reste affiché, mais son rang dans la liste
+  // filtrée n'existe plus — ceci le dit, plutôt qu'un « 0 sur 0 » ou un rang
+  // faux calculé quand même.
+  'panel.position.horsFiltre': 'Hors du filtre de recherche en cours',
 
   // Chantier n°6 : les quatre onglets du panneau, un par moment du travail.
   'panel.tab.fiche': 'Fiche',

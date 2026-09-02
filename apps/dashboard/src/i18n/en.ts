@@ -114,6 +114,7 @@ export const en: Record<keyof typeof fr, string> = {
   'panel.section.web': 'Web presence',
   'panel.section.score': 'Score breakdown',
   'panel.position': '{index} of {total}',
+  'panel.position.horsFiltre': 'Outside the current search filter',
 
   'panel.tab.fiche': 'Details',
   'panel.tab.site': 'Site',
