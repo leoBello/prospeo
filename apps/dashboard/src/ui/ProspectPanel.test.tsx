@@ -37,13 +37,31 @@ describe('ProspectPanel', () => {
     expect(screen.getByRole('heading', { name: 'Plomberie Guérin & Fils' })).toBeDefined();
   });
 
-  it('n ouvre qu un onglet a la fois — c est tout l objet de la refonte', () => {
+  it('n ouvre qu un onglet a la fois — c est tout l objet de la refonte', async () => {
+    // La preuve doit porter sur un texte propre au contenu de chaque onglet,
+    // pas sur un role="heading" que l'onglet visé ne rend pas (Historique n'en
+    // a pas) ni sur un texte présent de toute façon (SIRET) : ces deux formes
+    // passaient déjà avec les quatre panneaux montés en permanence — le bug
+    // exact que ce test doit détecter.
+    const user = userEvent.setup();
     renderWithPreferences(
       <ProspectPanel prospect={prospect()} position={null} currentRulesetVersion="v3" onClose={() => {}} />,
     );
-    // L'onglet Fiche est actif au montage ; le contenu des autres n'est pas rendu.
-    expect(screen.getByText('SIRET')).toBeDefined();
-    expect(screen.queryByRole('heading', { name: /Historique/ })).toBeNull();
+
+    // Avant tout clic, seul l'onglet Fiche (actif par défaut) est monté : le
+    // contenu des trois autres ne doit pas exister dans le DOM.
+    expect(screen.queryByRole('heading', { name: 'Site généré' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Messages de vente' })).toBeNull();
+    expect(screen.queryByText(/Journal détaillé des étapes/)).toBeNull();
+
+    await user.click(screen.getByRole('tab', { name: /Site/ }));
+    expect(screen.getByRole('heading', { name: 'Site généré' })).toBeDefined();
+
+    await user.click(screen.getByRole('tab', { name: /Messages/ }));
+    expect(screen.getByRole('heading', { name: 'Messages de vente' })).toBeDefined();
+
+    await user.click(screen.getByRole('tab', { name: /Historique/ }));
+    expect(screen.getByText(/Journal détaillé des étapes/)).toBeDefined();
   });
 
   it('bascule d onglet au clic', async () => {
