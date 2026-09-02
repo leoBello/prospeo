@@ -33,6 +33,7 @@ function builderImmediat(compte: () => number = () => 0) {
         eq() { return fige; },
         gte() { return fige; },
         lt() { return fige; },
+        or() { return fige; },
         order() { return fige; },
         range() { return Promise.resolve({ data: [], error: null }); },
         then(resolve: (v: unknown) => void) { resolve({ data: null, error: null, count: n }); },
@@ -50,6 +51,7 @@ function builderEnErreur(message: string) {
     eq() { return b; },
     gte() { return b; },
     lt() { return b; },
+    or() { return b; },
     order() { return b; },
     range() { return Promise.resolve({ data: null, error: { message } }); },
     then(resolve: (v: unknown) => void) { resolve({ data: null, error: { message }, count: null }); },
@@ -90,6 +92,7 @@ function fakeClientControlable() {
   const pipeline: {
     select: (colonnes: string, options?: { count?: string; head?: boolean }) => unknown;
     gte: () => unknown;
+    or: () => unknown;
     order: () => unknown;
     range: () => Promise<unknown>;
   } = {
@@ -102,6 +105,7 @@ function fakeClientControlable() {
       return pipeline;
     },
     gte() { return pipeline; },
+    or() { return pipeline; },
     order() { return pipeline; },
     range() {
       return new Promise((resolve) => {

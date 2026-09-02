@@ -24,12 +24,15 @@ import { fetchAllRows, type FetchAllOptions, type RangeReader } from './paginate
  *    `domain/jeu.ts`) ne portent QUE sur les quatorze jours civils
  *    précédents (`FENETRE_OBJECTIF_JOURS`, défini dans le domaine — une
  *    seule source de vérité pour cette taille). `pipeline_event` et
- *    `interaction` sont donc lus bornés PAR DATE (`gte('occurred_at', …)`),
- *    pas en nombre de lignes : un plafond en lignes aurait pu couper la
- *    fenêtre en plein milieu d'une journée chargée (voir `MARGE_FUSEAU_JOURS`
- *    ci-dessous pour la marge appliquée à la coupure elle-même). La
- *    pagination (`fetchAllRows`) reste en place À L'INTÉRIEUR de cette
- *    fenêtre, comme garde-fou de volume, pas comme borne de fenêtre.
+ *    `interaction` sont donc lus bornés PAR DATE, pas en nombre de lignes :
+ *    un plafond en lignes aurait pu couper la fenêtre en plein milieu d'une
+ *    journée chargée (voir `MARGE_FUSEAU_JOURS` ci-dessous pour la marge
+ *    appliquée à la coupure elle-même). La pagination (`fetchAllRows`) reste
+ *    en place À L'INTÉRIEUR de cette fenêtre, comme garde-fou de volume, pas
+ *    comme borne de fenêtre. **Second correctif de revue** : `pipeline_event`
+ *    n'est plus filtré par un simple `gte('occurred_at', …)` — voir le
+ *    docstring de `pipelineEventRangeReader` pour le trou de bord de fenêtre
+ *    que cela laissait ouvert, et comment `.or(...)` le referme.
  *
  * 2. **Les cumuls qui ne doivent jamais régresser** (site mis en ligne,
  *    rendez-vous obtenu) viennent d'un `count` PostgREST
@@ -156,13 +159,28 @@ function coupureFenetre(maintenant: Date): string {
  * l'intérieur de cette fenêtre, seule garantie que la pagination ne relise
  * ni ne saute une ligne — même raison que `prospectRangeReader`
  * (`data/queries.ts`).
+ *
+ * **Le filtre `.or(...)`, et pourquoi une seule coupure ne suffit pas ici.**
+ * Une échéance (`next_action_at`) peut avoir été POSÉE bien avant le début de
+ * la fenêtre tout en restant DUE dedans — une relance rare, décidée il y a
+ * longtemps pour une date proche. Un simple `gte('occurred_at', coupure)`
+ * (comme sur `interaction`, qui n'a pas ce problème : une interaction ne
+ * peut honorer qu'une échéance dont elle connaît déjà la pose) manquerait
+ * cette ligne, et `relancesTenues` (domain/jeu.ts) sous-compterait une
+ * relance pourtant réellement honorée dans la fenêtre — une régression que
+ * la lecture intégrale d'origine ne pouvait pas avoir. Le filtre retient donc
+ * une ligne dès que SON OCCURRENCE **ou** SON ÉCHÉANCE tombe dans la
+ * fenêtre : la borne reste une borne (aucune ligne dont les deux dates sont
+ * antérieures à la coupure n'est jamais lue), mais elle ne coupe plus
+ * silencieusement une échéance encore pertinente.
  */
 export function pipelineEventRangeReader(client: Client, coupureISO: string): RangeReader<unknown> {
+  const coupureDate = coupureISO.slice(0, 10); // `next_action_at` est une colonne `date`, pas `timestamptz` — voir FaitPipeline.
   return (from, to) =>
     client
       .from('pipeline_event')
       .select('prospect_id,status,next_action_at,origin,occurred_at')
-      .gte('occurred_at', coupureISO)
+      .or(`occurred_at.gte.${coupureISO},next_action_at.gte.${coupureDate}`)
       .order('id', { ascending: true })
       .range(from, to) as unknown as ReturnType<RangeReader<unknown>>;
 }
@@ -178,7 +196,15 @@ export function interactionRangeReader(client: Client, coupureISO: string): Rang
       .range(from, to) as unknown as ReturnType<RangeReader<unknown>>;
 }
 
-/** Lit un `count` PostgREST et le nomme dans l'erreur qu'il peut lever — même raison que `lireTable` ci-dessous pour les lectures de lignes. */
+/**
+ * Lit un `count` PostgREST et le nomme dans l'erreur qu'il peut lever — même
+ * raison que `lireTable` ci-dessous pour les lectures de lignes. `nom` doit
+ * distinguer les DEUX comptes posés sur `pipeline_event`
+ * (`compterRendezVousObtenus`, `historiqueAuDelaDeLaFenetre`) : les nommer
+ * tous les deux `'pipeline_event'` rendrait un échec de l'un indiscernable
+ * de l'échec de l'autre, alors que ce nom est précisément ce qui permet de
+ * désigner la source d'un échec.
+ */
 async function lireCompte(
   nom: string,
   requete: PromiseLike<{ count: number | null; error: { message: string } | null }>,
@@ -211,7 +237,7 @@ async function compterSitesMisEnLigne(client: Client): Promise<number> {
  */
 async function compterRendezVousObtenus(client: Client): Promise<number> {
   return lireCompte(
-    'pipeline_event',
+    'pipeline_event (rendez-vous obtenus)',
     client.from('pipeline_event').select('*', { count: 'exact', head: true }).eq('status', 'interesse').eq('origin', 'observe'),
   );
 }
@@ -224,7 +250,7 @@ async function compterRendezVousObtenus(client: Client): Promise<number> {
  */
 async function historiqueAuDelaDeLaFenetre(client: Client, coupureISO: string): Promise<boolean> {
   const n = await lireCompte(
-    'pipeline_event',
+    'pipeline_event (historique au-delà de la fenêtre)',
     client.from('pipeline_event').select('*', { count: 'exact', head: true }).eq('origin', 'observe').lt('occurred_at', coupureISO),
   );
   return n > 0;

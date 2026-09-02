@@ -29,6 +29,13 @@ import { joursCivils } from './today.js';
  * néanmoins de définir ses propres types plutôt que d'importer
  * `Tables<'...'>`, par cohérence avec `domain/prospect.ts` et
  * `domain/deployment.ts`.
+ *
+ * **Second correctif de revue.** `{connue: false}` dans `EntreesJeu` disait
+ * déjà honnêtement l'incomplétude EN ENTRÉE, mais elle se perdait avant
+ * d'atteindre l'écran : `Palier` n'exposait rien, et `EtatBadge` réduisait
+ * « pas encore obtenu » et « ne peut être obtenu par aucun geste » au même
+ * booléen. `Palier.complet` et `EtatBadgeValeur` (trois états, pas deux)
+ * portent maintenant cette distinction jusqu'à `Jeu` — voir leurs docstrings.
  */
 
 /**
@@ -353,7 +360,24 @@ export const PARAMETRES_PALIER = {
   seuil: 500,
 } as const;
 
-/** L'état du palier de points : le total, le seuil, le numéro du palier atteint et la progression dans celui-ci. */
+/**
+ * L'état du palier de points : le total, le seuil, le numéro du palier
+ * atteint et la progression dans celui-ci.
+ *
+ * **`complet` — second correctif de revue.** Un `Mesure<number>` non connu
+ * (voir `calculerPalier`) fait déjà contribuer zéro point à `points`, mais un
+ * zéro qui n'a JAMAIS l'occasion de changer n'est pas la même absence qu'un
+ * zéro vraiment mesuré — exactement la distinction que ce dépôt refuse de
+ * réduire au même booléen ailleurs (`ProspectView`, `Mesure` lui-même).
+ * `complet: false` porte cette distinction jusqu'à l'écran : `points` est
+ * alors un PLANCHER, pas le score réel, parce qu'au moins une source
+ * (aujourd'hui, seulement « relance tenue » — voir `calculerPalier`) reste
+ * structurellement non mesurable. Un simple drapeau suffit tant qu'une seule
+ * source peut se trouver dans ce cas ; s'il devait y en avoir plusieurs un
+ * jour, une liste des sources deviendrait nécessaire, mais inventer cette
+ * liste aujourd'hui pour une unique source serait de la prévoyance qui ne
+ * sert personne.
+ */
 export interface Palier {
   readonly points: number;
   readonly seuil: number;
@@ -361,15 +385,17 @@ export interface Palier {
   readonly numero: number;
   /** Points acquis dans le palier courant, entre 0 (inclus) et `seuil` (exclu). */
   readonly progression: number;
+  /** `false` : `points` omet au moins une source structurellement non mesurable — voir le docstring de l'interface. */
+  readonly complet: boolean;
 }
 
 /**
  * Calcule le palier à partir du nombre de faits observés de chaque source —
  * jamais du volume d'activité indifférencié.
  *
- * **Correctif de revue : pourquoi `relancesTenues` est un `Mesure<number>`
- * et non un simple nombre.** Le palier ne doit jamais régresser — un badge ou
- * des points acquis ne se reprennent pas. `nombreSitesMisEnLigne` et
+ * **Pourquoi `relancesTenues` est un `Mesure<number>` et non un simple
+ * nombre.** Le palier ne doit jamais régresser — un badge ou des points
+ * acquis ne se reprennent pas. `nombreSitesMisEnLigne` et
  * `nombreRendezVousObtenus` viennent d'un `count` serveur sur UNE table,
  * filtré une fois pour toutes (`step`/`outcome`, ou `status`/`origin`) : un
  * total qui ne peut que croître, jamais lu en entier côté client. « Relance
@@ -382,7 +408,8 @@ export interface Palier {
  * quand la fenêtre glisse). `relancesTenues.connue === false` — la valeur
  * que `data/jeu.ts` fournit tant qu'aucune source honnête n'existe — fait
  * donc contribuer zéro point ici, plutôt que de fabriquer un chiffre qui
- * prétendrait mesurer un cumul qu'il ne mesure pas.
+ * prétendrait mesurer un cumul qu'il ne mesure pas. **Ce zéro n'est cependant
+ * pas silencieux** : `complet` (voir `Palier`) porte l'aveu jusqu'à l'écran.
  */
 export function calculerPalier(
   relancesTenuesCumulees: Mesure<number>,
@@ -402,6 +429,7 @@ export function calculerPalier(
     seuil,
     numero: Math.floor(points / seuil) + 1,
     progression: points % seuil,
+    complet: relancesTenuesCumulees.connue,
   };
 }
 
@@ -421,10 +449,25 @@ export type BadgeId =
   | 'premier_rendez_vous'
   | 'serie_sept_jours';
 
-/** L'état d'un badge : son identifiant, et s'il est obtenu ou encore verrouillé. */
+/**
+ * Les trois états qu'un badge peut porter — **second correctif de revue**,
+ * en remplacement d'un simple `obtenu: boolean`.
+ *
+ * Un badge non obtenu peut se trouver dans deux situations que ce dépôt
+ * refuse par doctrine de réduire au même booléen (absences distinctes,
+ * `ProspectView`) : **`verrouille`**, atteignable par un geste réel de
+ * l'opérateur (une relance de plus, un site de plus) ; **`non_mesurable`**,
+ * où AUCUN geste ne peut le débloquer aujourd'hui, faute de source honnête
+ * pour la mesure sous-jacente (voir `calculerPalier`). Confondre les deux
+ * présenterait un badge comme un objectif poursuivable alors qu'il ne l'est
+ * pas — l'affordance qui annonce un fait qu'aucun code ne peut rendre vrai.
+ */
+export type EtatBadgeValeur = 'obtenu' | 'verrouille' | 'non_mesurable';
+
+/** L'état d'un badge : son identifiant, et lequel des trois états de `EtatBadgeValeur` il porte. */
 export interface EtatBadge {
   readonly id: BadgeId;
-  readonly obtenu: boolean;
+  readonly etat: EtatBadgeValeur;
 }
 
 export interface JalonsAtteints {
@@ -439,26 +482,34 @@ export interface JalonsAtteints {
 const SERIE_BADGE_JOURS = 7;
 
 /**
- * `premiere_relance_tenue` reste verrouillé tant que `relancesTenuesCumulees`
- * vaut `{connue: false}` — jamais débloqué par erreur sur une mesure qu'on
- * n'a pas. `serie_sept_jours`, lui, n'est PAS un jalon cumulatif : une série
- * en cours peut légitimement se rompre et redébloquer plus tard, ce n'est
- * pas la régression interdite par l'arbitrage (qui vise les jalons « depuis
- * toujours »). Le seuil (7) reste toujours en-deçà de `FENETRE_OBJECTIF_JOURS`
- * (14, le plafond de `serie.jours`) : `serie.jours >= 7` reste une
- * comparaison exacte même quand `serie.borneAtteinte` est vrai, puisque la
- * vraie série ne peut alors qu'être PLUS longue que ce plafond, jamais plus
- * courte.
+ * `premiere_relance_tenue` porte `non_mesurable` — jamais `verrouille` —
+ * tant que `relancesTenuesCumulees` vaut `{connue: false}` : rien ne
+ * distingue AUJOURD'HUI un opérateur qui n'a encore tenu aucune relance d'un
+ * opérateur qui en a tenu cent, faute de cumul honnête (voir
+ * `calculerPalier`) — présenter ce badge comme « verrouillé » laisserait
+ * croire qu'une relance de plus suffirait à le débloquer, ce qu'aucun geste
+ * ne peut faire aujourd'hui. `serie_sept_jours`, lui, n'est PAS un jalon
+ * cumulatif : une série en cours peut légitimement se rompre et redébloquer
+ * plus tard, ce n'est pas la régression interdite par l'arbitrage (qui vise
+ * les jalons « depuis toujours »), donc toujours `obtenu`/`verrouille`,
+ * jamais `non_mesurable`. Le seuil (7) reste toujours en-deçà de
+ * `FENETRE_OBJECTIF_JOURS` (14, le plafond de `serie.jours`) :
+ * `serie.jours >= 7` reste une comparaison exacte même quand
+ * `serie.borneAtteinte` est vrai, puisque la vraie série ne peut alors
+ * qu'être PLUS longue que ce plafond, jamais plus courte.
  */
 export function calculerBadges(jalons: JalonsAtteints): readonly EtatBadge[] {
+  const etatMesure = (mesure: Mesure<number>, seuilAtteint: (valeur: number) => boolean): EtatBadgeValeur => {
+    if (!mesure.connue) return 'non_mesurable';
+    return seuilAtteint(mesure.valeur) ? 'obtenu' : 'verrouille';
+  };
+  const etatCompte = (valeur: number, seuil: number): EtatBadgeValeur => (valeur >= seuil ? 'obtenu' : 'verrouille');
+
   return [
-    {
-      id: 'premiere_relance_tenue',
-      obtenu: jalons.relancesTenuesCumulees.connue && jalons.relancesTenuesCumulees.valeur >= 1,
-    },
-    { id: 'premier_site_en_ligne', obtenu: jalons.nombreSitesMisEnLigne >= 1 },
-    { id: 'premier_rendez_vous', obtenu: jalons.nombreRendezVousObtenus >= 1 },
-    { id: 'serie_sept_jours', obtenu: jalons.serie.jours >= SERIE_BADGE_JOURS },
+    { id: 'premiere_relance_tenue', etat: etatMesure(jalons.relancesTenuesCumulees, (v) => v >= 1) },
+    { id: 'premier_site_en_ligne', etat: etatCompte(jalons.nombreSitesMisEnLigne, 1) },
+    { id: 'premier_rendez_vous', etat: etatCompte(jalons.nombreRendezVousObtenus, 1) },
+    { id: 'serie_sept_jours', etat: etatCompte(jalons.serie.jours, SERIE_BADGE_JOURS) },
   ];
 }
 

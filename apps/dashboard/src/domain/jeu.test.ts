@@ -310,6 +310,16 @@ describe('calculerPalier', () => {
       1 * PARAMETRES_PALIER.points.siteMisEnLigne + 1 * PARAMETRES_PALIER.points.rendezVousObtenu,
     );
   });
+
+  it('complet vaut vrai quand le cumul de relances tenues est mesurable', () => {
+    expect(calculerPalier({ connue: true, valeur: 0 }, 0, 0).complet).toBe(true);
+  });
+
+  it('complet vaut faux quand le cumul de relances tenues ne l est pas — points est alors un plancher', () => {
+    // Second correctif de revue : l'incompletude doit rester lisible depuis
+    // `Jeu`, pas seulement absorbee en silence dans `points`.
+    expect(calculerPalier({ connue: false }, 1, 1).complet).toBe(false);
+  });
 });
 
 describe('calculerBadges', () => {
@@ -320,18 +330,28 @@ describe('calculerBadges', () => {
     serie: { jours: 0, borneAtteinte: false },
   };
 
-  it('rend tous les badges VERROUILLES, mais visibles, quand aucun jalon n est atteint', () => {
+  it('rend premiere_relance_tenue NON MESURABLE (pas verrouille) quand aucun cumul honnete n existe', () => {
+    // Second correctif de revue : ce badge n'est debloquable par AUCUN geste
+    // de l'operateur aujourd'hui — le confondre avec "verrouille" laisserait
+    // croire le contraire.
     const badges = calculerBadges(AUCUN_JALON);
-    expect(badges.length).toBeGreaterThan(0);
-    expect(badges.every((b) => b.obtenu === false)).toBe(true);
+    expect(badges.find((b) => b.id === 'premiere_relance_tenue')?.etat).toBe('non_mesurable');
+  });
+
+  it('rend les trois autres badges VERROUILLES (pas non_mesurable), visibles, quand aucun jalon n est atteint', () => {
+    const badges = calculerBadges(AUCUN_JALON);
+    const parId = new Map(badges.map((b) => [b.id, b.etat]));
+    expect(parId.get('premier_site_en_ligne')).toBe('verrouille');
+    expect(parId.get('premier_rendez_vous')).toBe('verrouille');
+    expect(parId.get('serie_sept_jours')).toBe('verrouille');
   });
 
   it('debloque un badge precis sans debloquer les autres', () => {
     const badges = calculerBadges({ ...AUCUN_JALON, nombreSitesMisEnLigne: 1 });
-    const parId = new Map(badges.map((b) => [b.id, b.obtenu]));
-    expect(parId.get('premier_site_en_ligne')).toBe(true);
-    expect(parId.get('premier_rendez_vous')).toBe(false);
-    expect(parId.get('premiere_relance_tenue')).toBe(false);
+    const parId = new Map(badges.map((b) => [b.id, b.etat]));
+    expect(parId.get('premier_site_en_ligne')).toBe('obtenu');
+    expect(parId.get('premier_rendez_vous')).toBe('verrouille');
+    expect(parId.get('premiere_relance_tenue')).toBe('non_mesurable');
   });
 
   it('ne debloque jamais premiere_relance_tenue quand le cumul n est pas mesurable, meme a une valeur qui semblerait suffisante', () => {
@@ -339,19 +359,25 @@ describe('calculerBadges', () => {
     // impossible de le confondre avec un `valeur: 1` qui debloquerait le
     // badge.
     const badges = calculerBadges(AUCUN_JALON);
-    expect(badges.find((b) => b.id === 'premiere_relance_tenue')?.obtenu).toBe(false);
+    expect(badges.find((b) => b.id === 'premiere_relance_tenue')?.etat).not.toBe('obtenu');
   });
 
-  it('debloque premiere_relance_tenue quand le cumul est mesurable et atteint au moins un', () => {
+  it('debloque premiere_relance_tenue (obtenu, pas seulement mesurable) quand le cumul atteint au moins un', () => {
     const badges = calculerBadges({ ...AUCUN_JALON, relancesTenuesCumulees: { connue: true, valeur: 1 } });
-    expect(badges.find((b) => b.id === 'premiere_relance_tenue')?.obtenu).toBe(true);
+    expect(badges.find((b) => b.id === 'premiere_relance_tenue')?.etat).toBe('obtenu');
+  });
+
+  it('rend premiere_relance_tenue VERROUILLE (pas non_mesurable) quand le cumul est mesurable mais nul', () => {
+    // La troisieme valeur possible du triplet : mesurable, mais pas encore atteint.
+    const badges = calculerBadges({ ...AUCUN_JALON, relancesTenuesCumulees: { connue: true, valeur: 0 } });
+    expect(badges.find((b) => b.id === 'premiere_relance_tenue')?.etat).toBe('verrouille');
   });
 
   it('debloque le badge de serie des sept jours, meme si le compte n est qu un plancher', () => {
     // `borneAtteinte: true` : la vraie serie est AU MOINS 14 jours, donc
     // forcement au moins 7 — la comparaison reste valide malgre l'incertitude.
     const badges = calculerBadges({ ...AUCUN_JALON, serie: { jours: 14, borneAtteinte: true } });
-    expect(badges.find((b) => b.id === 'serie_sept_jours')?.obtenu).toBe(true);
+    expect(badges.find((b) => b.id === 'serie_sept_jours')?.etat).toBe('obtenu');
   });
 });
 
@@ -378,7 +404,8 @@ describe('construireJeu', () => {
     expect(jeu.serie).toEqual({ jours: 0, borneAtteinte: false });
     expect(jeu.objectifDuJour).toEqual({ connue: false });
     expect(jeu.palier.points).toBe(0);
-    expect(jeu.badges.every((b) => b.obtenu === false)).toBe(true);
+    expect(jeu.palier.complet).toBe(false);
+    expect(jeu.badges.every((b) => b.etat !== 'obtenu')).toBe(true);
   });
 
   it('assemble des faits observes reels en un jeu coherent', () => {
@@ -403,8 +430,11 @@ describe('construireJeu', () => {
     expect(jeu.palier.points).toBe(
       1 * PARAMETRES_PALIER.points.siteMisEnLigne + 1 * PARAMETRES_PALIER.points.rendezVousObtenu,
     );
-    expect(jeu.badges.find((b) => b.id === 'premiere_relance_tenue')?.obtenu).toBe(false);
-    expect(jeu.badges.find((b) => b.id === 'premier_site_en_ligne')?.obtenu).toBe(true);
-    expect(jeu.badges.find((b) => b.id === 'premier_rendez_vous')?.obtenu).toBe(true);
+    // Le palier omet la part "relance tenue" (voir ci-dessus) : `complet`
+    // doit le dire, pas seulement le calcul silencieux de `points`.
+    expect(jeu.palier.complet).toBe(false);
+    expect(jeu.badges.find((b) => b.id === 'premiere_relance_tenue')?.etat).toBe('non_mesurable');
+    expect(jeu.badges.find((b) => b.id === 'premier_site_en_ligne')?.etat).toBe('obtenu');
+    expect(jeu.badges.find((b) => b.id === 'premier_rendez_vous')?.etat).toBe('obtenu');
   });
 });

@@ -21,6 +21,7 @@ function tablePaginee(pages: unknown[][]) {
   const appels = {
     selects: [] as [string, SelectOptions | undefined][],
     gtes: [] as [string, unknown][],
+    ors: [] as string[],
     orders: [] as [string, boolean | undefined][],
     ranges: [] as [number, number][],
   };
@@ -32,6 +33,10 @@ function tablePaginee(pages: unknown[][]) {
     },
     gte(colonne: string, valeur: unknown) {
       appels.gtes.push([colonne, valeur]);
+      return builder;
+    },
+    or(filtre: string) {
+      appels.ors.push(filtre);
       return builder;
     },
     order(colonne: string, options?: { ascending?: boolean }) {
@@ -54,6 +59,7 @@ function tableRangeEnErreur(message: string) {
   const builder = {
     select() { return builder; },
     gte() { return builder; },
+    or() { return builder; },
     order() { return builder; },
     range(from: number, to: number) {
       appels.ranges.push([from, to]);
@@ -69,6 +75,7 @@ function tableSansFin(ligne: () => unknown) {
   const builder = {
     select() { return builder; },
     gte() { return builder; },
+    or() { return builder; },
     order() { return builder; },
     range(from: number, to: number) {
       appels.ranges.push([from, to]);
@@ -235,14 +242,17 @@ describe('toFaitsInteraction', () => {
 });
 
 describe('pipelineEventRangeReader / interactionRangeReader — la borne PAR DATE', () => {
-  it('pipelineEventRangeReader filtre sur occurred_at >= la coupure fournie, et ordonne sur id', async () => {
+  it('pipelineEventRangeReader retient une ligne des que occurred_at OU next_action_at tombe dans la fenetre, et ordonne sur id', async () => {
+    // Second correctif de revue : un simple `gte('occurred_at', …)`
+    // manquerait une echeance posee avant la fenetre mais due dedans — voir
+    // le docstring de `pipelineEventRangeReader`.
     const { builder, appels } = tablePaginee([[]]);
     const lecteur = pipelineEventRangeReader(
       { from: () => builder } as unknown as SupabaseClient<Database>,
       '2026-08-19T00:00:00.000Z',
     );
     await lecteur(0, 999);
-    expect(appels.gtes).toEqual([['occurred_at', '2026-08-19T00:00:00.000Z']]);
+    expect(appels.ors).toEqual(['occurred_at.gte.2026-08-19T00:00:00.000Z,next_action_at.gte.2026-08-19']);
     expect(appels.orders).toEqual([['id', true]]);
   });
 
@@ -365,17 +375,20 @@ describe('fetchEntreesJeu — un echec de lecture distinct d un resultat vide', 
     );
   });
 
-  it('un echec sur le COUNT "rendez-vous obtenus" (pipeline_event) est nomme et distinct d un vide', async () => {
+  it('un echec sur le COUNT "rendez-vous obtenus" (pipeline_event) est nomme distinctement du compte "historique au-dela", et distinct d un vide', async () => {
+    // Mineur (revue) : les deux comptes portent sur la meme table mais ne
+    // doivent pas partager le meme nom d'erreur, sans quoi l'un est
+    // indiscernable de l'autre a la lecture du message.
     const { builder } = compte({ erreur: { message: 'rejete' } });
     await expect(fetchEntreesJeu(fakeClient({ pipelineRdv: builder }), new Date())).rejects.toThrow(
-      /pipeline_event.*rejete/,
+      /pipeline_event \(rendez-vous obtenus\).*rejete/,
     );
   });
 
-  it('un echec sur le COUNT "historique au-dela" (pipeline_event) est nomme et distinct d un vide', async () => {
+  it('un echec sur le COUNT "historique au-dela" (pipeline_event) est nomme distinctement du compte "rendez-vous obtenus", et distinct d un vide', async () => {
     const { builder } = compte({ erreur: { message: 'indisponible' } });
     await expect(fetchEntreesJeu(fakeClient({ pipelineAuDela: builder }), new Date())).rejects.toThrow(
-      /pipeline_event.*indisponible/,
+      /pipeline_event \(historique au-delà de la fenêtre\).*indisponible/,
     );
   });
 });
@@ -408,11 +421,32 @@ describe('fetchJeu', () => {
     expect(jeu.serie.jours).toBe(1);
   });
 
+  it('compte une relance tenue meme quand l echeance a ete posee bien avant le debut de la fenetre, tant que sa date d echeance y tombe', async () => {
+    // Second correctif de revue, point 2 : sans le filtre `.or(...)` de
+    // `pipelineEventRangeReader`, cette ligne (posee 52 jours avant `now`,
+    // hors de toute fenetre par `occurred_at`) n'aurait jamais ete lue, et la
+    // relance tenue le jour meme aurait ete silencieusement manquee.
+    const echeanceAncienne = {
+      prospect_id: 'p1',
+      status: 'relance',
+      next_action_at: '2026-09-02',
+      origin: 'observe',
+      occurred_at: '2026-07-12T09:00:00Z', // 52 jours avant `now`, tres hors fenetre
+    };
+    const pipelineLignes = tablePaginee([[echeanceAncienne]]).builder;
+    const interaction = tablePaginee([[{ prospect_id: 'p1', occurred_at: '2026-09-02T10:00:00Z' }]]).builder;
+    const jeu = await fetchJeu(
+      fakeClient({ pipelineLignes, interaction }),
+      new Date('2026-09-02T00:00:00Z'),
+    );
+    expect(jeu.serie).toEqual({ jours: 1, borneAtteinte: false });
+  });
+
   it('sur une base entierement vide, rend un jeu au repos plutot que d echouer', async () => {
     const jeu = await fetchJeu(fakeClient({}), new Date('2026-09-02T00:00:00Z'));
     expect(jeu.objectifDuJour).toEqual({ connue: false });
     expect(jeu.serie).toEqual({ jours: 0, borneAtteinte: false });
-    expect(jeu.palier).toEqual({ points: 0, seuil: 500, numero: 1, progression: 0 });
-    expect(jeu.badges.every((b) => !b.obtenu)).toBe(true);
+    expect(jeu.palier).toEqual({ points: 0, seuil: 500, numero: 1, progression: 0, complet: false });
+    expect(jeu.badges.every((b) => b.etat !== 'obtenu')).toBe(true);
   });
 });
