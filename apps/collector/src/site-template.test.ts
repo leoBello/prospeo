@@ -86,6 +86,24 @@ describe('lireGabaritActif', () => {
     await expect(lireGabaritActif(client)).resolves.toBeUndefined();
   });
 
+  // Ces deux tests n'affirment pas seulement que `lireGabaritActif` rend
+  // `undefined` en isolation : ils rejouent le calcul réel de
+  // `gabaritDefautPourPublication` avec la valeur obtenue, pour prouver ce
+  // qui compte vraiment — que l'environnement l'emporte. `?? undefined` ne
+  // filtre que le nul : une colonne vide n'est pas nulle, elle serait donc
+  // passée telle quelle et aurait battu l'environnement dans ce calcul.
+  it('une colonne vide n’est pas un gabarit désigné — l’environnement l’emporte', async () => {
+    const client = clientAvecLigne({ repo_full_name: '' });
+    const gabaritBase = await lireGabaritActif(client);
+    expect(gabaritDefautPourPublication(gabaritBase, 'org/depuis-env')).toBe('org/depuis-env');
+  });
+
+  it('une colonne faite uniquement d’espaces n’est pas un gabarit désigné — l’environnement l’emporte', async () => {
+    const client = clientAvecLigne({ repo_full_name: '   ' });
+    const gabaritBase = await lireGabaritActif(client);
+    expect(gabaritDefautPourPublication(gabaritBase, 'org/depuis-env')).toBe('org/depuis-env');
+  });
+
   it('échoue franchement si la ligne singleton est absente', async () => {
     // C'est un état anormal (migration non jouée, ligne supprimée à la main),
     // pas « aucun gabarit désigné » — le confondre avec le cas nul ferait

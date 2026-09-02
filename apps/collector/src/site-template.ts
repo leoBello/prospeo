@@ -65,5 +65,12 @@ export async function lireGabaritActif(
       'site_template : ligne singleton (id=1) introuvable — migration non jouée ou ligne supprimée.',
     );
   }
-  return data.repo_full_name ?? undefined;
+  // `?? undefined` ne filtrait que le nul : une colonne vide (ou faite
+  // uniquement d'espaces — l'écran qui écrit cette colonne n'empêche pas la
+  // saisie « tout espaces ») passait pour une désignation valide et battait
+  // la variable d'environnement. `config.ts` normalise déjà ses valeurs
+  // d'environnement pour cette raison exacte (voir `lire()`) ; on suit la
+  // même règle ici pour que les blancs ne gagnent jamais la priorité.
+  const valeur = data.repo_full_name?.trim();
+  return valeur === undefined || valeur === '' ? undefined : valeur;
 }
