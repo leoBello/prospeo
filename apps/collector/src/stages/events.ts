@@ -57,8 +57,11 @@ export function createEventSink(client: SupabaseClient<Database>): EventSink {
  * n'a pas de client sous la main) de satisfaire un champ `events`
  * obligatoire sans fabriquer de client Supabase.
  */
-export const NULL_SINK: EventSink = {
+// Gelé : c'est un singleton partagé par les tests d'étage — un appelant qui
+// réassignerait `NULL_SINK.emit` ferait fuir ce changement vers tous les
+// autres consommateurs.
+export const NULL_SINK: EventSink = Object.freeze({
   async emit(): Promise<void> {
     // Intentionnellement vide.
   },
-};
+});

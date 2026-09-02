@@ -33,6 +33,39 @@ function fauxClient(erreur: { message: string } | null = null) {
   return { client, inserts };
 }
 
+/**
+ * Doublure qui lève de façon synchrone dès `from(...)` — un client mal formé,
+ * ou une dépendance stubbée à moitié, peut échouer avant même d'atteindre le
+ * réseau.
+ */
+function fauxClientQuiLeveSurFrom(erreur: Error) {
+  const client = {
+    from(_table: string) {
+      throw erreur;
+    },
+  } as unknown as SupabaseClient<Database>;
+  return client;
+}
+
+/**
+ * Doublure dont `insert(...)` rend une promesse rejetée — c'est la forme que
+ * prend réellement une panne réseau, à distinguer du `{ error }` propre que
+ * rend le SDK Supabase pour un refus RLS ou similaire.
+ */
+function fauxClientQuiRejette(erreur: Error) {
+  const client = {
+    from(table: string) {
+      if (table !== 'deployment_event') throw new Error(`table inattendue : ${table}`);
+      return {
+        insert(_row: Record<string, unknown>) {
+          return Promise.reject(erreur);
+        },
+      };
+    },
+  } as unknown as SupabaseClient<Database>;
+  return client;
+}
+
 describe('createEventSink', () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -85,6 +118,51 @@ describe('createEventSink', () => {
     await sink.emit(EVENEMENT);
 
     expect(ecriture).not.toHaveBeenCalled();
+  });
+
+  it('écrit null pour detail et durationMs quand ils sont absents', async () => {
+    // Le seul endroit où le mappage n'est pas un pur passage : detail et
+    // durationMs sont optionnels côté appelant mais doivent atterrir en
+    // colonnes null, pas en `undefined`.
+    const { client, inserts } = fauxClient();
+    const sink = createEventSink(client);
+
+    await sink.emit({ prospectId: 'p2', step: 'depot', outcome: 'reussi' });
+
+    expect(inserts).toEqual([
+      {
+        prospect_id: 'p2',
+        step: 'depot',
+        outcome: 'reussi',
+        detail: null,
+        duration_ms: null,
+      },
+    ]);
+  });
+
+  it('ne rejette jamais et journalise la cause quand from() lève de façon synchrone', async () => {
+    const ecriture = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const client = fauxClientQuiLeveSurFrom(new Error('client mal formé'));
+    const sink = createEventSink(client);
+
+    await expect(sink.emit(EVENEMENT)).resolves.toBeUndefined();
+
+    expect(ecriture).toHaveBeenCalledTimes(1);
+    expect(ecriture.mock.calls[0]?.[0]).toContain('client mal formé');
+  });
+
+  it('ne rejette jamais et journalise la cause quand insert() rend une promesse rejetée', async () => {
+    // C'est la forme que prend une vraie panne réseau — le cas le plus
+    // probable en production, et pourtant le seul qu'aucun test ne tenait
+    // avant ce correctif.
+    const ecriture = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const client = fauxClientQuiRejette(new Error('ECONNRESET'));
+    const sink = createEventSink(client);
+
+    await expect(sink.emit(EVENEMENT)).resolves.toBeUndefined();
+
+    expect(ecriture).toHaveBeenCalledTimes(1);
+    expect(ecriture.mock.calls[0]?.[0]).toContain('ECONNRESET');
   });
 });
 
