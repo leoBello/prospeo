@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { screen } from '@testing-library/react';
+import type { Enums } from '@prospeo/db';
+import type { WebPresenceCategory } from '@prospeo/core';
 import { renderWithPreferences } from '../../test-utils.js';
-import type { ProspectView } from '../../domain/prospect.js';
+import type { EnrichmentView, ProspectView } from '../../domain/prospect.js';
 import { FicheTab } from './FicheTab.js';
 
 const base: ProspectView = {
@@ -83,5 +85,115 @@ describe('FicheTab', () => {
   it('dit l absence d enrichissement plutot que de montrer des champs vides', () => {
     renderWithPreferences(<FicheTab prospect={base} />);
     expect(screen.getByText(/étage « enrich »/)).toBeDefined();
+  });
+
+  // Finding 1 : le statut d'enrichissement (`ok` / `not_found` / `ambiguous` /
+  // `blocked`) avait disparu avec la refonte, et un prospect bloqué par
+  // Google se lisait exactement comme un prospect jamais enrichi. Les
+  // quatre statuts doivent rendre un texte distinct de l'absence, et
+  // distincts entre eux.
+  const statutsEnrichissement: { status: Enums<'enrichment_status'>; texte: string }[] = [
+    { status: 'ok', texte: 'Fiche Google appariée' },
+    { status: 'not_found', texte: 'Aucune fiche Google trouvée' },
+    { status: 'ambiguous', texte: 'Appariement à trancher' },
+    { status: 'blocked', texte: 'Enrichissement bloqué par Google' },
+  ];
+
+  const enrichissement = (status: Enums<'enrichment_status'>): EnrichmentView => ({
+    status,
+    phoneE164: null,
+    phoneKind: null,
+    rating: null,
+    reviewCount: null,
+    declaredUrl: null,
+    matchedName: null,
+    matchConfidence: null,
+    enrichedAt: '2026-09-01T00:00:00Z',
+  });
+
+  it.each(statutsEnrichissement)(
+    'rend le statut d enrichissement « $status » avec un texte qui lui est propre',
+    ({ status, texte }) => {
+      renderWithPreferences(
+        <FicheTab prospect={{ ...base, enrichment: enrichissement(status) }} />,
+      );
+      // Le texte du statut est visible...
+      expect(screen.getByText(texte)).toBeDefined();
+      // ...et distinct du texte d'absence totale d'enrichissement : un
+      // prospect bloqué n'est pas un prospect jamais enrichi.
+      expect(screen.queryByText(/étage « enrich »/)).toBeNull();
+    },
+  );
+
+  it('distingue le telephone jamais collecte du telephone bloque par la source', () => {
+    // Sans le statut visible, les deux cas rendaient le meme "pas encore
+    // collecté" pour le champ téléphone : c'est exactement la confusion
+    // que la doctrine du dépôt interdit.
+    renderWithPreferences(
+      <FicheTab prospect={{ ...base, enrichment: enrichissement('blocked') }} />,
+    );
+    expect(screen.getByText('Enrichissement bloqué par Google')).toBeDefined();
+    // Plusieurs champs (téléphone, site déclaré, nom apparié) partagent ce
+    // texte d'absence : `getAllByText` plutôt que `getByText`, qui échouerait
+    // sur la multiplicité au lieu de prouver la coexistence des deux faits.
+    expect(screen.getAllByText('pas encore collecté').length).toBeGreaterThan(0);
+  });
+
+  // Finding 1 : la présence web (le motif de qualification) avait disparu
+  // sans destination. Chaque catégorie doit rendre son propre texte, et
+  // l'état « sondé mais non classé » (`category: null`) doit se distinguer
+  // en code de l'absence totale de ligne, même si les deux rendent le même
+  // texte faute d'état intermédiaire à afficher (`PresenceView.category`,
+  // dans `domain/prospect.ts`).
+  const categoriesPresence: { category: WebPresenceCategory; texte: string }[] = [
+    { category: 'none', texte: 'Aucune présence web' },
+    { category: 'social_only', texte: 'Page sociale, aucun site' },
+    { category: 'directory_only', texte: 'Fiche annuaire uniquement' },
+    { category: 'dead_site', texte: 'Site en panne ou obsolète' },
+    { category: 'has_site', texte: 'Site correct et vivant' },
+  ];
+
+  it.each(categoriesPresence)('rend la categorie de presence « $category »', ({ category, texte }) => {
+    renderWithPreferences(
+      <FicheTab
+        prospect={{
+          ...base,
+          presence: {
+            category,
+            finalUrl: null,
+            httpStatus: null,
+            domainAvailable: null,
+            probedAt: '2026-09-01T00:00:00Z',
+          },
+        }}
+      />,
+    );
+    expect(screen.getByText(texte)).toBeDefined();
+  });
+
+  it('rend la meme absence pour une presence sondee non classee et pour aucune ligne', () => {
+    // `probe` a tourné, `classify` pas encore : `category` est `null` sans
+    // que la ligne elle-même soit absente. C'est un état réel, distinct
+    // d'un prospect jamais sondé, même si l'écran n'a pas (encore) de texte
+    // dédié pour l'un et pas l'autre.
+    const { unmount } = renderWithPreferences(
+      <FicheTab
+        prospect={{
+          ...base,
+          presence: {
+            category: null,
+            finalUrl: null,
+            httpStatus: null,
+            domainAvailable: null,
+            probedAt: '2026-09-01T00:00:00Z',
+          },
+        }}
+      />,
+    );
+    expect(screen.getByText('Présence web pas encore sondée')).toBeDefined();
+    unmount();
+
+    renderWithPreferences(<FicheTab prospect={base} />);
+    expect(screen.getByText('Présence web pas encore sondée')).toBeDefined();
   });
 });

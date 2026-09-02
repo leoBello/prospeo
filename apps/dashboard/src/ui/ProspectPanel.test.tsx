@@ -40,9 +40,23 @@ describe('ProspectPanel', () => {
   it('n ouvre qu un onglet a la fois — c est tout l objet de la refonte', async () => {
     // La preuve doit porter sur un texte propre au contenu de chaque onglet,
     // pas sur un role="heading" que l'onglet visé ne rend pas (Historique n'en
-    // a pas) ni sur un texte présent de toute façon (SIRET) : ces deux formes
-    // passaient déjà avec les quatre panneaux montés en permanence — le bug
-    // exact que ce test doit détecter.
+    // a pas) ni sur un texte présent de toute façon (SIRET, avant tout clic,
+    // puisque Fiche est l'onglet actif par défaut dans les deux versions du
+    // composant — correcte ou régressée).
+    //
+    // Les deux assertions `queryByRole` ci-dessous NE DÉTECTENT PAS une
+    // régression `keepMounted` : Base UI pose l'attribut `hidden` sur tout
+    // panneau inactif qu'il soit monté ou non, et `queryByRole` filtre par
+    // défaut (`hidden: false`) tout élément portant cet attribut. Elles
+    // rendent donc `null` que le panneau soit réellement absent du DOM ou
+    // simplement masqué-mais-monté : elles ne distinguent pas les deux cas.
+    // Elles restent utiles contre une AUTRE régression — un retour à des
+    // `<div>` empilées sans `hidden` du tout, qu'elles détecteraient bien.
+    //
+    // Seule l'assertion `queryByText('Découvert en base')` ci-dessous
+    // discrimine réellement : `queryByText` ne filtre pas sur `hidden`, donc
+    // un panneau Historique monté-mais-caché serait quand même trouvé, et
+    // l'assertion `toBeNull()` échouerait comme voulu.
     const user = userEvent.setup();
     renderWithPreferences(
       <ProspectPanel prospect={prospect()} position={null} currentRulesetVersion="v3" onClose={() => {}} />,
@@ -52,16 +66,27 @@ describe('ProspectPanel', () => {
     // contenu des trois autres ne doit pas exister dans le DOM.
     expect(screen.queryByRole('heading', { name: 'Site généré' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Messages de vente' })).toBeNull();
-    expect(screen.queryByText(/Journal détaillé des étapes/)).toBeNull();
+    // `histo.discovered`, rendu sans condition par `HistoriqueTab` — contrairement
+    // à `histo.detail.title` (« Journal détaillé des étapes »), affiché par
+    // un `Bientot` provisoire promis à disparaître dès la table des
+    // événements de déploiement livrée (§ finding 2 du rapport de revue).
+    expect(screen.queryByText('Découvert en base')).toBeNull();
 
     await user.click(screen.getByRole('tab', { name: /Site/ }));
     expect(screen.getByRole('heading', { name: 'Site généré' })).toBeDefined();
+    // Absence après bascule : le SIRET, propre à Fiche, ne doit plus se
+    // trouver nulle part dans le DOM une fois qu'on l'a quitté. Une
+    // régression où les onglets visités s'accumulent laisserait ce texte en
+    // place et ferait échouer cette ligne.
+    expect(screen.queryByText('81245678900023')).toBeNull();
 
     await user.click(screen.getByRole('tab', { name: /Messages/ }));
     expect(screen.getByRole('heading', { name: 'Messages de vente' })).toBeDefined();
+    expect(screen.queryByRole('heading', { name: 'Site généré' })).toBeNull();
 
     await user.click(screen.getByRole('tab', { name: /Historique/ }));
-    expect(screen.getByText(/Journal détaillé des étapes/)).toBeDefined();
+    expect(screen.getByText('Découvert en base')).toBeDefined();
+    expect(screen.queryByRole('heading', { name: 'Messages de vente' })).toBeNull();
   });
 
   it('bascule d onglet au clic', async () => {

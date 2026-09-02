@@ -1,18 +1,69 @@
+import type { Enums } from '@prospeo/db';
 import { minHeadcount } from '@prospeo/core';
+import type { WebPresenceCategory } from '@prospeo/core';
 import type { ProspectView } from '../../domain/prospect.js';
+import type { TranslationKey } from '../../i18n/translate.js';
 import { Absent, Card, Field } from '../kit/Card.js';
 import { Badge } from '../kit/Badge.js';
+import type { BadgeTon } from '../kit/Badge.js';
 import { Tooltip } from '../kit/Tooltip.js';
 import { ScoreCompact } from '../ScoreCompact.js';
 import { useT } from '../preferences.js';
 import styles from '../ProspectPanel.module.css';
 
 /**
+ * Le ton de chaque catégorie de présence web.
+ *
+ * Tiré de `PRESENCE_POINTS` (`@prospeo/core`), pas inventé ici : un site mort
+ * ou une simple page sociale rapporte plus de points qu'un site vivant, parce
+ * que c'est une meilleure cible de prospection — `has_site` vaut -100 et
+ * disqualifie presque le prospect. Le ton suit donc la valeur de vente, pas
+ * un jugement de qualité du site.
+ */
+const TON_PRESENCE: Record<WebPresenceCategory, BadgeTon> = {
+  social_only: 'succes',
+  dead_site: 'succes',
+  none: 'accent',
+  directory_only: 'info',
+  has_site: 'danger',
+};
+
+/** `Record` plutôt qu'une concaténation `'presence.' + category` : une
+ * catégorie ajoutée à `WebPresenceCategory` sans son entrée ici fait échouer
+ * la compilation au lieu de rendre une clé i18n absente en silence. */
+const CLE_PRESENCE: Record<WebPresenceCategory, TranslationKey> = {
+  none: 'presence.none',
+  social_only: 'presence.social_only',
+  directory_only: 'presence.directory_only',
+  dead_site: 'presence.dead_site',
+  has_site: 'presence.has_site',
+};
+
+type StatutEnrichissement = Enums<'enrichment_status'>;
+
+const TON_ENRICHISSEMENT: Record<StatutEnrichissement, BadgeTon> = {
+  ok: 'succes',
+  not_found: 'neutre',
+  ambiguous: 'alerte',
+  blocked: 'danger',
+};
+
+/** Même garde-fou qu'au-dessus : un statut ajouté à l'énumération base sans
+ * entrée ici est une erreur de compilation, pas un badge muet en prod. */
+const CLE_ENRICHISSEMENT: Record<StatutEnrichissement, TranslationKey> = {
+  ok: 'enrichment.ok',
+  not_found: 'enrichment.not_found',
+  ambiguous: 'enrichment.ambiguous',
+  blocked: 'enrichment.blocked',
+};
+
+/**
  * L'onglet consulté avant d'appeler.
  *
- * Deux cartes de faits côte à côte, puis la composition du score. C'est
- * l'ordre du geste : on vérifie à qui on parle, on vérifie qu'on peut le
- * joindre, on se rappelle pourquoi il est dans la file.
+ * Trois cartes de faits, puis la composition du score. C'est l'ordre du
+ * geste : on vérifie à qui on parle, on vérifie qu'on peut le joindre, on se
+ * rappelle pourquoi il est dans la file — la présence web est le motif de
+ * qualification, le signal le plus lourd du barème.
  */
 export function FicheTab({ prospect }: { prospect: ProspectView }) {
   const t = useT();
@@ -44,17 +95,27 @@ export function FicheTab({ prospect }: { prospect: ProspectView }) {
       <Card
         titre={t('panel.section.contact')}
         extra={
-          enrichment === null || enrichment.matchConfidence === null ? undefined : (
-            <Tooltip
-              intitule={t('field.matchConfidence')}
-              contenu={t('enrichment.confidence.hint')}
-            >
-              <span tabIndex={0}>
-                <Badge ton={enrichment.matchConfidence >= 0.9 ? 'succes' : 'alerte'}>
-                  {`${Math.round(enrichment.matchConfidence * 100)} %`}
-                </Badge>
-              </span>
-            </Tooltip>
+          enrichment === null ? undefined : (
+            // `styles.badges` (déjà utilisé dans l'en-tête du panneau) aligne
+            // plusieurs pastilles sur une ligne : le statut d'enrichissement
+            // et, quand elle existe, la confiance d'appariement.
+            <span className={styles.badges}>
+              <Badge ton={TON_ENRICHISSEMENT[enrichment.status]}>
+                {t(CLE_ENRICHISSEMENT[enrichment.status])}
+              </Badge>
+              {enrichment.matchConfidence === null ? null : (
+                <Tooltip
+                  intitule={t('field.matchConfidence')}
+                  contenu={t('enrichment.confidence.hint')}
+                >
+                  <span tabIndex={0}>
+                    <Badge ton={enrichment.matchConfidence >= 0.9 ? 'succes' : 'alerte'}>
+                      {`${Math.round(enrichment.matchConfidence * 100)} %`}
+                    </Badge>
+                  </span>
+                </Tooltip>
+              )}
+            </span>
           )
         }
       >
@@ -98,9 +159,34 @@ export function FicheTab({ prospect }: { prospect: ProspectView }) {
                 enrichment.declaredUrl
               )}
             </Field>
+            <Field label={t('field.matchedName')}>
+              {enrichment.matchedName === null ? (
+                <Absent>{t('value.notCollected')}</Absent>
+              ) : (
+                enrichment.matchedName
+              )}
+            </Field>
           </>
         )}
       </Card>
+
+      <div className={styles.pleineLargeur}>
+        {/* Le motif de qualification : pourquoi ce prospect est dans la
+            file. `presence` est `null` sans ligne `web_presence` du tout ;
+            `category` est `null` quand `probe` a tourné mais pas `classify`
+            — deux préludes différents au même texte affiché, faute d'un état
+            intermédiaire que l'écran doive distinguer (voir `PresenceView`
+            dans `domain/prospect.ts`). */}
+        <Card titre={t('panel.section.web')}>
+          {prospect.presence === null || prospect.presence.category === null ? (
+            <Absent>{t('presence.absent')}</Absent>
+          ) : (
+            <Badge ton={TON_PRESENCE[prospect.presence.category]}>
+              {t(CLE_PRESENCE[prospect.presence.category])}
+            </Badge>
+          )}
+        </Card>
+      </div>
 
       <div className={styles.pleineLargeur}>
         <Card titre={t('panel.section.score')}>
