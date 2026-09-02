@@ -1,4 +1,5 @@
 import { Tabs } from '@base-ui/react/tabs';
+import { getTrade } from '@prospeo/core';
 import type { ProspectView } from '../domain/prospect.js';
 import { dataWarnings } from '../domain/coherence.js';
 import { MessagesSection } from './MessagesSection.js';
@@ -84,7 +85,12 @@ export function ProspectPanel({
                 {t('site.badge.online')}
               </Badge>
             ) : null}
-            <Badge>{prospect.tradeSlug}</Badge>
+            {/* Le libellé du métier, jamais son slug : « plombier » est une
+                clé de `trades.ts`, pas un mot d'interface — et un métier à
+                deux mots s'afficherait « couvreur-zingueur ». Repli sur le
+                slug si le métier est inconnu du catalogue : un identifiant
+                lisible vaut mieux qu'un badge vide. */}
+            <Badge>{getTrade(prospect.tradeSlug)?.label ?? prospect.tradeSlug}</Badge>
           </div>
         </div>
         <button type="button" className={styles.close} onClick={onClose} aria-label={t('panel.close')}>

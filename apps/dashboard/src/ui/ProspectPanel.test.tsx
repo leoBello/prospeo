@@ -111,6 +111,31 @@ describe('ProspectPanel', () => {
     expect(screen.getByRole('tab', { name: /Site/ })).toHaveProperty('tabIndex', 0);
   });
 
+  it('affiche le libelle du metier, et non son slug de catalogue', () => {
+    // `tradeSlug` est une cle de `trades.ts` — un identifiant de code, pas un
+    // mot d'interface. `Trade.label` existe precisement pour cet usage.
+    renderWithPreferences(
+      <ProspectPanel prospect={prospect()} position={null} currentRulesetVersion="v3" onClose={() => {}} />,
+    );
+    expect(screen.getByText('Plombier')).toBeDefined();
+    expect(screen.queryByText('plombier')).toBeNull();
+  });
+
+  it('se rabat sur le slug quand le metier est absent du catalogue', () => {
+    // Un metier decouvert en base sans entree dans `trades.ts` ne doit pas
+    // rendre un badge vide : un identifiant lisible est encore une
+    // information, une pastille muette n'en est plus une.
+    renderWithPreferences(
+      <ProspectPanel
+        prospect={prospect({ tradeSlug: 'couvreur' })}
+        position={null}
+        currentRulesetVersion="v3"
+        onClose={() => {}}
+      />,
+    );
+    expect(screen.getByText('couvreur')).toBeDefined();
+  });
+
   it('rend une invite quand aucun prospect n est choisi', () => {
     renderWithPreferences(
       <ProspectPanel prospect={null} position={null} currentRulesetVersion="v3" onClose={() => {}} />,

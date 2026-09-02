@@ -61,7 +61,6 @@ export const en: Record<keyof typeof fr, string> = {
 
   'score.absent': 'not scored yet',
   'score.absent.hint': 'This prospect has no score, which is not the same as a score of zero.',
-  'score.outOf': '{total} / 100',
   'warning.badge': '{count} flags',
   'warning.badge_one': '1 flag',
   'warning.title': 'Flags',
@@ -73,7 +72,6 @@ export const en: Record<keyof typeof fr, string> = {
     'Score computed before the Google enrichment: it ignores the phone, rating and website found since.',
   'warning.staleRuleset':
     'Score computed with ruleset {stored}, while the ruleset in force is {current}.',
-  'score.total': 'Total',
   'score.group.presence': 'Presence',
   'score.group.vitalite': 'Vitality',
   'score.group.joignabilite': 'Reachability',
@@ -177,7 +175,6 @@ export const en: Record<keyof typeof fr, string> = {
   'pipeline.label': 'Status',
   'pipeline.absent': 'Never contacted',
   'pipeline.updated': 'Updated on {date}',
-  'pipeline.nextAction': 'Next action',
   'pipeline.status.a_contacter': 'To contact',
   'pipeline.status.contacte': 'Contacted',
   'pipeline.status.relance': 'Followed up',

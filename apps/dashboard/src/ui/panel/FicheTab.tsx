@@ -1,6 +1,6 @@
 import type { Enums } from '@prospeo/db';
 import { minHeadcount } from '@prospeo/core';
-import type { WebPresenceCategory } from '@prospeo/core';
+import type { PhoneKind, WebPresenceCategory } from '@prospeo/core';
 import type { ProspectView } from '../../domain/prospect.js';
 import type { TranslationKey } from '../../i18n/translate.js';
 import { Absent, Card, Field } from '../kit/Card.js';
@@ -37,6 +37,24 @@ const CLE_PRESENCE: Record<WebPresenceCategory, TranslationKey> = {
   directory_only: 'presence.directory_only',
   dead_site: 'presence.dead_site',
   has_site: 'presence.has_site',
+};
+
+/**
+ * Mobile ou fixe, à côté du numéro.
+ *
+ * Ce n'est pas un ornement : `SCORING_RULESET.phone` paie 20 points un mobile
+ * contre 10 un fixe, et c'est le MÊME écran qui affiche ce score et lance
+ * l'appel. Montrer le score sans la distinction qui le fabrique laisse un
+ * écart de dix points sans explication visible. Sur mobile on tombe sur
+ * l'artisan ; sur un fixe d'atelier, sur personne — le geste n'est pas le
+ * même, et il se décide ici.
+ *
+ * Même garde-fou que les autres `Record` de ce fichier : un type de numéro
+ * ajouté à `PhoneKind` sans son entrée ici casse la compilation.
+ */
+const CLE_TYPE_TELEPHONE: Record<PhoneKind, TranslationKey> = {
+  mobile: 'value.mobile',
+  landline: 'value.landline',
 };
 
 type StatutEnrichissement = Enums<'enrichment_status'>;
@@ -127,7 +145,16 @@ export function FicheTab({ prospect }: { prospect: ProspectView }) {
               {enrichment.phoneE164 === null ? (
                 <Absent>{t('value.notCollected')}</Absent>
               ) : (
-                enrichment.phoneE164
+                <span className={styles.telephone}>
+                  {enrichment.phoneE164}
+                  {/* `phoneKind` nul veut dire « type inconnu », pas « fixe » :
+                      un numéro que la classification n'a pas tranché ne porte
+                      aucune des deux étiquettes. Affirmer l'une des deux
+                      inventerait un fait, et ferait mentir le score. */}
+                  {enrichment.phoneKind === null ? null : (
+                    <Badge>{t(CLE_TYPE_TELEPHONE[enrichment.phoneKind])}</Badge>
+                  )}
+                </span>
               )}
             </Field>
             <Field label={t('field.rating')}>

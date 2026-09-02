@@ -332,3 +332,14 @@
 .pleineLargeur {
   grid-column: span 2;
 }
+
+/* Le numero et son qualificatif (mobile / fixe) sur une meme ligne, alignes a
+   droite comme toute valeur de champ. `flex-end` et non `space-between` : la
+   pastille suit le numero, elle ne derive pas a l'oppose quand il est court. */
+.telephone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+}

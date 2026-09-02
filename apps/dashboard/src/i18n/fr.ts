@@ -61,7 +61,6 @@ export const fr = {
   'score.absent': 'pas encore scoré',
   'score.absent.hint':
     'Ce prospect n’a pas de score, ce qui n’est pas la même chose qu’un score de zéro.',
-  'score.outOf': '{total} / 100',
   'warning.badge': '{count} signalements',
   'warning.badge_one': '1 signalement',
   'warning.title': 'Signalements',
@@ -73,7 +72,6 @@ export const fr = {
     'Score calculé avant l’enrichissement Google : il ignore le téléphone, la note et le site découverts depuis.',
   'warning.staleRuleset':
     'Score calculé avec le barème {stored}, quand le barème en vigueur est le {current}.',
-  'score.total': 'Total',
   'score.group.presence': 'Présence',
   'score.group.vitalite': 'Vitalité',
   'score.group.joignabilite': 'Joignabilité',
@@ -188,7 +186,6 @@ export const fr = {
   'pipeline.label': 'Statut',
   'pipeline.absent': 'Jamais contacté',
   'pipeline.updated': 'Mis à jour le {date}',
-  'pipeline.nextAction': 'Prochaine action',
   'pipeline.status.a_contacter': 'À contacter',
   'pipeline.status.contacte': 'Contacté',
   'pipeline.status.relance': 'Relancé',

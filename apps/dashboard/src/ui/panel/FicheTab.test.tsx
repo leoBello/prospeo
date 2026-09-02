@@ -82,6 +82,52 @@ describe('FicheTab', () => {
     expect(screen.getByText('pas encore collecté')).toBeDefined();
   });
 
+  // Le barème paie 20 points un mobile contre 10 un fixe. Sans le
+  // qualificatif à l'écran, le panneau affichait un score bâti sur une
+  // distinction qu'il refusait de montrer — sur le seul écran dont l'action
+  // principale est un `tel:`.
+  const avecTelephone = (phoneKind: EnrichmentView['phoneKind']): EnrichmentView => ({
+    status: 'ok',
+    phoneE164: '+33612345678',
+    phoneKind,
+    rating: null,
+    reviewCount: null,
+    declaredUrl: null,
+    matchedName: null,
+    matchConfidence: null,
+    enrichedAt: '2026-09-01T00:00:00Z',
+  });
+
+  it('qualifie le numero de mobile, a cote du numero', () => {
+    renderWithPreferences(
+      <FicheTab prospect={{ ...base, enrichment: avecTelephone('mobile') }} />,
+    );
+    expect(screen.getByText('+33612345678')).toBeDefined();
+    expect(screen.getByText('mobile')).toBeDefined();
+    expect(screen.queryByText('fixe')).toBeNull();
+  });
+
+  it('qualifie le numero de fixe, avec un texte distinct de celui du mobile', () => {
+    renderWithPreferences(
+      <FicheTab prospect={{ ...base, enrichment: avecTelephone('landline') }} />,
+    );
+    expect(screen.getByText('+33612345678')).toBeDefined();
+    expect(screen.getByText('fixe')).toBeDefined();
+    expect(screen.queryByText('mobile')).toBeNull();
+  });
+
+  it('n etiquette pas un numero dont le type n a pas ete tranche', () => {
+    // `phoneKind` nul veut dire « type inconnu ». Le ranger d'office en fixe
+    // (ou en mobile) inventerait un fait, et ferait mentir les dix points
+    // d'écart du barème.
+    renderWithPreferences(
+      <FicheTab prospect={{ ...base, enrichment: avecTelephone(null) }} />,
+    );
+    expect(screen.getByText('+33612345678')).toBeDefined();
+    expect(screen.queryByText('mobile')).toBeNull();
+    expect(screen.queryByText('fixe')).toBeNull();
+  });
+
   it('dit l absence d enrichissement plutot que de montrer des champs vides', () => {
     renderWithPreferences(<FicheTab prospect={base} />);
     expect(screen.getByText(/étage « enrich »/)).toBeDefined();

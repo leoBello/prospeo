@@ -17,24 +17,55 @@
 | `Card`, `Field`, `Absent` | `src/ui/kit/Card.tsx` | livré |
 | `EmptyState` | `src/ui/kit/EmptyState.tsx` | livré |
 | `ScoreCompact` | `src/ui/ScoreCompact.tsx` | livré |
-| `FicheTab` (présence web, enrichissement, score) | `src/ui/panel/FicheTab.tsx` | livré |
+| `FicheTab` (présence web, enrichissement, téléphone qualifié, score) | `src/ui/panel/FicheTab.tsx` | livré |
 | `HistoriqueTab` | `src/ui/panel/HistoriqueTab.tsx` | livré — zone détail inerte, voir plus bas |
 | `PanelActions` | `src/ui/PanelActions.tsx` | livré — bouton inerte, voir plus bas |
 | Fiche à 720 px, quatre onglets | `src/ui/ProspectPanel.tsx` | livré |
 
-## Un aller-retour à noter
+## Ce que la réécriture a fait tomber — trois fois, pas une
 
-Pendant l'écriture de l'onglet Fiche, la carte « Présence web » et le statut
-d'enrichissement (`enrichment.ok` / `not_found` / `ambiguous` / `blocked`) ont
-été perdus dans la réécriture du panneau en quatre onglets, puis restitués
-dans `FicheTab.tsx` (commit `a388a9f`, *« restituer la presence web et le
-statut d'enrichissement »*).
+La réécriture des sept sections empilées en quatre onglets a perdu des faits
+en silence. Chaque perte a été trouvée par une lecture différente, jamais par
+un test : **la suite était verte à chaque fois.**
 
-Les deux sont bien présents à la fin du lot 1 : la carte `panel.section.web`
-et les badges d'état d'enrichissement se trouvent dans
-`src/ui/panel/FicheTab.tsx`. Ce n'est pas un gap à combler au lot 2 — c'est
-consigné ici pour que le prochain lecteur ne les cherche pas ailleurs, ni ne
-les recrée en double.
+| Perdu | Retrouvé par | Restitué |
+|---|---|---|
+| Carte « Présence web » | relecture de la tâche | `a388a9f` |
+| Statut d'enrichissement (`ok` / `not_found` / `ambiguous` / `blocked`) | relecture de la tâche | `a388a9f` |
+| Qualificatif du téléphone (`phoneKind` : mobile / fixe) | revue de branche | ce lot |
+
+Le troisième est le plus coûteux des trois : `data/queries.ts` écrivait
+`phoneKind`, `domain/prospect.ts` le typait, et `SCORING_RULESET.phone` payait
+**20 points un mobile contre 10 un fixe** — mais `grep -rn "phoneKind"
+apps/dashboard/src --include=*.tsx` ne rendait rien. Le panneau affichait donc
+un score bâti sur une distinction qu'il refusait de montrer, sur l'écran dont
+l'action principale est un `tel:`. C'est restitué dans `FicheTab.tsx`, à côté
+du numéro, et un `phoneKind` nul ne porte aucune des deux étiquettes.
+
+**Ne pas lire ce tableau comme clos.** Rien ne prouve qu'il n'y a pas de
+quatrième. Le seul contrôle automatique qui existe désormais est celui des
+clés i18n, décrit juste en dessous : il constate qu'une clé n'a plus de
+consommateur, pas qu'un champ de la base a cessé d'être affiché.
+
+### Les clés orphelines, et le test qui les voit
+
+Quatre clés avaient survécu au lot 1 sans consommateur — trace exacte des
+faits tombés de l'écran :
+
+| Clé | Sort |
+|---|---|
+| `value.mobile`, `value.landline` | reconsommées par la restitution de `phoneKind` |
+| `score.total`, `score.outOf` | supprimées des deux catalogues — `ScoreCompact` les a remplacées par `score.outOfShort` |
+| `pipeline.nextAction` | supprimée aussi : orpheline antérieure au lot 1, trouvée par le même test |
+
+`src/i18n/i18n.test.ts` porte maintenant un contrôle d'orphelines : toute clé
+de `fr.ts` doit apparaître dans un `.ts`/`.tsx` de `apps/dashboard/src` hors
+catalogues **et hors tests** — une clé citée seulement par un test a un témoin,
+pas un consommateur. Deux exceptions, déclarées dans le fichier avec leur
+raison : les formes `_one`, que `translate` dérive de la clé nue, et le
+préfixe `interaction.kind.`, composé à l'exécution par `CLE_CANAL` dans
+`PipelineSection.tsx`. Ajouter une composition dynamique impose d'ajouter sa
+ligne à cette liste.
 
 ## Ce qui est annoncé mais pas alimenté
 
