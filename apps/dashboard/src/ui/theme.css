@@ -70,6 +70,10 @@
   --z-panel: 10;
   --z-overlay: 20;
   --z-tooltip: 30;
+
+  /* L'ombre d'un calque flottant se lit contre son fond : dense sur le thème
+     sombre, presque effacée sur le clair, où la même densité ferait une tache. */
+  --shadow-popup: 0 8px 24px rgb(0 0 0 / 45%);
 }
 
 :root[data-theme='light'] {
@@ -95,6 +99,8 @@
   --color-danger: #c23b3b;
   --color-warning: #a06a10;
   --color-info: #6d4bd8;
+
+  --shadow-popup: 0 8px 24px rgb(0 0 0 / 12%);
 }
 
 * {
