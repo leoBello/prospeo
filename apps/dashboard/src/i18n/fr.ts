@@ -193,4 +193,7 @@ export const fr = {
   'unit.prospects_one': '{count} prospect',
   'unit.employees': 'au moins {count} salariés',
   'unit.employees_one': 'au moins {count} salarié',
+
+  'bientot.label': 'Bientôt',
+  'bientot.aria': 'Fonctionnalité à venir',
 } as const;

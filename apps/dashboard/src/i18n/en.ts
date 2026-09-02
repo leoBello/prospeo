@@ -191,4 +191,7 @@ export const en: Record<keyof typeof fr, string> = {
   'unit.prospects_one': '{count} prospect',
   'unit.employees': 'at least {count} employees',
   'unit.employees_one': 'at least {count} employee',
+
+  'bientot.label': 'Soon',
+  'bientot.aria': 'Upcoming feature',
 };
