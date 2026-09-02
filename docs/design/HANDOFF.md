@@ -232,6 +232,47 @@ faits tombés en silence — sauf qu'ici, aucun test à écrire ne le comble : i
 faudrait un outil qui calcule réellement une mise en page (Playwright, par
 exemple), que ce dépôt n'a pas pour ses tests unitaires.
 
+## Le jeu comptait les sites en ligne sur la mauvaise table
+
+Trouvaille de l'utilisateur, après la revue finale de branche : la bande
+annonce « +120 pts · site mis en ligne », un site **était** réellement en
+ligne, et le score affichait zéro.
+
+La cause n'était pas dans le calcul. `data/jeu.ts` comptait les sites sur
+`deployment_event`. Le plan tenait cette source pour « débloquée par le
+lot 2 », qui a créé la table et son couple `en_ligne` / `reussi` — vrai du
+schéma, faux des données : **cette table ne se remplit qu'aux passages du
+collector, et tout ce qui a été publié avant sa création n'y figure pas.**
+Le handoff du lot 2 le disait déjà des sites vivants (« ils n'ont aucun
+événement ») ; le jeu, lui, a quand même compté depuis là. Un jalon
+réellement atteint rapportait donc zéro, sous une affordance qui promettait
+le contraire — exactement la classe de défaut que ce chantier s'était donné
+pour règle de ne plus produire. **Aucune revue ne l'a vu : toutes ont
+confronté le code au plan, jamais aux données.**
+
+Le compte se fait désormais sur **`prospect_site`**, qui porte l'état d'un
+site pour tous les prospects — ceux d'avant la table d'événements comme ceux
+d'après — et qui évite au passage le double comptage qu'un cumul des deux
+sources produirait sur les sites à venir. Le critère est **`published_at` non
+nul, sans regarder `unpublished_at`** : le jalon est « avoir mis un site en
+ligne », pas « en avoir un en ligne maintenant ». Un retrait — un refus, ou
+la péremption à 90 jours du chantier n°4 — ne défait pas le travail accompli,
+et le compter ferait régresser le palier et reverrouiller un badge acquis.
+`unpublish` n'efface jamais `published_at` : il n'écrit que `unpublished_at`.
+Ce compte ne peut donc que croître.
+
+**Relevé au 3 septembre 2026 :** `prospect_site` porte **une** ligne publiée,
+toujours en ligne, et `deployment_event` est vide. La mention « vingt-deux
+sites en ligne » héritée des lots précédents ne décrit donc pas l'état de
+cette instance ; elle est conservée telle quelle dans les sections
+antérieures, qui disent ce qui était vrai à leur date.
+
+**La leçon, pour le lot 4 :** une table d'événements créée en cours de route
+ne connaît pas le passé. Toute source de points, tout compteur, tout badge
+adossé à `deployment_event` doit se demander si le fait qu'il mesure existait
+avant elle — et, si oui, aller le chercher dans la table d'état.
+
+
 ## Ce que ce lot a fait tomber de l'écran — deux pertes, toutes deux délibérées
 
 Une note distincte du tableau « Ce que la réécriture a fait tomber » plus
