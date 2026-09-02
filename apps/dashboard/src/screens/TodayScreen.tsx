@@ -1,5 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import type { ReactNode } from 'react';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@prospeo/db';
 import type { ProspectView } from '../domain/prospect.js';
 import { buildToday, computeKpis } from '../domain/today.js';
 import { AppShell } from '../ui/AppShell.js';
@@ -8,6 +10,7 @@ import { ProspectPanel } from '../ui/ProspectPanel.js';
 import type { PanelActions } from '../ui/actions.js';
 import { WorkListSection } from '../ui/WorkListSection.js';
 import { useListNavigation } from '../ui/useListNavigation.js';
+import { useDeploymentEvents } from '../data/useDeploymentEvents.js';
 import { useT } from '../ui/preferences.js';
 import styles from './TodayScreen.module.css';
 
@@ -18,6 +21,14 @@ interface Props {
   onSignOut: () => void;
   /** `null` : écran consultable seul, ce que montent les tests. */
   actions?: PanelActions | null;
+  /**
+   * Le client Supabase, pour le journal de déploiement du prospect ouvert.
+   *
+   * `null` par défaut, comme `actions` : les tests de cet écran le montent
+   * sans réseau, et un client absent revient pour `useDeploymentEvents` à ne
+   * jamais lire — pas à échouer.
+   */
+  client?: SupabaseClient<Database> | null;
   /**
    * Le rail de navigation, fourni par `App`. Absent dans les tests de cet
    * écran, montré seul : `AppShell` s'en passe alors sans rien afficher à
@@ -32,6 +43,7 @@ export function TodayScreen({
   now,
   onSignOut,
   actions = null,
+  client = null,
   nav,
 }: Props) {
   const t = useT();
@@ -61,6 +73,26 @@ export function TodayScreen({
     () => prospects.find((p) => p.id === selectedId) ?? null,
     [prospects, selectedId],
   );
+
+  /**
+   * Le journal de déploiement du prospect ouvert (tâche 11).
+   *
+   * Câblé ici, pas dans `ProspectPanel` ni dans `HistoriqueTab` : c'est ce
+   * composant qui connaît déjà la sélection (`selectedId`) et sait quand le
+   * panneau est réellement affiché (`panelOpen`) — le lui faire redécouvrir
+   * dans un composant plus bas dupliquerait cet état. Un identifiant par
+   * prospect, fourni à `ProspectPanel` sous forme d'un simple tableau, garde
+   * ce dernier — et `HistoriqueTab` sous lui — testables sans réseau,
+   * exactement comme `actions` ci-dessus.
+   *
+   * `panelOpen ? selectedId : null` et non `selectedId` seul : fermer le
+   * panneau (Échap) ne vide pas la sélection — elle reste surlignée dans la
+   * liste, voir `useListNavigation.close` — mais plus aucun panneau n'affiche
+   * ce journal tant qu'il reste fermé. Lire quand même serait la lecture
+   * inutile que la consigne interdit.
+   */
+  const eventsState = useDeploymentEvents(client, panelOpen ? selectedId : null);
+  const events = eventsState.status === 'ready' ? eventsState.events : undefined;
 
   useEffect(() => {
     if (selectedId === null) return;
@@ -119,6 +151,7 @@ export function TodayScreen({
             currentRulesetVersion={currentRulesetVersion}
             onClose={close}
             actions={actions}
+            events={events}
           />
         ) : null
       }

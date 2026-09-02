@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@prospeo/db';
 import { renderWithPreferences } from '../test-utils.js';
 import type { ProspectView } from '../domain/prospect.js';
 import { TodayScreen } from './TodayScreen.js';
@@ -40,6 +42,45 @@ const score = (total: number, version = 'v2') => ({
     { code: 'phone_none', label: 'Aucun téléphone', points: -25, group: 'joignabilite' as const },
   ],
 });
+
+/**
+ * Client simulé pour `deployment_event` — tâche 11, le câblage du journal.
+ *
+ * Reproduit uniquement la chaîne que `fetchEventsFor` (data/deployments.ts)
+ * appelle : `from('deployment_event').select(...).eq('prospect_id', id)
+ * .order('occurred_at', ...)`. `appels` enregistre chaque table demandée,
+ * pour la preuve négative (aucune lecture sans sélection).
+ */
+function fakeEventsClient(lignes: Record<string, unknown>[]) {
+  const appels: string[] = [];
+  const client = {
+    from(table: string) {
+      appels.push(table);
+      return {
+        select() {
+          return {
+            eq() {
+              return {
+                order() {
+                  return Promise.resolve({ data: lignes, error: null });
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  return { client: client as unknown as SupabaseClient<Database>, appels };
+}
+
+const evenementBuildReussi = {
+  step: 'build',
+  outcome: 'reussi',
+  detail: null,
+  duration_ms: 92000,
+  occurred_at: '2026-09-01T14:20:32Z',
+};
 
 function rendre(prospects: ProspectView[]) {
   return renderWithPreferences(
@@ -192,5 +233,88 @@ describe('TodayScreen', () => {
     expect(within(panneau).getByText(/démentie par le site déclaré/)).toBeDefined();
     // Et l'ecart est visible sans ouvrir le panneau.
     expect(screen.getAllByText('!').length).toBeGreaterThan(0);
+  });
+});
+
+describe('TodayScreen — le journal de deploiement (tache 11)', () => {
+  it('ne lit aucun evenement tant qu aucun prospect n est ouvert', () => {
+    // La table ne doit jamais etre interrogee si le panneau n'est pas
+    // affiche : ni au montage, ni pour un prospect present dans une liste
+    // mais non selectionne.
+    const { client, appels } = fakeEventsClient([]);
+    renderWithPreferences(
+      <TodayScreen
+        prospects={[vue('a', { score: score(90) })]}
+        currentRulesetVersion="v2"
+        now={AUJOURDHUI}
+        onSignOut={vi.fn()}
+        client={client}
+      />,
+    );
+    expect(appels).toEqual([]);
+  });
+
+  it('affiche les evenements reels du prospect ouvert, une fois la lecture aboutie', async () => {
+    const { client } = fakeEventsClient([evenementBuildReussi]);
+    const user = userEvent.setup();
+    renderWithPreferences(
+      <TodayScreen
+        prospects={[vue('a', { score: score(90) })]}
+        currentRulesetVersion="v2"
+        now={AUJOURDHUI}
+        onSignOut={vi.fn()}
+        client={client}
+      />,
+    );
+
+    await user.keyboard('{ArrowDown}');
+    await user.click(screen.getByRole('tab', { name: /Historique/ }));
+
+    // `findByText` attend la resolution de la promesse simulee : c'est la
+    // preuve que l'evenement traverse bien hook -> TodayScreen -> ProspectPanel
+    // -> HistoriqueTab, et non une valeur deja presente au premier rendu.
+    expect(await screen.findByText('Réussi')).toBeDefined();
+    expect(screen.getByText('Build')).toBeDefined();
+    // 92000 ms = 1 min 32 s, meme conversion que HistoriqueTab.test.tsx.
+    expect(screen.getByText('1 m 32')).toBeDefined();
+  });
+
+  it('un prospect avec des jalons mais sans evenement affiche quand meme ses jalons', async () => {
+    // Le cas des vingt-deux sites deja en ligne : la lecture reseau aboutit
+    // reellement (contrairement au defaut `events={[]}` teste par
+    // HistoriqueTab.test.tsx), et rend un tableau vide — la frise des jalons
+    // ne doit pas en souffrir.
+    const { client } = fakeEventsClient([]);
+    const user = userEvent.setup();
+    renderWithPreferences(
+      <TodayScreen
+        prospects={[
+          vue('a', {
+            score: score(90),
+            site: {
+              repoUrl: 'https://github.com/prospeo/x',
+              deploymentUrl: 'https://x.vercel.app',
+              promptVersion: 'v4',
+              model: 'claude-opus-5',
+              generatedAt: '2026-09-01T14:18:00Z',
+              publishedAt: '2026-09-01T14:22:00Z',
+              unpublishedAt: null,
+              contentRejectedAt: null,
+              redaction: null,
+            },
+          }),
+        ]}
+        currentRulesetVersion="v2"
+        now={AUJOURDHUI}
+        onSignOut={vi.fn()}
+        client={client}
+      />,
+    );
+
+    await user.keyboard('{ArrowDown}');
+    await user.click(screen.getByRole('tab', { name: /Historique/ }));
+
+    expect(await screen.findByText(/Site publié/)).toBeDefined();
+    expect(screen.getByText('Aucun événement enregistré')).toBeDefined();
   });
 });

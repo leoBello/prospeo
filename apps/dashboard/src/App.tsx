@@ -201,6 +201,7 @@ function Authenticated({ client }: { client: SupabaseClient<Database> }) {
       currentRulesetVersion={SCORING_RULESET.version}
       onSignOut={() => void signOut()}
       actions={actions}
+      client={client}
       nav={nav}
     />
   );

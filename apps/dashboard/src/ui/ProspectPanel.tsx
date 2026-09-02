@@ -1,6 +1,7 @@
 import { Tabs } from '@base-ui/react/tabs';
 import { getTrade } from '@prospeo/core';
 import type { ProspectView } from '../domain/prospect.js';
+import type { DeploymentEventView } from '../domain/deployment.js';
 import { dataWarnings } from '../domain/coherence.js';
 import { MessagesSection } from './MessagesSection.js';
 import { PipelineSection } from './PipelineSection.js';
@@ -25,6 +26,16 @@ interface Props {
    * client Supabase ne pourrait plus se rendre sans réseau.
    */
   actions?: Actions | null;
+  /**
+   * Le journal de déploiement du prospect affiché (tâche 11, `fetchEventsFor`).
+   *
+   * Injecté comme `actions` : `TodayScreen` possède déjà la sélection et le
+   * client, ce composant n'a besoin que du résultat. `undefined` — plutôt que
+   * `[]` imposé ici — laisse `HistoriqueTab` distinguer implicitement rien à
+   * afficher pour l'instant ; il retombe de toute façon sur `[]`, le rendu
+   * correct tant que la lecture n'a pas abouti.
+   */
+  events?: DeploymentEventView[];
   /** Rang affiché dans la file, pour situer le parcours au clavier. */
   position: { index: number; total: number } | null;
   currentRulesetVersion: string;
@@ -50,6 +61,7 @@ export function ProspectPanel({
   currentRulesetVersion,
   onClose,
   actions = null,
+  events,
 }: Props) {
   const t = useT();
 
@@ -135,7 +147,7 @@ export function ProspectPanel({
         </Tabs.Panel>
 
         <Tabs.Panel className={styles.panneau} value="historique">
-          <HistoriqueTab prospect={prospect} />
+          <HistoriqueTab prospect={prospect} events={events} />
           <PipelineSection
             pipeline={prospect.pipeline}
             // « En ligne » veut dire déployé ET non retiré : une ligne conserve
