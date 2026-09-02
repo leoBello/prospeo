@@ -3,6 +3,7 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithPreferences } from '../test-utils.js';
 import type { ProspectView, ReasonFragment, WorkRow } from '../domain/prospect.js';
+import { fr } from '../i18n/fr.js';
 import { ProspectRow } from './ProspectRow.js';
 
 function prospect(patch: Partial<ProspectView> = {}): ProspectView {
@@ -112,5 +113,28 @@ describe('ProspectRow', () => {
     rendre(ligne({ id: 'abc123' }), { onSelect });
     await user.click(screen.getByRole('button'));
     expect(onSelect).toHaveBeenCalledWith('abc123');
+  });
+
+  /**
+   * La ligne tronque la raison sur un seul trait (maquette, l. 188), et jusqu'a
+   * TROIS signaux du bareme s'y concatenent : le dernier est le premier a
+   * disparaitre. Le plan interdit de « tronquer la raison au point de la rendre
+   * inutile » — le texte complet doit donc rester atteignable.
+   */
+  it('garde la raison entiere atteignable meme quand la ligne la tronque', () => {
+    const row = ligne({}, [
+      { kind: 'raw', text: 'aucun site' },
+      { kind: 'raw', text: 'note 4,9' },
+      { kind: 'raw', text: 'mobile trouve' },
+    ]);
+    renderWithPreferences(
+      <ul>
+        <ProspectRow row={row} selected={false} currentRulesetVersion="v3" onSelect={() => {}} />
+      </ul>,
+    );
+    // Le separateur est une donnee du catalogue, pas une invention : on le lit.
+    const separateur = fr['today.reason.separator'];
+    const attendu = ['aucun site', 'note 4,9', 'mobile trouve'].join(separateur);
+    expect(screen.getByTitle(attendu)).toBeDefined();
   });
 });
