@@ -194,6 +194,12 @@ export const en: Record<keyof typeof fr, string> = {
 
   'action.pending': 'Saving…',
   'action.failed': 'Write refused: {message}',
+  'action.call': 'Call {phone}',
+  'action.noPhone': 'No number collected',
+  'action.openSite': 'Open the site',
+  'action.redeploy': 'Redeploy',
+  'action.redeploy.reason':
+    'Triggering a deployment from the interface ships with batch 2. Today `publish` and `deploy` are only callable from the command-line collector.',
 
   'unit.prospects': '{count} prospects',
   'unit.prospects_one': '{count} prospect',

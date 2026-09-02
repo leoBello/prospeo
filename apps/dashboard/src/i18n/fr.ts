@@ -200,6 +200,12 @@ export const fr = {
 
   'action.pending': 'Enregistrement…',
   'action.failed': 'Écriture refusée : {message}',
+  'action.call': 'Appeler {phone}',
+  'action.noPhone': 'Aucun numéro collecté',
+  'action.openSite': 'Voir le site',
+  'action.redeploy': 'Redéployer',
+  'action.redeploy.reason':
+    'Le déclenchement d’un déploiement depuis l’interface arrive avec le lot 2. Aujourd’hui, `publish` et `deploy` ne s’appellent que depuis le collector en ligne de commande.',
 
   'unit.prospects': '{count} prospects',
   'unit.prospects_one': '{count} prospect',
