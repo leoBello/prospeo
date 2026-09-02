@@ -6,6 +6,10 @@ import type { JeuState } from '../data/useJeu.js';
 import type { EtatBadge, Jeu } from '../domain/jeu.js';
 import type { Kpis } from '../domain/today.js';
 import { BandeProgression, SerieEnTete } from './BandeProgression.js';
+import styles from './BandeProgression.module.css';
+
+/** Circonférence du rail de l'anneau — même calcul que `Anneau` (BandeProgression.tsx), recopié pour ne pas dépendre d'un export interne. */
+const CIRCONFERENCE_ANNEAU = 2 * Math.PI * 22;
 
 /** Les deux compteurs réels — valeurs de la base au 1er septembre 2026 (voir `domain/today.ts`). */
 const KPIS: Kpis = { inBase: 139, qualified: 25 };
@@ -36,9 +40,70 @@ describe('BandeProgression — anneau d objectif', () => {
     renderWithPreferences(
       <BandeProgression jeu={jeuPret({ objectifDuJour: { connue: true, valeur: 15 }, realiseAujourdHui: 12 })} kpis={KPIS} />,
     );
-    expect(screen.getByText('Objectif du jour')).toBeDefined();
     expect(screen.getByText('12')).toBeDefined();
     expect(screen.getByText('/ 15')).toBeDefined();
+  });
+
+  /**
+   * Correctif de revue (troisieme passage) : la maquette n ecrit « Objectif
+   * du jour » que dans l infobulle (l.120) — l anneau se suffit visuellement.
+   * On verifie la classe reellement appliquee plutot que la seule presence
+   * du texte dans le DOM : `getByText` le trouverait de toute facon, meme
+   * derriere l utilitaire *sr-only* `.accessible`, `jsdom` ne distinguant pas
+   * les deux. Le nom de la classe, lui, prouve laquelle des deux est active.
+   */
+  it('ne montre plus la legende « Objectif du jour » en clair quand la mediane est connue — seule l infobulle la porte desormais', () => {
+    const { container } = renderWithPreferences(<BandeProgression jeu={jeuPret()} kpis={KPIS} />);
+    expect(container.getElementsByClassName(styles.objectifLegende!)).toHaveLength(0);
+    // L anneau reste NOMME pour un lecteur d ecran malgre tout : la meme
+    // phrase migre vers l utilitaire sr-only plutot que de disparaitre.
+    const accessible = container.getElementsByClassName(styles.accessible!);
+    expect(Array.from(accessible).some((n) => n.textContent === 'Objectif du jour')).toBe(true);
+  });
+
+  it('garde en revanche la legende visible « Historique encore insuffisant » — c est precisement ce que ce lot doit dire', () => {
+    const { container } = renderWithPreferences(
+      <BandeProgression jeu={jeuPret({ objectifDuJour: { connue: false } })} kpis={KPIS} />,
+    );
+    const legende = container.getElementsByClassName(styles.objectifLegende!);
+    expect(legende).toHaveLength(1);
+    expect(legende[0]?.textContent).toBe('Historique encore insuffisant');
+  });
+
+  /**
+   * Correctif de revue (troisieme passage) : un objectif de zero, atteint
+   * des qu une seule relance est tenue aujourd hui, doit remplir l anneau —
+   * pas le laisser vide comme le faisait `objectif.valeur > 0 ? … : 0`.
+   * `stroke-dashoffset` a 0 est la preuve directe d un arc plein, seule
+   * grandeur de l anneau que `jsdom` calcule reellement (un attribut SVG,
+   * pas une mise en page).
+   */
+  it('remplit l anneau quand l objectif du jour vaut zero et qu une relance a deja ete tenue', () => {
+    renderWithPreferences(
+      <BandeProgression jeu={jeuPret({ objectifDuJour: { connue: true, valeur: 0 }, realiseAujourdHui: 1 })} kpis={KPIS} />,
+    );
+    const progres = document.querySelector('[data-anneau-partie="progres"]');
+    expect(progres).not.toBeNull();
+    expect(Number(progres!.getAttribute('stroke-dashoffset'))).toBeCloseTo(0, 5);
+  });
+
+  it('remplit aussi l anneau quand l objectif du jour vaut zero et que rien n a encore ete tenue aujourd hui', () => {
+    // Un objectif de zero est rempli des sa mesure, meme par un realise nul —
+    // c est un objectif vacuement atteint, pas une absence.
+    renderWithPreferences(
+      <BandeProgression jeu={jeuPret({ objectifDuJour: { connue: true, valeur: 0 }, realiseAujourdHui: 0 })} kpis={KPIS} />,
+    );
+    const progres = document.querySelector('[data-anneau-partie="progres"]');
+    expect(Number(progres!.getAttribute('stroke-dashoffset'))).toBeCloseTo(0, 5);
+  });
+
+  it('calcule le decalage de l arc proportionnellement au ratio realise / objectif quand l objectif n est pas nul', () => {
+    renderWithPreferences(
+      <BandeProgression jeu={jeuPret({ objectifDuJour: { connue: true, valeur: 15 }, realiseAujourdHui: 12 })} kpis={KPIS} />,
+    );
+    const progres = document.querySelector('[data-anneau-partie="progres"]');
+    // 12/15 = 80 % : il reste 20 % de rail visible, soit 20 % de la circonference.
+    expect(Number(progres!.getAttribute('stroke-dashoffset'))).toBeCloseTo(CIRCONFERENCE_ANNEAU * 0.2, 2);
   });
 
   /**
@@ -112,12 +177,37 @@ describe('BandeProgression — anneau d objectif', () => {
 });
 
 describe('BandeProgression — palier', () => {
-  it('rend le numero et le total de points', () => {
+  /**
+   * Arbitrage du proprietaire (troisieme passage) : les noms de la maquette
+   * (« Palier Prospecteur → Closer ») remplacent le nu « Palier 1 » pour les
+   * deux premiers paliers.
+   */
+  it('nomme le palier courant et le suivant, comme la maquette, pour le premier palier', () => {
     renderWithPreferences(
       <BandeProgression jeu={jeuPret({ palier: { points: 340, seuil: 500, numero: 1, progression: 340, complet: true } })} kpis={KPIS} />,
     );
-    expect(screen.getByText('Palier 1')).toBeDefined();
+    expect(screen.getByText('Palier Prospecteur')).toBeDefined();
+    expect(screen.getByText('Closer')).toBeDefined();
     expect(screen.getByText('340 / 500 points')).toBeDefined();
+  });
+
+  it('nomme le palier courant meme quand le suivant n a pas de nom dans la maquette', () => {
+    renderWithPreferences(
+      <BandeProgression jeu={jeuPret({ palier: { points: 600, seuil: 500, numero: 2, progression: 100, complet: true } })} kpis={KPIS} />,
+    );
+    expect(screen.getByText('Palier Closer')).toBeDefined();
+    // Repli honnete : la maquette ne nomme pas de troisieme palier.
+    expect(screen.getByText('Palier 3')).toBeDefined();
+  });
+
+  it('retombe sur « Palier N » pour le courant ET le suivant, au dela des noms de la maquette', () => {
+    renderWithPreferences(
+      <BandeProgression jeu={jeuPret({ palier: { points: 1200, seuil: 500, numero: 3, progression: 200, complet: true } })} kpis={KPIS} />,
+    );
+    expect(screen.getByText('Palier 3')).toBeDefined();
+    expect(screen.getByText('Palier 4')).toBeDefined();
+    // Aucun nom fabrique ne doit apparaitre a la place.
+    expect(screen.queryByText(/Prospecteur|Closer/)).toBeNull();
   });
 
   it('dit que le total est incomplet quand une source ne peut pas encore etre comptee', () => {
@@ -231,9 +321,33 @@ describe('BandeProgression — chargement et erreur, distincts l un de l autre e
     expect(screen.queryByText(/Palier/)).toBeNull();
   });
 
-  it('garde, pendant le chargement, la meme carcasse (role de statut) que la bande chargee', () => {
+  /**
+   * Ce test ne prouve QUE la presence d un role de statut accessible pendant
+   * le chargement — pas une invariance de hauteur : `jsdom` ne calcule
+   * aucune mise en page, et la bande chargee ne porte elle-meme aucun
+   * `role="status"` (voir le docstring de `Squelette`, BandeProgression.tsx).
+   * Le nom du test le dit explicitement pour ne rien laisser croire de plus.
+   */
+  it('expose un role de statut accessible pendant le chargement (pas une preuve de hauteur — voir le rapport de tache)', () => {
     renderWithPreferences(<BandeProgression jeu={{ status: 'loading' }} kpis={KPIS} />);
     expect(screen.getByRole('status')).toBeDefined();
+  });
+
+  /**
+   * Correctif de revue (troisieme passage) : l ancien squelette n imitait
+   * que trois rangees du palier (ligne, barre, ligne) — la bande chargee en
+   * rend jusqu a QUATRE (en-tete, barre, note d incompletude, poids), et
+   * c est precisement l etat du jour de la livraison (`palier.complet ===
+   * false`, voir `calculerPalier`, domain/jeu.ts). C est ce qui faisait
+   * grandir la bande visiblement au moment ou les donnees arrivaient. Seul
+   * le NOMBRE de rangees imitees est verifiable ici — pas leur hauteur
+   * reelle, que `jsdom` ne calcule pas.
+   */
+  it('le squelette du palier imite les quatre rangees reelles (dont la note d incompletude), pas seulement trois', () => {
+    renderWithPreferences(<BandeProgression jeu={{ status: 'loading' }} kpis={KPIS} />);
+    const blocPalier = document.querySelector('[data-squelette-bloc="palier"]');
+    expect(blocPalier).not.toBeNull();
+    expect(blocPalier!.children).toHaveLength(4);
   });
 
   it('nomme l echec de lecture, distinct du chargement et d un jeu vide', () => {
@@ -252,20 +366,25 @@ describe('BandeProgression — chargement et erreur, distincts l un de l autre e
 });
 
 describe('SerieEnTete — le compteur de serie de la barre du haut', () => {
+  /**
+   * Correctif de revue (troisieme passage) : la maquette ecrit « 6 jours »
+   * (l.94), pas « 6 jours d'affilée » — le sens complet vit dans l infobulle
+   * (`jeu.serie.hint`).
+   */
   it('rend le nombre exact tant que la fenetre lue n est pas atteinte', () => {
     renderWithPreferences(
       <SerieEnTete jeu={jeuPret({ objectifDuJour: { connue: true, valeur: 4 }, serie: { jours: 3, borneAtteinte: false } })} />,
     );
-    expect(screen.getByText('3 jours d’affilée')).toBeDefined();
+    expect(screen.getByText('3 jours')).toBeDefined();
   });
 
   it('dit « au moins N jours » quand le decompte a atteint le bord de la fenetre lue', () => {
     renderWithPreferences(
       <SerieEnTete jeu={jeuPret({ objectifDuJour: { connue: true, valeur: 4 }, serie: { jours: 14, borneAtteinte: true } })} />,
     );
-    expect(screen.getByText('Au moins 14 jours d’affilée')).toBeDefined();
+    expect(screen.getByText('Au moins 14 jours')).toBeDefined();
     // Jamais le nombre nu, que le code ne peut pas garantir exact ici.
-    expect(screen.queryByText('14 jours d’affilée')).toBeNull();
+    expect(screen.queryByText('14 jours')).toBeNull();
   });
 
   /**
@@ -290,7 +409,7 @@ describe('SerieEnTete — le compteur de serie de la barre du haut', () => {
     renderWithPreferences(
       <SerieEnTete jeu={jeuPret({ objectifDuJour: { connue: false }, serie: { jours: 5, borneAtteinte: false } })} />,
     );
-    expect(screen.getByText('5 jours d’affilée')).toBeDefined();
+    expect(screen.getByText('5 jours')).toBeDefined();
   });
 
   it('n affiche rien pendant le chargement', () => {

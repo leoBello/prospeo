@@ -26,11 +26,27 @@
   }
 }
 
+/*
+ * Correctif de revue (troisième passage) : la carcasse commune aux trois
+ * états (bande chargée, squelette, erreur) grandissait visiblement au
+ * moment où les données arrivaient — le `.palier` réellement chargé rend
+ * jusqu'à QUATRE rangées (en-tête, barre, note d'incomplétude, poids) que
+ * le squelette n'imitait pas toutes, et l'erreur n'avait aucun gabarit.
+ * `min-height` pose un plancher commun, dérivé de la colonne `.palier` dans
+ * son état le plus courant (`palier.complet === false`, celui du jour de la
+ * livraison) : en-tête (~17px) + barre (7px) + note (~16px) + poids (~16px)
+ * + trois espacements de 6px = ~74px, arrondi avec une marge de sécurité.
+ * **`jsdom` ne calcule aucune mise en page : aucun test ne peut prouver que
+ * cette valeur tient réellement à l'écran** — voir le docstring de
+ * `Squelette` (BandeProgression.tsx) pour ce que les tests de ce composant
+ * vérifient à la place (le NOMBRE de rangées imitées, pas leur hauteur).
+ */
 .corpsJeu {
   display: flex;
   align-items: stretch;
   flex: 1;
   min-width: 0;
+  min-height: 84px;
   gap: var(--space-4);
 }
 
@@ -135,11 +151,37 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
+  gap: var(--space-2);
   font-size: var(--text-sm);
   color: var(--color-text-muted);
 }
 
+/* Le nom du palier courant, la flèche, le nom du suivant (maquette, ~l.127) — voir `libellePalierComplet`/`libellePalierCourt`, BandeProgression.tsx. */
+.palierProgression {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.palierActuel {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.palierFleche {
+  color: var(--color-text-faint);
+}
+
+.palierSuivant {
+  color: var(--color-success);
+}
+
 .palierPoints {
+  flex: none;
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   color: var(--color-text-faint);
@@ -152,9 +194,10 @@
   overflow: hidden;
 }
 
+/* Dégradé de la maquette (accent → succès), en tokens — tient dans les deux thèmes. */
 .barreRemplie {
   height: 100%;
-  background: var(--color-accent);
+  background: linear-gradient(90deg, var(--color-accent), var(--color-success));
   border-radius: var(--radius-pill);
 }
 

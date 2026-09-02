@@ -26,8 +26,10 @@ import styles from './BandeProgression.module.css';
  *   quand l'objectif est inconnu, arc rempli sinon ;
  * - l'aveu « historique insuffisant » tient dans une ligne calme et une
  *   infobulle, plus dans un bloc à deux paragraphes ;
- * - `loading`/`error` (`Squelette`, `Erreur`) occupent la même carcasse et
- *   la même hauteur que la bande chargée ;
+ * - `loading`/`error` (`Squelette`, `Erreur`) occupent la même carcasse
+ *   (mêmes classes, une hauteur plancher commune posée en CSS) que la bande
+ *   chargée — voir le docstring de `Squelette` pour ce qu'un test peut, et
+ *   ne peut pas, en prouver sous `jsdom` ;
  * - les jalons sont des pastilles compactes (`Pastille`), sans mot visible,
  *   dont l'`aria-label` nomme le jalon et son état et dont l'infobulle porte
  *   le sens.
@@ -141,6 +143,15 @@ const ICONE_ETAT: Record<EtatBadgeValeur, ReactNode> = {
   non_mesurable: <IconeNonMesurable />,
 };
 
+/** La flamme de la maquette (Main.dc.html ~l.94, badge de série) — décorative, le mot porte déjà le sens (`SerieEnTete`). */
+function IconeFlamme() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3c3 4 5 6 5 9a5 5 0 0 1-10 0c0-1.6.8-3 2-4.4.3 1.6 1 2.4 2 2.4 1.2 0 1.6-1.2 1-7z" />
+    </svg>
+  );
+}
+
 /**
  * Un jalon, en pastille compacte (maquette, ~34px) — refonte tâche 8 : la
  * livraison précédente empilait un `Badge` texte et un mot sous chacun des
@@ -207,12 +218,13 @@ function Anneau({
   return (
     <span className={styles.anneau}>
       <svg width="52" height="52" viewBox="0 0 52 52" aria-hidden="true" data-anneau="objectif">
-        <circle cx="26" cy="26" r={RAYON_ANNEAU} className={styles.anneauFond} />
+        <circle cx="26" cy="26" r={RAYON_ANNEAU} className={styles.anneauFond} data-anneau-partie="fond" />
         <circle
           cx="26"
           cy="26"
           r={RAYON_ANNEAU}
           className={styles.anneauProgres}
+          data-anneau-partie="progres"
           strokeDasharray={CIRCONFERENCE_ANNEAU}
           strokeDashoffset={decalage}
           transform="rotate(-90 26 26)"
@@ -234,9 +246,17 @@ function Anneau({
  * en deux, mais plus au prix d'un `EmptyState` (deux paragraphes empilés) au
  * milieu d'une rangée horizontale (relevé du propriétaire, tâche 8, second
  * passage) : l'anneau existe dans les DEUX cas, rail seul quand l'objectif
- * est inconnu, arc rempli sinon — une seule ligne calme le résume
- * (`objectifLegende`), et l'explication complète, aussi explicite qu'avant,
- * vit dans l'infobulle plutôt que dans un second paragraphe permanent.
+ * est inconnu, arc rempli sinon.
+ *
+ * **Correctif de revue (troisième passage).** La maquette n'écrit « Objectif
+ * du jour » que dans l'infobulle (l. 120) — l'anneau se suffit, et la place
+ * gagnée est ce qui rend la bande dense. La légende visible ne reste donc
+ * QUE pour l'aveu « historique insuffisant » : c'est précisément ce que ce
+ * lot doit dire, et le retirer serait perdre le seul avertissement de
+ * l'écran. Quand l'objectif est connu, `t('jeu.objectif.titre')` migre vers
+ * `.accessible` (même utilitaire *sr-only* que `Squelette`) : l'anneau reste
+ * NOMMÉ pour un lecteur d'écran dans les deux cas, sans que la maquette n'ait
+ * eu à s'en soucier elle-même.
  */
 function Objectif({ objectif, realise }: { objectif: Jeu['objectifDuJour']; realise: number }) {
   const t = useT();
@@ -252,11 +272,18 @@ function Objectif({ objectif, realise }: { objectif: Jeu['objectifDuJour']; real
     );
   }
 
-  const pourcentage = objectif.valeur > 0 ? Math.min(100, (realise / objectif.valeur) * 100) : 0;
+  // Un objectif de ZERO est un objectif REMPLI, pas un anneau vide — correctif
+  // de revue (tâche 8, troisième passage) : `objectif.valeur === 0` reste
+  // parfaitement atteignable (une médiane à zéro après une série de jours
+  // sans relance tenue), et si une relance est tenue aujourd'hui, l'objectif
+  // n'est pas seulement atteint, il est dépassé. Diviser par un dénominateur
+  // nul aurait été l'erreur inverse ; y répondre par 0% en était une autre,
+  // silencieuse celle-là.
+  const pourcentage = objectif.valeur > 0 ? Math.min(100, (realise / objectif.valeur) * 100) : 100;
   return (
     <Tooltip
       intitule={t('jeu.objectif.titre')}
-      contenu={`${t('jeu.objectif.valeur', { count: realise })} — ${t('jeu.objectif.hint')}`}
+      contenu={`${t('jeu.objectif.valeur', { count: realise })}${t('today.reason.separator')}${t('jeu.objectif.hint')}`}
     >
       <span tabIndex={0} className={styles.objectifCellule}>
         <Anneau
@@ -264,10 +291,42 @@ function Objectif({ objectif, realise }: { objectif: Jeu['objectifDuJour']; real
           valeurCentre={realise}
           denominateur={t('jeu.objectif.denominateur', { objectif: objectif.valeur })}
         />
-        <span className={styles.objectifLegende}>{t('jeu.objectif.titre')}</span>
+        <span className={styles.accessible}>{t('jeu.objectif.titre')}</span>
       </span>
     </Tooltip>
   );
+}
+
+/**
+ * Les noms de palier de la maquette (Main.dc.html ~127 : « Palier
+ * **Prospecteur** → Closer ») — arbitrage du propriétaire (tâche 8,
+ * troisième passage) : ce ne sont pas des inventions, ils viennent de la
+ * référence visuelle elle-même. Elle n'en nomme que DEUX, et `Palier.numero`
+ * n'est borné nulle part dans le domaine (`domain/jeu.ts`) : au-delà du
+ * dernier nommé, `libellePalierComplet`/`libellePalierCourt` retombent sur
+ * « Palier N » (`jeu.palier.titre`, déjà existante) — un repli honnête
+ * plutôt qu'un nom fabriqué pour un palier que la maquette n'a jamais
+ * montré, même doctrine que partout ailleurs dans ce fichier.
+ *
+ * `Record` littéral, comme `CLE_BADGE` : une composition dynamique
+ * (`` `jeu.palier.nom.${numero}` ``) échapperait à la recherche textuelle du
+ * contrôle d'orphelines de `i18n.test.ts`.
+ */
+const NOMS_PALIER: Readonly<Record<number, TranslationKey>> = {
+  1: 'jeu.palier.nom.1',
+  2: 'jeu.palier.nom.2',
+};
+
+/** Le palier COURANT : « Palier Prospecteur » (nommé) ou « Palier N » (repli) — jamais le nom nu seul, pour que le mot « Palier » reste présent dans les deux cas. */
+function libellePalierComplet(numero: number, t: ReturnType<typeof useT>): string {
+  const nom = NOMS_PALIER[numero];
+  return nom !== undefined ? t('jeu.palier.avecNom', { nom: t(nom) }) : t('jeu.palier.titre', { numero });
+}
+
+/** Le palier SUIVANT : le nom nu (« Closer », comme la maquette) ou « Palier N » (repli) — jamais préfixé, pour ne pas répéter le mot « Palier » deux fois dans l'en-tête. */
+function libellePalierCourt(numero: number, t: ReturnType<typeof useT>): string {
+  const nom = NOMS_PALIER[numero];
+  return nom !== undefined ? t(nom) : t('jeu.palier.titre', { numero });
 }
 
 /**
@@ -279,10 +338,16 @@ function Objectif({ objectif, realise }: { objectif: Jeu['objectifDuJour']; real
 function PalierBande({ palier }: { palier: Jeu['palier'] }) {
   const t = useT();
   const pourcentage = palier.seuil === 0 ? 0 : Math.min(100, (palier.progression / palier.seuil) * 100);
+  const actuel = libellePalierComplet(palier.numero, t);
+  const suivant = libellePalierCourt(palier.numero + 1, t);
   return (
     <div className={styles.palier}>
       <div className={styles.palierEntete}>
-        <span>{t('jeu.palier.titre', { numero: palier.numero })}</span>
+        <span className={styles.palierProgression}>
+          <b className={styles.palierActuel}>{actuel}</b>
+          <span className={styles.palierFleche}>{t('jeu.palier.fleche')}</span>
+          <span className={styles.palierSuivant}>{suivant}</span>
+        </span>
         <span className={styles.palierPoints}>
           {t('jeu.palier.points', { points: palier.points, seuil: palier.seuil })}
         </span>
@@ -328,15 +393,26 @@ function Compteurs({ kpis }: { kpis: Kpis }) {
 }
 
 /**
- * Le squelette de chargement — même carcasse et même hauteur que la bande
- * chargée (relevé du propriétaire, tâche 8, second passage) : la livraison
- * précédente réduisait `loading` à un unique `<p>`, qui s'effondrait à la
- * hauteur d'une ligne pendant tout l'aller-retour réseau. Les trois cellules
- * ci-dessous reprennent les classes réelles (`objectifCellule`, `palier`,
- * `jalons`) pour occuper exactement le même espace, remplies de blocs
- * neutres plutôt que de données qui n'existent pas encore. `aria-hidden` sur
- * les blocs eux-mêmes : ce qui compte pour un lecteur d'écran, c'est le
- * texte de chargement, pas la forme des blocs vides.
+ * Le squelette de chargement — même carcasse que la bande chargée (relevé du
+ * propriétaire, tâche 8, second passage) : la livraison initiale réduisait
+ * `loading` à un unique `<p>`, qui s'effondrait à la hauteur d'une ligne
+ * pendant tout l'aller-retour réseau. Les trois cellules ci-dessous
+ * reprennent les classes réelles (`objectifCellule`, `palier`, `jalons`).
+ *
+ * **Correctif de revue (troisième passage).** Le bloc `.palier` imite
+ * maintenant les QUATRE rangées réelles — en-tête, barre, note, poids — pas
+ * trois : `palier.complet === false` (l'état du jour de la livraison, voir
+ * `calculerPalier`, domain/jeu.ts) ajoute une rangée réelle (`.palierNote`)
+ * que l'ancien squelette omettait, faisant grandir la bande visiblement au
+ * moment où les données arrivaient. `min-height` sur `.corpsJeu` (voir
+ * BandeProgression.module.css) porte le
+ * reste de la garantie : **`jsdom` ne calcule aucune mise en page, donc
+ * aucun test de ce fichier ne peut prouver que la hauteur réelle ne bouge
+ * pas** — seule l'imitation des rangées (leur NOMBRE) est vérifiable ici, et
+ * c'est tout ce que les tests de ce composant affirment.
+ *
+ * `aria-hidden` sur les blocs eux-mêmes : ce qui compte pour un lecteur
+ * d'écran, c'est le texte de chargement, pas la forme des blocs vides.
  */
 function Squelette() {
   const t = useT();
@@ -347,10 +423,15 @@ function Squelette() {
         <span className={styles.squeletteAnneau} />
         <span className={styles.squeletteLigne} style={{ width: '70%' }} />
       </div>
-      <div className={`${styles.palier} ${styles.squelette}`} aria-hidden="true">
-        <span className={styles.squeletteLigne} style={{ width: '55%' }} />
-        <span className={styles.squeletteBarre} />
-        <span className={styles.squeletteLigne} style={{ width: '85%' }} />
+      <div className={`${styles.palier} ${styles.squelette}`} aria-hidden="true" data-squelette-bloc="palier">
+        {/* en-tête */}
+        <span className={styles.squeletteLigne} data-squelette="ligne" style={{ width: '55%' }} />
+        {/* barre */}
+        <span className={styles.squeletteBarre} data-squelette="barre" />
+        {/* note d'incomplétude — état réel du jour de la livraison, voir le docstring ci-dessus */}
+        <span className={styles.squeletteLigne} data-squelette="ligne" style={{ width: '65%' }} />
+        {/* poids des trois sources */}
+        <span className={styles.squeletteLigne} data-squelette="ligne" style={{ width: '90%' }} />
       </div>
       <div className={`${styles.jalons} ${styles.squelette}`} aria-hidden="true">
         <span className={styles.squelettePastille} />
@@ -363,10 +444,11 @@ function Squelette() {
 }
 
 /**
- * Le message d'échec — même carcasse et même hauteur que la bande chargée,
- * même raison que `Squelette` ci-dessus. `role="status"` et non `alert` : un
- * jeu qui ne charge pas ne bloque aucune action de l'écran (relancer, ouvrir
- * un prospect) — ce n'est pas une panne au même titre qu'une lecture de
+ * Le message d'échec — même carcasse (classe `corpsJeu`, donc même hauteur
+ * plancher CSS) que la bande chargée et que `Squelette`, centré plutôt que
+ * réduit à un `<p>` nu. `role="status"` et non `alert` : un jeu qui ne
+ * charge pas ne bloque aucune action de l'écran (relancer, ouvrir un
+ * prospect) — ce n'est pas une panne au même titre qu'une lecture de
  * prospects en échec.
  */
 function Erreur({ message }: { message: string }) {
@@ -429,6 +511,16 @@ export function BandeProgression({ jeu, kpis }: { jeu: JeuState; kpis: Kpis }): 
  *
  * `AppShell`/`BarreHaut` reçoivent le résultat en `ReactNode`, sans rien
  * savoir du jeu — même patron que `search` (tâche 2, lot 3).
+ *
+ * **Correctif de revue (troisième passage).** La maquette écrit « 6 jours »
+ * (l. 94), pas « 6 jours d'affilée » : le texte complet — « jours civils
+ * consécutifs avec au moins une relance tenue » — vit déjà dans l'infobulle
+ * (`jeu.serie.hint`), la répéter dans le badge était une redite. `jeu.serie.jours`
+ * et `jeu.serie.auMoins` perdent donc « d'affilée » ; « Au moins » reste,
+ * lui, sur `jeu.serie.auMoins` — ce n'est pas une fioriture mais la seule
+ * formulation que le code puisse garantir quand `borneAtteinte` est vrai. La
+ * flamme de la maquette remplace le point de couleur : le mot (`texte`) porte
+ * déjà le sens, l'icône est décorative (`aria-hidden`).
  */
 export function SerieEnTete({ jeu }: { jeu: JeuState }): ReactNode {
   const t = useT();
@@ -446,7 +538,8 @@ export function SerieEnTete({ jeu }: { jeu: JeuState }): ReactNode {
   return (
     <Tooltip intitule={t('jeu.serie.titre')} contenu={t('jeu.serie.hint')}>
       <span tabIndex={0}>
-        <Badge ton="alerte" point>
+        <Badge ton="alerte">
+          <IconeFlamme />
           {texte}
         </Badge>
       </span>

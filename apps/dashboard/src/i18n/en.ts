@@ -77,6 +77,10 @@ export const en: Record<keyof typeof fr, string> = {
   'jeu.objectif.denominateur.inconnu': 'not yet',
 
   'jeu.palier.titre': 'Tier {numero}',
+  'jeu.palier.nom.1': 'Prospector',
+  'jeu.palier.nom.2': 'Closer',
+  'jeu.palier.avecNom': 'Tier {nom}',
+  'jeu.palier.fleche': '→',
   'jeu.palier.points': '{points} / {seuil} points',
   'jeu.palier.incomplet': 'Minimum total: follow-ups honored are not counted in this score yet.',
   'jeu.palier.poids.relanceTenue': '+{points} pts · follow-up honored',
@@ -95,9 +99,9 @@ export const en: Record<keyof typeof fr, string> = {
   'jeu.badge.aria': '{etat} — {nom}',
 
   'jeu.serie.titre': 'Current streak',
-  'jeu.serie.jours': '{count} days in a row',
-  'jeu.serie.jours_one': '{count} day in a row',
-  'jeu.serie.auMoins': 'At least {count} days in a row',
+  'jeu.serie.jours': '{count} days',
+  'jeu.serie.jours_one': '{count} day',
+  'jeu.serie.auMoins': 'At least {count} days',
   'jeu.serie.hint': 'Consecutive calendar days with at least one follow-up honored.',
 
   'jeu.chargement': 'Loading the game panel…',

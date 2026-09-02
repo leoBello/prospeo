@@ -101,6 +101,15 @@ export const fr = {
   'jeu.objectif.denominateur.inconnu': 'pas encore',
 
   'jeu.palier.titre': 'Palier {numero}',
+  // Noms de la maquette (Main.dc.html ~l.127) — voir `NOMS_PALIER`,
+  // `ui/BandeProgression.tsx` : arbitrage du propriétaire, tâche 8, troisième
+  // passage. `avecNom` porte le palier COURANT (le mot « Palier » + le nom) ;
+  // les noms nus (`nom.1`, `nom.2`) servent seuls pour le palier SUIVANT,
+  // comme la maquette écrit « Closer » sans le répéter.
+  'jeu.palier.nom.1': 'Prospecteur',
+  'jeu.palier.nom.2': 'Closer',
+  'jeu.palier.avecNom': 'Palier {nom}',
+  'jeu.palier.fleche': '→',
   'jeu.palier.points': '{points} / {seuil} points',
   'jeu.palier.incomplet': 'Total minimal : les relances tenues ne sont pas encore comptées dans ce score.',
   'jeu.palier.poids.relanceTenue': '+{points} pts · relance tenue',
@@ -123,9 +132,14 @@ export const fr = {
   'jeu.badge.aria': '{etat} — {nom}',
 
   'jeu.serie.titre': 'Série en cours',
-  'jeu.serie.jours': '{count} jours d’affilée',
-  'jeu.serie.jours_one': '{count} jour d’affilée',
-  'jeu.serie.auMoins': 'Au moins {count} jours d’affilée',
+  // Raccourci à la maquette (Main.dc.html ~l.94 : « 6 jours ») — correctif de
+  // revue, tâche 8, troisième passage : le sens complet vit dans `hint`
+  // ci-dessous, le répéter dans le badge était une redite. « Au moins »
+  // reste sur `auMoins` : ce n'est pas une fioriture, c'est la seule
+  // formulation que le code puisse garantir quand `borneAtteinte` est vrai.
+  'jeu.serie.jours': '{count} jours',
+  'jeu.serie.jours_one': '{count} jour',
+  'jeu.serie.auMoins': 'Au moins {count} jours',
   'jeu.serie.hint': 'Jours civils consécutifs avec au moins une relance tenue.',
 
   'jeu.chargement': 'Chargement du tableau de jeu…',
