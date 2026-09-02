@@ -205,6 +205,32 @@ describe('HistoriqueTab', () => {
     expect(reessayer).toHaveBeenCalledOnce();
   });
 
+  it('une lecture EN COURS n affirme pas que le prospect n a aucun evenement', () => {
+    // Le vide date est une affirmation POSITIVE sur l'histoire du prospect.
+    // La formuler avant qu'aucune reponse ne soit arrivee est faux pour tout
+    // prospect qui a des evenements.
+    renderWithPreferences(
+      <HistoriqueTab prospect={prospectDeploye} chargementEvenements />,
+    );
+    expect(screen.queryByText('Aucun événement enregistré')).toBeNull();
+    expect(
+      screen.queryByText('Le dernier fait connu pour ce site remonte au 01/09/2026.'),
+    ).toBeNull();
+    expect(screen.getByText('Chargement…')).toBeDefined();
+  });
+
+  it('une lecture en echec prime sur le chargement — les deux ne coexistent jamais', () => {
+    renderWithPreferences(
+      <HistoriqueTab
+        prospect={prospectDeploye}
+        chargementEvenements
+        erreurEvenements="reseau indisponible"
+      />,
+    );
+    expect(screen.getByText('Lecture impossible')).toBeDefined();
+    expect(screen.queryByText('Chargement…')).toBeNull();
+  });
+
   it('un echec sans callback de relecture n affiche simplement aucun bouton', () => {
     renderWithPreferences(
       <HistoriqueTab prospect={prospectDeploye} events={[]} erreurEvenements="reseau indisponible" />,

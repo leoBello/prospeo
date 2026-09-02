@@ -95,18 +95,24 @@ export function dernierEvenementPipeline(
 ): DeploymentEventView | null {
   const derniers = new Map<Enums<'deployment_step'>, DeploymentEventView>();
   for (const e of events) {
+    const tCandidat = new Date(e.occurredAt).getTime();
+    // Un horodatage illisible n'est comparable à rien : il ne peut donc
+    // jamais être « le dernier ». Le contrôle passe AVANT le cas « première
+    // occurrence de cette étape » — placé après, il laissait au contraire une
+    // date illisible s'installer sans condition dès qu'elle arrivait la
+    // première, l'inverse exact de ce que son commentaire annonçait.
+    if (Number.isNaN(tCandidat)) continue;
     const actuel = derniers.get(e.step);
     if (actuel === undefined) {
       derniers.set(e.step, e);
       continue;
     }
+    // `actuel` a franchi la même garde : son horodatage est lisible.
     const tActuel = new Date(actuel.occurredAt).getTime();
-    const tCandidat = new Date(e.occurredAt).getTime();
-    if (Number.isNaN(tCandidat)) continue; // horodatage illisible : jamais retenu comme « le dernier ».
     // À égalité, le dernier du tableau l'emporte — choix arbitraire mais
     // stable, le cas ne se présentant pas dans les faits rapportés par le
     // collector.
-    if (Number.isNaN(tActuel) || tCandidat >= tActuel) {
+    if (tCandidat >= tActuel) {
       derniers.set(e.step, e);
     }
   }
@@ -119,6 +125,42 @@ export function dernierEvenementPipeline(
 }
 
 /**
+ * L'événement le plus RÉCENT, toutes étapes confondues.
+ *
+ * Distincte de `dernierEvenementPipeline`, et les deux sont nécessaires :
+ * celle-là répond « où en est le pipeline ? », celle-ci « que s'est-il passé
+ * en dernier ? ». Confondre les deux masquait un échec.
+ *
+ * Le cas réel : `decidePublish` rend `'update'` dès que l'empreinte du
+ * contenu bouge, si bien qu'un `generate` rejoué renvoie `publish` sur un
+ * dépôt déjà en ligne. Un 403 GitHub y écrit alors `depot/echoue` sur un
+ * prospect qui porte déjà `en_ligne/reussi`. En n'interrogeant que l'étape la
+ * plus avancée, la ligne restait verte, le KPI d'échecs comptait zéro et le
+ * filtre « En échec » ne trouvait rien — sur l'écran dont la raison d'être
+ * est de dire pourquoi quelque chose s'est arrêté.
+ *
+ * Un horodatage illisible est écarté, pour la même raison que ci-dessus : il
+ * ne se compare à rien.
+ */
+export function dernierEvenementGlobal(
+  events: readonly DeploymentEventView[],
+): DeploymentEventView | null {
+  let retenu: DeploymentEventView | null = null;
+  let tRetenu = Number.NEGATIVE_INFINITY;
+  for (const e of events) {
+    const t = new Date(e.occurredAt).getTime();
+    if (Number.isNaN(t)) continue;
+    // `>=` : à égalité, le dernier du tableau l'emporte — même règle que
+    // `dernierEvenementPipeline`, pour que les deux ne divergent pas.
+    if (retenu === null || t >= tRetenu) {
+      retenu = e;
+      tRetenu = t;
+    }
+  }
+  return retenu;
+}
+
+/**
  * Dérive l'état d'un déploiement de ses événements et de `prospect_site`.
  *
  * Fonction pure : aucun accès réseau, aucune horloge — tout ce dont elle a
@@ -128,10 +170,14 @@ export function dernierEvenementPipeline(
  * Ordre de décision, et pourquoi :
  * 1. `retire` — dès que `unpublishedAt` est renseignée, quoi que disent les
  *    événements ou l'URL. Voir le docstring de `DeploymentEtat`.
- * 2. `en_cours` / `echec` — décidés par le dernier événement de l'étape la
- *    plus avancée. Ils priment sur `en_ligne` : un site déjà publié dont on
- *    relance le build doit montrer le build en cours (ou en échec), pas
- *    l'ancienne URL comme si de rien n'était.
+ * 2. `en_cours` / `echec` — décidés par l'événement le plus RÉCENT, toutes
+ *    étapes confondues (`dernierEvenementGlobal`), et non par celui de
+ *    l'étape la plus avancée. Un échec survenu sur `redaction` ou `depot`
+ *    après qu'`en_ligne/reussi` a été écrit une fois est invisible autrement,
+ *    et c'est un cas que le collector produit réellement — voir le docstring
+ *    de `dernierEvenementGlobal`. Ils priment sur `en_ligne` : un site déjà
+ *    publié dont on relance le build doit montrer le build en cours (ou en
+ *    échec), pas l'ancienne URL comme si de rien n'était.
  * 3. `en_ligne` — `deploymentUrl` présente (et `unpublishedAt` déjà exclue
  *    à l'étape 1).
  * 4. Des événements existent mais rien de ce qui précède n'a tranché — la
@@ -147,18 +193,42 @@ export function etatDepuisEvenements(
 ): DeploymentEtat {
   if (site.unpublishedAt !== null) return 'retire';
 
-  const dernier = dernierEvenementPipeline(events);
+  const recent = dernierEvenementGlobal(events);
 
-  if (dernier !== null) {
-    if (dernier.outcome === 'echoue') return 'echec';
-    if (dernier.outcome === 'demarre') return 'en_cours';
+  if (recent !== null) {
+    if (recent.outcome === 'echoue') return 'echec';
+    if (recent.outcome === 'demarre') return 'en_cours';
   }
 
   if (site.deploymentUrl !== null) return 'en_ligne';
 
-  if (dernier !== null) return 'en_cours';
+  if (recent !== null) return 'en_cours';
 
   return 'jamais';
+}
+
+/**
+ * L'événement dont l'écran montre l'étape, le détail et la durée.
+ *
+ * Deux règles, parce que les deux questions sont différentes :
+ *
+ * - En `echec`, c'est l'événement le plus récent — celui qui a échoué. Une
+ *   ligne rouge qui nommerait l'étape la plus avancée du pipeline afficherait
+ *   « En échec » à côté d'« En ligne » et du détail d'un SUCCÈS : elle
+ *   nommerait mal l'échec au lieu de ne pas le nommer, ce qui est pire.
+ * - Partout ailleurs, l'étape la plus avancée. `publish` réécrit
+ *   `redaction/reussi` à chaque passage : une règle « le plus récent »
+ *   ramènerait chaque ligne à « Rédaction » alors que son site est en ligne.
+ */
+export function evenementAffiche(
+  events: readonly DeploymentEventView[],
+  etat: DeploymentEtat,
+): DeploymentEventView | null {
+  if (etat === 'echec') {
+    const recent = dernierEvenementGlobal(events);
+    if (recent !== null && recent.outcome === 'echoue') return recent;
+  }
+  return dernierEvenementPipeline(events);
 }
 
 /** Délai avant péremption d'un site publié — §D5, 90 jours civils. */

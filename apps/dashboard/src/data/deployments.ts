@@ -1,8 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, Enums } from '@prospeo/db';
 import {
-  dernierEvenementPipeline,
   etatDepuisEvenements,
+  evenementAffiche,
   joursAvantPeremption,
   type DeploymentEventView,
   type DeploymentSite,
@@ -128,7 +128,11 @@ export function toDeploymentView(raw: unknown, gabarit: string | null, maintenan
   const site = toSite(o['prospect_site']);
   const events = toDeploymentEvents(o['deployment_event']);
   const scoreObj = unique(o['prospect_score']);
-  const courant = dernierEvenementPipeline(events);
+  const etat = etatDepuisEvenements(events, site);
+  // Pas `dernierEvenementPipeline` directement : en échec, la ligne doit
+  // nommer l'ÉTAPE QUI A ÉCHOUÉ, pas la plus avancée du pipeline — voir
+  // `evenementAffiche` (domain/deployment.ts).
+  const courant = evenementAffiche(events, etat);
 
   return {
     prospectId: texte(o['id']) ?? '',
@@ -137,7 +141,7 @@ export function toDeploymentView(raw: unknown, gabarit: string | null, maintenan
     city: texte(o['city']) ?? '',
     score: scoreObj === null ? null : nombre(scoreObj['total']),
     gabarit,
-    etat: etatDepuisEvenements(events, site),
+    etat,
     etapeCourante: courant?.step ?? null,
     detail: courant?.detail ?? null,
     durationMs: courant?.durationMs ?? null,

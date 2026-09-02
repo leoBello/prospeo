@@ -491,6 +491,39 @@ describe('TodayScreen — le journal de deploiement (tache 11)', () => {
     expect(await screen.findByText('Réussi')).toBeDefined();
   });
 
+  it('n affirme pas « aucun evenement » pendant que la lecture est en vol', async () => {
+    // La lecture reste suspendue : c'est exactement l'etat traverse a chaque
+    // ouverture de panneau. L'onglet y affichait « Aucun evenement enregistre
+    // — le dernier fait connu remonte au ... », une affirmation POSITIVE sur
+    // l'histoire du prospect, enoncee avant qu'aucune reponse ne soit
+    // arrivee, et fausse pour tout prospect qui a des evenements.
+    const user = userEvent.setup();
+    const { client, attentes } = fakeEventsClientControlee();
+    renderWithPreferences(
+      <TodayScreen
+        prospects={[vue('a', { score: score(90) })]}
+        currentRulesetVersion="v2"
+        now={AUJOURDHUI}
+        onSignOut={vi.fn()}
+        client={client}
+      />,
+    );
+
+    await user.keyboard('{ArrowDown}');
+    await user.click(screen.getByRole('tab', { name: /Historique/ }));
+    expect(attentes).toHaveLength(1);
+
+    // En vol : ni vide date, ni erreur.
+    expect(screen.queryByText('Aucun événement enregistré')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByText('Chargement…')).toBeDefined();
+
+    // La reponse arrive : le chargement cede la place aux faits reels.
+    attentes[0]!.resolve([evenementBuildReussi]);
+    expect(await screen.findByText('Réussi')).toBeDefined();
+    expect(screen.queryByText('Chargement…')).toBeNull();
+  });
+
   it('signale un echec de lecture au lieu de le confondre avec un prospect sans historique', async () => {
     // Finding 4 du relevé de revue.
     const user = userEvent.setup();

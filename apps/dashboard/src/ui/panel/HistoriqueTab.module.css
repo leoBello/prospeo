@@ -118,3 +118,12 @@
   font-size: var(--text-sm);
   color: var(--color-danger);
 }
+
+/* Une lecture EN COURS : un texte neutre, ni le rouge d'un échec ni le vide
+   nommé d'un prospect sans historique — la réponse n'est simplement pas
+   encore arrivée. */
+.chargement {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}

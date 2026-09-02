@@ -42,6 +42,8 @@ interface Props {
    * la même chose que `events` absent.
    */
   erreurEvenements?: string | null;
+  /** `true` tant que la lecture des événements est en vol — voir `HistoriqueTab`. */
+  chargementEvenements?: boolean;
   /** Rejoue la lecture des événements après un échec. */
   onReessayerEvenements?: () => void;
   /** Rang affiché dans la file, pour situer le parcours au clavier. */
@@ -71,6 +73,7 @@ export function ProspectPanel({
   actions = null,
   events,
   erreurEvenements = null,
+  chargementEvenements = false,
   onReessayerEvenements,
 }: Props) {
   const t = useT();
@@ -161,6 +164,7 @@ export function ProspectPanel({
             prospect={prospect}
             events={events}
             erreurEvenements={erreurEvenements}
+            chargementEvenements={chargementEvenements}
             onReessayerEvenements={onReessayerEvenements}
           />
           <PipelineSection

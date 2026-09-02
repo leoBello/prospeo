@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { DeploymentEventView, DeploymentSite } from './deployment.js';
 import {
+  dernierEvenementGlobal,
   dernierEvenementPipeline,
   etatDepuisEvenements,
+  evenementAffiche,
   joursAvantPeremption,
 } from './deployment.js';
 
@@ -124,6 +126,39 @@ describe('etatDepuisEvenements', () => {
     expect(etatDepuisEvenements(events, site())).toBe('echec');
   });
 
+  it('un echec sur une etape EN AMONT, plus recent que le "en_ligne/reussi", rend bien "echec"', () => {
+    // Le cas que la regle « etape la plus avancee » masquait entierement.
+    // `decidePublish` rend 'update' des que l'empreinte du contenu bouge : un
+    // `generate` rejoue renvoie donc `publish` sur un depot deja en ligne, et
+    // un 403 GitHub y ecrit `depot/echoue` sur un prospect qui porte deja
+    // `en_ligne/reussi`. La ligne restait verte et le filtre « En echec » ne
+    // la trouvait pas.
+    const events = [
+      evenement({ step: 'redaction', outcome: 'reussi', occurredAt: '2026-09-01T09:00:00Z' }),
+      evenement({ step: 'depot', outcome: 'reussi', occurredAt: '2026-09-01T09:01:00Z' }),
+      evenement({ step: 'build', outcome: 'reussi', occurredAt: '2026-09-01T09:05:00Z' }),
+      evenement({ step: 'en_ligne', outcome: 'reussi', occurredAt: '2026-09-01T09:06:00Z' }),
+      // Le run suivant, deux jours plus tard : GitHub refuse l'ecriture.
+      evenement({
+        step: 'depot',
+        outcome: 'echoue',
+        occurredAt: '2026-09-03T09:00:00Z',
+        detail: 'GitHub 403 : ecriture refusee',
+      }),
+    ];
+    const s = site({ deploymentUrl: 'https://dos.vercel.app', publishedAt: '2026-09-01T09:06:00Z' });
+    expect(etatDepuisEvenements(events, s)).toBe('echec');
+  });
+
+  it('un "demarre" en amont plus recent qu un "reussi" avance rend "en_cours", pas "en_ligne"', () => {
+    const events = [
+      evenement({ step: 'en_ligne', outcome: 'reussi', occurredAt: '2026-09-01T09:06:00Z' }),
+      evenement({ step: 'build', outcome: 'demarre', occurredAt: '2026-09-03T09:00:00Z' }),
+    ];
+    const s = site({ deploymentUrl: 'https://dos.vercel.app', publishedAt: '2026-09-01T09:06:00Z' });
+    expect(etatDepuisEvenements(events, s)).toBe('en_cours');
+  });
+
   it('un evenement "echoue" ancien sur une etape depassee par une "reussi" plus recente n empeche pas "en_ligne"', () => {
     const events = [
       evenement({ step: 'build', outcome: 'echoue', occurredAt: '2026-09-01T09:00:00Z', detail: 'timeout' }),
@@ -154,6 +189,73 @@ describe('dernierEvenementPipeline', () => {
     const events = [
       evenement({ step: 'build', outcome: 'demarre', occurredAt: '2026-09-01T09:00:00Z' }),
       evenement({ step: 'build', outcome: 'reussi', occurredAt: '2026-09-02T09:00:00Z' }),
+    ];
+    expect(dernierEvenementPipeline(events)?.outcome).toBe('reussi');
+  });
+});
+
+describe('dernierEvenementGlobal', () => {
+  it('rend null en l absence de tout evenement', () => {
+    expect(dernierEvenementGlobal([])).toBeNull();
+  });
+
+  it('retient le plus RECENT par horodatage, sans egard pour l ordre du pipeline', () => {
+    const events = [
+      evenement({ step: 'en_ligne', outcome: 'reussi', occurredAt: '2026-09-01T09:00:00Z' }),
+      evenement({ step: 'redaction', outcome: 'echoue', occurredAt: '2026-09-02T09:00:00Z' }),
+    ];
+    expect(dernierEvenementGlobal(events)?.step).toBe('redaction');
+  });
+
+  it('ecarte un horodatage illisible, meme rencontre en premier', () => {
+    // Il ne se compare a rien : le retenir ferait dependre le resultat de
+    // l'ordre du tableau.
+    const events = [
+      evenement({ step: 'build', outcome: 'echoue', occurredAt: 'pas-une-date' }),
+      evenement({ step: 'depot', outcome: 'reussi', occurredAt: '2026-09-01T09:00:00Z' }),
+    ];
+    expect(dernierEvenementGlobal(events)?.step).toBe('depot');
+  });
+});
+
+describe('evenementAffiche', () => {
+  it('en echec, nomme l etape qui a ECHOUE et non la plus avancee', () => {
+    // Sans cette regle, la ligne rouge afficherait « En ligne » et le detail
+    // d'un SUCCES a cote du mot « En echec ».
+    const events = [
+      evenement({ step: 'en_ligne', outcome: 'reussi', occurredAt: '2026-09-01T09:06:00Z', detail: 'https://dos.vercel.app' }),
+      evenement({
+        step: 'depot',
+        outcome: 'echoue',
+        occurredAt: '2026-09-03T09:00:00Z',
+        detail: 'GitHub 403 : ecriture refusee',
+      }),
+    ];
+    const affiche = evenementAffiche(events, 'echec');
+    expect(affiche?.step).toBe('depot');
+    expect(affiche?.detail).toBe('GitHub 403 : ecriture refusee');
+  });
+
+  it('hors echec, garde l etape la plus avancee — sinon chaque ligne retomberait sur "redaction"', () => {
+    // `publish` reecrit `redaction/reussi` a chaque passage : une regle « le
+    // plus recent » ramenerait a « Redaction » un prospect dont le site est
+    // en ligne.
+    const events = [
+      evenement({ step: 'en_ligne', outcome: 'reussi', occurredAt: '2026-09-01T09:06:00Z' }),
+      evenement({ step: 'redaction', outcome: 'reussi', occurredAt: '2026-09-03T09:00:00Z' }),
+    ];
+    expect(evenementAffiche(events, 'en_ligne')?.step).toBe('en_ligne');
+  });
+});
+
+describe('dernierEvenementPipeline — horodatage illisible', () => {
+  it('n est jamais retenu, meme quand il est le premier vu pour son etape', () => {
+    // La garde etait placee APRES le cas « premiere occurrence de cette
+    // etape » : une date illisible s'installait alors sans condition, exactement
+    // l'inverse de ce que son commentaire annoncait.
+    const events = [
+      evenement({ step: 'build', outcome: 'demarre', occurredAt: 'pas-une-date' }),
+      evenement({ step: 'build', outcome: 'reussi', occurredAt: '2026-09-01T09:00:00Z' }),
     ];
     expect(dernierEvenementPipeline(events)?.outcome).toBe('reussi');
   });

@@ -89,6 +89,16 @@ function texteDetail(t: (cle: TranslationKey) => string, e: DeploymentEventView)
  * existait déjà. On affiche donc CHAQUE événement, trié par horodatage, sans
  * tenter de les apparier en paires démarré/terminé.
  *
+ * **Une lecture EN COURS n'est pas non plus un prospect sans historique.**
+ * `chargementEvenements` est le pendant d'`erreurEvenements` pour l'état
+ * `'loading'` d'`useDeploymentEvents`. Sans lui, l'onglet affichait pendant
+ * tout l'aller-retour réseau « Aucun événement enregistré — le dernier fait
+ * connu remonte au … » : une affirmation POSITIVE sur l'histoire du prospect,
+ * énoncée avant qu'aucune réponse ne soit arrivée, et fausse pour tout
+ * prospect qui a des événements. Le hook distingue déjà `'idle'` de
+ * `'loading'` — son docstring plaide longuement pour cette distinction ; son
+ * unique consommateur la jetait.
+ *
  * **Une lecture en échec n'est pas un prospect sans historique** (tâche 11,
  * relevé de revue) : `erreurEvenements` prend le pas sur l'`EmptyState`
  * ci-dessus et affiche le message d'`useDeploymentEvents` sous `app.error.*`
@@ -100,6 +110,7 @@ export function HistoriqueTab({
   prospect,
   events,
   erreurEvenements = null,
+  chargementEvenements = false,
   onReessayerEvenements,
 }: {
   prospect: ProspectView;
@@ -134,6 +145,15 @@ export function HistoriqueTab({
    * déjà utilisé par `App.tsx` pour les mêmes lectures en échec.
    */
   erreurEvenements?: string | null;
+  /**
+   * `true` tant que la lecture des événements est EN VOL
+   * (`useDeploymentEvents`, `status: 'loading'`).
+   *
+   * Absent par défaut : un appelant sans réseau (les tests de ce composant)
+   * n'a jamais de lecture en cours, et obtient le rendu d'avant. Voir le
+   * docstring du composant pour ce que valait la confusion avec le vide.
+   */
+  chargementEvenements?: boolean;
   /**
    * Rejoue la lecture des événements après un échec (`useDeploymentEvents.reload`).
    *
@@ -201,6 +221,13 @@ export function HistoriqueTab({
               </button>
             )}
           </div>
+        ) : chargementEvenements ? (
+          // Ni un vide, ni une erreur : la réponse n'est pas encore là.
+          // `aria-live` pour que le passage à la liste réelle soit annoncé —
+          // même parti que les écrans de chargement d'`App.tsx`.
+          <p className={styles.chargement} aria-live="polite">
+            {t('app.loading')}
+          </p>
         ) : evenementsTries.length === 0 ? (
           <EmptyState
             titre={t('histo.events.empty.titre')}

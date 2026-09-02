@@ -97,6 +97,12 @@ export function TodayScreen({
   // ratée, pas un prospect sans historique — voir le docstring de
   // `HistoriqueTab` sur `erreurEvenements` (tâche 11, relevé de revue).
   const erreurEvenements = eventsState.status === 'error' ? eventsState.message : null;
+  // `'loading'` distinct d'`'idle'` : le hook plaide pour cette distinction
+  // dans son propre docstring, et la replier ici sur `events: undefined`
+  // faisait afficher « Aucun événement enregistré » pendant tout
+  // l'aller-retour réseau — une affirmation sur l'histoire du prospect,
+  // énoncée avant toute réponse (relevé de revue, lot 2).
+  const chargementEvenements = eventsState.status === 'loading';
 
   useEffect(() => {
     if (selectedId === null) return;
@@ -157,6 +163,7 @@ export function TodayScreen({
             actions={actions}
             events={events}
             erreurEvenements={erreurEvenements}
+            chargementEvenements={chargementEvenements}
             onReessayerEvenements={eventsState.reload}
           />
         ) : null
