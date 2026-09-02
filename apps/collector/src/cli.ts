@@ -44,6 +44,7 @@ import {
 import { createPitchRedacteur, createRedacteur } from './sources/anthropic.js';
 import { createGithubClient } from './sources/github.js';
 import { createVercelClient } from './sources/vercel.js';
+import { createEventSink } from './stages/events.js';
 import { runGenerate, type GenerateInput } from './stages/generate.js';
 import {
   publishExitCode,
@@ -1792,6 +1793,7 @@ async function main(argv: string[]): Promise<number> {
           if (error) throw new Error(error.message);
         },
         maintenant: () => new Date(),
+        events: createEventSink(client),
       };
 
       const report = await runPublish(lot, deps);
