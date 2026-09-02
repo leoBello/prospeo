@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import type { JeuState } from '../data/useJeu.js';
 import { PARAMETRES_PALIER } from '../domain/jeu.js';
-import type { BadgeId, EtatBadge, EtatBadgeValeur, Jeu } from '../domain/jeu.js';
+import type { BadgeId, EtatBadge, EtatBadgeValeur, Jeu, MotifObjectifInconnu } from '../domain/jeu.js';
 import type { TranslationKey } from '../i18n/translate.js';
 import type { BadgeTon } from './kit/Badge.js';
 import { Badge } from './kit/Badge.js';
@@ -47,11 +47,17 @@ import styles from './BandeProgression.module.css';
  * **La doctrine des absences distinctes gouverne tout ce fichier.** Quatre
  * absences de nature différente s'y croisent, et aucune ne se rend par un
  * zéro ni par un vide muet :
- * 1. `objectifDuJour: {connue: false}` — pas assez d'historique pour une
- *    médiane. État du jour de la livraison : la table `pipeline_event` vient
- *    d'être créée. `Objectif` rend cet état par un anneau au rail seul et un
- *    dénominateur textuel, jamais par un « 0 relances tenues » qui se
- *    lirait comme un échec.
+ * 1. `objectifDuJour: {connue: false}` — deux motifs distincts
+ *    (`MotifObjectifInconnu`, domain/jeu.ts), jamais confondus. **Correctif
+ *    de revue** : `historique_insuffisant` (pas assez d'historique pour une
+ *    médiane — état du jour de la livraison, la table `pipeline_event` vient
+ *    d'être créée) et `mediane_nulle` (l'historique est là, la médiane vaut
+ *    zéro — une VRAIE mesure, pas un manque, que le propriétaire a néanmoins
+ *    choisi de ne pas présenter comme un objectif : « 0 / 0 » puis « 1 / 0 »
+ *    serait arithmétiquement juste et visuellement absurde). `Objectif` rend
+ *    les DEUX par un anneau au rail seul et un dénominateur textuel — jamais
+ *    par un « 0 relances tenues » qui se lirait comme un échec — mais avec
+ *    un texte différent pour chacun (`CLE_OBJECTIF_INCONNU`).
  * 2. `serie.jours === 0` — un FAIT mesuré (aucune relance tenue), pas une
  *    absence : rendu comme un vrai zéro, distinct du cas 1. `realiseAujourdHui`
  *    (numérateur de l'anneau) est de la même nature : zéro y est honnête.
@@ -246,7 +252,7 @@ function Anneau({
  * L'objectif du jour : l'anneau, plus l'aveu — jamais un bloc à sa place —
  * quand l'historique ne permet pas encore de le connaître.
  *
- * `Mesure<number>` (voir son docstring, domain/jeu.ts) impose ce branchement
+ * `ObjectifDuJour` (voir son docstring, domain/jeu.ts) impose ce branchement
  * en deux, mais plus au prix d'un `EmptyState` (deux paragraphes empilés) au
  * milieu d'une rangée horizontale (relevé du propriétaire, tâche 8, second
  * passage) : l'anneau existe dans les DEUX cas, rail seul quand l'objectif
@@ -262,27 +268,49 @@ function Anneau({
  * NOMMÉ pour un lecteur d'écran dans les deux cas, sans que la maquette n'ait
  * eu à s'en soucier elle-même.
  */
+/**
+ * Les deux motifs d'objectif inconnu (`MotifObjectifInconnu`, domain/jeu.ts),
+ * chacun sur sa paire de clés — jamais une composition dynamique
+ * (`` `jeu.objectif.${motif}.titre` ``), qui échapperait à la recherche
+ * textuelle du contrôle d'orphelines de `i18n.test.ts` comme `CLE_BADGE`
+ * ci-dessus.
+ *
+ * **Pourquoi deux entrées, pas une seule refondue en `historique
+ * insuffisant`.** `historique_insuffisant` : aucune donnée encore observée,
+ * un manque réel. `mediane_nulle` : l'historique est là, la médiane a bien
+ * été calculée, elle vaut zéro — ce n'est pas un manque, c'est une mesure
+ * que le propriétaire a choisi de ne pas présenter comme un objectif (voir
+ * le docstring de `MotifObjectifInconnu`). Le même texte pour les deux
+ * referait la confusion « pas encore » / « jamais » que ce correctif corrige.
+ */
+const CLE_OBJECTIF_INCONNU: Record<MotifObjectifInconnu, { titre: TranslationKey; detail: TranslationKey }> = {
+  historique_insuffisant: { titre: 'jeu.objectif.insuffisant.titre', detail: 'jeu.objectif.insuffisant.detail' },
+  mediane_nulle: { titre: 'jeu.objectif.medianeNulle.titre', detail: 'jeu.objectif.medianeNulle.detail' },
+};
+
 function Objectif({ objectif, realise }: { objectif: Jeu['objectifDuJour']; realise: number }) {
   const t = useT();
 
   if (!objectif.connue) {
+    const cles = CLE_OBJECTIF_INCONNU[objectif.motif];
     return (
-      <Tooltip intitule={t('jeu.objectif.insuffisant.titre')} contenu={t('jeu.objectif.insuffisant.detail')}>
+      <Tooltip intitule={t(cles.titre)} contenu={t(cles.detail)}>
         <span tabIndex={0} className={styles.objectifCellule}>
           <Anneau pourcentage={0} valeurCentre={realise} denominateur={t('jeu.objectif.denominateur.inconnu')} />
-          <span className={styles.objectifLegende}>{t('jeu.objectif.insuffisant.titre')}</span>
+          <span className={styles.objectifLegende}>{t(cles.titre)}</span>
         </span>
       </Tooltip>
     );
   }
 
-  // Un objectif de ZERO est un objectif REMPLI, pas un anneau vide — correctif
-  // de revue (tâche 8, troisième passage) : `objectif.valeur === 0` reste
-  // parfaitement atteignable (une médiane à zéro après une série de jours
-  // sans relance tenue), et si une relance est tenue aujourd'hui, l'objectif
-  // n'est pas seulement atteint, il est dépassé. Diviser par un dénominateur
-  // nul aurait été l'erreur inverse ; y répondre par 0% en était une autre,
-  // silencieuse celle-là.
+  // Un objectif de ZERO serait un objectif REMPLI, pas un anneau vide — cette
+  // branche reste défensive (`objectif.valeur: number` n'exclut pas 0 par le
+  // type) mais n'est plus atteignable en pratique depuis le correctif de
+  // revue de cette tâche : `objectifDuJour` (domain/jeu.ts) ne rend plus
+  // JAMAIS `{connue: true, valeur: 0}`, une médiane nulle devenant le motif
+  // `mediane_nulle` géré ci-dessus. Diviser par un dénominateur nul aurait
+  // été l'erreur inverse ; y répondre par 0% en était une autre, silencieuse
+  // celle-là — la garde reste donc en place par prudence de type.
   const pourcentage = objectif.valeur > 0 ? Math.min(100, (realise / objectif.valeur) * 100) : 100;
   return (
     <Tooltip

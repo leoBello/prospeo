@@ -86,9 +86,19 @@ export const fr = {
   'jeu.objectif.insuffisant.titre': 'Historique encore insuffisant',
   'jeu.objectif.insuffisant.detail':
     'Pas encore un jour civil complet observé : aucune médiane fiable ne peut s’en déduire. Cet objectif apparaîtra dès qu’il y en aura un.',
+  // Correctif de revue (tâche 8) — deuxième motif d'objectif inconnu,
+  // distinct du précédent : ici l'historique NE MANQUE PAS, la médiane a
+  // bien pu être calculée, elle vaut zéro. Le texte ne prétend donc jamais
+  // qu'il manque des données ; il dit sur quoi l'objectif se fonde (des
+  // jours avec relance tenue) et pourquoi il n'y en a pas assez pour en
+  // proposer un — voir `MotifObjectifInconnu`, domain/jeu.ts.
+  'jeu.objectif.medianeNulle.titre': "Pas encore d'objectif à proposer",
+  'jeu.objectif.medianeNulle.detail':
+    'L’objectif se fonde sur les jours où au moins une relance a été tenue : il n’y en a pas encore assez pour en proposer un.',
   // Le dénominateur de l'anneau (maquette, ~« / 15 ») quand l'objectif est
   // connu, et son repli textuel — jamais un nombre — quand il ne l'est pas
-  // encore (refonte, tâche 8, second passage).
+  // encore (refonte, tâche 8, second passage). Sert les deux motifs
+  // d'objectif inconnu : aucun des deux ne fournit de dénominateur chiffré.
   'jeu.objectif.denominateur': '/ {objectif}',
   'jeu.objectif.denominateur.inconnu': 'pas encore',
 

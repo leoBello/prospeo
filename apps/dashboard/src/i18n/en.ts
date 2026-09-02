@@ -70,6 +70,9 @@ export const en: Record<keyof typeof fr, string> = {
   'jeu.objectif.insuffisant.titre': 'Not enough history yet',
   'jeu.objectif.insuffisant.detail':
     'No full calendar day has been observed yet: no reliable median can be derived from it. This goal will appear once there is one.',
+  'jeu.objectif.medianeNulle.titre': 'No goal to suggest yet',
+  'jeu.objectif.medianeNulle.detail':
+    'The goal is based on days with at least one follow-up honored: there are not enough of those yet to suggest one.',
   'jeu.objectif.denominateur': '/ {objectif}',
   'jeu.objectif.denominateur.inconnu': 'not yet',
 

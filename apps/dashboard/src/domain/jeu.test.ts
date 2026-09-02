@@ -211,26 +211,37 @@ describe('objectifDuJour', () => {
     // s'est encore ecoule depuis la premiere ligne observee, et rien
     // n'existe non plus au-dela de la fenetre lue.
     const events = [evenement({ prospectId: 'p1', status: 'relance', occurredAt: '2026-09-02T08:00:00' })];
-    expect(objectifDuJour(events, [], MAINTENANT, false)).toEqual({ connue: false });
+    expect(objectifDuJour(events, [], MAINTENANT, false)).toEqual({
+      connue: false,
+      motif: 'historique_insuffisant',
+    });
   });
 
-  it('rend une vraie VALEUR ZERO quand l historique existe mais qu aucune relance n y a ete tenue', () => {
-    // La distinction qui compte le plus : trois jours civils d'historique se
-    // sont ecoules (contrairement au cas ci-dessus), et aucune relance n'y a
-    // ete tenue. Ce zero est mesure, pas un manque de donnees.
+  it('rend le motif MEDIANE NULLE — pas insuffisant — quand l historique est suffisant mais qu aucune relance n y a ete tenue', () => {
+    // Le coeur du correctif : trois jours civils d'historique se sont ecoules
+    // (contrairement au cas ci-dessus), et aucune relance n'y a ete tenue —
+    // la mediane vaut zero, mais ce n'est PAS un manque de donnees. Rendre le
+    // meme motif que le test precedent confondrait deux absences de nature
+    // differente (voir le docstring de `MotifObjectifInconnu`).
     const events = [evenement({ prospectId: 'p1', status: 'relance', occurredAt: '2026-08-30T08:00:00' })];
-    expect(objectifDuJour(events, [], MAINTENANT, false)).toEqual({ connue: true, valeur: 0 });
+    expect(objectifDuJour(events, [], MAINTENANT, false)).toEqual({ connue: false, motif: 'mediane_nulle' });
   });
 
   it('n est pas assez d historique en l absence totale d evenement de pipeline', () => {
-    expect(objectifDuJour([], [], MAINTENANT, false)).toEqual({ connue: false });
+    expect(objectifDuJour([], [], MAINTENANT, false)).toEqual({
+      connue: false,
+      motif: 'historique_insuffisant',
+    });
   });
 
   it('une base UNIQUEMENT amorcee n est jamais assez d historique — l amorcage ne compte pas comme observation', () => {
     const events = [
       evenement({ prospectId: 'p1', status: 'relance', origin: 'amorcage', occurredAt: '2026-07-01T08:00:00' }),
     ];
-    expect(objectifDuJour(events, [], MAINTENANT, false)).toEqual({ connue: false });
+    expect(objectifDuJour(events, [], MAINTENANT, false)).toEqual({
+      connue: false,
+      motif: 'historique_insuffisant',
+    });
   });
 
   it('calcule la mediane sur les jours disponibles, meme moins de quatorze', () => {
@@ -249,28 +260,35 @@ describe('objectifDuJour', () => {
     expect(objectifDuJour(events, relances, MAINTENANT, false)).toEqual({ connue: true, valeur: 2 });
   });
 
-  it('plafonne la fenetre a quatorze jours quand la fenetre lue le confirme deja', () => {
+  it('plafonne la fenetre a quatorze jours quand la fenetre lue le confirme deja, et rend MEDIANE NULLE (pas insuffisant)', () => {
     // Vingt jours d'historique reel, mais la fenetre lue (14 jours) ne montre
     // aucune ligne "observe" — data/jeu.ts l'a etabli par un `count` separe
     // (`historiqueAuDelaDeLaFenetre: true`). Un enorme paquet de relances
     // range hors fenetre : s'il fuitait dans le calcul, la mediane ne
-    // vaudrait plus zero.
+    // vaudrait plus zero. L'historique est ici suffisant (quatorze jours
+    // pleins confirmes) : le zero qui en resulte est une mesure, pas un
+    // manque — motif `mediane_nulle`, jamais `historique_insuffisant`.
     const horsFenetre = Array.from({ length: 50 }, () => ({
       prospectId: 'p1',
       occurredAt: '2026-08-13T10:00:00',
     }));
-    expect(objectifDuJour([], horsFenetre, MAINTENANT, true)).toEqual({ connue: true, valeur: 0 });
+    expect(objectifDuJour([], horsFenetre, MAINTENANT, true)).toEqual({ connue: false, motif: 'mediane_nulle' });
   });
 
-  it('sans le drapeau, un historique absent de la fenetre lue reste NON mesurable, meme avec des relances hors fenetre', () => {
+  it('sans le drapeau, un historique absent de la fenetre lue reste INSUFFISANT, meme avec des relances hors fenetre', () => {
     // Meme jeu de relances que le test precedent, mais SANS la confirmation
     // serveur qu'il existe de l'historique au-dela : rien ne permet de dire
-    // qu'un seul jour civil complet s'est ecoule.
+    // qu'un seul jour civil complet s'est ecoule — motif
+    // `historique_insuffisant`, distinct du test precedent bien que les deux
+    // rendent `connue: false`.
     const horsFenetre = Array.from({ length: 50 }, () => ({
       prospectId: 'p1',
       occurredAt: '2026-08-13T10:00:00',
     }));
-    expect(objectifDuJour([], horsFenetre, MAINTENANT, false)).toEqual({ connue: false });
+    expect(objectifDuJour([], horsFenetre, MAINTENANT, false)).toEqual({
+      connue: false,
+      motif: 'historique_insuffisant',
+    });
   });
 });
 
@@ -455,7 +473,7 @@ describe('construireJeu', () => {
       nombreRendezVousObtenus: 0,
     });
     expect(jeu.serie).toEqual({ jours: 0, borneAtteinte: false });
-    expect(jeu.objectifDuJour).toEqual({ connue: false });
+    expect(jeu.objectifDuJour).toEqual({ connue: false, motif: 'historique_insuffisant' });
     expect(jeu.realiseAujourdHui).toBe(0);
     expect(jeu.palier.points).toBe(0);
     expect(jeu.palier.complet).toBe(false);

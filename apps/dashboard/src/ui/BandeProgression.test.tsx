@@ -59,11 +59,62 @@ describe('BandeProgression — anneau d objectif', () => {
 
   it('garde en revanche la legende visible « Historique encore insuffisant » — c est precisement ce que ce lot doit dire', () => {
     const { container } = renderWithPreferences(
-      <BandeProgression jeu={jeuPret({ objectifDuJour: { connue: false } })} />,
+      <BandeProgression jeu={jeuPret({ objectifDuJour: { connue: false, motif: 'historique_insuffisant' } })} />,
     );
     const legende = container.getElementsByClassName(styles.objectifLegende!);
     expect(legende).toHaveLength(1);
     expect(legende[0]?.textContent).toBe('Historique encore insuffisant');
+  });
+
+  /**
+   * Correctif de revue (tache 8, quatrieme passage) : `MotifObjectifInconnu`
+   * porte deux motifs distincts (domain/jeu.ts) — celui-ci ('mediane_nulle')
+   * dit que l historique est SUFFISANT (la mediane a bien ete calculee), pas
+   * qu il manque. Un texte identique aux deux motifs aurait ete exactement
+   * la confusion « pas encore » / « jamais » que ce correctif corrige — la
+   * preuve centrale de cette passe.
+   */
+  it('rend un texte DIFFERENT pour le motif mediane nulle — jamais le meme texte que l historique insuffisant', () => {
+    const { container } = renderWithPreferences(
+      <BandeProgression jeu={jeuPret({ objectifDuJour: { connue: false, motif: 'mediane_nulle' } })} />,
+    );
+    const legende = container.getElementsByClassName(styles.objectifLegende!);
+    expect(legende).toHaveLength(1);
+    expect(legende[0]?.textContent).toBe("Pas encore d'objectif à proposer");
+    expect(screen.queryByText('Historique encore insuffisant')).toBeNull();
+  });
+
+  it('rend quand meme l anneau (rail seul, arc a zero) pour le motif mediane nulle, jamais un bloc a sa place', () => {
+    renderWithPreferences(
+      <BandeProgression
+        jeu={jeuPret({ objectifDuJour: { connue: false, motif: 'mediane_nulle' }, realiseAujourdHui: 0 })}
+      />,
+    );
+    expect(document.querySelector('svg[data-anneau="objectif"]')).not.toBeNull();
+    const progres = document.querySelector('[data-anneau-partie="progres"]');
+    expect(progres).not.toBeNull();
+    // Arc a zero : `stroke-dashoffset` egal a la circonference entiere (rail
+    // seul, aucun progres affiche) — meme convention que le cas historique
+    // insuffisant, jamais un pourcentage invente.
+    expect(Number(progres!.getAttribute('stroke-dashoffset'))).toBeCloseTo(CIRCONFERENCE_ANNEAU, 5);
+    expect(screen.getByText('pas encore')).toBeDefined();
+  });
+
+  it('revele au survol l explication complete du motif mediane nulle, distincte de celle de l historique insuffisant', async () => {
+    const user = userEvent.setup();
+    renderWithPreferences(
+      <BandeProgression jeu={jeuPret({ objectifDuJour: { connue: false, motif: 'mediane_nulle' } })} />,
+    );
+    const declencheur = screen.getByText("Pas encore d'objectif à proposer").closest('[tabindex]');
+    expect(declencheur).not.toBeNull();
+    await user.hover(declencheur!);
+    expect(
+      await screen.findByText(
+        'L’objectif se fonde sur les jours où au moins une relance a été tenue : il n’y en a pas encore assez pour en proposer un.',
+        {},
+        ATTENTE_SURVOL,
+      ),
+    ).toBeDefined();
   });
 
   /**
@@ -109,7 +160,7 @@ describe('BandeProgression — anneau d objectif', () => {
    */
   it('rend l anneau au rail seul et un denominateur textuel quand l historique est insuffisant', () => {
     renderWithPreferences(
-      <BandeProgression jeu={jeuPret({ objectifDuJour: { connue: false }, realiseAujourdHui: 0 })} />,
+      <BandeProgression jeu={jeuPret({ objectifDuJour: { connue: false, motif: 'historique_insuffisant' }, realiseAujourdHui: 0 })} />,
     );
     expect(screen.getByText('Historique encore insuffisant')).toBeDefined();
     expect(screen.getByText('pas encore')).toBeDefined();
@@ -131,7 +182,7 @@ describe('BandeProgression — anneau d objectif', () => {
   it('revele au survol l explication complete de l historique insuffisant, aussi explicite qu avant', async () => {
     const user = userEvent.setup();
     renderWithPreferences(
-      <BandeProgression jeu={jeuPret({ objectifDuJour: { connue: false } })} />,
+      <BandeProgression jeu={jeuPret({ objectifDuJour: { connue: false, motif: 'historique_insuffisant' } })} />,
     );
     const declencheur = screen.getByText('Historique encore insuffisant').closest('[tabindex]');
     expect(declencheur).not.toBeNull();
@@ -155,7 +206,7 @@ describe('BandeProgression — anneau d objectif', () => {
     renderWithPreferences(
       <BandeProgression
         jeu={jeuPret({
-          objectifDuJour: { connue: false },
+          objectifDuJour: { connue: false, motif: 'historique_insuffisant' },
           serie: { jours: 0, borneAtteinte: false },
           badges: [
             { id: 'premiere_relance_tenue', etat: 'non_mesurable' },
@@ -331,7 +382,7 @@ describe('BandeProgression — chargement et erreur, distincts l un de l autre e
   });
 
   it('un jeu pret mais sans historique reste distinct du chargement et de l erreur', () => {
-    renderWithPreferences(<BandeProgression jeu={jeuPret({ objectifDuJour: { connue: false } })} />);
+    renderWithPreferences(<BandeProgression jeu={jeuPret({ objectifDuJour: { connue: false, motif: 'historique_insuffisant' } })} />);
     expect(screen.getByText('Historique encore insuffisant')).toBeDefined();
     expect(screen.queryByText('Chargement du tableau de jeu…')).toBeNull();
     expect(screen.queryByText(/n’a pas pu se charger/)).toBeNull();
@@ -380,7 +431,7 @@ describe('SerieEnTete — le compteur de serie de la barre du haut', () => {
    */
   it('affiche le compteur des un jour de serie, meme si l objectif n est pas encore connu', () => {
     renderWithPreferences(
-      <SerieEnTete jeu={jeuPret({ objectifDuJour: { connue: false }, serie: { jours: 5, borneAtteinte: false } })} />,
+      <SerieEnTete jeu={jeuPret({ objectifDuJour: { connue: false, motif: 'historique_insuffisant' }, serie: { jours: 5, borneAtteinte: false } })} />,
     );
     expect(screen.getByText('5 jours')).toBeDefined();
   });

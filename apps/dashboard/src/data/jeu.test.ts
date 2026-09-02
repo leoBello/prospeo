@@ -456,7 +456,7 @@ describe('fetchJeu', () => {
 
   it('sur une base entierement vide, rend un jeu au repos plutot que d echouer', async () => {
     const jeu = await fetchJeu(fakeClient({}), new Date('2026-09-02T00:00:00Z'));
-    expect(jeu.objectifDuJour).toEqual({ connue: false });
+    expect(jeu.objectifDuJour).toEqual({ connue: false, motif: 'historique_insuffisant' });
     expect(jeu.serie).toEqual({ jours: 0, borneAtteinte: false });
     expect(jeu.palier).toEqual({ points: 0, seuil: 500, numero: 1, progression: 0, complet: false });
     expect(jeu.badges.every((b) => b.etat !== 'obtenu')).toBe(true);

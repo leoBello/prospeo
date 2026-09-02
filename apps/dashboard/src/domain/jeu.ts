@@ -281,6 +281,50 @@ function relancesTenuesAujourdHui(relances: readonly RelanceTenue[], maintenant:
  */
 export const FENETRE_OBJECTIF_JOURS = 14;
 
+/**
+ * Pourquoi `objectifDuJour` ne peut pas proposer une valeur — deux motifs,
+ * jamais confondus (doctrine des absences distinctes de ce dépôt, voir
+ * `ProspectView`, `domain/prospect.ts`, et le docstring de `Mesure`
+ * ci-dessus).
+ *
+ * **Ce type ne réutilise délibérément pas la forme générique `Mesure<T>`.**
+ * `Mesure<T>` sert aussi `relancesTenuesCumulees` (voir `calculerPalier`,
+ * `data/jeu.ts`), qui n'a jamais qu'UNE seule raison de manquer — aucune
+ * source honnête pour un cumul depuis toujours. `objectifDuJour`, lui, en a
+ * deux, de nature différente : forcer un `motif` générique sur
+ * `relancesTenuesCumulees` aurait imposé d'y inventer une valeur qui ne
+ * correspond à rien de réel pour ce cumul-là. Un type dédié à
+ * `objectifDuJour` porte donc la distinction sans polluer l'autre usage —
+ * vérifié par `grep` avant ce correctif : `Mesure<T>` a bien deux
+ * consommateurs, pas un seul.
+ *
+ * - `historique_insuffisant` : aucun jour civil complet n'a encore pu être
+ *   observé — aucune ligne `observe` de `pipeline_event` (dans la fenêtre,
+ *   et rien avant elle non plus), ou la plus ancienne date d'aujourd'hui
+ *   même. L'état du jour de la livraison.
+ * - `mediane_nulle` : l'historique est cette fois suffisant — potentiellement
+ *   les quatorze jours pleins — mais la médiane calculée vaut zéro : la
+ *   moitié (au moins) des jours de la fenêtre n'a vu aucune relance tenue.
+ *   **Rien ne manque ici, c'est une VALEUR mesurée.** Mais le propriétaire a
+ *   tranché : un objectif de zéro n'est pas affichable comme un objectif —
+ *   l'anneau n'aurait alors aucune cible non triviale à proposer. Rendre
+ *   `{connue: true, valeur: 0}` referait, sous une autre forme, l'erreur que
+ *   ce correctif corrige (« 0 / 0 » puis « 1 / 0 », arithmétiquement juste et
+ *   visuellement absurde) ; rendre le MÊME motif que
+ *   `historique_insuffisant` mentirait dans l'autre sens, en présentant une
+ *   mesure réelle comme un manque de données.
+ */
+export type MotifObjectifInconnu = 'historique_insuffisant' | 'mediane_nulle';
+
+/**
+ * Le résultat d'`objectifDuJour` : une valeur connue — toujours strictement
+ * positive, voir `MotifObjectifInconnu.mediane_nulle` — ou l'un des deux
+ * motifs distincts qui expliquent pourquoi elle manque encore.
+ */
+export type ObjectifDuJour =
+  | { readonly connue: true; readonly valeur: number }
+  | { readonly connue: false; readonly motif: MotifObjectifInconnu };
+
 /** La date la plus ancienne parmi les lignes OBSERVÉES fournies, ou `null` s'il n'y en a aucune. */
 function premiereObservation(evenementsPipeline: readonly FaitPipeline[]): Date | null {
   let premiere: Date | null = null;
@@ -318,30 +362,40 @@ function mediane(valeurs: readonly number[]): number {
  * tout l'historique tient alors dans la fenêtre lue) déterminer une fenêtre
  * plus courte.
  *
- * `{connue: false}` (voir `Mesure`) dès qu'AUCUN jour civil complet n'a
- * encore pu être observé — c'est-à-dire dès qu'aucune ligne `observe` de
- * `pipeline_event` n'existe encore (dans la fenêtre, et rien avant elle non
- * plus), ou que la plus ancienne date d'aujourd'hui même.
+ * `{connue: false, motif: 'historique_insuffisant'}` (voir
+ * `MotifObjectifInconnu`) dès qu'AUCUN jour civil complet n'a encore pu être
+ * observé — c'est-à-dire dès qu'aucune ligne `observe` de `pipeline_event`
+ * n'existe encore (dans la fenêtre, et rien avant elle non plus), ou que la
+ * plus ancienne date d'aujourd'hui même.
  *
  * Passé ce seuil, la médiane porte sur AUTANT de jours que l'historique en
  * fournit — un jour sans aucune relance tenue y entre avec un compte de
  * zéro, un vrai zéro mesuré et non une absence. Elle ne réclame jamais
  * quatorze jours pleins, pour ne pas transformer chaque semaine de mise en
- * service en `{connue: false}`.
+ * service en absence.
+ *
+ * **Correctif de revue.** Si la médiane ainsi calculée vaut zéro, elle
+ * n'est PAS rendue comme une valeur : voir `MotifObjectifInconnu.mediane_nulle`
+ * pour le motif, distinct de `historique_insuffisant` bien que le résultat
+ * porte la même forme `{connue: false}` à l'écran. C'est le seul endroit de
+ * cette fonction où un calcul par ailleurs réussi est délibérément refusé en
+ * sortie.
  */
 export function objectifDuJour(
   evenementsPipeline: readonly FaitPipeline[],
   relances: readonly RelanceTenue[],
   maintenant: Date,
   historiqueAuDelaDeLaFenetre: boolean,
-): Mesure<number> {
+): ObjectifDuJour {
   const debut = premiereObservation(evenementsPipeline);
-  if (!historiqueAuDelaDeLaFenetre && debut === null) return { connue: false };
+  if (!historiqueAuDelaDeLaFenetre && debut === null) {
+    return { connue: false, motif: 'historique_insuffisant' };
+  }
 
   const tailleFenetre = historiqueAuDelaDeLaFenetre
     ? FENETRE_OBJECTIF_JOURS
     : Math.min(FENETRE_OBJECTIF_JOURS, joursCivils(debut!, maintenant));
-  if (tailleFenetre <= 0) return { connue: false };
+  if (tailleFenetre <= 0) return { connue: false, motif: 'historique_insuffisant' };
 
   const comptesParJour = new Map<number, number>();
   for (const r of relances) {
@@ -357,7 +411,14 @@ export function objectifDuJour(
     valeurs.push(comptesParJour.get(decalage) ?? 0);
   }
 
-  return { connue: true, valeur: mediane(valeurs) };
+  const valeur = mediane(valeurs);
+  // Le propriétaire a tranché : une médiane nulle ne s'affiche pas comme un
+  // objectif — voir `MotifObjectifInconnu.mediane_nulle`. C'est une mesure
+  // réelle (l'historique est suffisant), donc un motif différent de
+  // `historique_insuffisant` ci-dessus, jamais le même.
+  if (valeur === 0) return { connue: false, motif: 'mediane_nulle' };
+
+  return { connue: true, valeur };
 }
 
 /**
@@ -559,7 +620,7 @@ export interface EntreesJeu {
 
 /** Le jeu assemblé — ce que `data/jeu.ts` (tâche 7) et l'écran (tâche 8) consomment. */
 export interface Jeu {
-  readonly objectifDuJour: Mesure<number>;
+  readonly objectifDuJour: ObjectifDuJour;
   /** Voir le docstring de `relancesTenuesAujourdHui` : le numérateur de l'anneau, jamais une `Mesure`. */
   readonly realiseAujourdHui: number;
   readonly serie: Serie;
