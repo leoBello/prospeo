@@ -45,7 +45,6 @@
   --space-3: 12px;
   --space-4: 16px;
   --space-5: 24px;
-  --space-6: 32px;
 
   --radius-sm: 4px;
   --radius-md: 6px;
@@ -66,7 +65,6 @@
   --text-2xl: 24px;
 
   --z-panel: 10;
-  --z-overlay: 20;
   --z-tooltip: 30;
 
   /* L'ombre d'un calque flottant se lit contre son fond : dense sur le thème

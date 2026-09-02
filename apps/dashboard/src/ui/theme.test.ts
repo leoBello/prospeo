@@ -117,13 +117,7 @@ describe('theme.css', () => {
     expect(consommateurs.length).toBeGreaterThan(1);
   });
 
-  it('ne laisse aucun token declare sans consommateur, hors reserve documentee', () => {
-    // Tokens sans consommateur au moment de la tache 1, mais dont la decision
-    // (les employer ou les retirer) revient au pilote du chantier plutot qu'a
-    // ce test — voir `.superpowers/sdd/task-1-report.md`. Toute entree ajoutee
-    // ici doit etre justifiee dans ce rapport ; ce n'est pas une echappatoire
-    // pour faire taire un futur token mort.
-    const reserveDocumentee = new Set(['--space-6', '--z-overlay']);
+  it('ne laisse aucun token declare sans consommateur', () => {
 
     const fichiersSource = [...listerFichiers(racineSrc, '.module.css'), ...listerFichiers(racineSrc, '.tsx')];
 
@@ -147,7 +141,7 @@ describe('theme.css', () => {
     ];
 
     const orphelins = tokensDeclares.filter(
-      (tok) => !reserveDocumentee.has(tok) && !contenus.some((contenu) => contenu.includes(`var(${tok})`)),
+      (tok) => !contenus.some((contenu) => contenu.includes(`var(${tok})`)),
     );
 
     expect(orphelins).toEqual([]);
