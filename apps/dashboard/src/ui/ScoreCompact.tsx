@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { SCORING_RULESET } from '@prospeo/core';
 import type { ScoreView } from '../domain/prospect.js';
-import { groupBreakdown } from '../domain/score.js';
+import { SCORE_BAR_GROUPS, groupBreakdown } from '../domain/score.js';
+import type { ScoreBarGroup } from '../domain/score.js';
 import type { TranslationKey } from '../i18n/translate.js';
 import { Absent } from './kit/Card.js';
 import { Tooltip } from './kit/Tooltip.js';
@@ -14,19 +16,35 @@ const CLE_GROUPE: Record<string, TranslationKey> = {
   disqualifiant: 'score.group.disqualifiant',
 };
 
-/** Plafond de chaque bloc au barème, pour donner une échelle aux barres. */
-const PLAFOND: Record<string, number> = {
-  presence: 30,
-  vitalite: 35,
-  joignabilite: 35,
-  disqualifiant: 100,
+/**
+ * Plafond de chaque bloc, dérivé du barème réel (`SCORING_RULESET`) plutôt que
+ * ressaisi à la main — un plafond ressaisi dérive à la première évolution des
+ * règles : l'ancien plafond « presence » disait 30, alors que le barème
+ * attribue 45 à `social_only`.
+ *
+ * - `presence` : une seule ligne de présence est jamais posée par
+ *   `computeScore` ; le plafond est le maximum des points du barème
+ *   `presence` (les valeurs négatives, comme `has_site`, ne peuvent pas être
+ *   le maximum).
+ * - `joignabilite` : une seule ligne de téléphone est jamais posée ; même
+ *   logique sur le barème `phone`.
+ * - `vitalite` : plusieurs lignes peuvent se cumuler (réputation, volume
+ *   d'avis, fraîcheur sociale, effectif, ancienneté) ; le plafond en est la
+ *   somme. Deux de ces règles sont actuellement INERTES faute de donnée
+ *   source (voir les commentaires du barème) — les compter quand même rend le
+ *   plafond correct le jour où la donnée revient, sans toucher ce fichier.
+ */
+const R = SCORING_RULESET;
+const PLAFOND: Record<ScoreBarGroup, number> = {
+  presence: Math.max(...Object.values(R.presence)),
+  vitalite: R.reputation.points + R.reviewsVolume.points + R.socialFresh.points + R.staff.points + R.age.points,
+  joignabilite: Math.max(R.phone.mobile, R.phone.landline),
 };
 
-const COULEUR: Record<string, string> = {
+const COULEUR: Record<ScoreBarGroup, string> = {
   presence: 'var(--color-seg-presence)',
   vitalite: 'var(--color-seg-vitalite)',
   joignabilite: 'var(--color-seg-joignabilite)',
-  disqualifiant: 'var(--color-danger)',
 };
 
 const RAYON = 35;
@@ -49,12 +67,24 @@ export function ScoreCompact({ score }: { score: ScoreView | null }) {
   const [ouvert, setOuvert] = useState(false);
 
   // Un prospect non scoré n'est pas un prospect à zéro, et la distinction
-  // remonte jusqu'à l'écran (§ doctrine du chantier 1).
+  // remonte jusqu'à l'écran (§ doctrine du chantier 1). Le libellé court reste
+  // visible — c'est l'état de 114 prospects sur 139 — et la phrase longue
+  // passe en survol, comme le résout déjà ScoreBar pour la même raison.
   if (score === null) {
-    return <Absent>{t('score.absent.hint')}</Absent>;
+    return (
+      <Absent>
+        <Tooltip contenu={t('score.absent.hint')}>
+          <span tabIndex={0}>{t('score.absent')}</span>
+        </Tooltip>
+      </Absent>
+    );
   }
 
-  const groupes = groupBreakdown(score.breakdown);
+  // Le reçu garde les QUATRE groupes du barème, `disqualifiant` compris : ses
+  // points comptent dans le total, et les perdre casserait la raison d'être
+  // du reçu (§ binding constraint « le reçu ne perd rien »).
+  const groupesRecu = groupBreakdown(score.breakdown);
+  const parGroupe = new Map(groupesRecu.map((g) => [g.group, g]));
   const remplissage = Math.max(0, Math.min(1, score.total / 100));
 
   return (
@@ -89,28 +119,34 @@ export function ScoreCompact({ score }: { score: ScoreView | null }) {
         </div>
 
         <div className={styles.groupes}>
-          {groupes.map((groupe) => {
-            const points = groupe.lines.reduce((somme, l) => somme + l.points, 0);
-            const plafond = PLAFOND[groupe.group] ?? 100;
+          {/*
+           * Le résumé, lui, affiche TOUJOURS les trois mêmes blocs, dans le
+           * même ordre — `SCORE_BAR_GROUPS`, pas `groupesRecu`. Un
+           * établissement fermé n'a qu'une ligne `disqualifiant` : dérivé de
+           * `groupBreakdown()`, le résumé n'aurait affiché qu'une seule barre.
+           * Une franchise en aurait affiché quatre. Un groupe sans ligne
+           * affiche 0, il ne disparaît pas — c'est ce qui rend deux
+           * prospects à 71 comparables d'un coup d'œil (§ commentaire de
+           * `SCORE_BAR_GROUPS`).
+           */}
+          {SCORE_BAR_GROUPS.map((group) => {
+            const groupe = parGroupe.get(group);
+            const lignes = groupe?.lines ?? [];
+            const points = groupe?.subtotal ?? 0;
+            const plafond = PLAFOND[group];
             const part = Math.max(0, Math.min(1, points / plafond));
-            const detail = groupe.lines.map((l) => `${l.label} (${l.points >= 0 ? '+' : ''}${l.points})`).join(' · ');
+            const detail = lignes.map((l) => `${l.label} (${l.points >= 0 ? '+' : ''}${l.points})`).join(' · ');
             return (
-              <Tooltip
-                key={groupe.group}
-                intitule={`${t(CLE_GROUPE[groupe.group] ?? 'score.group.presence')} · ${points} / ${plafond}`}
-                contenu={detail}
-              >
-                <div className={styles.groupe} tabIndex={0}>
+              <Tooltip key={group} intitule={`${t(CLE_GROUPE[group] ?? 'score.group.presence')} · ${points} / ${plafond}`} contenu={detail}>
+                <div className={styles.groupe} tabIndex={0} data-groupe={group}>
                   <div className={styles.groupeTete}>
-                    <span className={styles.groupeNom}>
-                      {t(CLE_GROUPE[groupe.group] ?? 'score.group.presence')}
-                    </span>
+                    <span className={styles.groupeNom}>{t(CLE_GROUPE[group] ?? 'score.group.presence')}</span>
                     <span className={styles.groupePoints}>{points}</span>
                   </div>
                   <div className={styles.piste}>
                     <div
                       className={styles.remplissage}
-                      style={{ width: `${part * 100}%`, background: COULEUR[groupe.group] }}
+                      style={{ width: `${part * 100}%`, background: COULEUR[group] }}
                     />
                   </div>
                 </div>
@@ -125,12 +161,10 @@ export function ScoreCompact({ score }: { score: ScoreView | null }) {
       </button>
 
       {ouvert ? (
-        <div className={styles.recu}>
-          {groupes.map((groupe) => (
-            <div key={groupe.group} className={styles.recuGroupe}>
-              <h4 className={styles.recuGroupeTitre}>
-                {t(CLE_GROUPE[groupe.group] ?? 'score.group.presence')}
-              </h4>
+        <div className={styles.recu} data-testid="score-recu">
+          {groupesRecu.map((groupe) => (
+            <div key={groupe.group} className={styles.recuGroupe} data-recu-groupe={groupe.group}>
+              <h4 className={styles.recuGroupeTitre}>{t(CLE_GROUPE[groupe.group] ?? 'score.group.presence')}</h4>
               {groupe.lines.map((ligne) => (
                 <div key={ligne.code} className={styles.ligne}>
                   {/* Libellé du barème : une DONNÉE, affichée telle quelle. */}

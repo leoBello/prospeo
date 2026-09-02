@@ -57,4 +57,77 @@ describe('ScoreCompact', () => {
     renderWithPreferences(<ScoreCompact score={score()} />);
     expect(screen.getByRole('img').getAttribute('aria-label')).toContain('74');
   });
+
+  it('un etablissement ferme (une seule ligne disqualifiant) affiche quand meme trois barres', () => {
+    // groupBreakdown() ne rend qu'un groupe ici : { disqualifiant: [closed] }.
+    // Le resume doit rester fixe a trois barres (presence/vitalite/joignabilite),
+    // pas suivre l'ensemble variable que rend groupBreakdown().
+    const { container } = renderWithPreferences(
+      <ScoreCompact
+        score={score({
+          total: 0,
+          breakdown: [{ code: 'closed', label: 'Établissement cessé', points: 0, group: 'disqualifiant' }],
+        })}
+      />,
+    );
+    const barres = container.querySelectorAll('[data-groupe]');
+    expect(barres).toHaveLength(3);
+    expect([...barres].map((b) => b.getAttribute('data-groupe'))).toEqual([
+      'presence',
+      'vitalite',
+      'joignabilite',
+    ]);
+  });
+
+  it('une franchise (trois groupes normaux + disqualifiant) garde trois barres au resume, et le recu montre la ligne disqualifiant', async () => {
+    const user = userEvent.setup();
+    const { container } = renderWithPreferences(
+      <ScoreCompact
+        score={score({
+          breakdown: [
+            { code: 'presence_none', label: 'Aucune présence web', points: 35, group: 'presence' },
+            { code: 'rating', label: 'Note 4,6', points: 25, group: 'vitalite' },
+            { code: 'phone_mobile', label: 'Mobile trouvé', points: 20, group: 'joignabilite' },
+            { code: 'franchise', label: 'Enseigne de réseau', points: -30, group: 'disqualifiant' },
+          ],
+        })}
+      />,
+    );
+
+    // Le resume reste a trois barres : disqualifiant n'en gagne pas une quatrieme.
+    const barres = container.querySelectorAll('[data-groupe]');
+    expect(barres).toHaveLength(3);
+
+    // Le recu, lui, garde les quatre groupes : ces points comptent dans le total.
+    await user.click(screen.getByRole('button', { name: /reçu/i }));
+    expect(container.querySelector('[data-recu-groupe="disqualifiant"]')).not.toBeNull();
+    expect(screen.getByText('Enseigne de réseau')).toBeDefined();
+  });
+
+  it('le recu affiche chaque ligne, points negatifs et signe compris, sans en perdre aucune', async () => {
+    const user = userEvent.setup();
+    const lignes = [
+      { code: 'presence_none', label: 'Aucune présence web', points: 35, group: 'presence' as const },
+      { code: 'rating', label: 'Note 4,6', points: 25, group: 'vitalite' as const },
+      { code: 'phone_none', label: 'Aucun téléphone', points: -25, group: 'joignabilite' as const },
+      { code: 'franchise', label: 'Enseigne de réseau', points: -30, group: 'disqualifiant' as const },
+    ];
+    renderWithPreferences(<ScoreCompact score={score({ breakdown: lignes })} />);
+    await user.click(screen.getByRole('button', { name: /reçu/i }));
+
+    for (const ligne of lignes) {
+      const attendu = ligne.points >= 0 ? `+${ligne.points}` : `${ligne.points}`;
+      const bloc = screen.getByText(ligne.label).closest('div');
+      expect(bloc?.textContent).toContain(attendu);
+    }
+  });
+
+  it('une absence de score garde le libelle court visible, la phrase longue en survol', () => {
+    // ScoreBar.tsx resout deja ce cas : le libelle court reste visible pour le
+    // cas majoritaire (114 prospects sur 139), la phrase longue passe en
+    // infobulle plutot que d'occuper la place en permanence.
+    renderWithPreferences(<ScoreCompact score={null} />);
+    expect(screen.getByText('pas encore scoré')).toBeDefined();
+    expect(screen.queryByText(/Ce prospect n.a pas de score/i)).toBeNull();
+  });
 });
