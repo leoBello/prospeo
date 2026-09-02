@@ -29,6 +29,20 @@ artboard, pages, et les notes qui les commentent.
 
 ---
 
+## Ces maquettes sont contraignantes
+
+`Composants.dc.html` n'est pas une planche d'illustration : c'est le
+**vocabulaire d'interface du projet**, et
+[`../GUIDELINES.md`](../GUIDELINES.md) en fait une règle. Tout composant neuf
+en part, et un composant **important** passe par une maquette approuvée avant
+d'être écrit — les critères y sont énoncés.
+
+Raison courte : **aucun test de ce dépôt ne voit une mise en page.** `jsdom`
+ne calcule ni largeur, ni hauteur, ni débordement. La maquette est le seul
+contrôle qui les voie, et le chantier n°6 l'a appris trois fois.
+
+---
+
 ## Statut des données affichées
 
 **Tout ce qui est affiché est un échantillon.** Les noms d'entreprises, SIRET,
