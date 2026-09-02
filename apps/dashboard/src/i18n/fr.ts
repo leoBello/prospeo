@@ -95,7 +95,15 @@ export const fr = {
   'enrichment.not_found': 'Aucune fiche Google trouvée',
   'enrichment.ambiguous': 'Appariement à trancher',
   'enrichment.blocked': 'Enrichissement bloqué par Google',
-  'enrichment.absent': 'Pas encore enrichi',
+  // Aligné sur le patron déjà établi par `site.absent` et `messages.absent` :
+  // nommer l'étage du pipeline qui n'est pas encore passé, pas juste dire
+  // « pas encore ». C'est ce texte que `FicheTab` affiche pour distinguer
+  // « l'étage enrich n'a pas tourné » de « la source n'a rien publié ».
+  'enrichment.absent': 'Aucune coordonnée : l’étage « enrich » n’est pas passé sur ce prospect.',
+  'enrichment.reviews.hint':
+    'Google ne publie plus le nombre d’avis depuis août 2026. Relancer l’enrichissement ne remplira pas ce champ.',
+  'enrichment.confidence.hint':
+    'Confiance de l’appariement avec la fiche Google. Sous le seuil haut, le rattachement est un pari — et c’est au téléphone qu’un faux appariement se paie.',
 
   'panel.close': 'Fermer le panneau',
   'panel.empty': 'Sélectionnez un prospect pour afficher sa fiche.',

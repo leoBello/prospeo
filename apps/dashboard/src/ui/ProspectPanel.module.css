@@ -271,3 +271,15 @@
   padding-top: var(--space-3);
   border-top: 1px solid var(--color-border);
 }
+
+.grille {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+/* Le score court sur les deux colonnes : c'est le seul bloc dont la lecture
+   se fait en largeur, les trois groupes cote a cote. */
+.pleineLargeur {
+  grid-column: span 2;
+}
