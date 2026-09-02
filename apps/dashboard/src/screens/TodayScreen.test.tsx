@@ -221,7 +221,8 @@ function rendre(prospects: ProspectView[]) {
 
 describe('TodayScreen', () => {
   it('n inscrit pas un prospect sans score dans une file de travail', () => {
-    // Sur la base reelle, 114 prospects sur 139 n'ont aucun score. Ils n'ont
+    // Sur la base reelle, 10 prospects sur 139 n'ont aucun score (releve du
+    // 2 septembre 2026). Ils n'ont
     // pas de ligne — aucune action n'est possible dessus. L'ancien couple
     // « Qualifies » / « En base » qui portait cet ecart a ete retire de la
     // bande de progression (voir le rapport de la tache 8, alignement sur la

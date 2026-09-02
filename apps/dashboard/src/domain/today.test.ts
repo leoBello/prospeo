@@ -121,7 +121,9 @@ describe('buildToday', () => {
   });
 
   it('n inscrit un prospect sans score dans aucune file de travail', () => {
-    // 114 prospects sur 139 sont dans ce cas. Les faire tomber a zero les
+    // 10 prospects sur 139 sont dans ce cas (releve du 2 septembre 2026,
+    // apres qu'une campagne de scoring a couvert la majorite de la base).
+    // Les faire tomber a zero les
     // placerait en bas d'une liste ou ils n'ont rien a faire ; leur donner une
     // file a eux couterait douze arrets aux fleches pour des lignes sur
     // lesquelles aucune action n'est possible. Leur nombre n'est plus compte

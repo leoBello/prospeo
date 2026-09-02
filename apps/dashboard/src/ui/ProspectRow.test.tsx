@@ -68,8 +68,8 @@ describe('ProspectRow', () => {
   });
 
   it('nomme l absence de ligne de pipeline plutot que de laisser le badge muet', () => {
-    // 114 prospects sur 139 sont dans ce cas : c'est l'affichage le plus
-    // frequent, pas un cas degrade.
+    // 137 prospects sur 139 sont dans ce cas (releve du 2 septembre 2026) :
+    // c'est l'affichage le plus frequent, pas un cas degrade.
     rendre(ligne({ pipeline: null }));
     expect(screen.getByText('Jamais contacté')).toBeDefined();
   });

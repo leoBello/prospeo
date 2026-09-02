@@ -25,8 +25,8 @@ describe('ScoreCompact', () => {
   });
 
   it('affiche une absence de score comme une absence, jamais comme un zero', () => {
-    // 114 prospects sur 139. Un « 0 » les ferait lire comme juges sans valeur,
-    // alors qu'ils n'ont pas ete juges.
+    // 10 prospects sur 139 (releve du 2 septembre 2026). Un « 0 » les ferait
+    // lire comme juges sans valeur, alors qu'ils n'ont pas ete juges.
     const { container } = renderWithPreferences(<ScoreCompact score={null} />);
     expect(container.querySelector('[data-absent="true"]')).not.toBeNull();
     expect(screen.queryByText('0')).toBeNull();
@@ -169,9 +169,11 @@ describe('ScoreCompact', () => {
   });
 
   it('une absence de score garde le libelle court visible, la phrase longue en survol', () => {
-    // ScoreBar.tsx resout deja ce cas : le libelle court reste visible pour le
-    // cas majoritaire (114 prospects sur 139), la phrase longue passe en
-    // infobulle plutot que d'occuper la place en permanence.
+    // ScoreBar.tsx resout deja ce cas : le libelle court reste visible pour
+    // ce cas (10 prospects sur 139 au 2 septembre 2026, une minorite depuis
+    // qu'une campagne de scoring a couvert la base — le choix ne depend pas
+    // du volume), la phrase longue passe en infobulle plutot que d'occuper
+    // la place en permanence.
     renderWithPreferences(<ScoreCompact score={null} />);
     expect(screen.getByText('pas encore scoré')).toBeDefined();
     expect(screen.queryByText(/Ce prospect n.a pas de score/i)).toBeNull();

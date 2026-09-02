@@ -36,8 +36,9 @@ describe('StatusBadge', () => {
   });
 
   it('dit « jamais contacte » plutot que de ne rien afficher quand le suivi est absent', () => {
-    // 114 prospects sur 139 n'ont aucune ligne de pipeline. Un badge vide se
-    // lirait comme un defaut d'affichage ; l'absence est un etat reel.
+    // 137 prospects sur 139 n'ont aucune ligne de pipeline (releve du
+    // 2 septembre 2026). Un badge vide se lirait comme un defaut
+    // d'affichage ; l'absence est un etat reel.
     renderWithPreferences(<StatusBadge status={null} />);
     expect(screen.getByText('Jamais contacté')).toBeDefined();
   });

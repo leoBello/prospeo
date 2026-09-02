@@ -36,7 +36,7 @@ const CLE: Record<Statut, TranslationKey> = {
 /**
  * Le statut de suivi, ou son absence.
  *
- * `null` n'est pas un cas dégénéré : au 1ᵉʳ septembre 2026, 114 prospects sur
+ * `null` n'est pas un cas dégénéré : au 2 septembre 2026, 137 prospects sur
  * 139 n'ont aucune ligne dans `prospect_pipeline`. « Jamais contacté » est
  * donc l'affichage le plus fréquent, et il doit se lire comme un état.
  */

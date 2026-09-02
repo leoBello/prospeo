@@ -1,7 +1,7 @@
 # Handoff — ce que la maquette montre et que la base ne sait pas encore
 
-> Mis à jour à la fin du lot 1, puis à la fin du lot 2. À relire avant
-> d'ouvrir le lot 3.
+> Mis à jour à la fin du lot 1, du lot 2, puis du lot 3. À relire avant
+> d'ouvrir le lot 4.
 >
 > Règle : **toute zone d'interface rendue inerte par `<Bientot>` a sa ligne
 > ici.** Une affordance « bientôt » sans entrée dans ce tableau est un oubli,
@@ -77,6 +77,176 @@ garde rien d'autre qui les distingue), et `retrait/echoue` quand le garde-fou
 bloque une suppression ou qu'une suppression Vercel rate. **Le mode
 `--dry-run` n'émet rien** : journaliser un retrait qui n'a pas eu lieu ferait
 de la table un récit de travail imaginaire.
+
+## Ce qui est en place à la fin du lot 3
+
+| Composant | Fichier | État |
+|---|---|---|
+| Fonte d'affichage, quatre titres d'écran + titre du panneau, chiffre de la jauge en chasse fixe | `src/ui/theme.css`, `src/ui/ScoreCompact.tsx` | livré — tokens orphelins retirés (`--color-surface-3`, `--space-6`, `--z-overlay`), `--text-2xl` employé ; `src/ui/theme.test.ts` vérifie désormais qu'aucun token déclaré n'est sans consommateur |
+| Barre du haut : nom de l'application, recherche, préférences repliées derrière un compte (Popover Base UI), déconnexion | `src/ui/BarreHaut.tsx`, `src/ui/plateforme.ts` | livré — la recherche filtre les listes de travail déjà chargées, et le dit ; ce ne sont pas les 139 prospects de la base. Le raccourci clavier donne réellement le focus, et son libellé affiché correspond à la touche qui marche sur la plateforme courante |
+| Lignes de liste : liseré de sélection, nom, `StatusBadge`, raison de présence, `ScoreBar` ; en-tête de section avec compteur en pastille et filet | `src/ui/ProspectRow.tsx` | livré — `Badge` gagne une taille compacte ; le code postal et la ville quittent la ligne (voir « Ce que ce lot a fait tomber », plus bas) |
+| Table `pipeline_event` : une ligne par changement de statut, portant le statut **et** la `next_action_at` en vigueur à ce moment ; colonne `origin` (`observe` / `amorcage`) | `supabase/migrations/20260902120000_pipeline_event.sql` | livré, appliquée à l'instance réelle |
+| `definirStatut` écrit l'historique en plus de l'état | `src/data/mutations.ts`, `src/ui/actions.ts` | livré — ordre décidé et commenté (l'état d'abord, l'historique ensuite), un échec de la seule écriture d'historique est signalé sans être avalé (`EchecDefinirStatut.etape`), et l'écran relit quand même puisque l'état, lui, a changé |
+| Domaine du jeu : relance tenue, série, objectif médian sur 14 jours, palier pondéré, badges | `src/domain/jeu.ts` | livré, fonctions pures |
+| Lectures du jeu : fenêtre bornée par date pour les calculs à fenêtre, `count` serveur pour les cumuls | `src/data/jeu.ts`, `src/data/useJeu.ts` | livré |
+| `BandeProgression`, à la place de `KpiBand` (supprimé) | `src/ui/BandeProgression.tsx` | livré — `computeKpis`, le type `Kpis` et les clés `today.kpi.*` sont retirés avec `KpiBand` |
+
+**État de la suite à la fin du lot 3** : 462 tests dashboard, 339 tests collector, `pnpm -r typecheck` vert.
+
+### L'amorçage de l'historique, et à partir de quand le jeu dira quelque chose de vrai
+
+Relevé sur l'instance réelle, après application de la migration `pipeline_event`
+(2 septembre 2026) :
+
+| Table | Lignes |
+|---|---|
+| `prospect` | 139 |
+| `prospect_score` | 129 |
+| `prospect_pipeline` | 2 |
+| `pipeline_event` | 2 — **toutes deux `amorcage`, aucune `observe`** |
+| `interaction` | 0 |
+| `deployment_event` | 0 |
+
+**L'amorçage n'a produit que deux lignes**, parce que `prospect_pipeline`
+n'en contenait que deux au moment de la migration. Le jeu n'a donc **aucun
+fait observé** : ni relance tenue, ni rendez-vous, ni site mis en ligne
+enregistré depuis un vrai changement de statut. L'écran le dit — objectif
+« pas encore connue », aucun compteur de série — plutôt que d'inventer un
+zéro qui se lirait comme un échec (voir la doctrine des absences distinctes,
+docstring de `BandeProgression.tsx`).
+
+**Le jeu ne dira quelque chose de vrai qu'à partir du moment où :**
+1. de vrais changements de statut passent par `definirStatut` (tâche 5), qui
+   écrit désormais `pipeline_event` avec `origin: 'observe'` — chaque clic
+   sur l'écran en ajoute un ;
+2. des interactions sont journalisées (`journaliserInteraction`), pour que
+   « relance tenue » ait quelque chose à croiser ;
+3. ces faits s'accumulent sur **plusieurs jours civils distincts** — l'objectif
+   médian se calcule sur une fenêtre de 14 jours, et une série suppose des
+   jours différents, pas plusieurs gestes le même jour.
+
+Tant que ce n'est pas le cas, un écran qui affiche « pas encore de série » au
+lieu d'un chiffre n'est pas cassé : il est simplement neuf. Ne pas le
+diagnostiquer comme une régression au lot 4 sans avoir vérifié qu'un mois de
+faits observés existe.
+
+**Corollaire pour le collector.** Les vingt-deux sites déjà en ligne
+(mentionnés au lot 2) n'ont toujours **aucun** `deployment_event` : la
+table est vide. Le collector n'a pas tourné depuis sa création. La source de
+points « site mis en ligne » que le lot 2 déclarait débloquée ne rapporte
+donc rien pour l'instant — non par défaut de code (le chemin d'émission
+existe, voir la table du lot 2 ci-dessus), mais faute de passage réel du
+collector.
+
+### Deux affirmations périmées, corrigées dans le code
+
+Une dizaine d'endroits (`apps/dashboard/src`) portaient « 114 prospects sur
+139 » ou une variante, datée du 1ᵉʳ septembre 2026 et devenue fausse dès le
+lendemain — pire, la même phrase servait pour deux faits différents :
+
+- « 114 sur 139 n'ont aucun **score** » → au 2 septembre 2026, il n'en reste
+  que **10** (`prospect_score` compte 129 lignes) ;
+- « 114 sur 139 n'ont aucune ligne de **pipeline** » → il y en a **137**
+  (`prospect_pipeline` n'en compte que 2).
+
+Les écrans calculaient déjà depuis les données réelles — rien n'était faux à
+l'affichage, seuls des commentaires et des commentaires de test l'étaient.
+Corrigés et datés (2 septembre 2026) dans : `domain/prospect.ts`,
+`domain/today.test.ts`, `screens/TodayScreen.test.tsx`,
+`ui/kit/Badge.test.tsx`, `ui/kit/StatusBadge.tsx`, `ui/ProspectRow.tsx` (+
+son test), `ui/ScoreBar.test.tsx`, `ui/ScoreCompact.tsx` (+ son test),
+`ui/BandeProgression.tsx` (le couple « 139 en base, 25 scorés au 1ᵉʳ
+septembre » qu'y portait le récit de la suppression de `KpiBand` — corrigé en
+139 / 129, les vraies valeurs à la date du retrait). Aucune assertion ne
+dépendait de ces chiffres ; la suite reste verte à l'identique.
+
+**Une troisième catégorie de phrases n'a pas été corrigée par un chiffre.**
+`domain/coherence.test.ts` et `domain/prospect.ts` (docstring) portaient
+aussi « 114 sur 139 » pour un troisième fait — l'absence des **trois**
+satellites à la fois (enrichissement, présence **et** score, pas seulement le
+score). Ce décompte combiné n'a pas été revérifié pour ce lot : rien dans les
+données fournies ne permet de le recalculer sans l'inventer, et un score seul
+(10) ou un pipeline seul (137) ne s'y substitue pas — l'intersection des
+trois peut être n'importe quel nombre entre 0 et 10. Ces deux emplacements
+sont désormais explicites sur ce point (chiffre daté du 1ᵉʳ septembre,
+marqué non revérifié, renvoi ici) plutôt que silencieusement corrigés vers un
+nombre inventé. **Les docs de planification** (`docs/superpowers/plans/*.md`)
+portant les mêmes chiffres n'ont délibérément pas été touchées : ce sont des
+spécifications datées, déjà exécutées, pas de la documentation vivante — les
+corriger reviendrait à réécrire un historique qui était exact au moment où
+il a été écrit.
+
+### Une source de points restera muette tant qu'une migration ne la débloque pas
+
+« **Relance tenue** » croise `pipeline_event.next_action_at` et
+`interaction.occurred_at` : a-t-on relancé un prospect à la date où on avait
+dit qu'on le ferait ? Aucun `count` PostgREST ne peut rendre ce croisement
+(il exige de comparer deux tables ligne à ligne), et le compter sur une
+fenêtre glissante ferait **reverrouiller un badge déjà acquis** — la ligne
+rouge que ce lot s'est fixée dès le départ. Conséquences, écrites dans le
+code et ici :
+
+- `Palier.complet` (voir `domain/jeu.ts`) vaut `false` **en permanence** —
+  pas une absence transitoire — et l'écran l'écrit sous la jauge : le score
+  du palier omet cette source (40 points sur l'unité) ;
+- le badge `premiere_relance_tenue` porte l'état **`non_mesurable`**
+  (`EtatBadgeValeur`, troisième état, distinct de `verrouille`) : aucun
+  geste de l'opérateur ne peut le débloquer, contrairement à un badge
+  simplement `verrouille`.
+
+**Ce qui le débloquerait** : une vue ou une fonction en base qui calcule ce
+croisement côté serveur (PostgreSQL peut le faire ; PostgREST seul ne le
+peut pas). Ce serait une migration de plus sur une instance de production,
+et **cette décision n'a pas été prise dans ce lot** — elle reste à trancher
+par un humain, au même titre que les deux décisions listées plus bas.
+
+### Une vérification qui n'a pas pu être faite
+
+`data/jeu.ts` borne sa lecture de `pipeline_event` par
+`.or('occurred_at.gte.…,next_action_at.gte.…')`. La validité exacte de
+cette chaîne PostgREST n'a **pas** été vérifiée contre une vraie instance —
+seulement contre les tests, qui simulent le client. Le mode d'échec, si la
+chaîne était mal formée, serait un rejet **bruyant** propagé par
+`fetchAllRows` (une erreur réseau visible), pas une régression silencieuse :
+si le jeu se met à échouer bruyamment plutôt que de lire moins que prévu,
+regarder ici en premier. À fumer-tester au premier usage réel de l'écran
+avec des faits observés.
+
+### La largeur réelle de la colonne, et un angle mort de méthode
+
+`ProspectPanel` fait 720 px et le rail 56 px : la colonne qui porte la liste
+et la bande ne fait que **~664 px** sur un écran de 1440 px de large. Des
+points de rupture exprimés en largeur de **fenêtre** ne s'y déclenchent donc
+jamais. `BandeProgression` est passée en **requête de conteneur** pour cette
+raison précise (voir son docstring). **Les autres composants de la colonne
+n'ont pas été revus sous cet angle** — c'est une piste à vérifier au lot 4,
+pas un défaut constaté.
+
+Une leçon de méthode qui mérite sa place à côté du tableau des pertes plus
+bas : **aucun test de ce dépôt ne voit une mise en page** — `jsdom` ne
+calcule aucune géométrie. Trois défauts visuels de `BandeProgression` ont
+traversé successivement 446, 460 puis 468 tests verts sans qu'aucun ne les
+révèle ; c'est l'œil du propriétaire qui les a trouvés, à deux reprises.
+C'est la même classe de trou que le tableau des pertes documente pour les
+faits tombés en silence — sauf qu'ici, aucun test à écrire ne le comble : il
+faudrait un outil qui calcule réellement une mise en page (Playwright, par
+exemple), que ce dépôt n'a pas pour ses tests unitaires.
+
+## Ce que ce lot a fait tomber de l'écran — deux pertes, toutes deux délibérées
+
+Une note distincte du tableau « Ce que la réécriture a fait tomber » plus
+bas, qui documente une audit spécifique (la réécriture des sept sections en
+quatre onglets, lot 1) et dont le décompte à trois ne doit pas être retouché.
+Ce lot a son propre constat, plus court :
+
+| Perdu | Nature | Sort |
+|---|---|---|
+| Code postal et ville, sur la ligne de liste | déplacé, pas perdu | `panel/FicheTab.tsx` affiche l'adresse complète dès l'ouverture du panneau (`{address}, {postalCode} {city}`) — la maquette ne les montre pas sur la ligne |
+| « En base » (139) et « Qualifiés » (129), sur l'écran « Aujourd'hui » | perte réelle | Retirés avec `KpiBand` (tâche 8) ; `computeKpis`, le type `Kpis` et les clés `today.kpi.*` sont retirés avec lui. **Décision du propriétaire** : la maquette ne prévoit pas cette cellule, et c'était la quatrième d'une rangée qui n'en loge que trois dans la largeur réelle du conteneur (voir plus haut). Ces deux chiffres ne sont **plus visibles nulle part** dans le dashboard |
+
+Le premier n'est donc pas une perte au sens du tableau plus bas — le fait
+reste affiché, ailleurs. Le second l'est : contrairement au code postal, rien
+ne restitue « en base » / « qualifiés », et ce n'est pas prévu de le faire.
 
 ## Ce que la réécriture a fait tomber — trois fois, pas une
 
@@ -162,6 +332,17 @@ son docstring pour le détail des trois autres partis pris (flux brouillon,
 lecture en échec distincte d'un historique vide, cas des vingt-deux sites déjà
 en ligne).
 
+**Recensement inchangé à la fin du lot 3.** La même commande
+(`grep -rn "Bientot" apps/dashboard/src --include=*.tsx | grep -v "kit/Bientot" | grep -v ".test."`)
+rend exactement les deux mêmes lignes qu'à la fin du lot 2 : ce lot n'en a
+ajouté aucune et n'en a retiré aucune. Le motif du bouton « Vérifier »
+tient toujours pour la même raison — **aucun code du collector n'écrit
+encore** `checked_at` / `check_ok` / `check_detail`
+(`grep -rn "checked_at\|check_ok" apps/collector/src` ne rend que des
+occurrences de `domain_checked_at`, une colonne distincte, sans rapport avec
+le verdict de contrôle du gabarit). La passe de contrôle GitHub reste hors
+périmètre.
+
 ## Le déclenchement depuis l'interface : un choix de ce lot, pas un oubli
 
 Le dashboard **lit et enregistre** ; il n'appelle jamais GitHub ni Vercel.
@@ -234,11 +415,18 @@ qu'un métier hérite. **`trades.ts` n'a pas été touché** : quels métiers
 déclarent leur propre gabarit reste la décision humaine ci-dessus, et le choix
 1 la fait disparaître sans qu'aucun code ne change.
 
+**Confirmée inchangée et non tranchée à la fin du lot 3.**
+`git log --oneline -- packages/core/src/trades.ts` s'arrête à `9407a19`
+(chantier 5, gabarit « Atelier »), un commit antérieur à ce lot — aucun commit
+du lot 3 ne touche ce fichier. Les deux métiers déclarent toujours leur propre
+`templateRepo`, la carte affiche toujours `gabarit.actif.aucunMetier`, et la
+décision reste ouverte pour un humain, sans trace d'un tranchage silencieux.
+
 ## Ce qui n'est pas encore maquetté ni construit
 
 | Sujet | Décision | Blocage |
 |---|---|---|
-| Série, objectif, palier, badges | D5 | §4.2 : `prospect_pipeline` écrase son passé, donc « relance tenue » n'a aucune source. La **série** se calcule depuis `interaction.occurred_at`, qui existe. Question ouverte du lot 3, ci-dessous — inchangée par ce lot. |
+| Série, objectif, palier, badges | D5 | **Livré au lot 3** (`domain/jeu.ts`, `data/jeu.ts`, `BandeProgression.tsx`) — voir « Ce qui est en place à la fin du lot 3 », plus haut. La question ouverte ci-dessous est résolue (option 1, table `pipeline_event`). Une source reste muette (« relance tenue ») faute d'une migration serveur supplémentaire — voir « Une source de points restera muette », plus haut. |
 | Écran « Base » (les 139 prospects) | hors périmètre du chantier n°6 | — |
 
 L'écran de suivi des déploiements (D9) et l'écran de gabarit GitHub (D10),
@@ -263,3 +451,13 @@ chiffre motivant fondé sur rien est pire que pas de chiffre.
 **Inchangée par le lot 2.** Rien dans ce lot n'a touché `prospect_pipeline` ni
 ajouté de table d'historique du pipeline ; la question reste ouverte telle
 quelle à l'entrée du lot 3.
+
+**Résolue par le lot 3 — option 1 retenue.** La table `pipeline_event`
+(`supabase/migrations/20260902120000_pipeline_event.sql`) porte une ligne par
+changement de statut, avec la `next_action_at` en vigueur à ce moment précis.
+`definirStatut` l'alimente en plus de l'état courant. La série se calcule
+donc désormais sur des faits réels datés, pas sur l'option 2 (affaiblie) qui
+était envisagée ici. Ce que cette résolution ne couvre pas : voir « Une
+source de points restera muette », plus haut — « relance tenue » a besoin
+d'un croisement que `pipeline_event` seule ne suffit pas à rendre calculable
+côté client.

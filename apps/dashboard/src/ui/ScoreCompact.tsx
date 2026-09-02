@@ -82,8 +82,9 @@ export function ScoreCompact({ score }: { score: ScoreView | null }) {
 
   // Un prospect non scoré n'est pas un prospect à zéro, et la distinction
   // remonte jusqu'à l'écran (§ doctrine du chantier 1). Le libellé court reste
-  // visible — c'est l'état de 114 prospects sur 139 — et la phrase longue
-  // passe en survol, comme le résout déjà ScoreBar pour la même raison.
+  // visible — 10 prospects sur 139 sont dans ce cas au 2 septembre 2026 — et
+  // la phrase longue passe en survol, comme le résout déjà ScoreBar pour la
+  // même raison.
   if (score === null) {
     return (
       <Absent>

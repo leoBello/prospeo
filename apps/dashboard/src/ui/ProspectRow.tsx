@@ -52,8 +52,9 @@ export function ProspectRow({ row, selected, currentRulesetVersion, onSelect }: 
         <span className={styles.identity}>
           <span className={styles.topLine}>
             <span className={styles.name}>{nom}</span>
-            {/* `pipeline` est `null` pour 114 prospects sur 139 : ce n'est
-                pas un cas dégénéré à contourner, `StatusBadge` le nomme.
+            {/* `pipeline` est `null` pour 137 prospects sur 139 (releve du
+                2 septembre 2026) : ce n'est pas un cas dégénéré à
+                contourner, `StatusBadge` le nomme.
                 `taille="compacte"` : dimensions de la maquette pour une
                 ligne (19px/10px), plus petites que celles du panneau — sans
                 quoi le badge, plus haut que le nom, gonflait la ligne de

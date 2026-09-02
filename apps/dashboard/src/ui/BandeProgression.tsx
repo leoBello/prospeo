@@ -40,9 +40,9 @@ import styles from './BandeProgression.module.css';
  * pas la fenêtre), la bande n'a que ~664 px à 1440 px d'écran : quatre
  * cellules n'y tiennent pas, trois oui — le nombre même que dessine la
  * maquette. `Compteurs` est donc retiré : les deux chiffres qu'il portait
- * (139 en base, 25 scorés au 1er septembre 2026) quittent l'écran, une
- * décision du propriétaire consignée dans le rapport de la tâche 8, pas un
- * oubli.
+ * (139 en base, 129 qualifiés/scorés au 2 septembre 2026) quittent l'écran,
+ * une décision du propriétaire consignée dans le rapport de la tâche 8, pas
+ * un oubli.
  *
  * **La doctrine des absences distinctes gouverne tout ce fichier.** Quatre
  * absences de nature différente s'y croisent, et aucune ne se rend par un
