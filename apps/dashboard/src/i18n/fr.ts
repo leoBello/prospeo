@@ -74,11 +74,15 @@ export const fr = {
   'warning.staleRuleset':
     'Score calculé avec le barème {stored}, quand le barème en vigueur est le {current}.',
   'score.total': 'Total',
-  'score.group.presence': 'Présence web',
+  'score.group.presence': 'Présence',
   'score.group.vitalite': 'Vitalité',
   'score.group.joignabilite': 'Joignabilité',
   'score.group.disqualifiant': 'Disqualifiants',
   'score.bar.label': 'Score {total} sur 100 : {detail}',
+  'score.gauge.aria': 'Score de {total} sur 100',
+  'score.outOfShort': 'sur 100',
+  'score.receipt.open': 'Voir le reçu ligne par ligne',
+  'score.receipt.close': 'Masquer le reçu',
 
   'presence.none': 'Aucune présence web',
   'presence.social_only': 'Page sociale, aucun site',

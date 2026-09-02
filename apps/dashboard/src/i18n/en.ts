@@ -74,11 +74,15 @@ export const en: Record<keyof typeof fr, string> = {
   'warning.staleRuleset':
     'Score computed with ruleset {stored}, while the ruleset in force is {current}.',
   'score.total': 'Total',
-  'score.group.presence': 'Web presence',
+  'score.group.presence': 'Presence',
   'score.group.vitalite': 'Vitality',
   'score.group.joignabilite': 'Reachability',
   'score.group.disqualifiant': 'Disqualifiers',
   'score.bar.label': 'Score {total} out of 100: {detail}',
+  'score.gauge.aria': 'Score of {total} out of 100',
+  'score.outOfShort': 'out of 100',
+  'score.receipt.open': 'Show the line-by-line receipt',
+  'score.receipt.close': 'Hide the receipt',
 
   'presence.none': 'No web presence',
   'presence.social_only': 'Social page, no website',
