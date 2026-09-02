@@ -172,10 +172,13 @@ describe('definirStatut', () => {
 
     expect(appels).toHaveLength(1);
     expect(appels[0]?.table).toBe('prospect_pipeline');
-    expect(resultat).toBe('RLS');
+    // Résultat STRUCTURÉ, pas une chaîne composée par ce fichier : `etape`
+    // dit à l'appelant lequel des deux écrits a échoué, à charge pour lui de
+    // le traduire (relevé de revue — voir `EchecDefinirStatut`).
+    expect(resultat).toEqual({ etape: 'etat', message: 'RLS' });
   });
 
-  it('signale — et n’avale PAS — un échec de l’historique une fois l’état déjà écrit, en nommant la table qui a échoué', async () => {
+  it('signale — et n’avale PAS — un échec de l’historique une fois l’état déjà écrit, en nommant l’étape qui a échoué', async () => {
     // Le cœur de la tâche : une divergence silencieuse (état changé, jeu
     // resté aveugle à ce changement) est le pire des trois résultats
     // possibles. L'échec doit se voir, et dire LEQUEL des deux écrits a
@@ -189,9 +192,7 @@ describe('definirStatut', () => {
     expect(appels[0]?.table).toBe('prospect_pipeline');
     expect(appels[1]?.table).toBe('pipeline_event');
 
-    expect(resultat).not.toBeNull();
-    expect(resultat).toContain('HS');
-    expect(resultat).toContain('pipeline_event');
+    expect(resultat).toEqual({ etape: 'historique', message: 'HS' });
   });
 });
 

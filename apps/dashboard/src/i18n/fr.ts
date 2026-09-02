@@ -221,6 +221,8 @@ export const fr = {
   'pipeline.status.ne_pas_contacter': 'Ne pas contacter',
   'pipeline.refusalWarning':
     'Le statut est enregistré, mais le site reste en ligne jusqu’au prochain « prospeo unpublish » : ce tableau de bord ne détient aucun jeton Vercel, et n’en détiendra pas.',
+  'pipeline.historyFailed':
+    'Le statut est enregistré, mais ce changement ne sera pas compté : {message}',
 
   'interaction.title': 'Consigner un échange',
   'interaction.kind': 'Canal',

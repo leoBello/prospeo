@@ -64,6 +64,24 @@ export async function annulerRejet(client: Client, prospectId: string): Promise<
 }
 
 /**
+ * L'issue de `definirStatut` : `null` en cas de succès total, sinon LAQUELLE
+ * des deux écritures a échoué, et le message brut de Supabase pour celle-là.
+ *
+ * Une chaîne composée par l'application (par ex. `pipeline_event: …`) serait
+ * un texte d'INTERFACE écrit en dur — c'est l'application qui le rédigerait,
+ * en anglais, pour porter une information au lecteur, exactement ce que ce
+ * fichier ne fait nulle part ailleurs (relevé de revue). Sa seule exception
+ * documentée est de RELAYER le message brut d'une erreur externe, jamais
+ * d'en composer un nouveau. `etape` donne donc à l'appelant, sous forme de
+ * donnée, ce qu'une chaîne composée lui aurait donné sous forme de texte —
+ * charge à lui de la traduire avec une clé `t()` dédiée.
+ */
+export type EchecDefinirStatut = {
+  readonly etape: 'etat' | 'historique';
+  readonly message: string;
+};
+
+/**
  * Fixe le statut d'un prospect dans le pipeline, ET consigne le changement
  * dans `pipeline_event` (tâche 4) — la seule matière que `domain/jeu.ts`
  * (tâche 6) peut lire pour dater un rendez-vous obtenu ou une relance tenue.
@@ -96,25 +114,25 @@ export async function annulerRejet(client: Client, prospectId: string): Promise<
  *
  * **Si le premier échoue** (l'état) : l'historique n'est PAS tenté. Rien n'a
  * changé nulle part — ce n'est pas un échec partiel mais un échec net, rendu
- * tel quel (le message brut de Supabase, comme les autres fonctions de ce
- * fichier).
+ * tel quel (`{ etape: 'etat', message }`, le message brut de Supabase comme
+ * les autres fonctions de ce fichier).
  *
  * **Si le second échoue** (l'historique, une fois l'état déjà écrit) : le
  * geste de l'opérateur A PRIS, contrairement à ce qu'un message d'erreur nu
  * lui ferait croire. L'avaler ferait dériver le jeu en silence (un
  * rendez-vous ou une relance qui n'existera jamais) ; le confondre avec un
  * échec de l'état pousserait à réessayer sans nécessité, ou à douter d'un
- * changement qui a pourtant eu lieu. Le message est donc préfixé par le nom
- * de la table qui a réellement échoué — un identifiant technique, pas une
- * phrase d'interface : cette fonction ne rend déjà que des messages bruts de
- * Supabase (voir l'en-tête du fichier), jamais de prose traduite.
+ * changement qui a pourtant eu lieu. `{ etape: 'historique', message }`
+ * porte donc cette distinction à l'appelant. C'est aussi lui — `ui/actions.ts`
+ * — qui doit alors RELIRE malgré l'échec : l'état a changé, la fiche ne doit
+ * pas rester sur l'ancien statut.
  */
 export async function definirStatut(
   client: Client,
   prospectId: string,
   status: Enums<'pipeline_status'>,
   nextActionAt: string | null,
-): Promise<string | null> {
+): Promise<EchecDefinirStatut | null> {
   const { error } = await client.from('prospect_pipeline').upsert(
     {
       prospect_id: prospectId,
@@ -124,7 +142,7 @@ export async function definirStatut(
     },
     { onConflict: 'prospect_id' },
   );
-  if (error !== null) return error.message;
+  if (error !== null) return { etape: 'etat', message: error.message };
 
   const { error: erreurHistorique } = await client.from('pipeline_event').insert({
     prospect_id: prospectId,
@@ -141,7 +159,7 @@ export async function definirStatut(
     // `occurred_at` reste au défaut de la base (`now()`), comme dans
     // `journaliserInteraction` : l'écrire ici exposerait l'horloge du poste.
   });
-  if (erreurHistorique !== null) return `pipeline_event: ${erreurHistorique.message}`;
+  if (erreurHistorique !== null) return { etape: 'historique', message: erreurHistorique.message };
 
   return null;
 }

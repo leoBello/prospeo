@@ -193,6 +193,8 @@ export const en: Record<keyof typeof fr, string> = {
   'pipeline.status.ne_pas_contacter': 'Do not contact',
   'pipeline.refusalWarning':
     'The status is saved, but the site stays online until the next "prospeo unpublish": this dashboard holds no Vercel token, and never will.',
+  'pipeline.historyFailed':
+    'The status is saved, but this change will not be counted: {message}',
 
   'interaction.title': 'Log an exchange',
   'interaction.kind': 'Channel',
