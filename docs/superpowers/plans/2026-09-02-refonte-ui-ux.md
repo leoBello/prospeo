@@ -4,8 +4,9 @@
 > leur raison avec elles. Ne les rouvre pas sans raison neuve — une préférence
 > n'en est pas une.
 >
-> **Maquettes :** `docs/design/maquettes/` (voir le README qui s'y trouve).
-> Canvas en ligne : <https://claude.ai/code/artifact/9a4484de-0054-499a-8015-58bd7f1fe18a>
+> **Maquettes :** `docs/design/maquettes/` — sources des artboards. Le canvas
+> en ligne qui les portait a été supprimé ; les fichiers de ce dossier
+> suffisent à le reconstruire.
 
 ---
 
@@ -162,8 +163,13 @@ Ce qui manque — placement d'infobulle, piège de focus, navigation clavier des
 onglets, sémantique ARIA, fermeture au clic extérieur — est exactement ce
 qu'une bibliothèque **headless** fournit.
 
-**Retenu :** `@base-ui-components/react` pour Tooltip, Tabs, Popover, Select,
+**Retenu :** `@base-ui/react` (1.7.0) pour Tooltip, Tabs, Popover, Select,
 Dialog. Style par CSS Modules, comme aujourd'hui.
+
+*Correction lot 1 :* `@base-ui-components/react`, nommé ici initialement, est
+l'ancien nom du paquet, figé à `1.0.0-rc.0` et non maintenu ; le paquet
+installé et utilisé est `@base-ui/react`, dont les pairs `date-fns` sont
+optionnels et qui déclare `react: ^17 || ^18 || ^19`.
 
 **Contrepartie assumée :** une dépendance de plus dans un dashboard qui n'en
 avait que React et Supabase. Elle est justifiée par l'accessibilité, qui ne

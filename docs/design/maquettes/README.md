@@ -3,7 +3,9 @@
 Les maquettes qui accompagnent
 [`docs/superpowers/plans/2026-09-02-refonte-ui-ux.md`](../../superpowers/plans/2026-09-02-refonte-ui-ux.md).
 
-**Canvas en ligne :** <https://claude.ai/code/artifact/9a4484de-0054-499a-8015-58bd7f1fe18a>
+> **Maquettes :** `docs/design/maquettes/` — sources des artboards. Le canvas
+> en ligne qui les portait a été supprimé ; les fichiers de ce dossier
+> suffisent à le reconstruire.
 
 ---
 
@@ -56,8 +58,9 @@ Un `.dc.html` n'est **pas** une page autonome : il ne s'ouvre pas dans un
 navigateur. C'est la source d'un artboard, qui a besoin de l'éditeur pour se
 rendre.
 
-- **Consulter ou retoucher visuellement** : ouvrir le canvas en ligne
-  (lien ci-dessus). Les modifications y sont sauvegardées en place.
+- **Consulter ou retoucher visuellement** : le canvas en ligne qui portait ces
+  artboards a été supprimé — il n'y a plus de lien à ouvrir. Reconstruire le
+  canvas depuis les sources (ci-dessous) est le seul chemin qui reste.
 - **Repartir des sources** : les huit fichiers et `canvas.json` de ce dossier
   suffisent à reconstruire le canvas — c'est exactement ce dont ils sont issus.
 
