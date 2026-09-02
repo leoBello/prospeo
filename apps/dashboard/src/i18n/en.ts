@@ -286,4 +286,42 @@ export const en: Record<keyof typeof fr, string> = {
     'No prospect has a generated site yet. This screen will fill in as drafts are written.',
   'deploiements.empty.filtre.titre': 'No deployments in this filter',
   'deploiements.empty.filtre.detail': 'Choose "All" to see every deployment again.',
+
+  'gabarit.title': 'Site template',
+  'gabarit.subtitle':
+    'Every published site is generated from a GitHub repository marked as a template. Designating one here replaces the template shipped with the application, without touching any code.',
+
+  'gabarit.actif.titre': 'Active template',
+  'gabarit.actif.badge': 'Active',
+  'gabarit.actif.absent': 'No template designated — the template shipped with the application applies.',
+  'gabarit.actif.branche': 'Branch {branch}',
+  'gabarit.actif.controle.jamais': 'Never checked',
+  'gabarit.actif.controle.ok': 'Check passed on {date}',
+  'gabarit.actif.controle.echec': 'Check failed on {date}',
+  'gabarit.actif.controle.echecSansDetail': 'Check failed, with no detail recorded.',
+  'gabarit.actif.revenir': 'Revert to the default template',
+
+  'gabarit.ordre.titre': 'Resolution order',
+  'gabarit.ordre.detail':
+    'The trade’s own template wins over the active template designated here, which itself wins over the environment variable — the template shipped with the application.',
+
+  'gabarit.designer.titre': 'Designate another repository',
+  'gabarit.designer.aide':
+    'The repository must belong to the organization and be marked "Template repository" on GitHub.',
+  'gabarit.designer.champRepo': 'Repository (org/name)',
+  'gabarit.designer.champBranche': 'Branch',
+  'gabarit.designer.soumettre': 'Designate this repository',
+
+  'gabarit.verifier.label': 'Check',
+  'gabarit.verifier.raison':
+    'The check runs on the collector’s next pass: repository reachable, marked as a template, contains src/content/site.json.',
+
+  'gabarit.metiers.titre': 'Exceptions by trade',
+  'gabarit.metiers.aide':
+    'A trade can keep its own model. Without an exception, it receives the active template.',
+  'gabarit.metiers.herite': 'inherits the active one',
+  'gabarit.metiers.exception': 'exception',
+
+  'gabarit.portee':
+    'Changing the template only affects future deployments. Sites already online keep the model they were built with.',
 };

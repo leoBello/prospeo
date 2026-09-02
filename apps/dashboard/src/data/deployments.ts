@@ -170,6 +170,52 @@ export async function fetchSiteTemplate(client: Client): Promise<string | null> 
 }
 
 /**
+ * La ligne complète de `site_template` (chantier n°10, D10).
+ *
+ * `fetchSiteTemplate` ci-dessus ne rend que `repo_full_name`, seul champ dont
+ * `fetchDeployments` a besoin pour habiller chaque ligne. L'écran du gabarit,
+ * lui, doit aussi la branche et le dernier verdict connu — d'où ce type et le
+ * lecteur qui suit, plutôt qu'un élargissement de `fetchSiteTemplate` qui
+ * changerait la forme que `toDeploymentView` consomme déjà.
+ */
+export interface SiteTemplateView {
+  repoFullName: string | null;
+  branch: string;
+  /** `null` : jamais contrôlé. Le dashboard ne PRODUIT jamais ce verdict, il l'affiche. */
+  checkedAt: string | null;
+  checkOk: boolean | null;
+  checkDetail: string | null;
+}
+
+/**
+ * La ligne singleton de `site_template`, en entier.
+ *
+ * Même garde que `fetchSiteTemplate` sur `repo_full_name` : un champ réduit à
+ * des espaces ne doit pas se lire comme une désignation valide (tâche 6). Une
+ * ligne absente (migration non jouée) rend un gabarit par défaut plutôt que
+ * de faire échouer l'écran — l'infrastructure manquante se verra assez tôt
+ * ailleurs.
+ */
+export async function fetchSiteTemplateDetail(client: Client): Promise<SiteTemplateView> {
+  const { data, error } = await client
+    .from('site_template')
+    .select('repo_full_name,branch,checked_at,check_ok,check_detail')
+    .eq('id', 1)
+    .maybeSingle();
+  if (error !== null) {
+    throw new Error(`site_template : lecture impossible — ${error.message}`);
+  }
+  const valeur = data?.repo_full_name?.trim();
+  return {
+    repoFullName: valeur === undefined || valeur === '' ? null : valeur,
+    branch: data?.branch ?? 'main',
+    checkedAt: data?.checked_at ?? null,
+    checkOk: data?.check_ok ?? null,
+    checkDetail: data?.check_detail ?? null,
+  };
+}
+
+/**
  * Les événements d'UN prospect, du plus ancien au plus récent.
  *
  * Séparée de `fetchDeployments` : un panneau de détail qui veut rafraîchir

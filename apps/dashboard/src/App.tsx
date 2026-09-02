@@ -1,15 +1,18 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@prospeo/db';
-import { SCORING_RULESET } from '@prospeo/core';
+import { SCORING_RULESET, TRADES } from '@prospeo/core';
 import { AuthProvider, useAuth } from './auth/AuthProvider.js';
 import { createDashboardClient } from './data/supabase.js';
+import { designerGabarit } from './data/mutations.js';
 import { useProspects } from './data/useProspects.js';
 import { useDeployments } from './data/useDeployments.js';
+import { useSiteTemplate } from './data/useSiteTemplate.js';
 import { makePanelActions } from './ui/actions.js';
 import { LoginScreen } from './screens/LoginScreen.js';
 import { TodayScreen } from './screens/TodayScreen.js';
 import { DeploiementsScreen } from './screens/DeploiementsScreen.js';
+import { GabaritScreen } from './screens/GabaritScreen.js';
 import { AppShell } from './ui/AppShell.js';
 import { Nav, useVue } from './ui/Nav.js';
 import { PreferencesProvider, useT } from './ui/preferences.js';
@@ -48,11 +51,35 @@ function Authenticated({ client }: { client: SupabaseClient<Database> }) {
   // Appelé sans condition (règle des hooks) ; `enabled` évite la lecture
   // Supabase tant que l'écran « Déploiements » n'est pas affiché.
   const deploymentsState = useDeployments(client, vue === 'deploiements');
+  // Même garde pour « Gabarit » (D10, chantier n°10).
+  const gabaritState = useSiteTemplate(client, vue === 'gabarit');
+  const gabaritReload = gabaritState.reload;
 
   // Mémorisées : recréées à chaque rendu, elles changeraient d'identité en
   // permanence et feraient rerendre la fiche entière à chaque frappe dans le
   // champ de note.
   const actions = useMemo(() => makePanelActions(client, reload), [client, reload]);
+
+  /**
+   * Enregistre la désignation, puis relit la ligne — même parti que
+   * `makePanelActions` : l'écran entier doit dériver d'une seule lecture.
+   *
+   * `GabaritScreen` ne connaît que `(repoFullName, branch) => void` : il
+   * n'exécute aucun contrôle, seulement une écriture, et son interface ne
+   * porte donc pas de retour de promesse à attendre. Une écriture refusée par
+   * la RLS est journalisée plutôt que silencieusement perdue — signalé au
+   * rapport de tâche 10 comme piste pour la tâche 11 (une zone d'erreur
+   * dédiée, comme `action.failed` ailleurs dans ce dashboard).
+   */
+  const designer = useCallback(
+    (repoFullName: string | null, branch: string) => {
+      void designerGabarit(client, repoFullName, branch).then((erreur) => {
+        if (erreur === null) gabaritReload();
+        else console.error(`site_template : écriture refusée — ${erreur}`);
+      });
+    },
+    [client, gabaritReload],
+  );
 
   if (state.status === 'loading') {
     // `aria-live` : le changement d'état est annoncé, sans quoi un lecteur
@@ -76,21 +103,51 @@ function Authenticated({ client }: { client: SupabaseClient<Database> }) {
     );
   }
 
-  // L'écran « Gabarit » (chantier suivant) n'existe pas encore : un repère
-  // minimal, sous la coquille commune, suffit à rendre la navigation
-  // testable dès maintenant. « Déploiements », lui, est branché ci-dessous
-  // sur l'écran réel (D9).
+  // L'écran « Gabarit » (D10, chantier n°10) : branché sur l'écran réel,
+  // comme « Déploiements » ci-dessous. `TRADES` vient de `@prospeo/core` —
+  // jamais une liste recopiée dans l'écran.
   if (vue === 'gabarit') {
+    if (gabaritState.status === 'loading') {
+      return (
+        <AppShell
+          nav={nav}
+          onSignOut={() => void signOut()}
+          panel={null}
+          list={
+            <p className={styles.status} aria-live="polite">
+              {t('app.loading')}
+            </p>
+          }
+        />
+      );
+    }
+
+    if (gabaritState.status === 'error') {
+      return (
+        <AppShell
+          nav={nav}
+          onSignOut={() => void signOut()}
+          panel={null}
+          list={
+            <div className={styles.status} role="alert">
+              <h1>{t('app.error.title')}</h1>
+              <p>{gabaritState.message}</p>
+              <button type="button" onClick={gabaritState.reload}>
+                {t('app.error.retry')}
+              </button>
+            </div>
+          }
+        />
+      );
+    }
+
     return (
-      <AppShell
-        nav={nav}
+      <GabaritScreen
+        template={gabaritState.template}
+        trades={TRADES}
+        onDesigner={designer}
         onSignOut={() => void signOut()}
-        list={
-          <p className={styles.status} aria-live="polite">
-            {t('bientot.aria')}
-          </p>
-        }
-        panel={null}
+        nav={nav}
       />
     );
   }

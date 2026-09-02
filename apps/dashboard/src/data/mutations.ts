@@ -102,6 +102,46 @@ export async function definirStatut(
  * poste, qui peut être décalée de plusieurs minutes, et ferait apparaître des
  * échanges dans le désordre.
  */
+/**
+ * Désigne (ou efface) le gabarit actif (chantier n°10, D10).
+ *
+ * **`update`, jamais `insert`.** `site_template` est une table à ligne
+ * unique (tâche 2) : sa ligne `id = 1` est créée dès la migration, avec
+ * `repo_full_name` nul. Un `insert` violerait la contrainte
+ * `site_template_singleton` dès la première désignation — contrairement à
+ * `definirStatut` ci-dessus, dont la table est vide et exige un `upsert`.
+ *
+ * **Un champ vidé au clavier normalise en `null`.** `fetchSiteTemplate` a dû
+ * apprendre à distinguer `''` d'un `null` en lecture (tâche 6) précisément
+ * parce que le côté écriture ne le garantissait pas ; cette fonction ferme la
+ * boucle en écrivant `null` pour un dépôt vide ou fait uniquement d'espaces,
+ * plutôt que de laisser passer une chaîne vide qui se lirait, plus tard,
+ * comme une désignation.
+ *
+ * **Ce que cette fonction ne fait pas** : elle ne touche jamais
+ * `checked_at` / `check_ok` / `check_detail`. Produire un verdict exigerait
+ * un jeton GitHub, qui n'a rien à faire dans ce bundle — c'est le collector,
+ * à son prochain passage, qui les mettra à jour pour le dépôt nouvellement
+ * désigné.
+ */
+export async function designerGabarit(
+  client: Client,
+  repoFullName: string | null,
+  branch: string,
+): Promise<string | null> {
+  const repo = repoFullName?.trim();
+  const brancheNormalisee = branch.trim();
+  const { error } = await client
+    .from('site_template')
+    .update({
+      repo_full_name: repo === undefined || repo === '' ? null : repo,
+      branch: brancheNormalisee === '' ? 'main' : brancheNormalisee,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', 1);
+  return error === null ? null : error.message;
+}
+
 export async function journaliserInteraction(
   client: Client,
   prospectId: string,

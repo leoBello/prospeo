@@ -4,6 +4,7 @@ import type { Database } from '@prospeo/db';
 import {
   annulerRejet,
   definirStatut,
+  designerGabarit,
   journaliserInteraction,
   rejeterRedaction,
 } from './mutations.js';
@@ -107,6 +108,50 @@ describe('definirStatut', () => {
     const { client, appels } = fakeClient();
     await definirStatut(client, 'p1', 'relance', '2026-09-15');
     expect((appels[0]?.valeurs as Record<string, unknown>)['next_action_at']).toBe('2026-09-15');
+  });
+});
+
+describe('designerGabarit', () => {
+  it('ecrit un UPDATE sur la ligne singleton id=1, jamais un INSERT', async () => {
+    // `site_template` porte une contrainte `check (id = 1)` : sa ligne unique
+    // existe déjà depuis la migration (tâche 2). Un `insert` la violerait dès
+    // la première désignation qui suit le seed.
+    const { client, appels } = fakeClient();
+    await designerGabarit(client, 'prospeo/gabarit-agence-v2', 'main');
+
+    expect(appels[0]?.table).toBe('site_template');
+    expect(appels[0]?.verbe).toBe('update');
+    expect(appels[0]?.filtre).toEqual(['id', 1]);
+  });
+
+  it('normalise un depot vide ou fait d espaces en null, jamais en chaine vide', async () => {
+    // La même faute que `fetchSiteTemplate` a dû corriger en lecture (tâche
+    // 6) : sans ce garde, '' se lirait plus tard comme une désignation.
+    const { client, appels } = fakeClient();
+    await designerGabarit(client, '   ', 'main');
+    expect((appels[0]?.valeurs as Record<string, unknown>)['repo_full_name']).toBeNull();
+  });
+
+  it('replie une branche vide sur "main", plutot que d ecrire une chaine vide', async () => {
+    const { client, appels } = fakeClient();
+    await designerGabarit(client, 'prospeo/gabarit-agence-v2', '   ');
+    expect((appels[0]?.valeurs as Record<string, unknown>)['branch']).toBe('main');
+  });
+
+  it('ne touche jamais le verdict du dernier controle', async () => {
+    // Produire ce verdict exige un jeton GitHub, qui n'a rien à faire dans ce
+    // bundle : seul le collector, à son prochain passage, l'écrit.
+    const { client, appels } = fakeClient();
+    await designerGabarit(client, 'prospeo/gabarit-agence-v2', 'main');
+    const valeurs = appels[0]?.valeurs as Record<string, unknown>;
+    expect(valeurs).not.toHaveProperty('checked_at');
+    expect(valeurs).not.toHaveProperty('check_ok');
+    expect(valeurs).not.toHaveProperty('check_detail');
+  });
+
+  it('rend le message d’erreur plutôt que de lever', async () => {
+    const { client } = fakeClient({ message: 'RLS' });
+    expect(await designerGabarit(client, 'prospeo/gabarit-agence-v2', 'main')).toBe('RLS');
   });
 });
 

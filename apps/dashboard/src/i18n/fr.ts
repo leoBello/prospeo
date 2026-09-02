@@ -311,4 +311,49 @@ export const fr = {
     'Aucun prospect n’a encore de site généré. Cet écran se remplira au fil des rédactions.',
   'deploiements.empty.filtre.titre': 'Aucun déploiement dans ce filtre',
   'deploiements.empty.filtre.detail': 'Choisissez « Tous » pour revoir l’ensemble des déploiements.',
+
+  // Chantier n°10, D10 — l'écran du gabarit. Il ENREGISTRE le dépôt désigné,
+  // il ne vérifie rien lui-même : le contrôle exigerait un jeton GitHub, qui
+  // n'a rien à faire dans un bundle navigateur. Le bouton « Vérifier » reste
+  // donc sous `Bientot`, et l'écran n'affiche que le dernier verdict connu.
+  'gabarit.title': 'Gabarit des sites',
+  'gabarit.subtitle':
+    'Chaque site publié est engendré depuis un dépôt GitHub marqué « template ». En désigner un ici le substitue au gabarit livré avec l’application, sans toucher au code.',
+
+  'gabarit.actif.titre': 'Gabarit actif',
+  'gabarit.actif.badge': 'Actif',
+  'gabarit.actif.absent': 'Aucun gabarit désigné — le gabarit livré avec l’application s’applique.',
+  'gabarit.actif.branche': 'Branche {branch}',
+  'gabarit.actif.controle.jamais': 'Jamais contrôlé',
+  'gabarit.actif.controle.ok': 'Contrôle réussi le {date}',
+  'gabarit.actif.controle.echec': 'Contrôle en échec le {date}',
+  'gabarit.actif.controle.echecSansDetail': 'Contrôle en échec, sans détail enregistré.',
+  'gabarit.actif.revenir': 'Revenir au gabarit par défaut',
+
+  // L'infobulle que le brief demande d'afficher, pas seulement d'implémenter :
+  // sans elle, personne ne comprend pourquoi un métier ayant son propre
+  // `templateRepo` (trades.ts) n'a pas reçu le dépôt qu'on vient de désigner.
+  'gabarit.ordre.titre': 'Ordre de résolution',
+  'gabarit.ordre.detail':
+    'Le gabarit propre au métier l’emporte sur le gabarit actif désigné ici, qui l’emporte lui-même sur celui de la variable d’environnement — le gabarit livré avec l’application.',
+
+  'gabarit.designer.titre': 'Désigner un autre dépôt',
+  'gabarit.designer.aide':
+    'Le dépôt doit appartenir à l’organisation et être marqué « Template repository » sur GitHub.',
+  'gabarit.designer.champRepo': 'Dépôt (org/nom)',
+  'gabarit.designer.champBranche': 'Branche',
+  'gabarit.designer.soumettre': 'Désigner ce dépôt',
+
+  'gabarit.verifier.label': 'Vérifier',
+  'gabarit.verifier.raison':
+    'Le contrôle est fait par le collector à son prochain passage : accessibilité du dépôt, marquage « template », présence de src/content/site.json.',
+
+  'gabarit.metiers.titre': 'Exceptions par métier',
+  'gabarit.metiers.aide':
+    'Un métier peut garder son propre modèle. Sans exception, il reçoit le gabarit actif.',
+  'gabarit.metiers.herite': 'hérite de l’actif',
+  'gabarit.metiers.exception': 'exception',
+
+  'gabarit.portee':
+    'Changer de gabarit n’affecte que les déploiements à venir. Les sites déjà en ligne conservent le modèle avec lequel ils ont été construits.',
 } as const;
