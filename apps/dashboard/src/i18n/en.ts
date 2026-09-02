@@ -202,4 +202,13 @@ export const en: Record<keyof typeof fr, string> = {
 
   'bientot.label': 'Soon',
   'bientot.aria': 'Upcoming feature',
+
+  'histo.discovered': 'Added to the base',
+  'histo.generated': 'Copy generated',
+  'histo.published': 'Site published',
+  'histo.unpublished': 'Site taken down',
+  'histo.rejected': 'Copy rejected',
+  'histo.detail.title': 'Step-by-step deployment log',
+  'histo.detail.reason':
+    'Every deployment step will be dated here — repository, project, build, go-live. That needs an events table: `prospect_site` holds a current state, not a history.',
 };

@@ -208,4 +208,13 @@ export const fr = {
 
   'bientot.label': 'Bientôt',
   'bientot.aria': 'Fonctionnalité à venir',
+
+  'histo.discovered': 'Découvert en base',
+  'histo.generated': 'Rédaction générée',
+  'histo.published': 'Site publié',
+  'histo.unpublished': 'Site retiré',
+  'histo.rejected': 'Rédaction refusée',
+  'histo.detail.title': 'Journal détaillé des étapes',
+  'histo.detail.reason':
+    'Chaque étape de déploiement sera datée ici — dépôt, projet, build, mise en ligne. Il manque pour cela une table d’événements : `prospect_site` ne porte qu’un état courant, pas un historique.',
 } as const;
