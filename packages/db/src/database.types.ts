@@ -382,6 +382,36 @@ export type Database = {
           },
         ]
       }
+      site_template: {
+        Row: {
+          branch: string
+          check_detail: string | null
+          check_ok: boolean | null
+          checked_at: string | null
+          id: number
+          repo_full_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          branch?: string
+          check_detail?: string | null
+          check_ok?: boolean | null
+          checked_at?: string | null
+          id?: never
+          repo_full_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          branch?: string
+          check_detail?: string | null
+          check_ok?: boolean | null
+          checked_at?: string | null
+          id?: never
+          repo_full_name?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       web_presence: {
         Row: {
           category: Database["public"]["Enums"]["web_presence_category"] | null
