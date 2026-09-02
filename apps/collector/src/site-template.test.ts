@@ -1,0 +1,145 @@
+import { describe, expect, it } from 'vitest';
+import { getTrade, templateRepoFor, type Trade } from '@prospeo/core';
+import { gabaritDefautPourPublication, lireGabaritActif, resoudreTemplateRepo } from './site-template.js';
+
+/** Métier sans gabarit déclaré — les deux métiers réels en déclarent un. */
+const METIER_SANS_GABARIT: Trade = {
+  slug: 'test-sans-gabarit',
+  label: 'Test',
+  nafCodes: [],
+  mapsQueries: [],
+  keywords: [],
+  categoryLabels: [],
+  prestations: [],
+  heros: [],
+};
+
+describe('gabaritDefautPourPublication', () => {
+  // Le calcul introduit par la tâche 6 : le repli de niveau 2 (base) prime
+  // sur le repli de niveau 3 (environnement). C'est la ligne unique que
+  // `cli.ts` emploie pour construire `deps.templateRepoDefaut`.
+  it('retient le gabarit actif en base quand il est renseigné', () => {
+    expect(gabaritDefautPourPublication('org/depuis-la-base', 'org/depuis-env')).toBe(
+      'org/depuis-la-base',
+    );
+  });
+
+  it('retombe sur la variable d’environnement quand la base est nulle', () => {
+    expect(gabaritDefautPourPublication(undefined, 'org/depuis-env')).toBe('org/depuis-env');
+  });
+
+  it('rend undefined quand ni la base ni l’environnement ne sont renseignés', () => {
+    expect(gabaritDefautPourPublication(undefined, undefined)).toBeUndefined();
+  });
+});
+
+describe('resoudreTemplateRepo — les trois niveaux ensemble', () => {
+  // Ces trois tests exercent la résolution telle qu'elle tourne réellement :
+  // `templateRepoFor` (inchangé) reçoit le résultat de
+  // `gabaritDefautPourPublication` (nouveau). C'est la combinaison qui
+  // compte, pas chaque fonction isolément — un `defaut` correctement calculé
+  // ne sert à rien si l'appelant l'utilisait avant de consulter le métier.
+
+  it('le métier prime, même quand la base désigne un autre gabarit', () => {
+    const plombier = getTrade('plombier');
+    if (plombier === undefined) throw new Error('métier de test introuvable');
+    // La base ET l'environnement désignent tous deux un AUTRE dépôt : si l'un
+    // des deux l'emportait, ce test le détecterait.
+    expect(
+      resoudreTemplateRepo(plombier, 'org/gabarit-generique-en-base', 'org/gabarit-env'),
+    ).toBe('plombier');
+  });
+
+  it('à défaut de gabarit métier, la base gagne', () => {
+    expect(
+      resoudreTemplateRepo(METIER_SANS_GABARIT, 'org/gabarit-generique-en-base', 'org/gabarit-env'),
+    ).toBe('org/gabarit-generique-en-base');
+  });
+
+  it('à défaut de gabarit métier et de base, l’environnement gagne', () => {
+    expect(resoudreTemplateRepo(METIER_SANS_GABARIT, undefined, 'org/gabarit-env')).toBe(
+      'org/gabarit-env',
+    );
+  });
+
+  it('délègue effectivement à templateRepoFor (pas de logique dupliquée)', () => {
+    // Filet de sécurité : si `resoudreTemplateRepo` se mettait à réimplémenter
+    // la priorité au lieu d'appeler `templateRepoFor`, ce test le remarquerait
+    // en cas de désaccord entre les deux calculs.
+    const plombier = getTrade('plombier');
+    if (plombier === undefined) throw new Error('métier de test introuvable');
+    const defaut = gabaritDefautPourPublication('org/base', 'org/env');
+    expect(resoudreTemplateRepo(plombier, 'org/base', 'org/env')).toBe(
+      templateRepoFor(plombier, defaut),
+    );
+  });
+});
+
+describe('lireGabaritActif', () => {
+  it('rend le gabarit désigné quand la ligne singleton le porte', async () => {
+    const client = clientAvecLigne({ repo_full_name: 'org/gabarit-choisi' });
+    await expect(lireGabaritActif(client)).resolves.toBe('org/gabarit-choisi');
+  });
+
+  it('rend undefined quand la colonne est nulle — aucun gabarit désigné', async () => {
+    const client = clientAvecLigne({ repo_full_name: null });
+    await expect(lireGabaritActif(client)).resolves.toBeUndefined();
+  });
+
+  it('échoue franchement si la ligne singleton est absente', async () => {
+    // C'est un état anormal (migration non jouée, ligne supprimée à la main),
+    // pas « aucun gabarit désigné » — le confondre avec le cas nul ferait
+    // disparaître silencieusement un problème d'infrastructure.
+    const client = clientAvecLigne(null);
+    await expect(lireGabaritActif(client)).rejects.toThrow(/site_template/);
+  });
+
+  it('échoue franchement si Supabase rend une erreur', async () => {
+    const client = clientAvecErreur('la connexion a été refusée');
+    await expect(lireGabaritActif(client)).rejects.toThrow(/la connexion a été refusée/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Client Supabase minimal, ne portant que ce que `lireGabaritActif` emploie.
+// ---------------------------------------------------------------------------
+
+function clientAvecLigne(row: { repo_full_name: string | null } | null) {
+  return {
+    from() {
+      return {
+        select() {
+          return {
+            eq() {
+              return {
+                async maybeSingle() {
+                  return { data: row, error: null };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  } as unknown as Parameters<typeof lireGabaritActif>[0];
+}
+
+function clientAvecErreur(message: string) {
+  return {
+    from() {
+      return {
+        select() {
+          return {
+            eq() {
+              return {
+                async maybeSingle() {
+                  return { data: null, error: { message } };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  } as unknown as Parameters<typeof lireGabaritActif>[0];
+}

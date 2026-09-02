@@ -61,6 +61,7 @@ import {
   type SiteEnLigne,
   type UnpublishDeps,
 } from './stages/unpublish.js';
+import { gabaritDefautPourPublication, lireGabaritActif } from './site-template.js';
 
 // `.env` vit a la racine du depot. Ni tsx ni Node ne le chargent tout seuls :
 // sans cette ligne, la procedure documentee (« copier .env.example en .env »)
@@ -1747,6 +1748,11 @@ async function main(argv: string[]): Promise<number> {
       const pubConfig = loadPublishConfig(process.env);
       const client = createClient(loadConfig(process.env));
       const rows = await fetchSiteRows(client);
+      // Le gabarit actif en base prime sur PROSPEO_GITHUB_TEMPLATE_REPO — le
+      // métier, lui, continue de primer sur les deux (templateRepoFor,
+      // inchangé, tranche entre ce repli et trade.templateRepo plus bas dans
+      // runPublish). Voir apps/collector/src/site-template.ts.
+      const gabaritActif = await lireGabaritActif(client);
 
       // On ne publie que ce qui a été généré. L'ordre des étages est une
       // dépendance de données, pas une convention.
@@ -1769,7 +1775,7 @@ async function main(argv: string[]): Promise<number> {
 
       const deps: PublishDeps = {
         github: createGithubClient({ token: pubConfig.githubToken, org: pubConfig.githubOrg }),
-        templateRepoDefaut: pubConfig.githubTemplateRepo,
+        templateRepoDefaut: gabaritDefautPourPublication(gabaritActif, pubConfig.githubTemplateRepo),
         async lireEtat(prospectId) {
           const row = rows[prospectId];
           if (row === undefined || row.repo_full_name === null) return null;
