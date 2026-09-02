@@ -75,7 +75,41 @@ describe('PanelActions', () => {
       />,
     );
     const lien = screen.getByRole('link', { name: /Voir le site/ });
-    expect(lien.getAttribute('rel')).toContain('noopener');
+    // L'URL doit etre exactement celle du site publie : un href fige en dur
+    // ou mal recopie doit faire echouer le test.
+    expect(lien.getAttribute('href')).toBe('https://x.vercel.app');
+    expect(lien.getAttribute('target')).toBe('_blank');
+    // Les deux jetons comptent : `noreferrer` seul empecherait `noopener`
+    // de suffire, et l'inverse laisserait fuiter le referrer.
+    const rel = lien.getAttribute('rel')?.split(' ') ?? [];
+    expect(rel).toContain('noreferrer');
+    expect(rel).toContain('noopener');
+  });
+
+  it('ne propose pas le site retire meme s il garde son URL de deploiement', () => {
+    // Un site depublie conserve son deployment_url en base (trace de l'ancien
+    // deploiement) : tester la seule presence de l'URL offrirait un lien vers
+    // une page qui n'existe plus. Seul `unpublishedAt === null` garantit que
+    // le site est encore joignable.
+    renderWithPreferences(
+      <PanelActions
+        prospect={{
+          ...base,
+          site: {
+            repoUrl: null,
+            deploymentUrl: 'https://x.vercel.app',
+            promptVersion: null,
+            model: null,
+            generatedAt: null,
+            publishedAt: '2026-09-01T00:00:00Z',
+            unpublishedAt: '2026-09-02T00:00:00Z',
+            contentRejectedAt: null,
+            redaction: null,
+          },
+        }}
+      />,
+    );
+    expect(screen.queryByRole('link', { name: /Voir le site/ })).toBeNull();
   });
 
   it('annonce le redeploiement comme a venir plutot que d offrir un bouton inerte', () => {
