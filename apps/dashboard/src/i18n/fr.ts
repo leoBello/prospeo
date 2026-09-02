@@ -231,15 +231,22 @@ export const fr = {
   'histo.published': 'Site publié',
   'histo.unpublished': 'Site retiré',
   'histo.rejected': 'Rédaction refusée',
-  'histo.detail.title': 'Journal détaillé des étapes',
-  // Deux textes et non un seul : le visible dit CE QUI VIENT, l'infobulle dit
-  // CE QUI BLOQUE. Les deux portaient la même phrase, si bien que survoler le
-  // marqueur « Bientôt » révélait une phrase déjà lisible deux centimètres
-  // plus haut — un geste pour rien, et une infobulle qui n'apprend rien.
-  'histo.detail.reason':
-    'Chaque étape de déploiement sera datée ici : dépôt créé, projet ouvert, build, mise en ligne.',
-  'histo.detail.blocked':
-    'Aucune table d’événements n’existe : `prospect_site` ne porte qu’un état courant, pas un historique. Rien ne peut donc être daté étape par étape avant la migration §4.1.',
+
+  // Chantier n°5, tâche 11 — le journal détaillé, désormais réel : la table
+  // `deployment_event` existe depuis ce lot. Les jalons ci-dessus restent :
+  // ils portent des faits que les événements ne rejouent pas pour les sites
+  // déployés avant cette migration (les vingt-deux sites déjà en ligne).
+  'histo.events.title': 'Journal détaillé',
+  // L'absence d'événements se dit comme un fait daté, pas comme un vide : le
+  // dernier jalon connu sert de repère, plutôt qu'un silence qui se lirait
+  // comme un oubli.
+  'histo.events.empty.titre': 'Aucun événement enregistré',
+  'histo.events.empty.detail': 'Le dernier fait connu pour ce site remonte au {date}.',
+
+  'histo.issue.demarre': 'Démarré',
+  'histo.issue.reussi': 'Réussi',
+  'histo.issue.echoue': 'Échoué',
+  'histo.issue.ignore': 'Ignoré',
 
   // Chantier n°5, D9 — l'écran de suivi des déploiements. Vingt-deux sites
   // publiés au nom de vraies entreprises : le seul moyen de voir ce que le

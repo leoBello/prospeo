@@ -50,3 +50,49 @@
   color: var(--color-text-faint);
   margin-left: var(--space-2);
 }
+
+.journal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ligneJournal {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  padding: 3px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ligneJournal:last-child {
+  border-bottom: none;
+}
+
+.etapeJournal {
+  font-weight: 600;
+}
+
+.dateJournal,
+.dureeJournal {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+}
+
+.detailJournal {
+  flex-basis: 100%;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* La cause d'un échec se distingue du reste : c'est le seul fait de la
+   ligne qui appelle une action, pas une simple note. */
+.detailJournal[data-echec='true'] {
+  color: var(--color-danger);
+}

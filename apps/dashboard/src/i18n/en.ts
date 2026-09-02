@@ -220,11 +220,15 @@ export const en: Record<keyof typeof fr, string> = {
   'histo.published': 'Site published',
   'histo.unpublished': 'Site taken down',
   'histo.rejected': 'Copy rejected',
-  'histo.detail.title': 'Step-by-step deployment log',
-  'histo.detail.reason':
-    'Every deployment step will be dated here: repository created, project opened, build, go-live.',
-  'histo.detail.blocked':
-    'No events table exists: `prospect_site` holds a current state, not a history. Nothing can be dated step by step before the §4.1 migration.',
+
+  'histo.events.title': 'Detailed log',
+  'histo.events.empty.titre': 'No event recorded',
+  'histo.events.empty.detail': 'The latest known fact for this site dates back to {date}.',
+
+  'histo.issue.demarre': 'Started',
+  'histo.issue.reussi': 'Succeeded',
+  'histo.issue.echoue': 'Failed',
+  'histo.issue.ignore': 'Skipped',
 
   'deploiements.title': 'Deployments',
   'deploiements.subtitle':
