@@ -474,6 +474,47 @@ L'écran de suivi des déploiements (D9) et l'écran de gabarit GitHub (D10),
 tous deux listés ici à la fin du lot 1 comme non construits, sont livrés — voir
 « Ce qui est en place à la fin du lot 2 » ci-dessus.
 
+## Le chantier suivant : la refonte de l'écran de déploiement
+
+**Décidé par le propriétaire à la clôture du lot 3, pas encore planifié.**
+
+`DeploiementDetail.dc.html` est **la seule maquette d'écran sans contrepartie
+dans l'application**. Recensement fait à la clôture du lot 3 :
+
+| Maquette | Dans l'application |
+|---|---|
+| `Main` | `TodayScreen` |
+| `Deploiements` | `DeploiementsScreen` |
+| `Gabarit` | `GabaritScreen` |
+| `Composants` | le kit `src/ui/kit/` — un vocabulaire, pas un écran |
+| `DirectionA` / `B` / `C` | études de direction, jamais destinées à être construites (D11 retient B) |
+| **`DeploiementDetail`** | **rien** |
+
+Elle n'a été rattachée à aucune tâche : le lot 2 a livré le tableau, le lot 3
+couvrait l'écran de travail et le jeu. **Elle est tombée entre les deux** —
+le même accident que le chrome de l'écran de liste, tombé entre le lot 1 et
+le lot 3, et rattrapé par ce dernier. Ce n'est pas un défaut de D9, qui a
+délibérément mis la cause d'échec *dans la ligne* plutôt que derrière un
+journal à ouvrir ; c'est un artboard sans propriétaire.
+
+Ce que la maquette montre et que l'application ne rend nulle part : le
+déploiement d'un prospect vu **par déploiement** et non par prospect —
+en-tête, état courant, les cinq étapes en frise avec le message de chacune,
+un bouton d'annulation, et le journal de construction. Le chemin qui y
+mènerait est le clic sur une ligne de `#/deploiements` ; aujourd'hui les
+lignes ne sont pas cliquables, leur unique lien étant l'URL du site publié.
+
+**Deux préalables, à peser avant d'ouvrir ce chantier :**
+
+- `deployment_event` est **vide** sur l'instance : les cinq étapes détaillées
+  en viennent, et l'écran n'aurait presque rien à afficher tant que le
+  collector n'aura pas tourné. Voir plus haut, « le jeu comptait les sites en
+  ligne sur la mauvaise table » — même piège, même table.
+- Une partie du contenu existe déjà ailleurs : `panel/HistoriqueTab.tsx`
+  affiche le journal réel des événements. Ce que le détail ajoute, c'est la
+  vue par déploiement et la frise des étapes, pas le journal lui-même.
+
+
 ## La question ouverte du lot 3
 
 `prospect_pipeline` ne porte que `status` et `updated_at`. Savoir qu'une
