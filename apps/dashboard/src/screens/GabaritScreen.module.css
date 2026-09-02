@@ -4,6 +4,11 @@
 
 .title {
   margin: 0;
+  /* Titre d'écran : la maquette le confie à la fonte d'affichage, comme tous
+     les h1-h4 (règle globale de Main.dc.html) — jusqu'ici seule la jauge de
+     score l'employait, et l'écran entier lisait en Instrument Sans. */
+  font-family: var(--font-display);
+  font-weight: 600;
   font-size: var(--text-xl);
   letter-spacing: -0.02em;
 }

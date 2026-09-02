@@ -27,7 +27,11 @@
 }
 
 .total {
-  font-family: var(--font-display);
+  /* La maquette écrit ce chiffre en chasse fixe (`.num`), comme tous les
+     autres nombres de l'écran — pas en fonte d'affichage : la chasse fixe
+     est ce qui aligne les colonnes de score d'une ligne à l'autre (D6,
+     commentaire de theme.css), un rôle que Bricolage Grotesque ne tient pas. */
+  font-family: var(--font-mono);
   font-size: 26px;
   font-weight: 700;
   line-height: 1;
