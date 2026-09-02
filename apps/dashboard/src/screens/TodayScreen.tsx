@@ -1,9 +1,10 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@prospeo/db';
-import type { ProspectView } from '../domain/prospect.js';
-import { buildToday, computeKpis } from '../domain/today.js';
+import type { ProspectView, WorkList } from '../domain/prospect.js';
+import { buildToday, computeKpis, matchesQuery } from '../domain/today.js';
+import type { TranslationKey } from '../i18n/translate.js';
 import { AppShell } from '../ui/AppShell.js';
 import { KpiBand } from '../ui/KpiBand.js';
 import { ProspectPanel } from '../ui/ProspectPanel.js';
@@ -12,7 +13,28 @@ import { WorkListSection } from '../ui/WorkListSection.js';
 import { useListNavigation } from '../ui/useListNavigation.js';
 import { useDeploymentEvents } from '../data/useDeploymentEvents.js';
 import { useT } from '../ui/preferences.js';
+import { estMac } from '../ui/plateforme.js';
 import styles from './TodayScreen.module.css';
+
+const TRAIT_RECHERCHE = {
+  width: 14,
+  height: 14,
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 2,
+  strokeLinecap: 'round' as const,
+  'aria-hidden': true,
+} as const;
+
+function IconeRecherche() {
+  return (
+    <svg {...TRAIT_RECHERCHE}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="M20 20l-4-4" />
+    </svg>
+  );
+}
 
 interface Props {
   prospects: ProspectView[];
@@ -51,8 +73,80 @@ export function TodayScreen({
   // permanence et recomposerait les listes sans fin.
   const instant = useMemo(() => now ?? new Date(), [now]);
 
-  const today = useMemo(() => buildToday(prospects, instant), [prospects, instant]);
+  // La recherche de la barre du haut (lot 3, tâche 2) : elle filtre les
+  // listes de travail déjà chargées en mémoire, jamais les 139 prospects de
+  // la base — d'où son application ICI, en amont de `buildToday`, et pas sur
+  // un écran séparé.
+  const [recherche, setRecherche] = useState('');
+  const champRechercheRef = useRef<HTMLInputElement>(null);
+
+  const prospectsFiltres = useMemo(
+    () => (recherche.trim() === '' ? prospects : prospects.filter((p) => matchesQuery(p, recherche))),
+    [prospects, recherche],
+  );
+
+  const today = useMemo(() => buildToday(prospectsFiltres, instant), [prospectsFiltres, instant]);
+  // Non filtrée : sert uniquement à distinguer, quand une liste est vide,
+  // une recherche sans résultat d'une liste réellement vide pour une autre
+  // raison — deux absences que `today.empty.search` et `today.empty.*` ne
+  // doivent pas confondre (voir `clefAbsence` ci-dessous).
+  const todaySansRecherche = useMemo(() => buildToday(prospects, instant), [prospects, instant]);
+  // Les indicateurs portent sur la base entière, jamais sur la recherche :
+  // « En base » doit rester 139 pendant qu'on tape, pas se réduire au nombre
+  // de lignes qui correspondent au texte tapé.
   const kpis = useMemo(() => computeKpis(prospects), [prospects]);
+
+  /**
+   * Choisit le texte d'un vide de liste : celui de la recherche sans
+   * résultat quand elle explique le vide, celui de la liste elle-même sinon.
+   *
+   * `base.totalCount > 0` est la condition qui les distingue : si la liste
+   * était déjà vide sans la moindre recherche, ce n'est pas la recherche qui
+   * la vide, et lui attribuer le message de recherche mentirait sur la cause.
+   */
+  const clefAbsence = (base: WorkList, filtree: WorkList, defaut: TranslationKey): TranslationKey =>
+    recherche.trim() !== '' && base.totalCount > 0 && filtree.totalCount === 0
+      ? 'today.empty.search'
+      : defaut;
+
+  // Raccourci clavier de la recherche : `⌘K` sur macOS, `Ctrl+K` ailleurs
+  // (voir `ui/plateforme.ts`) — écoute les deux touches de modification et
+  // n'affiche que celle qui fonctionne réellement sur la plateforme
+  // détectée (décision du pilote, lot 3 tâche 2).
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key.toLowerCase() !== 'k' || !(event.metaKey || event.ctrlKey)) return;
+      // Sans cela, certains navigateurs ouvrent leur propre recherche : le
+      // raccourci annoncé perdrait face au raccourci natif.
+      event.preventDefault();
+      champRechercheRef.current?.focus();
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  // `navigator` ne change pas en cours de session : la détection n'a besoin
+  // d'être refaite qu'une fois.
+  const modificateur = useMemo(() => (estMac() ? '⌘' : 'Ctrl+'), []);
+
+  const libelleRecherche = t('header.search.label');
+  const champRecherche = (
+    <div className={styles.recherche}>
+      <IconeRecherche />
+      <input
+        ref={champRechercheRef}
+        type="search"
+        className={styles.rechercheChamp}
+        value={recherche}
+        onChange={(event) => setRecherche(event.target.value)}
+        placeholder={libelleRecherche}
+        aria-label={libelleRecherche}
+      />
+      <span className={styles.rechercheRaccourci} aria-hidden="true">
+        {t('header.search.shortcut', { modifier: modificateur })}
+      </span>
+    </div>
+  );
 
   /**
    * L'ordre du parcours clavier est l'ordre visuel, sections concaténées.
@@ -124,6 +218,7 @@ export function TodayScreen({
     <AppShell
       onSignOut={onSignOut}
       nav={nav}
+      search={champRecherche}
       list={
         <>
           <div className={styles.intro}>
@@ -137,7 +232,7 @@ export function TodayScreen({
 
           <WorkListSection
             titleKey="today.section.followUps"
-            emptyKey="today.empty.followUps"
+            emptyKey={clefAbsence(todaySansRecherche.followUps, today.followUps, 'today.empty.followUps')}
             list={today.followUps}
             selectedId={selectedId}
             currentRulesetVersion={currentRulesetVersion}
@@ -145,7 +240,7 @@ export function TodayScreen({
           />
           <WorkListSection
             titleKey="today.section.newHighScore"
-            emptyKey="today.empty.newHighScore"
+            emptyKey={clefAbsence(todaySansRecherche.newHighScore, today.newHighScore, 'today.empty.newHighScore')}
             list={today.newHighScore}
             selectedId={selectedId}
             currentRulesetVersion={currentRulesetVersion}

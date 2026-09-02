@@ -312,6 +312,91 @@ describe('TodayScreen', () => {
   });
 });
 
+describe('TodayScreen — la recherche de la barre du haut (lot 3, tache 2)', () => {
+  it('filtre reellement les listes de travail affichees, sans toucher aux indicateurs de la base', async () => {
+    const user = userEvent.setup();
+    rendre([
+      vue('alpha', { denomination: 'PLOMBERIE ALPHA', score: score(90) }),
+      vue('beta', { denomination: 'SERRURERIE BETA', score: score(80) }),
+    ]);
+
+    expect(screen.getByText('PLOMBERIE ALPHA')).toBeDefined();
+    expect(screen.getByText('SERRURERIE BETA')).toBeDefined();
+    // « En base » porte sur toute la base, pas sur la recherche : 2 avant
+    // toute frappe.
+    expect(screen.getByText('En base').closest('div')?.textContent).toContain('2');
+
+    const champ = screen.getByRole('searchbox', { name: /Filtrer les listes du jour/ });
+    await user.type(champ, 'alpha');
+
+    expect(screen.getByText('PLOMBERIE ALPHA')).toBeDefined();
+    expect(screen.queryByText('SERRURERIE BETA')).toBeNull();
+    // Toujours 2 : la recherche ne retire personne de la base, seulement des
+    // listes de travail affichees.
+    expect(screen.getByText('En base').closest('div')?.textContent).toContain('2');
+  });
+
+  it('le raccourci clavier donne reellement le focus au champ de recherche', async () => {
+    const user = userEvent.setup();
+    rendre([vue('a', { score: score(90) })]);
+
+    const champ = screen.getByRole('searchbox');
+    expect(document.activeElement).not.toBe(champ);
+
+    await user.keyboard('{Control>}k{/Control}');
+
+    expect(document.activeElement).toBe(champ);
+  });
+
+  it('affiche le raccourci qui fonctionne reellement sur la plateforme detectee', () => {
+    rendre([vue('a', { score: score(90) })]);
+    // `⌘K` sur macOS, `Ctrl+K` ailleurs (ui/plateforme.ts) : jamais l'un a la
+    // place de l'autre, et jamais un texte different des deux.
+    expect(screen.getByText(/^(⌘K|Ctrl\+K)$/)).toBeDefined();
+  });
+
+  it('taper dans le champ ne deplace pas la selection de la liste et ne ferme pas le panneau', async () => {
+    const user = userEvent.setup();
+    rendre([vue('haut', { score: score(90) }), vue('bas', { score: score(50) })]);
+
+    await user.keyboard('{ArrowDown}');
+    expect(
+      within(screen.getByRole('complementary')).getByRole('heading', { level: 2 }).textContent,
+    ).toBe('ENTREPRISE haut');
+
+    const champ = screen.getByRole('searchbox');
+    await user.click(champ);
+    // `shouldIgnoreKeyboard` (ui/list-navigation.ts) ignore deja les fleches
+    // et Echap venant d'un <input> ; ce test prouve que ca tient depuis le
+    // vrai champ de recherche, et pas seulement en theorie.
+    await user.keyboard('{ArrowDown}{Escape}');
+
+    expect(
+      within(screen.getByRole('complementary')).getByRole('heading', { level: 2 }).textContent,
+    ).toBe('ENTREPRISE haut');
+  });
+
+  it('dit qu aucune ligne ne correspond a la recherche, distinctement d une liste vide pour une autre raison', async () => {
+    const user = userEvent.setup();
+    rendre([vue('a', { score: score(90) })]);
+
+    const champ = screen.getByRole('searchbox');
+    await user.type(champ, 'aucune-entreprise-ne-porte-ce-nom');
+
+    expect(screen.getByText('Aucune ligne ne correspond à votre recherche.')).toBeDefined();
+    // Distinct du texte d'un vide "naturel" (aucun prospect score) : la
+    // recherche ne doit pas emprunter ce message-la, ni l'inverse.
+    expect(screen.queryByText('Aucun prospect scoré pour le moment.')).toBeNull();
+  });
+
+  it('garde le texte d un vide naturel quand la recherche est vide, sans jamais parler de recherche', () => {
+    // Aucune relance due, aucune frappe dans le champ : le vide vient de
+    // l'etat reel de la base, pas d'une recherche qui l'aurait cause.
+    rendre([vue('a')]);
+    expect(screen.queryByText('Aucune ligne ne correspond à votre recherche.')).toBeNull();
+  });
+});
+
 describe('TodayScreen — le journal de deploiement (tache 11)', () => {
   it('ne lit aucun evenement tant qu aucun prospect n est ouvert', () => {
     // La table ne doit jamais etre interrogee si le panneau n'est pas

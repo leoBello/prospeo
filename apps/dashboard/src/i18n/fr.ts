@@ -21,6 +21,20 @@ export const fr = {
   'theme.toLight': 'Passer au thème clair',
   'locale.switch': 'English',
 
+  // Lot 3, tâche 2 — le bouton de compte qui replie thème, langue et
+  // déconnexion. Un libellé traduit, jamais des initiales inventées : rien
+  // ici ne connaît l'identité de la personne connectée.
+  'account.button': 'Préférences du compte',
+
+  // Le champ dit explicitement ce qu'il filtre — les listes de travail déjà
+  // affichées sur cet écran — et jamais les 139 prospects de la base, hors
+  // périmètre du chantier (décision du pilote, lot 3 tâche 2).
+  'header.search.label': 'Filtrer les listes du jour (relances dues, nouveaux prospects à fort score)',
+  // `{modifier}` vaut « ⌘ » ou « Ctrl+ » selon la plateforme détectée
+  // (`ui/plateforme.ts`) : afficher ⌘K sur Windows serait une promesse que
+  // rien ne tient.
+  'header.search.shortcut': '{modifier}K',
+
   'auth.title': 'Prospeo',
   'auth.subtitle': 'Connexion au tableau de bord de prospection',
   'auth.email': 'Adresse e-mail',
@@ -50,6 +64,11 @@ export const fr = {
   'today.empty.followUps':
     'Aucune relance : la table de suivi ne contient encore aucune ligne. Aucun écrivain ne l’alimente à ce jour.',
   'today.empty.newHighScore': 'Aucun prospect scoré pour le moment.',
+  // Distincte des deux ci-dessus : une recherche sans résultat ne dit rien
+  // sur l'état réel des relances ou des nouveaux prospects, seulement sur ce
+  // qui a été tapé. Les confondre ferait croire, une fois la recherche
+  // effacée, que la liste avait toujours été vide.
+  'today.empty.search': 'Aucune ligne ne correspond à votre recherche.',
 
   'today.reason.followUp.today': 'relance prévue aujourd’hui',
   'today.reason.followUp.late': 'relance en retard de {days} j',

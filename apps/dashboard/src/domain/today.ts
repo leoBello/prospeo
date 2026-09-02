@@ -133,6 +133,33 @@ export function computeKpis(prospects: ProspectView[]): Kpis {
   return { inBase: prospects.length, qualified, contacted, interested };
 }
 
+/**
+ * Neutralise casse et diacritiques, pour que « nantes » retrouve « NANTES »
+ * comme « Nântes » : la dénomination vient de sources externes (INSEE,
+ * Google) qui ne garantissent aucune normalisation commune.
+ */
+function normalise(texte: string): string {
+  return texte.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+}
+
+/**
+ * Un prospect correspond-il au texte tapé dans la recherche de la barre du
+ * haut ?
+ *
+ * Comparé à la dénomination et, quand il existe, au nom usuel : c'est ce
+ * qu'un opérateur reconnaît en cherchant une fiche précise parmi les listes
+ * de travail déjà affichées. Cette recherche ne porte QUE sur elles — jamais
+ * sur les 139 prospects de la base, hors périmètre du chantier (décision du
+ * pilote, lot 3 tâche 2) — d'où son emploi dans `buildToday`, jamais ailleurs.
+ */
+export function matchesQuery(prospect: ProspectView, query: string): boolean {
+  const cible = normalise(query.trim());
+  if (cible === '') return true;
+  return [prospect.denomination, prospect.denominationUsuelle ?? ''].some((texte) =>
+    normalise(texte).includes(cible),
+  );
+}
+
 export interface TodayLists {
   followUps: WorkList;
   newHighScore: WorkList;

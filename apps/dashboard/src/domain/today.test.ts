@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { ProspectView } from './prospect.js';
-import { MAX_ROWS_PER_LIST, buildToday, computeKpis, followUpReason, highlightLines } from './today.js';
+import {
+  MAX_ROWS_PER_LIST,
+  buildToday,
+  computeKpis,
+  followUpReason,
+  highlightLines,
+  matchesQuery,
+} from './today.js';
 
 const AUJOURDHUI = new Date('2026-09-01T09:00:00');
 
@@ -241,5 +248,38 @@ describe('buildToday', () => {
         expect(ligne.reason.length).toBeGreaterThan(0);
       }
     }
+  });
+});
+
+describe('matchesQuery', () => {
+  it('retrouve un prospect par sa denomination, insensible a la casse', () => {
+    const p = vue({ id: 'a', denomination: 'AUBERT SERVICES' });
+    expect(matchesQuery(p, 'aubert')).toBe(true);
+    expect(matchesQuery(p, 'AUBERT')).toBe(true);
+  });
+
+  it('retrouve un prospect par son nom usuel quand la denomination legale ne correspond pas', () => {
+    const p = vue({
+      id: 'a',
+      denomination: 'SARL DURAND ET FILS',
+      denominationUsuelle: 'Plomberie Durand',
+    });
+    expect(matchesQuery(p, 'plomberie durand')).toBe(true);
+  });
+
+  it('ignore les accents, la denomination ne les normalisant pas elle meme', () => {
+    const p = vue({ id: 'a', denomination: 'ÉLECTRICITÉ NANTAISE' });
+    expect(matchesQuery(p, 'electricite')).toBe(true);
+  });
+
+  it('rejette un prospect qui ne correspond a rien', () => {
+    const p = vue({ id: 'a', denomination: 'AUBERT SERVICES' });
+    expect(matchesQuery(p, 'plombier')).toBe(false);
+  });
+
+  it('une recherche vide ou faite uniquement d espaces laisse passer tout le monde', () => {
+    const p = vue({ id: 'a', denomination: 'AUBERT SERVICES' });
+    expect(matchesQuery(p, '')).toBe(true);
+    expect(matchesQuery(p, '   ')).toBe(true);
   });
 });

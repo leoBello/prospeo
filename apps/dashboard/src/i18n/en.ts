@@ -23,6 +23,11 @@ export const en: Record<keyof typeof fr, string> = {
   'theme.toLight': 'Switch to light theme',
   'locale.switch': 'Français',
 
+  'account.button': 'Account preferences',
+
+  'header.search.label': 'Filter today’s lists (follow-ups due, new high-scoring prospects)',
+  'header.search.shortcut': '{modifier}K',
+
   'auth.title': 'Prospeo',
   'auth.subtitle': 'Sign in to the prospecting dashboard',
   'auth.email': 'Email address',
@@ -51,6 +56,7 @@ export const en: Record<keyof typeof fr, string> = {
   'today.empty.followUps':
     'No follow-up: the pipeline table holds no rows yet. Nothing writes to it so far.',
   'today.empty.newHighScore': 'No scored prospect yet.',
+  'today.empty.search': 'No row matches your search.',
 
   'today.reason.followUp.today': 'follow-up due today',
   'today.reason.followUp.late': 'follow-up {days} days overdue',
