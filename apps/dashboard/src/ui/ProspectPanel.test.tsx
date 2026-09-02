@@ -66,10 +66,8 @@ describe('ProspectPanel', () => {
     // contenu des trois autres ne doit pas exister dans le DOM.
     expect(screen.queryByRole('heading', { name: 'Site généré' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Messages de vente' })).toBeNull();
-    // `histo.discovered`, rendu sans condition par `HistoriqueTab` — contrairement
-    // à `histo.detail.title` (« Journal détaillé des étapes »), affiché par
-    // un `Bientot` provisoire promis à disparaître dès la table des
-    // événements de déploiement livrée (§ finding 2 du rapport de revue).
+    // `histo.discovered`, rendu sans condition par `HistoriqueTab` : la
+    // découverte est toujours connue, contrairement aux autres jalons.
     expect(screen.queryByText('Découvert en base')).toBeNull();
 
     await user.click(screen.getByRole('tab', { name: /Site/ }));

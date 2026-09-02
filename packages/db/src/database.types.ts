@@ -14,6 +14,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      deployment_event: {
+        Row: {
+          detail: string | null
+          duration_ms: number | null
+          id: number
+          occurred_at: string
+          outcome: Database["public"]["Enums"]["deployment_outcome"]
+          prospect_id: string
+          step: Database["public"]["Enums"]["deployment_step"]
+        }
+        Insert: {
+          detail?: string | null
+          duration_ms?: number | null
+          id?: never
+          occurred_at?: string
+          outcome: Database["public"]["Enums"]["deployment_outcome"]
+          prospect_id: string
+          step: Database["public"]["Enums"]["deployment_step"]
+        }
+        Update: {
+          detail?: string | null
+          duration_ms?: number | null
+          id?: never
+          occurred_at?: string
+          outcome?: Database["public"]["Enums"]["deployment_outcome"]
+          prospect_id?: string
+          step?: Database["public"]["Enums"]["deployment_step"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deployment_event_prospect_id_fkey"
+            columns: ["prospect_id"]
+            isOneToOne: false
+            referencedRelation: "prospect"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       generated_message: {
         Row: {
           channel: string
@@ -344,6 +382,36 @@ export type Database = {
           },
         ]
       }
+      site_template: {
+        Row: {
+          branch: string
+          check_detail: string | null
+          check_ok: boolean | null
+          checked_at: string | null
+          id: number
+          repo_full_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          branch?: string
+          check_detail?: string | null
+          check_ok?: boolean | null
+          checked_at?: string | null
+          id?: never
+          repo_full_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          branch?: string
+          check_detail?: string | null
+          check_ok?: boolean | null
+          checked_at?: string | null
+          id?: never
+          repo_full_name?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       web_presence: {
         Row: {
           category: Database["public"]["Enums"]["web_presence_category"] | null
@@ -411,6 +479,14 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      deployment_outcome: "demarre" | "reussi" | "echoue" | "ignore"
+      deployment_step:
+        | "redaction"
+        | "depot"
+        | "projet"
+        | "build"
+        | "en_ligne"
+        | "retrait"
       enrichment_status: "ok" | "not_found" | "ambiguous" | "blocked"
       interaction_kind: "appel" | "whatsapp" | "email" | "sms" | "note"
       pipeline_status:
@@ -554,6 +630,15 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      deployment_outcome: ["demarre", "reussi", "echoue", "ignore"],
+      deployment_step: [
+        "redaction",
+        "depot",
+        "projet",
+        "build",
+        "en_ligne",
+        "retrait",
+      ],
       enrichment_status: ["ok", "not_found", "ambiguous", "blocked"],
       interaction_kind: ["appel", "whatsapp", "email", "sms", "note"],
       pipeline_status: [

@@ -50,3 +50,80 @@
   color: var(--color-text-faint);
   margin-left: var(--space-2);
 }
+
+.journal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ligneJournal {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  padding: 3px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ligneJournal:last-child {
+  border-bottom: none;
+}
+
+.etapeJournal {
+  font-weight: 600;
+}
+
+.dateJournal,
+.dureeJournal {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+}
+
+.detailJournal {
+  flex-basis: 100%;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* La cause d'un échec se distingue du reste : c'est le seul fait de la
+   ligne qui appelle une action, pas une simple note. */
+.detailJournal[data-echec='true'] {
+  color: var(--color-danger);
+}
+
+/* Une lecture en échec (tâche 11) : même ton que la cause d'un échec de
+   déploiement ci-dessus, pour la même raison — c'est un fait qui appelle une
+   action (relire), pas une note. */
+.erreur {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.erreurTitre {
+  margin: 0;
+  font-weight: 600;
+  color: var(--color-danger);
+}
+
+.erreurDetail {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-danger);
+}
+
+/* Une lecture EN COURS : un texte neutre, ni le rouge d'un échec ni le vide
+   nommé d'un prospect sans historique — la réponse n'est simplement pas
+   encore arrivée. */
+.chargement {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}

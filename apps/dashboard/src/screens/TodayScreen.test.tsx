@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@prospeo/db';
 import { renderWithPreferences } from '../test-utils.js';
 import type { ProspectView } from '../domain/prospect.js';
 import { TodayScreen } from './TodayScreen.js';
@@ -40,6 +42,121 @@ const score = (total: number, version = 'v2') => ({
     { code: 'phone_none', label: 'Aucun téléphone', points: -25, group: 'joignabilite' as const },
   ],
 });
+
+/**
+ * Client simulé pour `deployment_event` — tâche 11, le câblage du journal.
+ *
+ * Reproduit uniquement la chaîne que `fetchEventsFor` (data/deployments.ts)
+ * appelle : `from('deployment_event').select(...).eq('prospect_id', id)
+ * .order('occurred_at', ...)`. `appels` enregistre chaque table demandée,
+ * pour la preuve négative (aucune lecture sans sélection).
+ */
+function fakeEventsClient(lignes: Record<string, unknown>[]) {
+  const appels: string[] = [];
+  const client = {
+    from(table: string) {
+      appels.push(table);
+      return {
+        select() {
+          return {
+            eq() {
+              return {
+                order() {
+                  return Promise.resolve({ data: lignes, error: null });
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  return { client: client as unknown as SupabaseClient<Database>, appels };
+}
+
+const evenementBuildReussi = {
+  step: 'build',
+  outcome: 'reussi',
+  detail: null,
+  duration_ms: 92000,
+  occurred_at: '2026-09-01T14:20:32Z',
+};
+
+/**
+ * Variante controlee de `fakeEventsClient` ci-dessus : la lecture ne
+ * s'acheve pas toute seule — chaque `order()` en attente reste suspendu tant
+ * qu'un test n'appelle pas `resolve` explicitement, dans l'ordre de son
+ * choix. Necessaire pour la garde anti-reponse-tardive (finding 1, relevé de
+ * revue) et pour prouver qu'une fermeture ne laisse rien en suspens
+ * (finding 2) : un simple `Promise.resolve()` immediat, comme
+ * `fakeEventsClient`, ne permettrait jamais d'observer un ordre de reponse
+ * differe de l'ordre des requetes.
+ */
+function fakeEventsClientControlee() {
+  const appels: string[] = [];
+  const attentes: { prospectId: string; resolve: (lignes: Record<string, unknown>[]) => void }[] = [];
+  const client = {
+    from(table: string) {
+      appels.push(table);
+      return {
+        select() {
+          return {
+            eq(_colonne: string, prospectId: string) {
+              return {
+                order() {
+                  return new Promise<{ data: Record<string, unknown>[]; error: null }>((resolve) => {
+                    attentes.push({ prospectId, resolve: (lignes) => resolve({ data: lignes, error: null }) });
+                  });
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  return { client: client as unknown as SupabaseClient<Database>, appels, attentes };
+}
+
+/**
+ * Client simulé dont la lecture `deployment_event` échoue toujours —
+ * finding 4 (relevé de revue) : la même erreur que `fetchEventsFor` produit
+ * réellement pour une RLS refusée ou un réseau perdu.
+ */
+function fakeEventsClientErreur(message: string) {
+  const appels: string[] = [];
+  const client = {
+    from(table: string) {
+      appels.push(table);
+      return {
+        select() {
+          return {
+            eq() {
+              return {
+                order() {
+                  return Promise.resolve({ data: null, error: { message } });
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+  return { client: client as unknown as SupabaseClient<Database>, appels };
+}
+
+/**
+ * Laisse la file de microtaches (les `.then` de `fetchEventsFor` puis du
+ * hook) s'écouler jusqu'au bout avant de lire le DOM — `resolve()` seul ne
+ * suffit pas : `act` doit envelopper l'attente pour que React committe le
+ * `setState` qui en résulte.
+ */
+async function flush(): Promise<void> {
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 0));
+  });
+}
 
 function rendre(prospects: ProspectView[]) {
   return renderWithPreferences(
@@ -192,5 +309,251 @@ describe('TodayScreen', () => {
     expect(within(panneau).getByText(/démentie par le site déclaré/)).toBeDefined();
     // Et l'ecart est visible sans ouvrir le panneau.
     expect(screen.getAllByText('!').length).toBeGreaterThan(0);
+  });
+});
+
+describe('TodayScreen — le journal de deploiement (tache 11)', () => {
+  it('ne lit aucun evenement tant qu aucun prospect n est ouvert', () => {
+    // La table ne doit jamais etre interrogee si le panneau n'est pas
+    // affiche : ni au montage, ni pour un prospect present dans une liste
+    // mais non selectionne.
+    const { client, appels } = fakeEventsClient([]);
+    renderWithPreferences(
+      <TodayScreen
+        prospects={[vue('a', { score: score(90) })]}
+        currentRulesetVersion="v2"
+        now={AUJOURDHUI}
+        onSignOut={vi.fn()}
+        client={client}
+      />,
+    );
+    expect(appels).toEqual([]);
+  });
+
+  it('affiche les evenements reels du prospect ouvert, une fois la lecture aboutie', async () => {
+    const { client } = fakeEventsClient([evenementBuildReussi]);
+    const user = userEvent.setup();
+    renderWithPreferences(
+      <TodayScreen
+        prospects={[vue('a', { score: score(90) })]}
+        currentRulesetVersion="v2"
+        now={AUJOURDHUI}
+        onSignOut={vi.fn()}
+        client={client}
+      />,
+    );
+
+    await user.keyboard('{ArrowDown}');
+    await user.click(screen.getByRole('tab', { name: /Historique/ }));
+
+    // `findByText` attend la resolution de la promesse simulee : c'est la
+    // preuve que l'evenement traverse bien hook -> TodayScreen -> ProspectPanel
+    // -> HistoriqueTab, et non une valeur deja presente au premier rendu.
+    expect(await screen.findByText('Réussi')).toBeDefined();
+    expect(screen.getByText('Build')).toBeDefined();
+    // 92000 ms = 1 min 32 s, meme conversion que HistoriqueTab.test.tsx.
+    expect(screen.getByText('1 m 32')).toBeDefined();
+  });
+
+  it('un prospect avec des jalons mais sans evenement affiche quand meme ses jalons', async () => {
+    // Le cas des vingt-deux sites deja en ligne : la lecture reseau aboutit
+    // reellement (contrairement au defaut `events={[]}` teste par
+    // HistoriqueTab.test.tsx), et rend un tableau vide — la frise des jalons
+    // ne doit pas en souffrir.
+    const { client } = fakeEventsClient([]);
+    const user = userEvent.setup();
+    renderWithPreferences(
+      <TodayScreen
+        prospects={[
+          vue('a', {
+            score: score(90),
+            site: {
+              repoUrl: 'https://github.com/prospeo/x',
+              deploymentUrl: 'https://x.vercel.app',
+              promptVersion: 'v4',
+              model: 'claude-opus-5',
+              generatedAt: '2026-09-01T14:18:00Z',
+              publishedAt: '2026-09-01T14:22:00Z',
+              unpublishedAt: null,
+              contentRejectedAt: null,
+              redaction: null,
+            },
+          }),
+        ]}
+        currentRulesetVersion="v2"
+        now={AUJOURDHUI}
+        onSignOut={vi.fn()}
+        client={client}
+      />,
+    );
+
+    await user.keyboard('{ArrowDown}');
+    await user.click(screen.getByRole('tab', { name: /Historique/ }));
+
+    expect(await screen.findByText(/Site publié/)).toBeDefined();
+    expect(screen.getByText('Aucun événement enregistré')).toBeDefined();
+  });
+
+  it('ignore une reponse tardive du prospect quitte (garde anti-reponse-tardive)', async () => {
+    // Finding 1 du relevé de revue. A est ouvert en premier ; on bascule
+    // vers B avant que la lecture de A n'aboutisse ; B répond d'abord ; la
+    // réponse de A, tardive, ne doit jamais s'écrire dans le panneau — déjà
+    // sur B au moment où elle arrive.
+    const user = userEvent.setup();
+    const { client, attentes } = fakeEventsClientControlee();
+    renderWithPreferences(
+      <TodayScreen
+        prospects={[vue('a', { score: score(90) }), vue('b', { score: score(50) })]}
+        currentRulesetVersion="v2"
+        now={AUJOURDHUI}
+        onSignOut={vi.fn()}
+        client={client}
+      />,
+    );
+
+    // Ouvre A (le score le plus haut est selectionne en premier — meme ordre
+    // que le test de navigation clavier ci-dessus) : une lecture part.
+    await user.keyboard('{ArrowDown}');
+    await user.click(screen.getByRole('tab', { name: /Historique/ }));
+    expect(attentes).toHaveLength(1);
+    expect(attentes[0]!.prospectId).toBe('a');
+
+    // Bascule vers B avant que A ne reponde : deuxieme lecture en attente.
+    // L'onglet Historique reste actif — c'est le meme `ProspectPanel` monte,
+    // seules ses props changent (voir TodayScreen.tsx).
+    await user.keyboard('{ArrowDown}');
+    expect(within(screen.getByRole('complementary')).getByRole('heading', { level: 2 }).textContent)
+      .toBe('ENTREPRISE b');
+    expect(attentes).toHaveLength(2);
+    expect(attentes[1]!.prospectId).toBe('b');
+
+    // B répond d'abord.
+    attentes[1]!.resolve([
+      { step: 'en_ligne', outcome: 'reussi', detail: null, duration_ms: null, occurred_at: '2026-09-01T14:22:00Z' },
+    ]);
+    expect(await screen.findByText('Mise en ligne')).toBeDefined();
+
+    // A répond ensuite, en retard : `evenementBuildReussi` porte l'étape
+    // « Build », absente de la réponse de B — un marqueur sans ambiguïté.
+    attentes[0]!.resolve([evenementBuildReussi]);
+    await flush();
+
+    expect(within(screen.getByRole('complementary')).getByRole('heading', { level: 2 }).textContent)
+      .toBe('ENTREPRISE b');
+    expect(screen.queryByText('Build')).toBeNull();
+    expect(screen.getByText('Mise en ligne')).toBeDefined();
+  });
+
+  it('reinitialise la lecture a la fermeture, sans laisser une reponse tardive s ecrire au silence', async () => {
+    // Finding 2 du relevé de revue. Fermer garde `selectedId` mais retombe
+    // `prospectId` à `null` (`panelOpen ? selectedId : null`, TodayScreen.tsx) :
+    // une réponse qui arrive panneau fermé ne doit rien afficher, et rouvrir
+    // le même prospect doit relire pour de vrai, pas rejouer une réponse
+    // déjà en poche.
+    const user = userEvent.setup();
+    const { client, attentes } = fakeEventsClientControlee();
+    renderWithPreferences(
+      <TodayScreen
+        prospects={[vue('a', { score: score(90) })]}
+        currentRulesetVersion="v2"
+        now={AUJOURDHUI}
+        onSignOut={vi.fn()}
+        client={client}
+      />,
+    );
+
+    // Ouvre : une lecture part.
+    await user.keyboard('{ArrowDown}');
+    expect(attentes).toHaveLength(1);
+
+    // Ferme AVANT que la réponse n'arrive.
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('complementary')).toBeNull();
+
+    // La réponse arrive tardivement, panneau fermé : rien ne doit planter,
+    // et rien ne s'affiche puisqu'aucun panneau n'est monté.
+    attentes[0]!.resolve([evenementBuildReussi]);
+    await flush();
+    expect(screen.queryByRole('complementary')).toBeNull();
+
+    // Rouvre le MÊME prospect : si la fermeture avait vraiment coupé la
+    // lecture (et pas seulement cessé de l'afficher), une lecture fraîche
+    // repart — deuxième appel réseau, distinct du premier.
+    await user.keyboard('{ArrowDown}');
+    expect(attentes).toHaveLength(2);
+    await user.click(screen.getByRole('tab', { name: /Historique/ }));
+    // Tant que cette seconde lecture n'a pas répondu, la réponse de la
+    // première (pourtant déjà résolue plus haut) n'a rien laissé fuiter dans
+    // ce nouveau montage.
+    expect(screen.queryByText('Réussi')).toBeNull();
+
+    attentes[1]!.resolve([evenementBuildReussi]);
+    expect(await screen.findByText('Réussi')).toBeDefined();
+  });
+
+  it('n affirme pas « aucun evenement » pendant que la lecture est en vol', async () => {
+    // La lecture reste suspendue : c'est exactement l'etat traverse a chaque
+    // ouverture de panneau. L'onglet y affichait « Aucun evenement enregistre
+    // — le dernier fait connu remonte au ... », une affirmation POSITIVE sur
+    // l'histoire du prospect, enoncee avant qu'aucune reponse ne soit
+    // arrivee, et fausse pour tout prospect qui a des evenements.
+    const user = userEvent.setup();
+    const { client, attentes } = fakeEventsClientControlee();
+    renderWithPreferences(
+      <TodayScreen
+        prospects={[vue('a', { score: score(90) })]}
+        currentRulesetVersion="v2"
+        now={AUJOURDHUI}
+        onSignOut={vi.fn()}
+        client={client}
+      />,
+    );
+
+    await user.keyboard('{ArrowDown}');
+    await user.click(screen.getByRole('tab', { name: /Historique/ }));
+    expect(attentes).toHaveLength(1);
+
+    // En vol : ni vide date, ni erreur.
+    expect(screen.queryByText('Aucun événement enregistré')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByText('Chargement…')).toBeDefined();
+
+    // La reponse arrive : le chargement cede la place aux faits reels.
+    attentes[0]!.resolve([evenementBuildReussi]);
+    expect(await screen.findByText('Réussi')).toBeDefined();
+    expect(screen.queryByText('Chargement…')).toBeNull();
+  });
+
+  it('signale un echec de lecture au lieu de le confondre avec un prospect sans historique', async () => {
+    // Finding 4 du relevé de revue.
+    const user = userEvent.setup();
+    const { client, appels } = fakeEventsClientErreur('Row level security violation');
+    renderWithPreferences(
+      <TodayScreen
+        prospects={[vue('a', { score: score(90) })]}
+        currentRulesetVersion="v2"
+        now={AUJOURDHUI}
+        onSignOut={vi.fn()}
+        client={client}
+      />,
+    );
+
+    await user.keyboard('{ArrowDown}');
+    await user.click(screen.getByRole('tab', { name: /Historique/ }));
+
+    expect(await screen.findByRole('alert')).toBeDefined();
+    expect(screen.getByText('Lecture impossible')).toBeDefined();
+    // Le message vient de `fetchEventsFor` (data/deployments.ts), pas
+    // inventé ici.
+    expect(
+      screen.getByText('deployment_event : lecture impossible pour a — Row level security violation'),
+    ).toBeDefined();
+    // Distinct du vide daté d'un prospect sans événement : la panne ne dit
+    // rien sur l'historique réel de ce prospect.
+    expect(screen.queryByText('Aucun événement enregistré')).toBeNull();
+
+    const appelsAvantReessai = appels.length;
+    await user.click(screen.getByRole('button', { name: 'Réessayer' }));
+    expect(appels.length).toBeGreaterThan(appelsAvantReessai);
   });
 });

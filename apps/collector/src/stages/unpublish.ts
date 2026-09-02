@@ -14,6 +14,7 @@
  */
 
 import { estUnRefus } from '@prospeo/core';
+import type { EventSink } from './events.js';
 
 /** Délai de péremption d'un site resté sans réponse (D5). */
 export const PEREMPTION_JOURS = 90;
@@ -40,6 +41,10 @@ export interface SiteEnLigne {
 }
 
 export type UnpublishAction = 'garder' | 'refus' | 'peremption';
+
+/** Motifs journalisés sur `retrait/reussi` — voir `runUnpublish`. */
+const MOTIF_REFUS = 'refus du prospect (ne_pas_contacter ou perdu)';
+const MOTIF_PEREMPTION = `péremption à ${PEREMPTION_JOURS} jours sans réponse`;
 
 /**
  * Que faire de ce site ?
@@ -115,6 +120,23 @@ export interface UnpublishDeps {
   supprimerProjet(vercelProjectId: string): Promise<void>;
   marquerDepublie(prospectId: string): Promise<void>;
   maintenant(): Date;
+  /**
+   * Journal des événements de déploiement — l'étape `retrait`.
+   *
+   * OBLIGATOIRE, pas `events?:` — même raison que dans `PublishDeps` et
+   * `DeployDeps` : un champ optionnel laisse un appelant l'oublier sans que
+   * rien ne le signale, et c'est alors le journal qui se tait, en silence,
+   * sur une partie seulement des runs.
+   *
+   * `retrait` était jusqu'ici une étape que RIEN n'émettait : elle figurait
+   * dans l'énumération de la base, dans l'ordre du pipeline, dans les deux
+   * catalogues de traduction et dans deux composants — et aucune ligne n'a
+   * jamais pu la porter, parce que `publish` et `deploy` avaient été
+   * instrumentés et pas `unpublish`. Un retrait est pourtant le seul
+   * événement du pipeline qui fasse DISPARAÎTRE une page publiée au nom d'un
+   * tiers : c'est celui qu'on doit le plus pouvoir prouver après coup.
+   */
+  events: EventSink;
 }
 
 /**
@@ -144,15 +166,34 @@ export async function runUnpublish(
     const action = decideUnpublish(site, now);
     report.decided[action] += 1;
     if (action === 'garder') continue;
+    // En simulation, AUCUN événement : le mode « montre avant d'agir »
+    // n'écrit rien, et journaliser un retrait qui n'a pas eu lieu ferait de
+    // la table un récit de travail imaginaire.
     if (options.dryRun) continue;
+
+    // Chronomètre du retrait : il couvre la suppression Vercel et l'écriture
+    // en base, c'est-à-dire tout ce que cette étape fait réellement. Pris
+    // avant le `try` pour que l'échec soit mesuré lui aussi.
+    const debutRetrait = deps.maintenant().getTime();
 
     try {
       if (site.vercelProjectId !== null) {
         if (!projetSupprimable(site.vercelProjectId, connus)) {
-          console.error(
-            `unpublish : ${site.prospectId} — suppression refusée, le projet ` +
-              `« ${site.vercelProjectId} » n'est pas enregistré en base.`,
-          );
+          const detail =
+            `suppression refusée par le garde-fou — le projet ` +
+            `« ${site.vercelProjectId} » n'est pas enregistré en base`;
+          console.error(`unpublish : ${site.prospectId} — ${detail}.`);
+          // `echoue` et non `ignore` : le site est TOUJOURS EN LIGNE au nom
+          // d'un tiers qui a refusé, ou d'un site périmé. Ce n'est pas un
+          // travail délibérément sauté, c'est un retrait qui n'a pas eu
+          // lieu — et `unpublishExitCode` le compte déjà comme tel.
+          await deps.events.emit({
+            prospectId: site.prospectId,
+            step: 'retrait',
+            outcome: 'echoue',
+            detail,
+            durationMs: deps.maintenant().getTime() - debutRetrait,
+          });
           report.refusedGuard += 1;
           continue;
         }
@@ -163,13 +204,30 @@ export async function runUnpublish(
       // suppression échoue, une ligne qui prétend que le site est hors ligne
       // alors qu'il est toujours servi au nom d'une entreprise qui a refusé.
       await deps.marquerDepublie(site.prospectId);
+      // Le motif est journalisé avec le fait : un retrait pour refus et un
+      // retrait pour péremption ne se relisent pas de la même façon des mois
+      // plus tard, et la table ne garde rien d'autre qui les distingue.
+      await deps.events.emit({
+        prospectId: site.prospectId,
+        step: 'retrait',
+        outcome: 'reussi',
+        detail: action === 'refus' ? MOTIF_REFUS : MOTIF_PEREMPTION,
+        durationMs: deps.maintenant().getTime() - debutRetrait,
+      });
       report.unpublished += 1;
     } catch (erreur) {
-      console.error(
-        `unpublish : échec sur ${site.prospectId} (${site.repoFullName}) — ${
-          erreur instanceof Error ? erreur.message : String(erreur)
-        }`,
-      );
+      const detail = erreur instanceof Error ? erreur.message : String(erreur);
+      console.error(`unpublish : échec sur ${site.prospectId} (${site.repoFullName}) — ${detail}`);
+      // C'est la ligne qui manquait : un retrait raté ne partait que sur
+      // `stderr`, et l'écran de suivi n'avait aucun moyen de dire qu'un site
+      // devant disparaître est toujours servi.
+      await deps.events.emit({
+        prospectId: site.prospectId,
+        step: 'retrait',
+        outcome: 'echoue',
+        detail,
+        durationMs: deps.maintenant().getTime() - debutRetrait,
+      });
       report.failed += 1;
     }
   }

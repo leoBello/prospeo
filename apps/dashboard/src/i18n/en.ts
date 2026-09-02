@@ -15,6 +15,8 @@ import type { fr } from './fr.js';
 export const en: Record<keyof typeof fr, string> = {
   'app.name': 'Prospeo',
   'nav.today': 'Today',
+  'nav.deploiements': 'Deployments',
+  'nav.gabarit': 'Template',
   'nav.signOut': 'Sign out',
 
   'theme.toDark': 'Switch to dark theme',
@@ -218,9 +220,114 @@ export const en: Record<keyof typeof fr, string> = {
   'histo.published': 'Site published',
   'histo.unpublished': 'Site taken down',
   'histo.rejected': 'Copy rejected',
-  'histo.detail.title': 'Step-by-step deployment log',
-  'histo.detail.reason':
-    'Every deployment step will be dated here: repository created, project opened, build, go-live.',
-  'histo.detail.blocked':
-    'No events table exists: `prospect_site` holds a current state, not a history. Nothing can be dated step by step before the §4.1 migration.',
+
+  'histo.events.title': 'Detailed log',
+  'histo.events.empty.titre': 'No event recorded',
+  'histo.events.empty.detail': 'The latest known fact for this site dates back to {date}.',
+
+  'histo.issue.demarre': 'Started',
+  'histo.issue.reussi': 'Succeeded',
+  'histo.issue.echoue': 'Failed',
+  'histo.issue.ignore': 'Skipped',
+
+  'deploiements.title': 'Deployments',
+  'deploiements.subtitle':
+    'One site per prospect, generated from the template then built by Vercel. Each row says where it stands, and why it stopped there.',
+
+  'deploiements.kpi.enLigne': 'online',
+  'deploiements.kpi.enCours': 'in progress',
+  'deploiements.kpi.enEchec': 'failed',
+  'deploiements.kpi.peremption': 'expiring within {days} d',
+  'deploiements.kpi.peremption.tipTitre': 'Takedown at 90 days',
+  'deploiements.kpi.peremption.hint':
+    '{count} sites will reach 90 days of publication within {days} d and will be taken down automatically.',
+  'deploiements.kpi.peremption.hint_one':
+    'One site will reach 90 days of publication within {days} d and will be taken down automatically.',
+
+  'deploiements.filtre.tous': 'All',
+  'deploiements.filtre.enCours': 'In progress',
+  'deploiements.filtre.echec': 'Failed',
+  'deploiements.filtre.jamais': 'Never deployed',
+
+  'deploiements.colonnes.prospect': 'Prospect',
+  'deploiements.colonnes.gabarit': 'Template',
+  'deploiements.colonnes.piste': 'Draft · Repo · Project · Build · Live',
+  'deploiements.colonnes.etat': 'Status',
+  'deploiements.colonnes.duree': 'Duration',
+  'deploiements.colonnes.adresse': 'Address',
+
+  'deploiements.etape.redaction': 'Draft',
+  'deploiements.etape.depot': 'Repository',
+  'deploiements.etape.projet': 'Vercel project',
+  'deploiements.etape.build': 'Build',
+  'deploiements.etape.en_ligne': 'Go-live',
+  'deploiements.etape.retrait': 'Takedown',
+  'deploiements.etape.inconnue': 'unknown step',
+
+  'deploiements.etat.jamais': 'Never deployed',
+  'deploiements.etat.enCours': '{etape} in progress',
+  'deploiements.etat.echec': '{etape} failed',
+  'deploiements.etat.enLigne': 'Online',
+  'deploiements.etat.retire': 'Unpublished',
+
+  'deploiements.piste.aria': 'Deployment track: {etat}',
+
+  'deploiements.peremption.badge': 'Expires in {days} d',
+  'deploiements.peremption.badge_one': 'Expires tomorrow',
+  'deploiements.peremption.today': 'Expires today',
+  'deploiements.peremption.tipDetail':
+    "Published on {date}. A site published under a third party's name is automatically taken down 90 days after publication.",
+
+  'deploiements.row.score': 'score {score}',
+  'deploiements.row.duree': '{min} m {sec}',
+  'deploiements.row.adresseAbsente': 'no address yet',
+  'deploiements.row.horsLigne': 'offline',
+  'deploiements.row.echecSansDetail': 'The deployment failed, with no detail recorded.',
+  'deploiements.row.gabaritAbsent': 'no active template',
+
+  'deploiements.empty.titre': 'No deployments',
+  'deploiements.empty.detail':
+    'No prospect has a generated site yet. This screen will fill in as drafts are written.',
+  'deploiements.empty.filtre.titre': 'No deployments in this filter',
+  'deploiements.empty.filtre.detail': 'Choose "All" to see every deployment again.',
+
+  'gabarit.title': 'Site template',
+  'gabarit.subtitle':
+    'Every published site is generated from a GitHub repository marked as a template. Designating one here replaces the template shipped with the application, without touching any code.',
+
+  'gabarit.actif.titre': 'Active template',
+  'gabarit.actif.badge': 'Active',
+  'gabarit.actif.absent': 'No template designated — the template shipped with the application applies.',
+  'gabarit.actif.branche': 'Branch {branch}',
+  'gabarit.actif.controle.jamais': 'Never checked',
+  'gabarit.actif.controle.ok': 'Check passed on {date}',
+  'gabarit.actif.controle.echec': 'Check failed on {date}',
+  'gabarit.actif.controle.echecSansDetail': 'Check failed, with no detail recorded.',
+  'gabarit.actif.revenir': 'Revert to the default template',
+  'gabarit.actif.aucunMetier':
+    'No current trade is governed by this template: each trade declares its own, which wins. It will apply to the first trade without an exception.',
+
+  'gabarit.ordre.titre': 'Resolution order',
+  'gabarit.ordre.detail':
+    'The trade’s own template wins over the active template designated here, which itself wins over the environment variable — the template shipped with the application.',
+
+  'gabarit.designer.titre': 'Designate another repository',
+  'gabarit.designer.aide':
+    'The repository must belong to the organization and be marked "Template repository" on GitHub.',
+  'gabarit.designer.champRepo': 'Repository (org/name)',
+  'gabarit.designer.champBranche': 'Branch',
+  'gabarit.designer.soumettre': 'Designate this repository',
+
+  'gabarit.verifier.label': 'Check',
+  'gabarit.verifier.raison':
+    'The automatic check has not been written yet — neither here nor in the collector. It will have to verify that the repository is reachable, marked as a template, and contains src/content/site.json. Until then, "never checked" is what this card will keep showing.',
+
+  'gabarit.metiers.titre': 'Exceptions by trade',
+  'gabarit.metiers.aide':
+    'A trade can keep its own model. Without an exception, it receives the active template.',
+  'gabarit.metiers.herite': 'inherits the active one',
+  'gabarit.metiers.exception': 'exception',
+
+  'gabarit.portee':
+    'Changing the template only affects future deployments. Sites already online keep the model they were built with.',
 };

@@ -13,6 +13,8 @@
 export const fr = {
   'app.name': 'Prospeo',
   'nav.today': "Aujourd'hui",
+  'nav.deploiements': 'Déploiements',
+  'nav.gabarit': 'Gabarit',
   'nav.signOut': 'Se déconnecter',
 
   'theme.toDark': 'Passer au thème sombre',
@@ -229,13 +231,149 @@ export const fr = {
   'histo.published': 'Site publié',
   'histo.unpublished': 'Site retiré',
   'histo.rejected': 'Rédaction refusée',
-  'histo.detail.title': 'Journal détaillé des étapes',
-  // Deux textes et non un seul : le visible dit CE QUI VIENT, l'infobulle dit
-  // CE QUI BLOQUE. Les deux portaient la même phrase, si bien que survoler le
-  // marqueur « Bientôt » révélait une phrase déjà lisible deux centimètres
-  // plus haut — un geste pour rien, et une infobulle qui n'apprend rien.
-  'histo.detail.reason':
-    'Chaque étape de déploiement sera datée ici : dépôt créé, projet ouvert, build, mise en ligne.',
-  'histo.detail.blocked':
-    'Aucune table d’événements n’existe : `prospect_site` ne porte qu’un état courant, pas un historique. Rien ne peut donc être daté étape par étape avant la migration §4.1.',
+
+  // Chantier n°5, tâche 11 — le journal détaillé, désormais réel : la table
+  // `deployment_event` existe depuis ce lot. Les jalons ci-dessus restent :
+  // ils portent des faits que les événements ne rejouent pas pour les sites
+  // déployés avant cette migration (les vingt-deux sites déjà en ligne).
+  'histo.events.title': 'Journal détaillé',
+  // L'absence d'événements se dit comme un fait daté, pas comme un vide : le
+  // dernier jalon connu sert de repère, plutôt qu'un silence qui se lirait
+  // comme un oubli.
+  'histo.events.empty.titre': 'Aucun événement enregistré',
+  'histo.events.empty.detail': 'Le dernier fait connu pour ce site remonte au {date}.',
+
+  'histo.issue.demarre': 'Démarré',
+  'histo.issue.reussi': 'Réussi',
+  'histo.issue.echoue': 'Échoué',
+  'histo.issue.ignore': 'Ignoré',
+
+  // Chantier n°5, D9 — l'écran de suivi des déploiements. Vingt-deux sites
+  // publiés au nom de vraies entreprises : le seul moyen de voir ce que le
+  // pipeline leur a fait, jusqu'ici, était un terminal.
+  'deploiements.title': 'Déploiements',
+  'deploiements.subtitle':
+    'Un site par prospect, généré depuis le gabarit puis construit par Vercel. Chaque ligne dit où en est le sien, et pourquoi il s’y est arrêté.',
+
+  'deploiements.kpi.enLigne': 'en ligne',
+  'deploiements.kpi.enCours': 'en cours',
+  'deploiements.kpi.enEchec': 'en échec',
+  'deploiements.kpi.peremption': 'péremption sous {days} j',
+  'deploiements.kpi.peremption.tipTitre': 'Retrait à 90 jours',
+  'deploiements.kpi.peremption.hint':
+    '{count} sites atteindront leurs 90 jours de publication sous {days} j et seront retirés automatiquement.',
+  'deploiements.kpi.peremption.hint_one':
+    'Un site atteindra ses 90 jours de publication sous {days} j et sera retiré automatiquement.',
+
+  'deploiements.filtre.tous': 'Tous',
+  'deploiements.filtre.enCours': 'En cours',
+  'deploiements.filtre.echec': 'En échec',
+  'deploiements.filtre.jamais': 'Jamais déployé',
+
+  'deploiements.colonnes.prospect': 'Prospect',
+  'deploiements.colonnes.gabarit': 'Gabarit',
+  'deploiements.colonnes.piste': 'Rédaction · Dépôt · Projet · Build · Ligne',
+  'deploiements.colonnes.etat': 'État',
+  'deploiements.colonnes.duree': 'Durée',
+  'deploiements.colonnes.adresse': 'Adresse',
+
+  // Cinq des six étapes réelles du pipeline (voir `ORDRE_ETAPES`,
+  // domain/deployment.ts) ; `retrait` n'a pas de segment sur la piste — voir
+  // le docstring d'`EtapesPiste` — mais garde son libellé, utile ailleurs
+  // (date de retrait, état « Dépublié »).
+  'deploiements.etape.redaction': 'Rédaction',
+  'deploiements.etape.depot': 'Dépôt',
+  'deploiements.etape.projet': 'Projet Vercel',
+  'deploiements.etape.build': 'Build',
+  'deploiements.etape.en_ligne': 'Mise en ligne',
+  'deploiements.etape.retrait': 'Retrait',
+  'deploiements.etape.inconnue': 'étape inconnue',
+
+  'deploiements.etat.jamais': 'Jamais déployé',
+  'deploiements.etat.enCours': '{etape} en cours',
+  'deploiements.etat.echec': '{etape} en échec',
+  'deploiements.etat.enLigne': 'En ligne',
+  'deploiements.etat.retire': 'Dépublié',
+
+  'deploiements.piste.aria': 'Piste de déploiement : {etat}',
+
+  // Le compteur de péremption prime sur le badge « En ligne » dès qu'il
+  // approche (§D5, chantier n°4) : un site publié au nom d'un tiers est
+  // retiré automatiquement à 90 jours, et ce n'est pas une statistique.
+  'deploiements.peremption.badge': 'Péremption dans {days} j',
+  'deploiements.peremption.badge_one': 'Péremption demain',
+  'deploiements.peremption.today': 'Péremption aujourd’hui',
+  'deploiements.peremption.tipDetail':
+    'Publié le {date}. Un site publié au nom d’un tiers est retiré automatiquement 90 jours après sa publication.',
+
+  'deploiements.row.score': 'score {score}',
+  'deploiements.row.duree': '{min} m {sec}',
+  'deploiements.row.adresseAbsente': 'aucune adresse pour le moment',
+  'deploiements.row.horsLigne': 'hors ligne',
+  'deploiements.row.echecSansDetail': 'Le déploiement a échoué, sans détail enregistré.',
+  'deploiements.row.gabaritAbsent': 'aucun gabarit actif',
+
+  'deploiements.empty.titre': 'Aucun déploiement',
+  'deploiements.empty.detail':
+    'Aucun prospect n’a encore de site généré. Cet écran se remplira au fil des rédactions.',
+  'deploiements.empty.filtre.titre': 'Aucun déploiement dans ce filtre',
+  'deploiements.empty.filtre.detail': 'Choisissez « Tous » pour revoir l’ensemble des déploiements.',
+
+  // Chantier n°10, D10 — l'écran du gabarit. Il ENREGISTRE le dépôt désigné,
+  // il ne vérifie rien lui-même : le contrôle exigerait un jeton GitHub, qui
+  // n'a rien à faire dans un bundle navigateur. Le bouton « Vérifier » reste
+  // donc sous `Bientot`, et l'écran n'affiche que le dernier verdict connu.
+  'gabarit.title': 'Gabarit des sites',
+  'gabarit.subtitle':
+    'Chaque site publié est engendré depuis un dépôt GitHub marqué « template ». En désigner un ici le substitue au gabarit livré avec l’application, sans toucher au code.',
+
+  'gabarit.actif.titre': 'Gabarit actif',
+  'gabarit.actif.badge': 'Actif',
+  'gabarit.actif.absent': 'Aucun gabarit désigné — le gabarit livré avec l’application s’applique.',
+  'gabarit.actif.branche': 'Branche {branch}',
+  'gabarit.actif.controle.jamais': 'Jamais contrôlé',
+  'gabarit.actif.controle.ok': 'Contrôle réussi le {date}',
+  'gabarit.actif.controle.echec': 'Contrôle en échec le {date}',
+  'gabarit.actif.controle.echecSansDetail': 'Contrôle en échec, sans détail enregistré.',
+  'gabarit.actif.revenir': 'Revenir au gabarit par défaut',
+  // Affichée seulement quand TOUS les métiers déclarent leur propre
+  // `templateRepo` : `templateRepoFor` résout d'abord celui du métier, si
+  // bien que le gabarit désigné ici ne gouverne alors aucun métier existant.
+  // L'écran est juste et servira au troisième métier — le taire serait la
+  // seule faute.
+  'gabarit.actif.aucunMetier':
+    'Aucun métier actuel n’est gouverné par ce gabarit : chaque métier déclare le sien, qui l’emporte. Il s’appliquera au premier métier sans exception.',
+
+  // L'infobulle que le brief demande d'afficher, pas seulement d'implémenter :
+  // sans elle, personne ne comprend pourquoi un métier ayant son propre
+  // `templateRepo` (trades.ts) n'a pas reçu le dépôt qu'on vient de désigner.
+  'gabarit.ordre.titre': 'Ordre de résolution',
+  'gabarit.ordre.detail':
+    'Le gabarit propre au métier l’emporte sur le gabarit actif désigné ici, qui l’emporte lui-même sur celui de la variable d’environnement — le gabarit livré avec l’application.',
+
+  'gabarit.designer.titre': 'Désigner un autre dépôt',
+  'gabarit.designer.aide':
+    'Le dépôt doit appartenir à l’organisation et être marqué « Template repository » sur GitHub.',
+  'gabarit.designer.champRepo': 'Dépôt (org/nom)',
+  'gabarit.designer.champBranche': 'Branche',
+  'gabarit.designer.soumettre': 'Désigner ce dépôt',
+
+  'gabarit.verifier.label': 'Vérifier',
+  // Le motif dit ce qui EST, pas ce qui viendra : aucun code du collector
+  // n'exécute ce contrôle, et les seuls écrivains de `checked_at` /
+  // `check_ok` les mettent à nul. Promettre « au prochain passage »
+  // envoyait l'opérateur relancer le collector pour revoir « jamais
+  // contrôlé » — une remédiation qui n'existe pas, pire qu'un « indisponible »
+  // générique. Voir docs/design/HANDOFF.md, qui documente déjà le manque.
+  'gabarit.verifier.raison':
+    'Le contrôle automatique n’est pas encore écrit — ni ici, ni dans le collector. Il devra vérifier l’accessibilité du dépôt, son marquage « template » et la présence de src/content/site.json. En attendant, « jamais contrôlé » restera affiché.',
+
+  'gabarit.metiers.titre': 'Exceptions par métier',
+  'gabarit.metiers.aide':
+    'Un métier peut garder son propre modèle. Sans exception, il reçoit le gabarit actif.',
+  'gabarit.metiers.herite': 'hérite de l’actif',
+  'gabarit.metiers.exception': 'exception',
+
+  'gabarit.portee':
+    'Changer de gabarit n’affecte que les déploiements à venir. Les sites déjà en ligne conservent le modèle avec lequel ils ont été construits.',
 } as const;

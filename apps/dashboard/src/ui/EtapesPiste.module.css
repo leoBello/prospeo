@@ -1,0 +1,73 @@
+.piste {
+  display: flex;
+  gap: 3px;
+}
+
+/*
+ * Quatre motifs, pas quatre couleurs : `empty` est creux (bordure seule,
+ * aucun remplissage), `ok` est plein et uni, `run` porte un hachurage animé,
+ * `fail` porte un quadrillage statique. Un lecteur en niveaux de gris — ou
+ * huit pour cent des hommes, pour le rouge et le vert — distingue les quatre
+ * sans l'aide de la teinte.
+ */
+.segment {
+  width: 30px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  flex: none;
+}
+
+.segment[data-etat='empty'] {
+  background: transparent;
+  border: 1px solid var(--color-border-strong);
+}
+
+.segment[data-etat='ok'] {
+  background: var(--color-success);
+  border: 1px solid transparent;
+}
+
+/*
+ * Le hachurage de `fail` et `run` se mélange à `--color-border-strong`, pas à
+ * `black` : ce token est déjà, dans ce même fichier, la marque structurelle
+ * posée sur un segment (la bordure de `empty`). Il porte en plus la bonne
+ * direction dans les deux thèmes sans aucune règle conditionnelle — sombre
+ * dans le thème sombre, où il fonce le motif comme prévu ; clair dans le
+ * thème clair, où foncer encore une couleur d'état déjà saturée aurait noyé
+ * le motif au lieu de le dessiner.
+ */
+.segment[data-etat='fail'] {
+  border: 1px solid transparent;
+  background-color: var(--color-danger);
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent 0 3px,
+    color-mix(in srgb, var(--color-border-strong) 35%, transparent) 3px 6px
+  );
+}
+
+.segment[data-etat='run'] {
+  border: 1px solid transparent;
+  background-color: var(--color-accent);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent 0 4px,
+    color-mix(in srgb, var(--color-border-strong) 30%, transparent) 4px 8px
+  );
+  background-size: 200% 100%;
+  animation: glissement 1.2s linear infinite;
+}
+
+/*
+ * La seule animation de l'écran. `theme.css` porte déjà la règle globale
+ * `prefers-reduced-motion` (sélecteur `*`), qui la neutralise sans rien
+ * ajouter ici — voir le docstring d'`EtapesPiste.tsx`.
+ */
+@keyframes glissement {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 16px 0;
+  }
+}

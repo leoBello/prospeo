@@ -8,6 +8,7 @@ import {
   type EtatSite,
   type PublishReport,
 } from './publish.js';
+import { NULL_SINK, type DeploymentEvent, type EventSink } from './events.js';
 
 const FAITS: SiteFacts = {
   nomAffiche: 'Dos-Services',
@@ -186,11 +187,37 @@ const CONTENU: ContenuPublie = {
 
 const UN: PublishInput = { prospectId: 'p1', contenu: CONTENU };
 
-/** Dépendances de test : enregistre les appels, ne sort jamais sur le réseau. */
-function fausseDeps(etats: Record<string, EtatSite> = {}) {
+/**
+ * Puits d'événements factice : collecte dans un tableau plutôt que d'écrire
+ * en base, pour qu'on asserte sur les événements réellement émis — pas sur
+ * une chaîne affichée.
+ */
+function fauxEvents() {
+  const events: DeploymentEvent[] = [];
+  const sink: EventSink = {
+    async emit(e) {
+      events.push(e);
+    },
+  };
+  return { sink, events };
+}
+
+/**
+ * Dépendances de test : enregistre les appels, ne sort jamais sur le réseau.
+ *
+ * `horloge` sert à la fois de date de publication et de CHRONOMÈTRE pour
+ * `duration_ms`. Figée par défaut (durée mesurée nulle) ; un test qui veut
+ * prouver la mesure la fait avancer.
+ */
+function fausseDeps(
+  etats: Record<string, EtatSite> = {},
+  events: EventSink = NULL_SINK,
+  horloge: () => Date = () => new Date('2026-09-01T12:00:00Z'),
+) {
   const journal: string[] = [];
   const ecrits: Record<string, Record<string, unknown>> = {};
   const deps: PublishDeps = {
+    events,
     github: {
       async creerDepuisModele(templateRepo, nom) {
         journal.push(`creer:${templateRepo}:${nom}`);
@@ -215,7 +242,7 @@ function fausseDeps(etats: Record<string, EtatSite> = {}) {
       journal.push(`enregistrer:${id}`);
       ecrits[id] = etat as unknown as Record<string, unknown>;
     },
-    maintenant: () => new Date('2026-09-01T12:00:00Z'),
+    maintenant: horloge,
   };
   return { deps, journal, ecrits };
 }
@@ -366,5 +393,154 @@ describe('runPublish', () => {
     expect(report.created).toBe(1);
     expect(journal).toContain('enregistrer:p2');
     expect(journal).not.toContain('enregistrer:p1');
+  });
+
+  // -------------------------------------------------------------------------
+  // Journalisation (tâche 4) : `publish` franchit deux étapes — `redaction`
+  // (le contenu est prêt et cohérent) et `depot` (le dépôt existe et le
+  // contenu y est écrit). Ce qu'il DÉCIDE — créer, mettre à jour, sauter, ou
+  // refuser — se lit dans les événements, pas seulement dans le rapport.
+  // -------------------------------------------------------------------------
+
+  it('émet depot/reussi quand la création aboutit', async () => {
+    const { sink, events } = fauxEvents();
+    const { deps } = fausseDeps({}, sink);
+
+    const report = await runPublish([UN], deps);
+
+    expect(report.created).toBe(1);
+    expect(events).toContainEqual(
+      expect.objectContaining({ prospectId: 'p1', step: 'depot', outcome: 'reussi' }),
+    );
+  });
+
+  it('émet un événement ignore — pas une absence — quand publish saute un prospect inchangé', async () => {
+    // `decidePublish` rend `skip` : savoir qu'un run a délibérément sauté ce
+    // prospect est une information. Sans cet événement, le journal montrerait
+    // un trou identique à celui d'un prospect jamais traité par ce run.
+    const empreinte = empreinteContenu(CONTENU);
+    const { sink, events } = fauxEvents();
+    const { deps } = fausseDeps(
+      { p1: { repoFullName: 'org/dos-services-51000900400035', empreinte } },
+      sink,
+    );
+
+    const report = await runPublish([UN], deps);
+
+    expect(report.skipped).toBe(1);
+    expect(events).toContainEqual(
+      expect.objectContaining({ prospectId: 'p1', step: 'depot', outcome: 'ignore' }),
+    );
+  });
+
+  it('MESURE la durée de l’étape « depot » au lieu de la laisser nulle', async () => {
+    // La colonne `duration_ms` existait, l'écran affichait une colonne
+    // « Durée », et AUCUN appelant ne la renseignait : toutes les lignes
+    // lisaient « non renseigné » à jamais. C'était une absence mal nommée —
+    // le fait n'était pas « la durée de ce prospect est inconnue » mais
+    // « rien ne mesure les durées ».
+    //
+    // Horloge qui avance de 250 ms à chaque lecture : la première est prise
+    // au départ du chronomètre, la seconde par `enregistrer` (via
+    // `deps.maintenant()` dans `runPublish`), la troisième à l'émission.
+    let t = new Date('2026-09-01T12:00:00Z').getTime();
+    const horloge = () => {
+      const instant = new Date(t);
+      t += 250;
+      return instant;
+    };
+    const { sink, events } = fauxEvents();
+    const { deps } = fausseDeps({}, sink, horloge);
+
+    await runPublish([UN], deps);
+
+    const depot = events.find((e) => e.step === 'depot' && e.outcome === 'reussi');
+    expect(depot?.durationMs).toBe(500);
+  });
+
+  it('n’invente AUCUNE durée pour un prospect ignoré — il n’a rien fait', async () => {
+    // Un `skip` n'a pas de durée : mesurer le temps de constater qu'il n'y
+    // avait rien à faire n'est pas la même grandeur que celle qu'affichent
+    // les autres lignes. `null` est ici la réponse honnête, et c'est bien
+    // « non renseigné » que l'écran doit montrer.
+    const empreinte = empreinteContenu(CONTENU);
+    const { sink, events } = fauxEvents();
+    const { deps } = fausseDeps(
+      { p1: { repoFullName: 'org/dos-services-51000900400035', empreinte } },
+      sink,
+    );
+
+    await runPublish([UN], deps);
+
+    const ignore = events.find((e) => e.outcome === 'ignore');
+    expect(ignore).toBeDefined();
+    expect(ignore?.durationMs ?? null).toBeNull();
+  });
+
+  it('mesure aussi la durée d’un échec — trois secondes ou trois cents ne se diagnostiquent pas pareil', async () => {
+    let t = new Date('2026-09-01T12:00:00Z').getTime();
+    const horloge = () => {
+      const instant = new Date(t);
+      t += 1000;
+      return instant;
+    };
+    const { sink, events } = fauxEvents();
+    const { deps } = fausseDeps({}, sink, horloge);
+    deps.github.creerDepuisModele = async () => {
+      throw new Error('GitHub création : 403 — refusé');
+    };
+
+    await runPublish([UN], deps);
+
+    const echec = events.find((e) => e.step === 'depot' && e.outcome === 'echoue');
+    expect(echec?.durationMs).toBe(1000);
+  });
+
+  it('émet echoue avec un detail qui nomme le motif quand l’éditeur n’est pas renseigné', async () => {
+    // Ce `detail` est exactement ce que l'écran de suivi affichera dans la
+    // ligne : un motif vague ou vide y serait un défaut, pas un détail utile.
+    const { sink, events } = fauxEvents();
+    const { deps } = fausseDeps({}, sink);
+    const sansEditeur: PublishInput = {
+      prospectId: 'p1',
+      contenu: { ...CONTENU, editeur: { nom: 'À RENSEIGNER', contact: 'x@example.com' } },
+    };
+
+    const report = await runPublish([sansEditeur], deps);
+
+    expect(report.refused).toBe(1);
+    expect(events).toHaveLength(1);
+    const [evenement] = events;
+    expect(evenement?.step).toBe('redaction');
+    expect(evenement?.outcome).toBe('echoue');
+    // Non vide ET porteur du motif — pas un simple "il y a eu un problème".
+    expect(evenement?.detail).toBeTruthy();
+    expect(evenement?.detail).toMatch(/éditeur/i);
+  });
+
+  it('émet echoue sur une panne réseau GitHub, sans interrompre la boucle sur le prospect suivant', async () => {
+    const { sink, events } = fauxEvents();
+    const { deps } = fausseDeps({}, sink);
+    deps.github.attendreContenuModele = async () => 'sha-du-modele';
+    deps.github.creerDepuisModele = async (_modele, nom) => {
+      if (nom.endsWith('51000900400035')) throw new Error('GitHub création : 403 — refusé');
+      return { fullName: `org/${nom}`, htmlUrl: 'u' };
+    };
+    const autre: PublishInput = {
+      prospectId: 'p2',
+      contenu: { ...CONTENU, faits: { ...FAITS, siret: '52405116600014' } },
+    };
+
+    const report = await runPublish([UN, autre], deps);
+
+    expect(report.failed).toBe(1);
+    expect(report.created).toBe(1);
+    expect(events).toContainEqual(
+      expect.objectContaining({ prospectId: 'p1', step: 'depot', outcome: 'echoue' }),
+    );
+    // La boucle a bien continué : p2 a son propre événement de succès.
+    expect(events).toContainEqual(
+      expect.objectContaining({ prospectId: 'p2', step: 'depot', outcome: 'reussi' }),
+    );
   });
 });

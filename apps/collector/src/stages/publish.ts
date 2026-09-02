@@ -7,6 +7,7 @@ import {
   type SiteFacts,
 } from '@prospeo/core';
 import type { GithubClient } from '../sources/github.js';
+import type { EventSink } from './events.js';
 
 /** Plafond GitHub pour un nom de dépôt. */
 const MAX_NOM_DEPOT = 100;
@@ -149,6 +150,14 @@ export interface EtatSiteEcrit {
 export interface PublishDeps {
   github: GithubClient;
   /**
+   * Journal des événements de déploiement (tâche 4). OBLIGATOIRE — pas
+   * `events?:` — sinon un appelant qui l'omet ne le sait jamais : le run
+   * s'exécute normalement, et c'est le journal qui se tait, en silence, pour
+   * une partie seulement des runs. Les tests qui n'ont rien à journaliser
+   * passent `NULL_SINK` (voir `events.ts`).
+   */
+  events: EventSink;
+  /**
    * Dépôt modèle de repli, employé quand le métier n'en déclare pas.
    *
    * Vient de `PROSPEO_GITHUB_TEMPLATE_REPO`. Le métier prime : `trades.ts`
@@ -158,7 +167,17 @@ export interface PublishDeps {
   templateRepoDefaut?: string | undefined;
   lireEtat(prospectId: string): Promise<EtatSite | null>;
   enregistrer(prospectId: string, etat: EtatSiteEcrit): Promise<void>;
-  /** Injectée plutôt que `new Date()` : une date de publication se teste. */
+  /**
+   * Injectée plutôt que `new Date()` : une date de publication se teste.
+   *
+   * Sert aussi de CHRONOMÈTRE pour `duration_ms` (voir plus bas) : la colonne
+   * existait, l'écran l'affichait, et aucun appelant ne la renseignait — si
+   * bien que chaque ligne lisait « non renseigné » à jamais. C'est une
+   * absence mal nommée : le vrai fait n'était pas « la durée de ce prospect
+   * est inconnue » mais « rien ne mesure les durées ». Une horloge déjà
+   * injectée vaut mieux qu'un `Date.now()` en dur : la mesure se teste au
+   * lieu de se constater.
+   */
   maintenant(): Date;
 }
 
@@ -202,10 +221,13 @@ export async function runPublish(
     // juste en dessous. `generate` reprendra ce prospect ; `publish` n'a rien
     // à en faire tant qu'une nouvelle rédaction n'a pas été écrite.
     if (rejeteeLe !== undefined && rejeteeLe !== null) {
-      console.error(
-        `publish : ${prospectId} refusé — rédaction rejetée à la relecture le ` +
-          `${rejeteeLe.toISOString().slice(0, 10)}. Rejouez « generate » pour en écrire une autre.`,
-      );
+      // « redaction » : le contenu n'est pas prêt à publier. Le motif est
+      // celui qu'affichera l'écran de suivi — pas un simple « refusé ».
+      const detail =
+        `rédaction rejetée à la relecture le ${rejeteeLe.toISOString().slice(0, 10)} — ` +
+        `rejouez « generate » pour en écrire une autre`;
+      console.error(`publish : ${prospectId} refusé — ${detail}.`);
+      await deps.events.emit({ prospectId, step: 'redaction', outcome: 'echoue', detail });
       report.refused += 1;
       continue;
     }
@@ -215,20 +237,47 @@ export async function runPublish(
     // est ici, avant le moindre appel réseau — un dépôt créé ne se « dé-crée »
     // pas, et c'est la publication, pas le build, qui expose une page au monde.
     if (!editeurRenseigne(contenu.editeur)) {
-      console.error(
-        `publish : ${prospectId} refusé — éditeur non renseigné (voir EDITEUR dans packages/core).`,
-      );
+      const detail = 'éditeur non renseigné (voir EDITEUR dans packages/core)';
+      console.error(`publish : ${prospectId} refusé — ${detail}.`);
+      await deps.events.emit({ prospectId, step: 'redaction', outcome: 'echoue', detail });
       report.refused += 1;
       continue;
     }
 
+    // Les deux contrôles ci-dessus sont franchis : le contenu est prêt et
+    // cohérent. C'est la seule place où « redaction » réussit — le reste de
+    // la boucle ne porte plus que sur le dépôt.
+    await deps.events.emit({ prospectId, step: 'redaction', outcome: 'reussi' });
+
     const depot = nomDepot(contenu.faits);
     const empreinte = empreinteContenu(contenu);
+
+    // Départ du chronomètre de l'étape « depot » : il couvre TOUT ce que
+    // cette étape fait réellement — la lecture de l'état, l'appel GitHub, et
+    // l'écriture en base — parce que c'est ce temps-là qu'un opérateur veut
+    // comparer d'un prospect à l'autre. Il est pris avant le `try` pour que
+    // le `catch` mesure lui aussi : savoir qu'un échec est survenu au bout de
+    // trois cents secondes plutôt que de trois est la moitié du diagnostic.
+    const debutDepot = deps.maintenant().getTime();
 
     try {
       const etat = await deps.lireEtat(prospectId);
       const action = decidePublish(etat, empreinte);
       if (action === 'skip') {
+        // Un skip est un événement, pas une absence : savoir qu'un run a
+        // délibérément sauté ce prospect est une information. Sans elle, le
+        // journal se lirait comme un trou identique à celui d'un prospect que
+        // ce run n'aurait jamais examiné.
+        // Aucune `durationMs` : ce run n'a rien fait pour ce prospect. Une
+        // durée sur un « ignoré » mesurerait le temps de constater qu'il n'y
+        // avait rien à faire, ce qui n'est pas la même grandeur que celle
+        // qu'affichent les autres lignes. `null` est ici la réponse honnête.
+        await deps.events.emit({
+          prospectId,
+          step: 'depot',
+          outcome: 'ignore',
+          detail: `contenu déjà à jour — ${depot}`,
+        });
         report.skipped += 1;
         continue;
       }
@@ -289,17 +338,33 @@ export async function runPublish(
         generatedAt: maintenant,
       });
 
+      // Le dépôt existe et le contenu y est écrit : « depot » aboutit ici,
+      // qu'il s'agisse d'une création ou d'une mise à jour.
+      await deps.events.emit({
+        prospectId,
+        step: 'depot',
+        outcome: 'reussi',
+        detail: repoFullName,
+        durationMs: deps.maintenant().getTime() - debutDepot,
+      });
+
       if (action === 'create') report.created += 1;
       else report.updated += 1;
     } catch (erreur) {
+      const detail = erreur instanceof Error ? erreur.message : String(erreur);
       // Journalisé AVEC le prospect concerné, comme l'exige le §12 du spec :
       // un message d'erreur qui ne dit pas sur quelle ligne il porte oblige à
       // rejouer le lot entier pour le retrouver.
-      console.error(
-        `publish : échec sur ${prospectId} (${depot}) — ${
-          erreur instanceof Error ? erreur.message : String(erreur)
-        }`,
-      );
+      console.error(`publish : échec sur ${prospectId} (${depot}) — ${detail}`);
+      // Émis puis on continue la boucle : un échec sur un prospect ne doit
+      // pas empêcher le journal — ni la publication — des suivants.
+      await deps.events.emit({
+        prospectId,
+        step: 'depot',
+        outcome: 'echoue',
+        detail,
+        durationMs: deps.maintenant().getTime() - debutDepot,
+      });
       report.failed += 1;
     }
   }

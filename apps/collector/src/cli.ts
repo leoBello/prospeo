@@ -44,6 +44,8 @@ import {
 import { createPitchRedacteur, createRedacteur } from './sources/anthropic.js';
 import { createGithubClient } from './sources/github.js';
 import { createVercelClient } from './sources/vercel.js';
+import { createEventSink } from './stages/events.js';
+import { deployExitCode, runDeploy, type DeployDeps, type DeploySite } from './stages/deploy.js';
 import { runGenerate, type GenerateInput } from './stages/generate.js';
 import {
   publishExitCode,
@@ -59,6 +61,7 @@ import {
   type SiteEnLigne,
   type UnpublishDeps,
 } from './stages/unpublish.js';
+import { gabaritDefautPourPublication, lireGabaritActif } from './site-template.js';
 
 // `.env` vit a la racine du depot. Ni tsx ni Node ne le chargent tout seuls :
 // sans cette ligne, la procedure documentee (« copier .env.example en .env »)
@@ -1745,6 +1748,11 @@ async function main(argv: string[]): Promise<number> {
       const pubConfig = loadPublishConfig(process.env);
       const client = createClient(loadConfig(process.env));
       const rows = await fetchSiteRows(client);
+      // Le gabarit actif en base prime sur PROSPEO_GITHUB_TEMPLATE_REPO — le
+      // métier, lui, continue de primer sur les deux (templateRepoFor,
+      // inchangé, tranche entre ce repli et trade.templateRepo plus bas dans
+      // runPublish). Voir apps/collector/src/site-template.ts.
+      const gabaritActif = await lireGabaritActif(client);
 
       // On ne publie que ce qui a été généré. L'ordre des étages est une
       // dépendance de données, pas une convention.
@@ -1767,7 +1775,7 @@ async function main(argv: string[]): Promise<number> {
 
       const deps: PublishDeps = {
         github: createGithubClient({ token: pubConfig.githubToken, org: pubConfig.githubOrg }),
-        templateRepoDefaut: pubConfig.githubTemplateRepo,
+        templateRepoDefaut: gabaritDefautPourPublication(gabaritActif, pubConfig.githubTemplateRepo),
         async lireEtat(prospectId) {
           const row = rows[prospectId];
           if (row === undefined || row.repo_full_name === null) return null;
@@ -1792,6 +1800,7 @@ async function main(argv: string[]): Promise<number> {
           if (error) throw new Error(error.message);
         },
         maintenant: () => new Date(),
+        events: createEventSink(client),
       };
 
       const report = await runPublish(lot, deps);
@@ -1824,66 +1833,41 @@ async function main(argv: string[]): Promise<number> {
         return 0;
       }
 
-      let deploye = 0;
-      let enAttente = 0;
-      let echoue = 0;
+      const sites: DeploySite[] = lot.map(([prospectId, row]) => ({
+        prospectId,
+        repoFullName: row.repo_full_name as string,
+        vercelProjectId: row.vercel_project_id,
+      }));
 
-      for (const [prospectId, row] of lot) {
-        const depot = row.repo_full_name as string;
-        const nom = depot.split('/')[1] as string;
-        try {
-          let projectId = row.vercel_project_id;
-          if (projectId === null) {
-            const projet = await vercel.creerProjet(nom, depot);
-            projectId = projet.id;
-            const { error } = await client
-              .from('prospect_site')
-              .update({ vercel_project_id: projectId, updated_at: new Date().toISOString() })
-              .eq('prospect_id', prospectId);
-            if (error) throw new Error(error.message);
-          }
-
-          let url = await vercel.urlProduction(projectId);
-          if (url === null) {
-            // Vercel ne déploie pas le HEAD d'un dépôt qu'on vient de lier :
-            // il attend le commit suivant, et `publish` a poussé le sien AVANT
-            // que le projet existe. Le premier déploiement doit donc être
-            // amorcé. Le déclencher deux fois est sans conséquence : l'API
-            // dédoublonne les déploiements identiques faute de `forceNew`.
-            await vercel.declencherDeploiement(projectId, depot, 'main');
-            url = await attendreUrl(vercel, projectId);
-          }
-
-          if (url === null) {
-            // Le build est en cours. Rejouer `deploy` reprendra la ligne : son
-            // URL est toujours nulle, et le projet ne sera pas recréé.
-            enAttente += 1;
-            process.stdout.write(`deploy : ${nom} en construction, à reprendre au prochain run\n`);
-            continue;
-          }
-
+      const deps: DeployDeps = {
+        vercel,
+        events: createEventSink(client),
+        async enregistrerProjet(prospectId, vercelProjectId) {
+          const { error } = await client
+            .from('prospect_site')
+            .update({ vercel_project_id: vercelProjectId, updated_at: new Date().toISOString() })
+            .eq('prospect_id', prospectId);
+          if (error) throw new Error(error.message);
+        },
+        async enregistrerUrl(prospectId, url) {
           const { error } = await client
             .from('prospect_site')
             .update({ deployment_url: url, updated_at: new Date().toISOString() })
             .eq('prospect_id', prospectId);
           if (error) throw new Error(error.message);
-          deploye += 1;
-          process.stdout.write(`deploy : ${url}\n`);
-        } catch (erreur) {
-          echoue += 1;
-          process.stderr.write(
-            `deploy : échec sur ${prospectId} (${depot}) — ${
-              erreur instanceof Error ? erreur.message : String(erreur)
-            }\n`,
-          );
-        }
-      }
+        },
+        // Le déclenchement double est sans conséquence : l'API Vercel
+        // dédoublonne les déploiements identiques faute de `forceNew`.
+        attendreUrl: (projectId) => attendreUrl(vercel, projectId),
+        maintenant: () => new Date(),
+      };
 
+      const report = await runDeploy(sites, deps);
       process.stdout.write(
-        `deploy : ${deploye} sites en ligne, ${enAttente} en construction, ${echoue} en échec\n`,
+        `deploy : ${report.deployed} sites en ligne, ${report.pending} en construction, ` +
+          `${report.failed} en échec\n`,
       );
-      // Un build en cours n'est pas un échec : c'est un run à rejouer.
-      return echoue > 0 ? 1 : 0;
+      return deployExitCode(report);
     }
 
     case 'unpublish': {
@@ -1958,6 +1942,10 @@ async function main(argv: string[]): Promise<number> {
           if (error) throw new Error(error.message);
         },
         maintenant: () => new Date(),
+        // Le vrai puits, jamais `NULL_SINK` : celui-là est réservé aux tests
+        // d'étage. Sans cette ligne, l'étape `retrait` resterait ce qu'elle
+        // était — une étape que rien n'émet.
+        events: createEventSink(client),
       };
 
       const report = await runUnpublish(deps, { dryRun });
