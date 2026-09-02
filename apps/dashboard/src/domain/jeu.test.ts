@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import type { FaitInteraction, FaitMiseEnLigne, FaitPipeline } from './jeu.js';
+import type { FaitInteraction, FaitPipeline } from './jeu.js';
 import {
+  FENETRE_OBJECTIF_JOURS,
   PARAMETRES_PALIER,
   calculerBadges,
   calculerPalier,
   construireJeu,
   objectifDuJour,
   relancesTenues,
-  rendezVousObtenus,
   serieDeJours,
 } from './jeu.js';
 
@@ -29,10 +29,6 @@ function evenement(
 }
 
 function interaction(prospectId: string, occurredAt: string): FaitInteraction {
-  return { prospectId, occurredAt };
-}
-
-function miseEnLigne(prospectId: string, occurredAt: string): FaitMiseEnLigne {
   return { prospectId, occurredAt };
 }
 
@@ -118,30 +114,11 @@ describe('relancesTenues', () => {
   });
 });
 
-describe('rendezVousObtenus', () => {
-  it('compte un changement de statut OBSERVE vers "interesse"', () => {
-    const events = [evenement({ prospectId: 'p1', status: 'interesse', occurredAt: '2026-08-05T08:00:00' })];
-    expect(rendezVousObtenus(events)).toHaveLength(1);
-  });
-
-  it('ignore un statut "interesse" issu d un AMORCAGE : ce n est pas un fait date observe', () => {
-    const events = [
-      evenement({ prospectId: 'p1', status: 'interesse', origin: 'amorcage', occurredAt: '2026-08-05T08:00:00' }),
-    ];
-    expect(rendezVousObtenus(events)).toHaveLength(0);
-  });
-
-  it('ignore un statut qui n est pas "interesse"', () => {
-    const events = [evenement({ prospectId: 'p1', status: 'contacte', occurredAt: '2026-08-05T08:00:00' })];
-    expect(rendezVousObtenus(events)).toHaveLength(0);
-  });
-});
-
 describe('serieDeJours', () => {
   const MAINTENANT = new Date('2026-09-02T09:00:00');
 
   it('rend zero — un fait mesure — quand aucune relance n a jamais ete tenue', () => {
-    expect(serieDeJours([], MAINTENANT)).toBe(0);
+    expect(serieDeJours([], MAINTENANT, FENETRE_OBJECTIF_JOURS)).toEqual({ jours: 0, borneAtteinte: false });
   });
 
   it('compte le jour meme quand une relance y a deja ete tenue', () => {
@@ -149,7 +126,7 @@ describe('serieDeJours', () => {
       [evenement({ prospectId: 'p1', status: 'relance', nextActionAt: '2026-09-02', occurredAt: '2026-09-01T08:00:00' })],
       [interaction('p1', '2026-09-02T08:30:00')],
     );
-    expect(serieDeJours(relances, MAINTENANT)).toBe(1);
+    expect(serieDeJours(relances, MAINTENANT, FENETRE_OBJECTIF_JOURS)).toEqual({ jours: 1, borneAtteinte: false });
   });
 
   it('ne casse pas la serie si aujourd hui n a encore rien : la journee n est pas terminee', () => {
@@ -157,7 +134,7 @@ describe('serieDeJours', () => {
       [evenement({ prospectId: 'p1', status: 'relance', nextActionAt: '2026-09-01', occurredAt: '2026-08-25T08:00:00' })],
       [interaction('p1', '2026-09-01T08:30:00')],
     );
-    expect(serieDeJours(relances, MAINTENANT)).toBe(1);
+    expect(serieDeJours(relances, MAINTENANT, FENETRE_OBJECTIF_JOURS)).toEqual({ jours: 1, borneAtteinte: false });
   });
 
   it('cumule des jours consecutifs', () => {
@@ -173,12 +150,14 @@ describe('serieDeJours', () => {
         interaction('p1', '2026-09-02T08:30:00'),
       ],
     );
-    expect(serieDeJours(relances, MAINTENANT)).toBe(3);
+    expect(serieDeJours(relances, MAINTENANT, FENETRE_OBJECTIF_JOURS)).toEqual({ jours: 3, borneAtteinte: false });
   });
 
   it('s arrete au premier jour manquant, en remontant depuis aujourd hui', () => {
     // Relance tenue aujourd'hui et avant-hier, mais pas hier : le trou casse
-    // la serie, qui ne vaut donc que 1 et non 2.
+    // la serie, qui ne vaut donc que 1 et non 2 — et c'est un compte EXACT,
+    // pas un plancher, puisqu'un vrai trou a ete observe avant le bord de la
+    // fenetre.
     const relances = relancesTenues(
       [
         evenement({ prospectId: 'p1', status: 'relance', nextActionAt: '2026-08-31', occurredAt: '2026-08-25T08:00:00' }),
@@ -189,7 +168,7 @@ describe('serieDeJours', () => {
         interaction('p1', '2026-09-02T08:30:00'),
       ],
     );
-    expect(serieDeJours(relances, MAINTENANT)).toBe(1);
+    expect(serieDeJours(relances, MAINTENANT, FENETRE_OBJECTIF_JOURS)).toEqual({ jours: 1, borneAtteinte: false });
   });
 
   it('une base UNIQUEMENT amorcee ne produit jamais de serie presentee comme observee', () => {
@@ -201,7 +180,26 @@ describe('serieDeJours', () => {
       ],
       [interaction('p1', '2026-09-02T08:30:00')],
     );
-    expect(serieDeJours(relances, MAINTENANT)).toBe(0);
+    expect(serieDeJours(relances, MAINTENANT, FENETRE_OBJECTIF_JOURS)).toEqual({ jours: 0, borneAtteinte: false });
+  });
+
+  it('nomme la borne plutot que de la taire quand la serie remplit toute la fenetre fournie', () => {
+    // Fenetre volontairement etroite (3 jours) pour ecrire un test lisible :
+    // trois relances consecutives, aucun trou observe — impossible de savoir
+    // si la serie s'arrete la ou continue plus loin, faute de donnee au-dela.
+    const relances = [
+      { prospectId: 'p1', occurredAt: '2026-09-02T08:00:00' },
+      { prospectId: 'p1', occurredAt: '2026-09-01T08:00:00' },
+      { prospectId: 'p1', occurredAt: '2026-08-31T08:00:00' },
+    ];
+    expect(serieDeJours(relances, MAINTENANT, 3)).toEqual({ jours: 3, borneAtteinte: true });
+  });
+
+  it('ne pretend pas la borne atteinte quand un vrai trou arrete le compte avant elle', () => {
+    // Meme fenetre de 3 jours, mais un trou hier : le compte s'arrete a 1,
+    // et c'est un fait EXACT — la fenetre n'a rien a voir avec cet arret.
+    const relances = [{ prospectId: 'p1', occurredAt: '2026-09-02T08:00:00' }];
+    expect(serieDeJours(relances, MAINTENANT, 3)).toEqual({ jours: 1, borneAtteinte: false });
   });
 });
 
@@ -210,9 +208,10 @@ describe('objectifDuJour', () => {
 
   it('n est pas assez d historique le tout premier jour — la premiere observation date d aujourd hui', () => {
     // Le cas courant au jour de la livraison : aucun jour civil COMPLET ne
-    // s'est encore ecoule depuis la premiere ligne observee.
+    // s'est encore ecoule depuis la premiere ligne observee, et rien
+    // n'existe non plus au-dela de la fenetre lue.
     const events = [evenement({ prospectId: 'p1', status: 'relance', occurredAt: '2026-09-02T08:00:00' })];
-    expect(objectifDuJour(events, [], MAINTENANT)).toEqual({ connue: false });
+    expect(objectifDuJour(events, [], MAINTENANT, false)).toEqual({ connue: false });
   });
 
   it('rend une vraie VALEUR ZERO quand l historique existe mais qu aucune relance n y a ete tenue', () => {
@@ -220,18 +219,18 @@ describe('objectifDuJour', () => {
     // sont ecoules (contrairement au cas ci-dessus), et aucune relance n'y a
     // ete tenue. Ce zero est mesure, pas un manque de donnees.
     const events = [evenement({ prospectId: 'p1', status: 'relance', occurredAt: '2026-08-30T08:00:00' })];
-    expect(objectifDuJour(events, [], MAINTENANT)).toEqual({ connue: true, valeur: 0 });
+    expect(objectifDuJour(events, [], MAINTENANT, false)).toEqual({ connue: true, valeur: 0 });
   });
 
   it('n est pas assez d historique en l absence totale d evenement de pipeline', () => {
-    expect(objectifDuJour([], [], MAINTENANT)).toEqual({ connue: false });
+    expect(objectifDuJour([], [], MAINTENANT, false)).toEqual({ connue: false });
   });
 
   it('une base UNIQUEMENT amorcee n est jamais assez d historique — l amorcage ne compte pas comme observation', () => {
     const events = [
       evenement({ prospectId: 'p1', status: 'relance', origin: 'amorcage', occurredAt: '2026-07-01T08:00:00' }),
     ];
-    expect(objectifDuJour(events, [], MAINTENANT)).toEqual({ connue: false });
+    expect(objectifDuJour(events, [], MAINTENANT, false)).toEqual({ connue: false });
   });
 
   it('calcule la mediane sur les jours disponibles, meme moins de quatorze', () => {
@@ -247,25 +246,37 @@ describe('objectifDuJour', () => {
       ...Array(4).fill(0).map(() => ({ prospectId: 'p1', occurredAt: '2026-08-29T10:00:00' })), // il y a 4 jours : 4
       ...Array(3).fill(0).map(() => ({ prospectId: 'p1', occurredAt: '2026-08-28T10:00:00' })), // il y a 5 jours : 3
     ];
-    expect(objectifDuJour(events, relances, MAINTENANT)).toEqual({ connue: true, valeur: 2 });
+    expect(objectifDuJour(events, relances, MAINTENANT, false)).toEqual({ connue: true, valeur: 2 });
   });
 
-  it('plafonne la fenetre a quatorze jours : un historique plus ancien ne doit rien changer au resultat', () => {
-    // Vingt jours d'historique, mais un enorme paquet de relances range hors
-    // fenetre (il y a vingt jours) : s'il fuitait dans le calcul, la mediane
-    // ne vaudrait plus zero.
-    const events = [evenement({ prospectId: 'p1', status: 'relance', occurredAt: '2026-08-13T08:00:00' })];
+  it('plafonne la fenetre a quatorze jours quand la fenetre lue le confirme deja', () => {
+    // Vingt jours d'historique reel, mais la fenetre lue (14 jours) ne montre
+    // aucune ligne "observe" — data/jeu.ts l'a etabli par un `count` separe
+    // (`historiqueAuDelaDeLaFenetre: true`). Un enorme paquet de relances
+    // range hors fenetre : s'il fuitait dans le calcul, la mediane ne
+    // vaudrait plus zero.
     const horsFenetre = Array.from({ length: 50 }, () => ({
       prospectId: 'p1',
       occurredAt: '2026-08-13T10:00:00',
     }));
-    expect(objectifDuJour(events, horsFenetre, MAINTENANT)).toEqual({ connue: true, valeur: 0 });
+    expect(objectifDuJour([], horsFenetre, MAINTENANT, true)).toEqual({ connue: true, valeur: 0 });
+  });
+
+  it('sans le drapeau, un historique absent de la fenetre lue reste NON mesurable, meme avec des relances hors fenetre', () => {
+    // Meme jeu de relances que le test precedent, mais SANS la confirmation
+    // serveur qu'il existe de l'historique au-dela : rien ne permet de dire
+    // qu'un seul jour civil complet s'est ecoule.
+    const horsFenetre = Array.from({ length: 50 }, () => ({
+      prospectId: 'p1',
+      occurredAt: '2026-08-13T10:00:00',
+    }));
+    expect(objectifDuJour([], horsFenetre, MAINTENANT, false)).toEqual({ connue: false });
   });
 });
 
 describe('calculerPalier', () => {
   it('pese chaque source de points selon les parametres uniques du jeu', () => {
-    const palier = calculerPalier(2, 1, 1);
+    const palier = calculerPalier({ connue: true, valeur: 2 }, 1, 1);
     const attendu =
       2 * PARAMETRES_PALIER.points.relanceTenue +
       1 * PARAMETRES_PALIER.points.siteMisEnLigne +
@@ -274,7 +285,7 @@ describe('calculerPalier', () => {
   });
 
   it('rend zero point pour une base sans aucun fait observe', () => {
-    const palier = calculerPalier(0, 0, 0);
+    const palier = calculerPalier({ connue: true, valeur: 0 }, 0, 0);
     expect(palier.points).toBe(0);
     expect(palier.numero).toBe(1);
     expect(palier.progression).toBe(0);
@@ -282,15 +293,32 @@ describe('calculerPalier', () => {
 
   it('fait franchir un palier une fois le seuil depasse', () => {
     // 3 rendez-vous a 200 points = 600 : un seuil de 500 est franchi une fois.
-    const palier = calculerPalier(0, 0, 3);
+    const palier = calculerPalier({ connue: true, valeur: 0 }, 0, 3);
     expect(palier.seuil).toBe(PARAMETRES_PALIER.seuil);
     expect(palier.numero).toBe(2);
     expect(palier.progression).toBe(600 - PARAMETRES_PALIER.seuil);
   });
+
+  it('ne fait contribuer aucun point pour les relances tenues tant que le cumul n est pas mesurable', () => {
+    // Le coeur du correctif de revue : `{connue: false}` (faute de source
+    // honnete pour un cumul depuis toujours, croisant deux tables) ne doit
+    // JAMAIS se lire comme un zero mesure — mais ne doit pas non plus faire
+    // regresser ou fabriquer un total. Sa seule consequence licite est de ne
+    // rien ajouter, pas plus, pas moins.
+    const palier = calculerPalier({ connue: false }, 1, 1);
+    expect(palier.points).toBe(
+      1 * PARAMETRES_PALIER.points.siteMisEnLigne + 1 * PARAMETRES_PALIER.points.rendezVousObtenu,
+    );
+  });
 });
 
 describe('calculerBadges', () => {
-  const AUCUN_JALON = { nombreRelancesTenues: 0, nombreSitesMisEnLigne: 0, nombreRendezVousObtenus: 0, serie: 0 };
+  const AUCUN_JALON = {
+    relancesTenuesCumulees: { connue: false as const },
+    nombreSitesMisEnLigne: 0,
+    nombreRendezVousObtenus: 0,
+    serie: { jours: 0, borneAtteinte: false },
+  };
 
   it('rend tous les badges VERROUILLES, mais visibles, quand aucun jalon n est atteint', () => {
     const badges = calculerBadges(AUCUN_JALON);
@@ -305,6 +333,26 @@ describe('calculerBadges', () => {
     expect(parId.get('premier_rendez_vous')).toBe(false);
     expect(parId.get('premiere_relance_tenue')).toBe(false);
   });
+
+  it('ne debloque jamais premiere_relance_tenue quand le cumul n est pas mesurable, meme a une valeur qui semblerait suffisante', () => {
+    // Un pur garde-fou de type : `connue: false` ne porte aucune `valeur`,
+    // impossible de le confondre avec un `valeur: 1` qui debloquerait le
+    // badge.
+    const badges = calculerBadges(AUCUN_JALON);
+    expect(badges.find((b) => b.id === 'premiere_relance_tenue')?.obtenu).toBe(false);
+  });
+
+  it('debloque premiere_relance_tenue quand le cumul est mesurable et atteint au moins un', () => {
+    const badges = calculerBadges({ ...AUCUN_JALON, relancesTenuesCumulees: { connue: true, valeur: 1 } });
+    expect(badges.find((b) => b.id === 'premiere_relance_tenue')?.obtenu).toBe(true);
+  });
+
+  it('debloque le badge de serie des sept jours, meme si le compte n est qu un plancher', () => {
+    // `borneAtteinte: true` : la vraie serie est AU MOINS 14 jours, donc
+    // forcement au moins 7 — la comparaison reste valide malgre l'incertitude.
+    const badges = calculerBadges({ ...AUCUN_JALON, serie: { jours: 14, borneAtteinte: true } });
+    expect(badges.find((b) => b.id === 'serie_sept_jours')?.obtenu).toBe(true);
+  });
 });
 
 describe('construireJeu', () => {
@@ -313,7 +361,8 @@ describe('construireJeu', () => {
   it('une base UNIQUEMENT amorcee ne produit jamais de serie ni de palier presentes comme observes', () => {
     // Le scenario du jour de livraison : `pipeline_event` vient d etre
     // amorcee depuis `prospect_pipeline.updated_at`, aucune observation reelle
-    // n existe encore, et aucun site n a d evenement de mise en ligne.
+    // n existe encore, et aucun site ni rendez-vous ne remonte des comptes
+    // serveur.
     const jeu = construireJeu({
       maintenant: MAINTENANT,
       evenementsPipeline: [
@@ -321,9 +370,12 @@ describe('construireJeu', () => {
         evenement({ prospectId: 'p2', status: 'interesse', origin: 'amorcage', occurredAt: '2026-08-15T10:00:00' }),
       ],
       interactions: [],
-      sitesMisEnLigne: [],
+      historiqueAuDelaDeLaFenetre: false,
+      relancesTenuesCumulees: { connue: false },
+      nombreSitesMisEnLigne: 0,
+      nombreRendezVousObtenus: 0,
     });
-    expect(jeu.serie).toBe(0);
+    expect(jeu.serie).toEqual({ jours: 0, borneAtteinte: false });
     expect(jeu.objectifDuJour).toEqual({ connue: false });
     expect(jeu.palier.points).toBe(0);
     expect(jeu.badges.every((b) => b.obtenu === false)).toBe(true);
@@ -333,19 +385,25 @@ describe('construireJeu', () => {
     const jeu = construireJeu({
       maintenant: MAINTENANT,
       evenementsPipeline: [
-        evenement({ prospectId: 'p1', status: 'relance', nextActionAt: '2026-09-02', occurredAt: '2026-08-15T10:00:00' }),
+        evenement({ prospectId: 'p1', status: 'relance', nextActionAt: '2026-09-02', occurredAt: '2026-08-20T10:00:00' }),
         evenement({ prospectId: 'p2', status: 'interesse', occurredAt: '2026-09-01T10:00:00' }),
       ],
       interactions: [interaction('p1', '2026-09-02T08:00:00')],
-      sitesMisEnLigne: [miseEnLigne('p3', '2026-09-01T10:00:00')],
+      historiqueAuDelaDeLaFenetre: false,
+      // Voir le docstring de `calculerPalier` : sans source honnete pour un
+      // cumul de relances tenues depuis toujours, ce champ reste `{connue:
+      // false}` MEME quand une relance a bel et bien ete tenue dans la
+      // fenetre (elle nourrit `serie`/`objectifDuJour` ci-dessous, pas le
+      // palier).
+      relancesTenuesCumulees: { connue: false },
+      nombreSitesMisEnLigne: 1,
+      nombreRendezVousObtenus: 1,
     });
-    expect(jeu.serie).toBe(1);
+    expect(jeu.serie).toEqual({ jours: 1, borneAtteinte: false });
     expect(jeu.palier.points).toBe(
-      1 * PARAMETRES_PALIER.points.relanceTenue +
-        1 * PARAMETRES_PALIER.points.siteMisEnLigne +
-        1 * PARAMETRES_PALIER.points.rendezVousObtenu,
+      1 * PARAMETRES_PALIER.points.siteMisEnLigne + 1 * PARAMETRES_PALIER.points.rendezVousObtenu,
     );
-    expect(jeu.badges.find((b) => b.id === 'premiere_relance_tenue')?.obtenu).toBe(true);
+    expect(jeu.badges.find((b) => b.id === 'premiere_relance_tenue')?.obtenu).toBe(false);
     expect(jeu.badges.find((b) => b.id === 'premier_site_en_ligne')?.obtenu).toBe(true);
     expect(jeu.badges.find((b) => b.id === 'premier_rendez_vous')?.obtenu).toBe(true);
   });

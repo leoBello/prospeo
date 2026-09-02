@@ -5,40 +5,116 @@ import type { Database } from '@prospeo/db';
 import { useJeu } from './useJeu.js';
 
 /**
- * Client simulé dont la lecture `pipeline_event` reste EN SUSPENS tant qu'un
- * test n'appelle pas `resolve` explicitement — même besoin que
- * `fakeEventsClientControlee` de `TodayScreen.test.tsx` : observer un ordre
- * de réponse différé de l'ordre des requêtes est le seul moyen de prouver la
- * garde `vivant`. `interaction` et `deployment_event` répondent tout de
- * suite, vides : seul `pipeline_event` sert de sonde de contrôle ici, `useJeu`
- * n'ayant qu'un client et un drapeau `enabled`, pas d'identifiant à faire
- * varier comme `useDeploymentEvents`.
+ * Un builder permissif générique : répond immédiatement, vide, à n'importe
+ * quelle chaîne (lecture de lignes terminée par `.range`, ou lecture de
+ * compte terminée par un simple `await`). Les FORMES exactes des requêtes
+ * (colonnes, filtres) sont déjà éprouvées par `data/jeu.test.ts` — ce fichier
+ * ne teste que la machine à états du hook et sa garde `vivant`, donc un seul
+ * mock générique par table suffit ici.
+ */
+/**
+ * `compte()` est appelé DANS `select()`, donc SYNCHRONE au moment où la
+ * requête est construite — jamais dans `.then()`. `.then()` reste différé
+ * (microtâche), comme toute résolution de promesse/thenable réelle, mais la
+ * VALEUR qu'il rendra est déjà figée avant même que la moindre microtâche ne
+ * s'exécute. Sans ça, un compte lu paresseusement dans `.then()` verrait la
+ * valeur CORRESPONDANT AU MOMENT DE LA RÉSOLUTION plutôt qu'au moment de la
+ * requête — exactement ce qui rendait la premiere version de ce mock
+ * incapable de distinguer un cycle de lecture perime d'un cycle courant : les
+ * deux comptes finissaient par lire la MEME valeur, celle du dernier cycle,
+ * quel que soit le cycle interroge.
+ */
+function builderImmediat(compte: () => number = () => 0) {
+  const base = {
+    select(_colonnes?: string, _options?: unknown) {
+      const n = compte();
+      const fige = {
+        select() { return fige; },
+        eq() { return fige; },
+        gte() { return fige; },
+        lt() { return fige; },
+        order() { return fige; },
+        range() { return Promise.resolve({ data: [], error: null }); },
+        then(resolve: (v: unknown) => void) { resolve({ data: null, error: null, count: n }); },
+      };
+      return fige;
+    },
+  };
+  return base;
+}
+
+/** Même chose, mais qui échoue toujours — la lecture ou le compte, peu importe. */
+function builderEnErreur(message: string) {
+  const b = {
+    select() { return b; },
+    eq() { return b; },
+    gte() { return b; },
+    lt() { return b; },
+    order() { return b; },
+    range() { return Promise.resolve({ data: null, error: { message } }); },
+    then(resolve: (v: unknown) => void) { resolve({ data: null, error: { message }, count: null }); },
+  };
+  return b;
+}
+
+function fakeClientToutVaBien() {
+  const b = builderImmediat();
+  return { from: () => b } as unknown as SupabaseClient<Database>;
+}
+
+function fakeClientEnErreur(message: string) {
+  const b = builderEnErreur(message);
+  return { from: () => b } as unknown as SupabaseClient<Database>;
+}
+
+/**
+ * Client simulé dont la lecture DE LIGNES de `pipeline_event` (fenêtre
+ * bornée) reste EN SUSPENS tant qu'un test n'appelle pas `resolve`
+ * explicitement — même besoin que `fakeEventsClientControlee` de
+ * `TodayScreen.test.tsx` : observer un ordre de réponse différé de l'ordre
+ * des requêtes est le seul moyen de prouver la garde `vivant`.
+ *
+ * `ronde` distingue le jeu produit par CHAQUE cycle de lecture, sans dépendre
+ * de l'horloge réelle (`useJeu` appelle `fetchJeu` sans lui fixer `now`) :
+ * elle s'incrémente au moment où la lecture de lignes DÉMARRE (donc avant que
+ * les trois comptes de ce même cycle ne répondent), et ces comptes répondent
+ * `ronde` — premier cycle : sites = rendez-vous = 1 (points = 320) ; second
+ * cycle (après `reload`) : sites = rendez-vous = 2 (points = 640). Deux
+ * valeurs de palier distinctes, indépendantes de la date du jour, prouvent
+ * sans ambiguïté laquelle des deux réponses a fini par s'écrire.
  */
 function fakeClientControlable() {
   const attentes: { resolve: (lignes: unknown[]) => void }[] = [];
-  const appels: string[] = [];
-  const immediat = {
-    select() { return this; },
-    eq() { return this; },
-    order() { return this; },
-    range() { return Promise.resolve({ data: [], error: null }); },
+  let ronde = 0;
+  const immediat = builderImmediat(() => ronde);
+  const pipeline: {
+    select: (colonnes: string, options?: { count?: string; head?: boolean }) => unknown;
+    gte: () => unknown;
+    order: () => unknown;
+    range: () => Promise<unknown>;
+  } = {
+    select(colonnes: string, options?: { count?: string; head?: boolean }) {
+      // `immediat.select(...)` — pas `immediat` seul — pour que la valeur de
+      // `ronde` soit bien figee ICI, synchrone, voir le docstring de
+      // `builderImmediat`.
+      if (options !== undefined) return immediat.select(colonnes);
+      ronde += 1;
+      return pipeline;
+    },
+    gte() { return pipeline; },
+    order() { return pipeline; },
+    range() {
+      return new Promise((resolve) => {
+        attentes.push({ resolve: (lignes) => resolve({ data: lignes, error: null }) });
+      });
+    },
   };
   const client = {
     from(table: string) {
-      appels.push(table);
-      if (table !== 'pipeline_event') return immediat;
-      return {
-        select() { return this; },
-        order() { return this; },
-        range() {
-          return new Promise((resolve) => {
-            attentes.push({ resolve: (lignes) => resolve({ data: lignes, error: null }) });
-          });
-        },
-      };
+      return table === 'pipeline_event' ? pipeline : immediat;
     },
   };
-  return { client: client as unknown as SupabaseClient<Database>, attentes, appels };
+  return { client: client as unknown as SupabaseClient<Database>, attentes };
 }
 
 /** Laisse la file de microtâches s'écouler jusqu'au bout, comme `flush` de `TodayScreen.test.tsx`. */
@@ -50,7 +126,11 @@ async function flush(): Promise<void> {
 
 describe('useJeu', () => {
   it('demarre en chargement puis passe a ready avec le jeu assemble', async () => {
-    const { client } = fakeClientControlableResolueImmediatement();
+    // Le client DOIT être construit une seule fois, hors du callback de
+    // `renderHook` : en recréer un à chaque rendu changerait sa référence,
+    // que l'effet du hook surveille (`[client, tentative, enabled]`) — la
+    // lecture repartirait à chaque rendu, dans une boucle sans fin.
+    const client = fakeClientToutVaBien();
     const { result } = renderHook(() => useJeu(client, true));
     expect(result.current.status).toBe('loading');
     await flush();
@@ -79,43 +159,33 @@ describe('useJeu', () => {
     });
     expect(attentes).toHaveLength(2);
 
-    // La reponse PERIMEE (premiere requete) arrive en dernier. Si la garde ne
-    // tenait pas, c'est ELLE qui gagnerait puisqu'elle resout apres la
-    // seconde — et l'etat resterait bloque sur une lecture qu'un reload a
-    // pourtant remplacee.
-    attentes[1]!.resolve([
-      { prospect_id: 'p1', status: 'interesse', next_action_at: null, origin: 'observe', occurred_at: '2026-09-01T00:00:00Z' },
-    ]);
+    // La reponse du SECOND cycle (correcte) arrive d'abord.
+    attentes[1]!.resolve([]);
     await flush();
     expect(result.current.status).toBe('ready');
     const jeuApresSeconde = (result.current as { status: 'ready'; jeu: { palier: { points: number } } }).jeu;
-    expect(jeuApresSeconde.palier.points).toBe(200); // un rendez-vous obtenu : 200 points
+    expect(jeuApresSeconde.palier.points).toBe(640); // 2 sites * 120 + 2 rendez-vous * 200
 
-    attentes[0]!.resolve([
-      { prospect_id: 'p2', status: 'interesse', next_action_at: null, origin: 'observe', occurred_at: '2026-09-01T00:00:00Z' },
-      { prospect_id: 'p3', status: 'interesse', next_action_at: null, origin: 'observe', occurred_at: '2026-09-01T00:00:00Z' },
-    ]);
+    // La reponse PERIMEE (premier cycle) arrive en dernier. Si la garde ne
+    // tenait pas, c'est ELLE qui gagnerait puisqu'elle resout apres la
+    // seconde — remplacant 640 par 320.
+    attentes[0]!.resolve([]);
     await flush();
-    // Toujours l'etat de la SECONDE lecture : la premiere, perimee, n'a rien ecrase.
     expect(result.current.status).toBe('ready');
     const jeuFinal = (result.current as { status: 'ready'; jeu: { palier: { points: number } } }).jeu;
-    expect(jeuFinal.palier.points).toBe(200);
+    expect(jeuFinal.palier.points).toBe(640); // inchange : la reponse perimee n'a rien pu ecrire
   });
 
   /**
    * Le démontage exécute la MÊME fermeture de nettoyage (`vivant = false`)
-   * que le `reload` testé ci-dessus — il n'y a qu'un seul point du code qui
-   * pose la garde, partagé par les deux causes de nettoyage. Ce test-ci ne
-   * vérifie donc pas la garde une seconde fois : il vérifie seulement qu'une
-   * réponse qui arrive après démontage ne fait rien planter.
-   *
-   * Une version antérieure de ce test tentait d'observer un
-   * `console.error` de React sur un `setState` post-démontage — vérifié
-   * absent du bundle `react-dom` 18.3 (recherché directement dans les
-   * sources) : React 18 abandonne silencieusement une mise à jour d'état sur
-   * un composant démonté, sans avertissement ni effet, guard ou pas. Une
-   * telle assertion ne peut donc JAMAIS échouer pour la bonne raison — elle a
-   * été retirée plutôt que gardée comme fausse preuve.
+   * que le `reload` ci-dessus — un seul point du code pose la garde. Ce
+   * test-ci ne la revérifie donc pas : il vérifie seulement qu'une réponse
+   * tardive après démontage ne fait rien planter. Une version antérieure
+   * tentait d'observer un `console.error` de React sur un `setState`
+   * post-démontage : recherché directement dans le bundle `react-dom` 18.3,
+   * ce message n'existe plus pour les composants fonctionnels — une telle
+   * assertion ne pouvait donc jamais échouer pour la bonne raison, et a été
+   * retirée plutôt que gardée comme fausse preuve.
    */
   it('une reponse qui arrive apres le demontage ne fait rien planter', async () => {
     const { client, attentes } = fakeClientControlable();
@@ -124,36 +194,8 @@ describe('useJeu', () => {
     unmount();
 
     expect(() => {
-      attentes[0]!.resolve([
-        { prospect_id: 'p1', status: 'interesse', next_action_at: null, origin: 'observe', occurred_at: '2026-09-01T00:00:00Z' },
-      ]);
+      attentes[0]!.resolve([]);
     }).not.toThrow();
     await flush();
   });
 });
-
-function fakeClientControlableResolueImmediatement() {
-  const immediat = {
-    select() { return this; },
-    eq() { return this; },
-    order() { return this; },
-    range() { return Promise.resolve({ data: [], error: null }); },
-  };
-  const client = {
-    from() { return immediat; },
-  };
-  return { client: client as unknown as SupabaseClient<Database> };
-}
-
-function fakeClientEnErreur(message: string) {
-  const enErreur = {
-    select() { return this; },
-    eq() { return this; },
-    order() { return this; },
-    range() { return Promise.resolve({ data: null, error: { message } }); },
-  };
-  const client = {
-    from() { return enErreur; },
-  };
-  return client as unknown as SupabaseClient<Database>;
-}

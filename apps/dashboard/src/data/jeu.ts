@@ -1,24 +1,57 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, Enums } from '@prospeo/db';
 import {
+  FENETRE_OBJECTIF_JOURS,
   construireJeu,
   type EntreesJeu,
   type FaitInteraction,
-  type FaitMiseEnLigne,
   type FaitPipeline,
   type Jeu,
+  type Mesure,
 } from '../domain/jeu.js';
 import { fetchAllRows, type FetchAllOptions, type RangeReader } from './paginate.js';
 
 /**
  * Lecteurs Supabase du jeu (D5).
  *
- * Même partage des rôles qu'entre `data/deployments.ts` et `domain/deployment.ts` :
- * aucune règle du jeu n'est décidée ici, seulement la mise en forme des trois
- * sources que `domain/jeu.ts` réclame — `pipeline_event`, `interaction`, et
- * `deployment_event` filtré sur « site mis en ligne ». Le calcul reste dans
- * `construireJeu` (tâche 6) ; ce fichier se contente de l'appeler une fois les
- * faits en main, comme `toDeploymentView` appelle `etatDepuisEvenements`.
+ * **Correctif de revue (second passage sur cette tâche).** La première
+ * version lisait `pipeline_event` et `interaction` en ENTIER (pagination
+ * complète, protégée par `hardLimit`) — un arbitrage a exclu cette lecture
+ * intégrale à chaque chargement d'écran, même bien protégée. Trois natures
+ * de faits coexistent désormais ici, chacune avec sa propre garantie :
+ *
+ * 1. **Les calculs à fenêtre** (`objectifDuJour`, `serieDeJours`, dans
+ *    `domain/jeu.ts`) ne portent QUE sur les quatorze jours civils
+ *    précédents (`FENETRE_OBJECTIF_JOURS`, défini dans le domaine — une
+ *    seule source de vérité pour cette taille). `pipeline_event` et
+ *    `interaction` sont donc lus bornés PAR DATE (`gte('occurred_at', …)`),
+ *    pas en nombre de lignes : un plafond en lignes aurait pu couper la
+ *    fenêtre en plein milieu d'une journée chargée (voir `MARGE_FUSEAU_JOURS`
+ *    ci-dessous pour la marge appliquée à la coupure elle-même). La
+ *    pagination (`fetchAllRows`) reste en place À L'INTÉRIEUR de cette
+ *    fenêtre, comme garde-fou de volume, pas comme borne de fenêtre.
+ *
+ * 2. **Les cumuls qui ne doivent jamais régresser** (site mis en ligne,
+ *    rendez-vous obtenu) viennent d'un `count` PostgREST
+ *    (`select('*', { count: 'exact', head: true })`) : un NOMBRE, sans
+ *    transférer une seule ligne, sur TOUTE la durée de vie de la table. Un
+ *    `count` ne peut pas mentir par troncature — il n'y a rien à tronquer,
+ *    la réponse est déjà un scalaire — et il ne peut que croître tant que la
+ *    table ne connaît pas de suppression.
+ *
+ * 3. **« Relance tenue » cumulée, depuis toujours, ne peut PAS venir d'un
+ *    `count`** : c'est un croisement de DEUX tables
+ *    (`pipeline_event.next_action_at` × `interaction.occurred_at`) que
+ *    PostgREST ne réduit à aucun total serveur — il faudrait une vue ou une
+ *    fonction SQL, une migration de plus sur une base réelle, décision hors
+ *    du périmètre de cette tâche (signalée, pas tranchée ici). Ce fichier
+ *    fournit donc honnêtement `{ connue: false }` pour ce cumul précis — voir
+ *    `RELANCES_TENUES_CUMULEES` et le docstring de `calculerPalier`
+ *    (domain/jeu.ts) pour ce que cela implique pour le palier et les badges.
+ *
+ * Aucune règle du jeu n'est décidée ici, seulement la mise en forme et le
+ * découpage des lectures — le calcul reste entièrement dans
+ * `construireJeu` (tâche 6).
  */
 
 type Client = SupabaseClient<Database>;
@@ -93,83 +126,116 @@ export function toFaitsInteraction(raw: unknown): FaitInteraction[] {
 }
 
 /**
- * Les lignes `deployment_event` déjà filtrées (`step: 'en_ligne'`,
- * `outcome: 'reussi'`) en `FaitMiseEnLigne`.
+ * Marge de sécurité, en jours, ajoutée à `FENETRE_OBJECTIF_JOURS` pour fixer
+ * la date de coupure des deux lectures bornées.
  *
- * Le filtre est posé côté serveur par `sitesMisEnLigneRangeReader` — cette
- * fonction ne revalide pas `step`/`outcome` : ce ne sont plus des colonnes de
- * sortie (voir le docstring de `FaitMiseEnLigne`, `domain/jeu.ts`), seule leur
- * valeur EN AMONT, dans la clause `.eq`, fait le tri.
+ * `domain/jeu.ts` (`joursCivils`) raisonne en dates de calendrier LOCALES ;
+ * la coupure posée ici porte sur `occurred_at`, une colonne `timestamptz`
+ * comparée en UTC côté serveur. Sans marge, une ligne du 14ᵉ jour pourrait
+ * tomber, de justesse, du mauvais côté de la coupure UTC selon le fuseau de
+ * la machine qui a écrit la ligne — amputant la fenêtre d'un jour en
+ * silence, exactement ce que cette lecture doit éviter. Un jour de marge
+ * absorbe tout décalage de fuseau raisonnable ; les lignes surnuméraires
+ * que ça ramène ne faussent rien, puisque `objectifDuJour`/`serieDeJours`
+ * rejettent déjà, par leur propre décalage en jours, tout ce qui dépasse
+ * `FENETRE_OBJECTIF_JOURS`.
  */
-export function toFaitsMiseEnLigne(raw: unknown): FaitMiseEnLigne[] {
-  if (!Array.isArray(raw)) return [];
-  const faits: FaitMiseEnLigne[] = [];
-  for (const brut of raw) {
-    const o = ligne(brut);
-    if (o === null) continue;
-    const prospectId = texte(o['prospect_id']);
-    const occurredAt = texte(o['occurred_at']);
-    if (prospectId === null || occurredAt === null) continue;
-    faits.push({ prospectId, occurredAt });
-  }
-  return faits;
+const MARGE_FUSEAU_JOURS = 1;
+
+/** La date de coupure ISO des lectures bornées — voir `MARGE_FUSEAU_JOURS`. */
+function coupureFenetre(maintenant: Date): string {
+  const coupure = new Date(maintenant);
+  coupure.setDate(coupure.getDate() - (FENETRE_OBJECTIF_JOURS + MARGE_FUSEAU_JOURS));
+  return coupure.toISOString();
 }
 
 /**
- * Construit le lecteur de tranches de `pipeline_event` attendu par `fetchAllRows`.
- *
- * `order('id', ...)` : la clé primaire donne un ordre total et déterministe,
- * seule garantie que la pagination ne relise ni ne saute une ligne — même
- * raison que `prospectRangeReader` (`data/queries.ts`). Elle ne sert PAS à
- * choisir ce qui est gardé (contrairement au tri sur `occurred_at` de
- * `deploymentRangeReader`) : ici, rien n'est tronqué, voir plus bas.
+ * Construit le lecteur de tranches de `pipeline_event`, borné par date à la
+ * fenêtre du jeu — voir le docstring de ce fichier et `coupureFenetre`.
+ * `order('id', …)` : la clé primaire donne un ordre total et déterministe à
+ * l'intérieur de cette fenêtre, seule garantie que la pagination ne relise
+ * ni ne saute une ligne — même raison que `prospectRangeReader`
+ * (`data/queries.ts`).
  */
-export function pipelineEventRangeReader(client: Client): RangeReader<unknown> {
+export function pipelineEventRangeReader(client: Client, coupureISO: string): RangeReader<unknown> {
   return (from, to) =>
     client
       .from('pipeline_event')
       .select('prospect_id,status,next_action_at,origin,occurred_at')
+      .gte('occurred_at', coupureISO)
       .order('id', { ascending: true })
       .range(from, to) as unknown as ReturnType<RangeReader<unknown>>;
 }
 
 /** Même raison que `pipelineEventRangeReader` ci-dessus. */
-export function interactionRangeReader(client: Client): RangeReader<unknown> {
+export function interactionRangeReader(client: Client, coupureISO: string): RangeReader<unknown> {
   return (from, to) =>
     client
       .from('interaction')
       .select('prospect_id,occurred_at')
+      .gte('occurred_at', coupureISO)
       .order('id', { ascending: true })
       .range(from, to) as unknown as ReturnType<RangeReader<unknown>>;
 }
 
+/** Lit un `count` PostgREST et le nomme dans l'erreur qu'il peut lever — même raison que `lireTable` ci-dessous pour les lectures de lignes. */
+async function lireCompte(
+  nom: string,
+  requete: PromiseLike<{ count: number | null; error: { message: string } | null }>,
+): Promise<number> {
+  const { count, error } = await requete;
+  if (error !== null) {
+    throw new Error(`${nom} : lecture impossible — ${error.message}`);
+  }
+  return count ?? 0;
+}
+
 /**
- * Le lecteur de tranches de `deployment_event`, restreint aux lignes qui
- * valent « site mis en ligne » — l'énoncé de la tâche : `step: 'en_ligne'`
- * **et** `outcome: 'reussi'`. Poser ce filtre ici, dans la clause `.eq`, n'est
- * pas une décision : c'est la définition donnée, traduite en requête plutôt
- * que rejouée en mémoire après coup — et ça réduit d'autant le volume à
- * paginer.
+ * Le nombre de sites mis en ligne DEPUIS TOUJOURS — `step: 'en_ligne'` **et**
+ * `outcome: 'reussi'` (l'énoncé de la tâche), traduit en clause `.eq` plutôt
+ * que rejoué en mémoire. Un `count`, jamais une ligne transférée : voir le
+ * docstring du fichier.
  */
-export function sitesMisEnLigneRangeReader(client: Client): RangeReader<unknown> {
-  return (from, to) =>
-    client
-      .from('deployment_event')
-      .select('prospect_id,occurred_at')
-      .eq('step', 'en_ligne')
-      .eq('outcome', 'reussi')
-      .order('id', { ascending: true })
-      .range(from, to) as unknown as ReturnType<RangeReader<unknown>>;
+async function compterSitesMisEnLigne(client: Client): Promise<number> {
+  return lireCompte(
+    'deployment_event',
+    client.from('deployment_event').select('*', { count: 'exact', head: true }).eq('step', 'en_ligne').eq('outcome', 'reussi'),
+  );
 }
 
 /**
- * Lit une table en la nommant dans l'erreur qu'elle peut lever.
+ * Le nombre de rendez-vous obtenus DEPUIS TOUJOURS — chaque ligne
+ * `pipeline_event` OBSERVÉE portant le statut `interesse` (voir le docstring
+ * de l'ex-`rendezVousObtenus`, retiré de `domain/jeu.ts` : ce comptage ne
+ * nécessite plus de lire la moindre ligne).
+ */
+async function compterRendezVousObtenus(client: Client): Promise<number> {
+  return lireCompte(
+    'pipeline_event',
+    client.from('pipeline_event').select('*', { count: 'exact', head: true }).eq('status', 'interesse').eq('origin', 'observe'),
+  );
+}
+
+/**
+ * Existe-t-il, dans `pipeline_event`, une ligne OBSERVÉE antérieure à la
+ * coupure de la fenêtre ? Un `count` suffit (`> 0`) — voir le docstring
+ * d'`objectifDuJour` (domain/jeu.ts) pour ce que ce booléen lui permet de
+ * décider sans avoir à relire l'historique complet.
+ */
+async function historiqueAuDelaDeLaFenetre(client: Client, coupureISO: string): Promise<boolean> {
+  const n = await lireCompte(
+    'pipeline_event',
+    client.from('pipeline_event').select('*', { count: 'exact', head: true }).eq('origin', 'observe').lt('occurred_at', coupureISO),
+  );
+  return n > 0;
+}
+
+/**
+ * Lit une table paginée en la nommant dans l'erreur qu'elle peut lever.
  *
  * `fetchAllRows` échoue déjà avec un message utile (ligne atteinte, cause) —
  * mais ce message ne dit pas DE QUELLE table il vient, puisque `fetchAllRows`
- * est générique. Sans ce nom, un échec sur `interaction` et un échec sur
- * `deployment_event` seraient indiscernables à la lecture du message, alors
- * que la tâche 8 (ou un journal d'erreur) doit pouvoir désigner la source.
+ * est générique.
  */
 async function lireTable(nom: string, lecteur: RangeReader<unknown>, options?: FetchAllOptions): Promise<unknown[]> {
   try {
@@ -180,66 +246,44 @@ async function lireTable(nom: string, lecteur: RangeReader<unknown>, options?: F
 }
 
 /**
- * Lit les trois sources brutes du jeu et les rend dans la forme que
- * `domain/jeu.ts` attend (`EntreesJeu`).
- *
- * **La borne, et ce qu'elle garantit.** `pipeline_event` et `interaction`
- * grossissent à chaque geste (tâche 5, et chaque appel/email journalisé) : il
- * ne faut ni les lire sans limite, ni les tronquer en silence. Ces deux
- * exigences s'opposent au premier réglage venu :
- *
- * - Un plafond en NOMBRE DE LIGNES (`.limit(500)`, par exemple) coupe le flux
- *   à un rang qui ne correspond à aucune date précise. `objectifDuJour` et
- *   `serieDeJours` (domain/jeu.ts) raisonnent en jours civils : une journée
- *   chargée peut à elle seule épuiser tout le plafond, et la fenêtre de 14
- *   jours se retrouverait amputée sans qu'aucune erreur ne le signale — la
- *   série s'arrêterait net, en silence, pour une raison qui n'a rien à voir
- *   avec l'activité réelle. C'est exactement le piège que ce fichier doit
- *   éviter.
- * - Un plafond en DATE (« les 90 derniers jours », disons) résout ce
- *   problème-là, mais en ouvre un autre, plus grave : `calculerPalier` et
- *   `calculerBadges` (domain/jeu.ts) comptent les relances tenues et les
- *   rendez-vous obtenus DEPUIS TOUJOURS — un badge acquis ne doit jamais se
- *   reverrouiller. Borner par date ferait sortir de la fenêtre, un jour, une
- *   relance tenue il y a longtemps : le score et les badges régresseraient
- *   silencieusement, ce que la doctrine du jeu (badges liés à des jalons
- *   réels, jamais retirés) interdit explicitement.
- *
- * La borne posée ici est donc celle de `fetchAllRows` : pagination COMPLÈTE
- * (aucune ligne n'est sacrifiée, aucune fenêtre n'est coupée), protégée par
- * `hardLimit` — un volume qui ne termine jamais échoue bruyamment plutôt que
- * de rendre une page partielle pour un historique complet. C'est la même
- * garantie que `prospectRangeReader` offre déjà à la table `prospect`, qui
- * grossit tout autant.
- *
- * **Ce que cette borne NE garantit PAS.** Elle ne plafonne ni le coût ni la
- * latence de la lecture : une table de plusieurs dizaines de milliers de
- * lignes sera lue en entier à chaque chargement de l'écran. Tant que
- * `domain/jeu.ts` recalcule le score cumulé à partir de l'historique brut
- * plutôt que depuis un compteur tenu à jour côté serveur, ce coût est
- * inhérent au contrat qu'il impose à ce pont — une évolution future
- * souhaitable, mais hors du périmètre de cette tâche.
+ * Voir le point 3 du docstring de ce fichier : aucune requête PostgREST ne
+ * réduit à un `count` un croisement de deux tables. Constante plutôt que
+ * literal recopié, pour qu'un futur retrait (le jour où une vue ou fonction
+ * SQL fournira un cumul honnête) n'ait qu'un seul endroit à changer.
+ */
+const RELANCES_TENUES_CUMULEES: Mesure<number> = { connue: false };
+
+/**
+ * Lit les cinq sources brutes du jeu et les rend dans la forme que
+ * `domain/jeu.ts` attend (`EntreesJeu`) — voir le docstring du fichier pour
+ * la nature de chacune.
  */
 export async function fetchEntreesJeu(
   client: Client,
   now: Date = new Date(),
   options?: FetchAllOptions,
 ): Promise<EntreesJeu> {
-  const [pipelineRaw, interactionRaw, miseEnLigneRaw] = await Promise.all([
-    lireTable('pipeline_event', pipelineEventRangeReader(client), options),
-    lireTable('interaction', interactionRangeReader(client), options),
-    lireTable('deployment_event', sitesMisEnLigneRangeReader(client), options),
+  const coupureISO = coupureFenetre(now);
+  const [pipelineRaw, interactionRaw, auDela, nombreSitesMisEnLigne, nombreRendezVousObtenus] = await Promise.all([
+    lireTable('pipeline_event', pipelineEventRangeReader(client, coupureISO), options),
+    lireTable('interaction', interactionRangeReader(client, coupureISO), options),
+    historiqueAuDelaDeLaFenetre(client, coupureISO),
+    compterSitesMisEnLigne(client),
+    compterRendezVousObtenus(client),
   ]);
   return {
     maintenant: now,
     evenementsPipeline: toFaitsPipeline(pipelineRaw),
     interactions: toFaitsInteraction(interactionRaw),
-    sitesMisEnLigne: toFaitsMiseEnLigne(miseEnLigneRaw),
+    historiqueAuDelaDeLaFenetre: auDela,
+    relancesTenuesCumulees: RELANCES_TENUES_CUMULEES,
+    nombreSitesMisEnLigne,
+    nombreRendezVousObtenus,
   };
 }
 
 /**
- * Lit les trois sources ET assemble le jeu — ce que `useJeu` (le hook)
+ * Lit les cinq sources ET assemble le jeu — ce que `useJeu` (le hook)
  * consomme directement. Simple composition, comme `fetchDeployments`
  * (`data/deployments.ts`) compose ses lectures et `etatDepuisEvenements` :
  * aucune règle nouvelle, `construireJeu` reste l'unique décideur.

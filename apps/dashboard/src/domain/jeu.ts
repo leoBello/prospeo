@@ -10,24 +10,29 @@ import { joursCivils } from './today.js';
  * ce fichier ne produit et ne doit produire AUCUNE chaîne d'interface,
  * seulement des valeurs et des identifiants que la tâche 8 traduira.
  *
- * `pipeline_event` (tâche 4) n'est pas encore appliquée à la base réelle :
- * `database.types.ts` généré ne la connaît pas, et `Tables<'pipeline_event'>`
- * ne se résout pas. Ce fichier de domaine ne doit de toute façon jamais
- * dépendre d'un type généré — voir `domain/prospect.ts` et
- * `domain/deployment.ts`, qui définissent déjà leurs propres vues plutôt que
- * d'importer `Tables<'...'>`. Seuls `Enums<'pipeline_status'>` et
- * `Enums<'interaction_kind'>` sont importés : ces énumérations existent déjà
- * dans le socle.
+ * **Correctif de revue (tâche 7, second passage).** La première version de ce
+ * fichier supposait que `evenementsPipeline`/`interactions` portaient
+ * l'historique COMPLET, depuis toujours. `data/jeu.ts` ne peut plus fournir
+ * cela sans relire les deux tables en entier à chaque chargement d'écran —
+ * exactement ce qu'un arbitrage a exclu. Ce fichier reçoit désormais :
+ * - `evenementsPipeline`/`interactions` : une FENÊTRE BORNÉE PAR DATE (voir
+ *   `FENETRE_OBJECTIF_JOURS`), suffisante pour `objectifDuJour` et
+ *   `serieDeJours`, qui n'ont jamais eu besoin de plus ;
+ * - des COMPTES SERVEUR (`nombreSitesMisEnLigne`, `nombreRendezVousObtenus`)
+ *   pour tout ce qui doit être cumulatif et ne jamais régresser — un `count`
+ *   PostgREST ne transfère aucune ligne et ne peut pas mentir par troncature ;
+ * - `relancesTenuesCumulees: Mesure<number>` — voir son docstring : `{connue:
+ *   false}` tant qu'aucune source honnête n'existe pour ce cumul précis.
+ *
+ * `pipeline_event` (tâche 4) est désormais bien connue de
+ * `database.types.ts` (la migration a été appliquée) ; ce fichier continue
+ * néanmoins de définir ses propres types plutôt que d'importer
+ * `Tables<'...'>`, par cohérence avec `domain/prospect.ts` et
+ * `domain/deployment.ts`.
  */
 
 /**
  * Les deux origines qu'une ligne de `pipeline_event` peut porter.
- *
- * Recopiée ici plutôt qu'importée : l'énumération SQL `pipeline_event_origin`
- * (migration de la tâche 4) n'existe pas encore dans le type généré, la
- * migration n'ayant pas été appliquée. C'est sans conséquence : cette union
- * est la donnée qui compte le plus dans tout ce fichier, puisque c'est elle
- * qui distingue un fait observé d'une reconstitution.
  *
  * - `observe` : écrite au moment réel du changement de statut (tâche 5).
  * - `amorcage` : reconstituée une seule fois, à la création de la table,
@@ -62,31 +67,17 @@ export interface FaitInteraction {
 }
 
 /**
- * Un site passé en ligne — `deployment_event` (lot 2) filtré en amont sur
- * `step: 'en_ligne'` et `outcome: 'reussi'` par `data/jeu.ts` (tâche 7).
- *
- * Un type propre à ce fichier plutôt que `DeploymentEventView`
- * (`domain/deployment.ts`) : ce module n'a besoin de rien d'autre que le
- * fait et sa date, et importer la vue générique de l'autre domaine
- * couplerait ce fichier à des colonnes (`step`, `outcome`, `detail`,
- * `durationMs`) qui ne servent à rien ici.
- */
-export interface FaitMiseEnLigne {
-  readonly prospectId: string;
-  readonly occurredAt: string;
-}
-
-/**
- * Une mesure qui peut manquer d'historique pour être fiable.
+ * Une mesure qui peut manquer d'historique — ou de moyen honnête — pour être
+ * fiable.
  *
  * Trois issues sont possibles pour une fonction du jeu, jamais deux : une
  * VALEUR connue — qui peut très bien être zéro, zéro relance tenue est un
- * fait mesuré — ou l'aveu explicite qu'il n'y a pas encore assez
- * d'observations pour répondre. Rendre `0` pour ce second cas ferait
- * passer une absence de données pour un échec ; rendre `null` retomberait
- * dans le fourre-tout que la doctrine des absences distinctes du dépôt
- * (voir `ProspectView`, `domain/prospect.ts`) demande justement d'éviter.
- * `historique_insuffisant` est un état nommé, exploitable par l'écran sans
+ * fait mesuré — ou l'aveu explicite qu'il n'y a pas (encore, ou pas du tout
+ * avec les moyens actuels) de quoi répondre. Rendre `0` pour ce second cas
+ * ferait passer une absence de données pour un échec ; rendre `null`
+ * retomberait dans le fourre-tout que la doctrine des absences distinctes du
+ * dépôt (voir `ProspectView`, `domain/prospect.ts`) demande justement
+ * d'éviter. `connue: false` est un état nommé, exploitable par l'écran sans
  * qu'il ait à réinterpréter un nombre.
  */
 export type Mesure<T> =
@@ -130,6 +121,15 @@ function aUneEcheanceObservee(
  * amorcée ne dit rien d'une échéance réellement en vigueur (voir
  * `OrigineEvenementPipeline`), et la retenir fabriquerait une relance tenue
  * sur une reconstitution plutôt que sur un fait.
+ *
+ * **Portée depuis le correctif de revue.** Cette fonction reste pure et ne
+ * change pas : elle croise ce qu'on lui donne. Ce qui change, c'est ce que
+ * `data/jeu.ts` lui donne — une fenêtre bornée par date plutôt que
+ * l'historique complet. Le résultat qu'elle rend n'est donc plus, en toute
+ * rigueur, « toutes les relances tenues depuis toujours » mais « toutes les
+ * relances tenues DANS LA FENÊTRE fournie ». `objectifDuJour` et
+ * `serieDeJours`, ses deux seuls appelants, n'ont jamais eu besoin de plus —
+ * voir leurs docstrings respectifs.
  */
 export function relancesTenues(
   evenementsPipeline: readonly FaitPipeline[],
@@ -169,33 +169,6 @@ export function relancesTenues(
   return tenues;
 }
 
-/** Un rendez-vous obtenu : le passage OBSERVÉ du statut à « intéressé ». */
-export interface RendezVousObtenu {
-  readonly prospectId: string;
-  readonly occurredAt: string;
-}
-
-/**
- * Les rendez-vous obtenus : chaque ligne `pipeline_event` observée portant
- * le statut `interesse`.
- *
- * `pipeline_event` écrit une ligne à CHAQUE changement de statut (tâche 5) :
- * une ligne `status: 'interesse'` représente donc exactement l'instant où le
- * statut y est devenu. Un prospect qui repasse par « intéressé » plusieurs
- * fois compte plusieurs rendez-vous — chacun est un jalon réel distinct.
- *
- * Seules les lignes `origin: 'observe'` comptent, pour la même raison que
- * `relancesTenues` : une ligne amorcée reconstitue un état courant, elle ne
- * dit pas QUAND le statut est devenu « intéressé ».
- */
-export function rendezVousObtenus(
-  evenementsPipeline: readonly FaitPipeline[],
-): readonly RendezVousObtenu[] {
-  return evenementsPipeline
-    .filter((e) => e.origin === 'observe' && e.status === 'interesse')
-    .map((e) => ({ prospectId: e.prospectId, occurredAt: e.occurredAt }));
-}
-
 /**
  * Le décalage en jours civils entre un horodatage et « maintenant » —
  * 0 pour aujourd'hui, 1 pour hier, etc. `null` sur un horodatage illisible,
@@ -209,21 +182,49 @@ function decalageEnJours(occurredAt: string, maintenant: Date): number | null {
 }
 
 /**
+ * Le résultat de `serieDeJours` : un compte de jours, et un drapeau qui dit
+ * si ce compte est EXACT ou seulement un plancher.
+ *
+ * Une série peut, en toute rigueur, dépasser la fenêtre de jours que
+ * `data/jeu.ts` a pu fournir (voir `fenetreJours` dans `serieDeJours`) : nous
+ * n'avons alors aucun moyen de savoir si elle continue au-delà. Rendre un
+ * nombre nu dans ce cas ferait mentir par omission — un `14` qui prétend être
+ * exact alors qu'il ne l'est pas. `borneAtteinte: true` nomme cette limite
+ * plutôt que de la taire ; c'est à la tâche 8 de la traduire (« 14 jours ou
+ * plus », par exemple), jamais à ce fichier de le dire en toutes lettres.
+ */
+export interface Serie {
+  readonly jours: number;
+  /** `true` : le décompte s'est arrêté au bord de la fenêtre fournie, pas sur un vrai jour manquant — la valeur réelle peut être plus grande. */
+  readonly borneAtteinte: boolean;
+}
+
+/**
  * Série : nombre de jours civils consécutifs, en remontant depuis
  * aujourd'hui, avec au moins une relance tenue.
  *
  * Toujours une vraie valeur, jamais « pas assez d'historique » : une série
  * de zéro jour est un fait aussi valable qu'une série de dix, y compris le
- * tout premier jour de l'historique (voir le brief de la tâche : « la série
- * vaudra zéro, ce n'est pas une erreur »). Croisée avec `relancesTenues`, qui
+ * tout premier jour de l'historique. Croisée avec `relancesTenues`, qui
  * exclut déjà les lignes amorcées : une base uniquement amorcée ne peut donc
  * produire qu'un zéro réel, jamais une série fabriquée sur une reconstitution.
  *
  * Aujourd'hui n'est compté QUE s'il porte déjà une relance tenue : la
  * journée n'étant pas terminée, son absence de relance ne casse pas la
  * série pour autant — le décompte reprend alors simplement à hier.
+ *
+ * `fenetreJours` borne le décompte : `relances` ne couvre de toute façon que
+ * ce que `data/jeu.ts` a lu (une fenêtre par date, voir son docstring), donc
+ * chercher au-delà serait chercher dans du vide. Si le décompte atteint
+ * exactement `fenetreJours` — chaque jour de la fenêtre porte une relance,
+ * sans le moindre trou observé — on ne peut pas savoir si la série s'arrête
+ * réellement là ou continue plus loin : `borneAtteinte` le dit.
  */
-export function serieDeJours(relances: readonly RelanceTenue[], maintenant: Date): number {
+export function serieDeJours(
+  relances: readonly RelanceTenue[],
+  maintenant: Date,
+  fenetreJours: number,
+): Serie {
   const joursAvecRelance = new Set<number>();
   for (const r of relances) {
     const decalage = decalageEnJours(r.occurredAt, maintenant);
@@ -233,17 +234,25 @@ export function serieDeJours(relances: readonly RelanceTenue[], maintenant: Date
 
   let decalage = joursAvecRelance.has(0) ? 0 : 1;
   let jours = 0;
-  while (joursAvecRelance.has(decalage)) {
+  while (jours < fenetreJours && joursAvecRelance.has(decalage)) {
     jours += 1;
     decalage += 1;
   }
-  return jours;
+  // Le plafond a été atteint sans le moindre trou : on ignore ce qu'il y a
+  // plus loin, faute de donnée — voir le docstring de `Serie`.
+  return { jours, borneAtteinte: jours === fenetreJours };
 }
 
-/** Fenêtre de la médiane de l'objectif du jour — §D5, la veille impose 14 jours. */
-const FENETRE_OBJECTIF_JOURS = 14;
+/**
+ * Fenêtre de la médiane de l'objectif du jour — §D5, la veille impose 14
+ * jours. Réutilisée telle quelle comme plafond pour `serieDeJours` (voir son
+ * docstring) et pour dimensionner la lecture bornée par date de
+ * `data/jeu.ts` : les deux calculs à fenêtre n'ont jamais eu besoin de plus
+ * que cette exigence-là, une seule lecture les sert donc tous les deux.
+ */
+export const FENETRE_OBJECTIF_JOURS = 14;
 
-/** La date la plus ancienne parmi les lignes OBSERVÉES, ou `null` s'il n'y en a aucune. */
+/** La date la plus ancienne parmi les lignes OBSERVÉES fournies, ou `null` s'il n'y en a aucune. */
 function premiereObservation(evenementsPipeline: readonly FaitPipeline[]): Date | null {
   let premiere: Date | null = null;
   for (const e of evenementsPipeline) {
@@ -268,29 +277,41 @@ function mediane(valeurs: readonly number[]): number {
  * les quatorze jours civils COMPLETS précédents (aujourd'hui exclu — la
  * journée n'est pas terminée, son compte n'est pas définitif).
  *
- * `historique_insuffisant` (voir `Mesure`) dès qu'AUCUN jour civil complet
- * n'a encore pu être observé — c'est-à-dire dès qu'aucune ligne `observe` de
- * `pipeline_event` n'existe encore, ou que la plus ancienne date d'aujourd'hui
- * même. C'est exactement le cas courant au jour de la livraison : la table
- * vient d'être créée, ou d'être amorcée (l'amorçage ne compte pas comme une
- * observation — voir `OrigineEvenementPipeline`).
+ * `historiqueAuDelaDeLaFenetre` : depuis le correctif de revue,
+ * `evenementsPipeline` ne couvre plus qu'une fenêtre bornée par date (voir
+ * `data/jeu.ts`) — `premiereObservation` calculée dessus ne peut donc plus,
+ * à elle seule, distinguer « l'historique a commencé il y a moins de
+ * quatorze jours » de « l'historique est bien plus ancien, mais la fenêtre
+ * lue ne le montre pas ». `data/jeu.ts` tranche cette ambiguïté par un
+ * `count` séparé (borné, sans transfert de lignes) et la restitue ici sous
+ * forme de drapeau : `true` fixe directement la fenêtre à quatorze jours
+ * pleins, `false` laisse `premiereObservation` (exacte dans ce cas, puisque
+ * tout l'historique tient alors dans la fenêtre lue) déterminer une fenêtre
+ * plus courte.
+ *
+ * `{connue: false}` (voir `Mesure`) dès qu'AUCUN jour civil complet n'a
+ * encore pu être observé — c'est-à-dire dès qu'aucune ligne `observe` de
+ * `pipeline_event` n'existe encore (dans la fenêtre, et rien avant elle non
+ * plus), ou que la plus ancienne date d'aujourd'hui même.
  *
  * Passé ce seuil, la médiane porte sur AUTANT de jours que l'historique en
  * fournit — un jour sans aucune relance tenue y entre avec un compte de
  * zéro, un vrai zéro mesuré et non une absence. Elle ne réclame jamais
- * quatorze jours pleins : la tâche l'exige explicitement, pour ne pas
- * transformer chaque semaine de mise en service en `historique_insuffisant`.
+ * quatorze jours pleins, pour ne pas transformer chaque semaine de mise en
+ * service en `{connue: false}`.
  */
 export function objectifDuJour(
   evenementsPipeline: readonly FaitPipeline[],
   relances: readonly RelanceTenue[],
   maintenant: Date,
+  historiqueAuDelaDeLaFenetre: boolean,
 ): Mesure<number> {
   const debut = premiereObservation(evenementsPipeline);
-  if (debut === null) return { connue: false };
+  if (!historiqueAuDelaDeLaFenetre && debut === null) return { connue: false };
 
-  const joursEcoules = joursCivils(debut, maintenant);
-  const tailleFenetre = Math.min(FENETRE_OBJECTIF_JOURS, joursEcoules);
+  const tailleFenetre = historiqueAuDelaDeLaFenetre
+    ? FENETRE_OBJECTIF_JOURS
+    : Math.min(FENETRE_OBJECTIF_JOURS, joursCivils(debut!, maintenant));
   if (tailleFenetre <= 0) return { connue: false };
 
   const comptesParJour = new Map<number, number>();
@@ -314,6 +335,10 @@ export function objectifDuJour(
  * Les poids et le seuil du jeu, en un seul endroit — §D5 : « pondérer, c'est
  * dire ce qui compte », et ce sont des valeurs d'attente assumées, à régler
  * à l'usage. Ne pas les disséminer ailleurs dans ce fichier.
+ *
+ * `relanceTenue` reste défini bien qu'inutilisé tant que
+ * `relancesTenuesCumulees` vaut `{connue: false}` (voir `calculerPalier`) —
+ * le poids est déjà arrêté pour le jour où un cumul honnête existera.
  */
 export const PARAMETRES_PALIER = {
   points: {
@@ -340,18 +365,35 @@ export interface Palier {
 
 /**
  * Calcule le palier à partir du nombre de faits observés de chaque source —
- * jamais du volume d'activité indifférencié (voir le tableau de la veille,
- * brief de la tâche). Les comptes fournis doivent déjà exclure les lignes
- * amorcées : c'est `relancesTenues` et `rendezVousObtenus` qui s'en chargent
- * en amont, ce calcul est de la seule arithmétique.
+ * jamais du volume d'activité indifférencié.
+ *
+ * **Correctif de revue : pourquoi `relancesTenues` est un `Mesure<number>`
+ * et non un simple nombre.** Le palier ne doit jamais régresser — un badge ou
+ * des points acquis ne se reprennent pas. `nombreSitesMisEnLigne` et
+ * `nombreRendezVousObtenus` viennent d'un `count` serveur sur UNE table,
+ * filtré une fois pour toutes (`step`/`outcome`, ou `status`/`origin`) : un
+ * total qui ne peut que croître, jamais lu en entier côté client. « Relance
+ * tenue » n'a pas cette chance : c'est un croisement de DEUX tables
+ * (`pipeline_event.next_action_at` × `interaction.occurred_at`) qu'aucune
+ * requête PostgREST ne réduit à un `count` — il faudrait une vue ou une
+ * fonction SQL, une migration de plus sur une base réelle, décision qui ne
+ * revient pas à cette tâche. Faute de mieux, le comptabiliser sur une fenêtre
+ * bornée referait courir le risque exclu (un badge qui se reverrouille
+ * quand la fenêtre glisse). `relancesTenues.connue === false` — la valeur
+ * que `data/jeu.ts` fournit tant qu'aucune source honnête n'existe — fait
+ * donc contribuer zéro point ici, plutôt que de fabriquer un chiffre qui
+ * prétendrait mesurer un cumul qu'il ne mesure pas.
  */
 export function calculerPalier(
-  nombreRelancesTenues: number,
+  relancesTenuesCumulees: Mesure<number>,
   nombreSitesMisEnLigne: number,
   nombreRendezVousObtenus: number,
 ): Palier {
+  const pointsRelances = relancesTenuesCumulees.connue
+    ? relancesTenuesCumulees.valeur * PARAMETRES_PALIER.points.relanceTenue
+    : 0;
   const points =
-    nombreRelancesTenues * PARAMETRES_PALIER.points.relanceTenue +
+    pointsRelances +
     nombreSitesMisEnLigne * PARAMETRES_PALIER.points.siteMisEnLigne +
     nombreRendezVousObtenus * PARAMETRES_PALIER.points.rendezVousObtenu;
   const seuil: number = PARAMETRES_PALIER.seuil;
@@ -386,36 +428,66 @@ export interface EtatBadge {
 }
 
 export interface JalonsAtteints {
-  readonly nombreRelancesTenues: number;
+  /** Voir le docstring de `calculerPalier` : `{connue: false}` tant qu'aucun cumul honnête n'existe. */
+  readonly relancesTenuesCumulees: Mesure<number>;
   readonly nombreSitesMisEnLigne: number;
   readonly nombreRendezVousObtenus: number;
-  readonly serie: number;
+  readonly serie: Serie;
 }
 
 /** Seuil de série à partir duquel le badge de régularité se débloque. */
 const SERIE_BADGE_JOURS = 7;
 
+/**
+ * `premiere_relance_tenue` reste verrouillé tant que `relancesTenuesCumulees`
+ * vaut `{connue: false}` — jamais débloqué par erreur sur une mesure qu'on
+ * n'a pas. `serie_sept_jours`, lui, n'est PAS un jalon cumulatif : une série
+ * en cours peut légitimement se rompre et redébloquer plus tard, ce n'est
+ * pas la régression interdite par l'arbitrage (qui vise les jalons « depuis
+ * toujours »). Le seuil (7) reste toujours en-deçà de `FENETRE_OBJECTIF_JOURS`
+ * (14, le plafond de `serie.jours`) : `serie.jours >= 7` reste une
+ * comparaison exacte même quand `serie.borneAtteinte` est vrai, puisque la
+ * vraie série ne peut alors qu'être PLUS longue que ce plafond, jamais plus
+ * courte.
+ */
 export function calculerBadges(jalons: JalonsAtteints): readonly EtatBadge[] {
   return [
-    { id: 'premiere_relance_tenue', obtenu: jalons.nombreRelancesTenues >= 1 },
+    {
+      id: 'premiere_relance_tenue',
+      obtenu: jalons.relancesTenuesCumulees.connue && jalons.relancesTenuesCumulees.valeur >= 1,
+    },
     { id: 'premier_site_en_ligne', obtenu: jalons.nombreSitesMisEnLigne >= 1 },
     { id: 'premier_rendez_vous', obtenu: jalons.nombreRendezVousObtenus >= 1 },
-    { id: 'serie_sept_jours', obtenu: jalons.serie >= SERIE_BADGE_JOURS },
+    { id: 'serie_sept_jours', obtenu: jalons.serie.jours >= SERIE_BADGE_JOURS },
   ];
 }
 
-/** Les faits bruts dont le jeu entier se dérive. */
+/**
+ * Les faits bruts dont le jeu entier se dérive.
+ *
+ * `evenementsPipeline`/`interactions` : une fenêtre bornée par date (voir
+ * `FENETRE_OBJECTIF_JOURS` et le docstring de `data/jeu.ts`), pour
+ * `objectifDuJour`/`serieDeJours` seulement — plus l'historique complet.
+ * `nombreSitesMisEnLigne`/`nombreRendezVousObtenus`/`relancesTenuesCumulees`
+ * portent, eux, sur toute la durée de vie des données (voir
+ * `calculerPalier`).
+ */
 export interface EntreesJeu {
   readonly maintenant: Date;
   readonly evenementsPipeline: readonly FaitPipeline[];
   readonly interactions: readonly FaitInteraction[];
-  readonly sitesMisEnLigne: readonly FaitMiseEnLigne[];
+  /** Voir le docstring d'`objectifDuJour`. */
+  readonly historiqueAuDelaDeLaFenetre: boolean;
+  /** Voir le docstring de `calculerPalier`. */
+  readonly relancesTenuesCumulees: Mesure<number>;
+  readonly nombreSitesMisEnLigne: number;
+  readonly nombreRendezVousObtenus: number;
 }
 
 /** Le jeu assemblé — ce que `data/jeu.ts` (tâche 7) et l'écran (tâche 8) consomment. */
 export interface Jeu {
   readonly objectifDuJour: Mesure<number>;
-  readonly serie: number;
+  readonly serie: Serie;
   readonly palier: Palier;
   readonly badges: readonly EtatBadge[];
 }
@@ -429,14 +501,22 @@ export interface Jeu {
  */
 export function construireJeu(entrees: EntreesJeu): Jeu {
   const relances = relancesTenues(entrees.evenementsPipeline, entrees.interactions);
-  const rendezVous = rendezVousObtenus(entrees.evenementsPipeline);
-  const serie = serieDeJours(relances, entrees.maintenant);
-  const objectif = objectifDuJour(entrees.evenementsPipeline, relances, entrees.maintenant);
-  const palier = calculerPalier(relances.length, entrees.sitesMisEnLigne.length, rendezVous.length);
+  const serie = serieDeJours(relances, entrees.maintenant, FENETRE_OBJECTIF_JOURS);
+  const objectif = objectifDuJour(
+    entrees.evenementsPipeline,
+    relances,
+    entrees.maintenant,
+    entrees.historiqueAuDelaDeLaFenetre,
+  );
+  const palier = calculerPalier(
+    entrees.relancesTenuesCumulees,
+    entrees.nombreSitesMisEnLigne,
+    entrees.nombreRendezVousObtenus,
+  );
   const badges = calculerBadges({
-    nombreRelancesTenues: relances.length,
-    nombreSitesMisEnLigne: entrees.sitesMisEnLigne.length,
-    nombreRendezVousObtenus: rendezVous.length,
+    relancesTenuesCumulees: entrees.relancesTenuesCumulees,
+    nombreSitesMisEnLigne: entrees.nombreSitesMisEnLigne,
+    nombreRendezVousObtenus: entrees.nombreRendezVousObtenus,
     serie,
   });
 

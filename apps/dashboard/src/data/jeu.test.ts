@@ -6,34 +6,32 @@ import {
   fetchJeu,
   interactionRangeReader,
   pipelineEventRangeReader,
-  sitesMisEnLigneRangeReader,
   toFaitsInteraction,
-  toFaitsMiseEnLigne,
   toFaitsPipeline,
 } from './jeu.js';
 
+type SelectOptions = { count?: 'exact'; head?: boolean };
+
 /**
- * Constructeur de table simulée : enregistre les appels (`select`, `eq`,
- * `order`, `range`) et répond selon `reponses`, un lecteur de tranche au sens
- * de `paginate.ts`. Générique plutôt que calqué sur une chaîne PostgREST
- * précise : ce dont les tests ci-dessous ont besoin, c'est de PROUVER quelles
- * colonnes de filtre et de tri partent, et combien de tranches sont demandées
- * — pas de reproduire la forme exacte de la chaîne.
+ * Un "builder" de lecture DE LIGNES, paginée — comme `fakeServer` de
+ * `paginate.test.ts`. `select` n'attend jamais d'options : c'est ce qui le
+ * distingue d'un builder de compte pour le routeur `fakeClient` plus bas.
  */
-function fakeTable(reponses: (from: number, to: number) => Promise<{ data: unknown[] | null; error: { message: string } | null }>) {
+function tablePaginee(pages: unknown[][]) {
   const appels = {
-    selects: [] as string[],
-    eqs: [] as [string, unknown][],
+    selects: [] as [string, SelectOptions | undefined][],
+    gtes: [] as [string, unknown][],
     orders: [] as [string, boolean | undefined][],
     ranges: [] as [number, number][],
   };
+  let page = 0;
   const builder = {
-    select(colonnes: string) {
-      appels.selects.push(colonnes);
+    select(colonnes: string, options?: SelectOptions) {
+      appels.selects.push([colonnes, options]);
       return builder;
     },
-    eq(colonne: string, valeur: unknown) {
-      appels.eqs.push([colonne, valeur]);
+    gte(colonne: string, valeur: unknown) {
+      appels.gtes.push([colonne, valeur]);
       return builder;
     },
     order(colonne: string, options?: { ascending?: boolean }) {
@@ -42,47 +40,137 @@ function fakeTable(reponses: (from: number, to: number) => Promise<{ data: unkno
     },
     range(from: number, to: number) {
       appels.ranges.push([from, to]);
-      return reponses(from, to);
+      const data = pages[page] ?? [];
+      page += 1;
+      return Promise.resolve({ data, error: null });
     },
   };
   return { builder, appels };
 }
 
-/** Une table qui rend toujours `pages`, une tranche à la fois, comme `fakeServer` de `paginate.test.ts`. */
-function tablePaginee(pages: unknown[][]) {
-  let page = 0;
-  return fakeTable(async () => {
-    const data = pages[page] ?? [];
-    page += 1;
-    return { data, error: null };
-  });
+/** Une lecture DE LIGNES qui échoue toujours — pour distinguer un échec d'un résultat vide. */
+function tableRangeEnErreur(message: string) {
+  const appels = { ranges: [] as [number, number][] };
+  const builder = {
+    select() { return builder; },
+    gte() { return builder; },
+    order() { return builder; },
+    range(from: number, to: number) {
+      appels.ranges.push([from, to]);
+      return Promise.resolve({ data: null, error: { message } });
+    },
+  };
+  return { builder, appels };
 }
 
-/** Une table dont la lecture échoue toujours — pour distinguer un échec d'un résultat vide. */
-function tableEnErreur(message: string) {
-  return fakeTable(async () => ({ data: null, error: { message } }));
+/** Une lecture DE LIGNES qui ne rend jamais de page incomplète : force `fetchAllRows` à boucler jusqu'au `hardLimit`. */
+function tableSansFin(ligne: () => unknown) {
+  const appels = { ranges: [] as [number, number][] };
+  const builder = {
+    select() { return builder; },
+    gte() { return builder; },
+    order() { return builder; },
+    range(from: number, to: number) {
+      appels.ranges.push([from, to]);
+      const largeur = to - from + 1;
+      return Promise.resolve({ data: Array.from({ length: largeur }, ligne), error: null });
+    },
+  };
+  return { builder, appels };
 }
 
-/** Une table qui ne rend jamais de page incomplète : force `fetchAllRows` à boucler jusqu'au `hardLimit`. */
-function tableSansFin(tailleLigne: () => unknown) {
-  return fakeTable(async (from, to) => {
-    const largeur = to - from + 1;
-    return { data: Array.from({ length: largeur }, tailleLigne), error: null };
-  });
+/**
+ * Un builder de COMPTE PostgREST — `select('*', { count, head })`, puis des
+ * `.eq`/`.lt`, jamais de `.range()` : c'est directement `await`-é, comme le
+ * fait `lireCompte` (`data/jeu.ts`). `then` le rend "thenable".
+ */
+function compte(reglage: { n?: number; erreur?: { message: string } | null } = {}) {
+  const appels = {
+    selects: [] as [string, SelectOptions | undefined][],
+    eqs: [] as [string, unknown][],
+    lts: [] as [string, unknown][],
+  };
+  const builder = {
+    select(colonnes: string, options?: SelectOptions) {
+      appels.selects.push([colonnes, options]);
+      return builder;
+    },
+    eq(colonne: string, valeur: unknown) {
+      appels.eqs.push([colonne, valeur]);
+      return builder;
+    },
+    lt(colonne: string, valeur: unknown) {
+      appels.lts.push([colonne, valeur]);
+      return builder;
+    },
+    then(resolve: (v: unknown) => void, reject?: (e: unknown) => void) {
+      const erreur = reglage.erreur ?? null;
+      Promise.resolve({ data: null, error: erreur, count: erreur === null ? (reglage.n ?? 0) : null }).then(
+        resolve,
+        reject,
+      );
+    },
+  };
+  return { builder, appels };
 }
 
-function fakeClient(tables: {
-  pipeline_event?: ReturnType<typeof fakeTable>['builder'];
-  interaction?: ReturnType<typeof fakeTable>['builder'];
-  deployment_event?: ReturnType<typeof fakeTable>['builder'];
+// `unknown` plutot qu'une union precise : `tablePaginee`, `tableRangeEnErreur`
+// et `tableSansFin` rendent des formes de reponse differentes (donnees vides,
+// erreur, page pleine) qui n'ont pas a s'unifier structurellement — seul le
+// contrat runtime (les methodes appelees par `data/jeu.ts`) compte ici, et il
+// est de toute facon verifie par un cast au retour de `fakeClient`.
+type Builder = unknown;
+
+/**
+ * Client simulé.
+ *
+ * `pipeline_event` sert TROIS rôles bien distincts dans `fetchEntreesJeu`
+ * (lecture de lignes bornée par date, compte "historique au-delà", compte
+ * "rendez-vous obtenus") — et `client.from('pipeline_event')` est rappelé À
+ * CHAQUE PAGE pour le premier rôle (fermeture de `pipelineEventRangeReader`,
+ * une par appel de `fetchAllRows`), donc un simple compteur d'appels à
+ * `.from` ne peut pas les distinguer. Le routeur ci-dessous distingue plutôt
+ * sur la FORME de l'appel : `select(colonnes)` SANS options → lecture de
+ * lignes ; `select('*', { count, head })` → un compte, le premier `.eq` posé
+ * ensuite disant lequel (`status` → rendez-vous, sinon → historique au-delà).
+ * C'est exactement la forme que `data/jeu.ts` produit réellement.
+ */
+/** Le seul contrat dont le routeur `fakeClient` a besoin pour le rôle "lecture de lignes". */
+interface LigneBuilder {
+  select(colonnes: string): unknown;
+}
+
+function fakeClient(config: {
+  pipelineLignes?: LigneBuilder;
+  pipelineAuDela?: ReturnType<typeof compte>['builder'];
+  pipelineRdv?: ReturnType<typeof compte>['builder'];
+  interaction?: Builder;
+  deploymentEvent?: ReturnType<typeof compte>['builder'];
 }) {
-  const vide = fakeTable(async () => ({ data: [], error: null })).builder;
+  const pipelineLignes = config.pipelineLignes ?? tablePaginee([[]]).builder;
+  const pipelineAuDela = config.pipelineAuDela ?? compte().builder;
+  const pipelineRdv = config.pipelineRdv ?? compte().builder;
+  const interaction = config.interaction ?? tablePaginee([[]]).builder;
+  const deploymentEvent = config.deploymentEvent ?? compte().builder;
+
   return {
     from(table: string) {
-      if (table === 'pipeline_event') return tables.pipeline_event ?? vide;
-      if (table === 'interaction') return tables.interaction ?? vide;
-      if (table === 'deployment_event') return tables.deployment_event ?? vide;
-      throw new Error(`table inattendue dans le test : ${table}`);
+      if (table === 'interaction') return interaction;
+      if (table === 'deployment_event') return deploymentEvent;
+      if (table !== 'pipeline_event') throw new Error(`table inattendue dans le test : ${table}`);
+      return {
+        select(colonnes: string, options?: SelectOptions) {
+          if (options === undefined) return pipelineLignes.select(colonnes);
+          // Compte : on ne sait pas encore lequel avant le premier `.eq`.
+          let cible: ReturnType<typeof compte>['builder'] | null = null;
+          return {
+            eq(colonne: string, valeur: unknown) {
+              if (cible === null) cible = colonne === 'status' ? pipelineRdv : pipelineAuDela;
+              return cible.eq(colonne, valeur);
+            },
+          };
+        },
+      };
     },
   } as unknown as SupabaseClient<Database>;
 }
@@ -146,58 +234,77 @@ describe('toFaitsInteraction', () => {
   });
 });
 
-describe('toFaitsMiseEnLigne', () => {
-  it('garde une ligne valide', () => {
-    expect(toFaitsMiseEnLigne([{ prospect_id: 'p1', occurred_at: '2026-08-20T09:00:00Z' }])).toEqual([
-      { prospectId: 'p1', occurredAt: '2026-08-20T09:00:00Z' },
-    ]);
-  });
-
-  it('ecarte une ligne sans prospect_id', () => {
-    expect(toFaitsMiseEnLigne([{ prospect_id: null, occurred_at: '2026-08-20T09:00:00Z' }])).toEqual([]);
-  });
-});
-
-describe('pipelineEventRangeReader / interactionRangeReader', () => {
-  it('ordonnent sur la cle primaire, sans quoi la pagination peut relire ou sauter des lignes', async () => {
+describe('pipelineEventRangeReader / interactionRangeReader — la borne PAR DATE', () => {
+  it('pipelineEventRangeReader filtre sur occurred_at >= la coupure fournie, et ordonne sur id', async () => {
     const { builder, appels } = tablePaginee([[]]);
-    await pipelineEventRangeReader(fakeClient({ pipeline_event: builder }))(0, 999);
+    const lecteur = pipelineEventRangeReader(
+      { from: () => builder } as unknown as SupabaseClient<Database>,
+      '2026-08-19T00:00:00.000Z',
+    );
+    await lecteur(0, 999);
+    expect(appels.gtes).toEqual([['occurred_at', '2026-08-19T00:00:00.000Z']]);
     expect(appels.orders).toEqual([['id', true]]);
   });
 
-  it('interactionRangeReader ordonne aussi sur id', async () => {
+  it('interactionRangeReader filtre et ordonne de meme', async () => {
     const { builder, appels } = tablePaginee([[]]);
-    await interactionRangeReader(fakeClient({ interaction: builder }))(0, 999);
+    const lecteur = interactionRangeReader(
+      { from: () => builder } as unknown as SupabaseClient<Database>,
+      '2026-08-19T00:00:00.000Z',
+    );
+    await lecteur(0, 999);
+    expect(appels.gtes).toEqual([['occurred_at', '2026-08-19T00:00:00.000Z']]);
     expect(appels.orders).toEqual([['id', true]]);
   });
 });
 
-describe('sitesMisEnLigneRangeReader', () => {
-  it('filtre sur step=en_ligne et outcome=reussi cote serveur — c est la definition donnee, pas une decision de ce fichier', async () => {
-    const { builder, appels } = tablePaginee([[]]);
-    await sitesMisEnLigneRangeReader(fakeClient({ deployment_event: builder }))(0, 999);
+describe('fetchEntreesJeu — les comptes serveur ne transferent aucune ligne', () => {
+  it('demande un count exact, "head" (sans donnees), filtre sur step et outcome, pour les sites mis en ligne', async () => {
+    const { builder, appels } = compte({ n: 3 });
+    const entrees = await fetchEntreesJeu(fakeClient({ deploymentEvent: builder }), new Date('2026-09-02T00:00:00Z'));
+    expect(appels.selects).toEqual([['*', { count: 'exact', head: true }]]);
     expect(appels.eqs).toEqual([
       ['step', 'en_ligne'],
       ['outcome', 'reussi'],
     ]);
+    expect(entrees.nombreSitesMisEnLigne).toBe(3);
+  });
+
+  it('demande un count filtre sur status=interesse et origin=observe pour les rendez-vous obtenus', async () => {
+    const { builder, appels } = compte({ n: 5 });
+    const entrees = await fetchEntreesJeu(fakeClient({ pipelineRdv: builder }), new Date('2026-09-02T00:00:00Z'));
+    expect(appels.eqs).toEqual([
+      ['status', 'interesse'],
+      ['origin', 'observe'],
+    ]);
+    expect(entrees.nombreRendezVousObtenus).toBe(5);
+  });
+
+  it('le compte "au-dela de la fenetre" filtre sur origin=observe et occurred_at < la coupure', async () => {
+    const coupureAttendue = new Date('2026-08-18T00:00:00.000Z'); // 2026-09-02 - (14+1) jours
+    const { builder, appels } = compte({ n: 1 });
+    const entrees = await fetchEntreesJeu(fakeClient({ pipelineAuDela: builder }), new Date('2026-09-02T00:00:00Z'));
+    expect(appels.eqs).toEqual([['origin', 'observe']]);
+    expect(appels.lts).toEqual([['occurred_at', coupureAttendue.toISOString()]]);
+    expect(entrees.historiqueAuDelaDeLaFenetre).toBe(true);
+  });
+
+  it('relancesTenuesCumulees reste honnetement non mesurable — aucune requete ne pretend le contraire', async () => {
+    const entrees = await fetchEntreesJeu(fakeClient({}), new Date('2026-09-02T00:00:00Z'));
+    expect(entrees.relancesTenuesCumulees).toEqual({ connue: false });
   });
 });
 
-describe('fetchEntreesJeu — la borne sur les lectures qui grandissent', () => {
-  it('lit TOUTES les lignes au-dela d une seule page, sans les tronquer a la premiere tranche', async () => {
-    // Preuve positive de la borne choisie : `fetchAllRows` (pagination
-    // complete, garde-fou `hardLimit`) plutot qu'un `.limit(N)` fixe. Un
-    // plafond en nombre de lignes couperait la fenetre de jours du jeu
-    // (objectif, serie) en plein milieu sans le signaler ; une lecture
-    // integrale, elle, ne perd aucune ligne — seul un volume vraiment
-    // aberrant (hardLimit, teste plus bas) fait echouer la lecture.
+describe('fetchEntreesJeu — la borne PAR DATE sur les lectures qui grandissent', () => {
+  it('lit TOUTES les lignes de la fenetre au-dela d une seule page, sans les tronquer a la premiere tranche', async () => {
+    // Preuve positive : `fetchAllRows` (pagination complete a l'INTERIEUR de
+    // la fenetre bornee par date) plutot qu'un `.limit(N)` fixe qui pourrait
+    // couper la fenetre elle-meme en plein milieu d'une journee chargee.
     const pages = [[ligneObservee], [{ ...ligneObservee, prospect_id: 'p2' }]];
     const { builder, appels } = tablePaginee(pages);
-    const entrees = await fetchEntreesJeu(
-      fakeClient({ pipeline_event: builder }),
-      new Date('2026-09-02T00:00:00Z'),
-      { pageSize: 1 },
-    );
+    const entrees = await fetchEntreesJeu(fakeClient({ pipelineLignes: builder }), new Date('2026-09-02T00:00:00Z'), {
+      pageSize: 1,
+    });
     // Une troisieme tranche est demandee : la deuxieme page, pleine (1 ligne
     // pour pageSize:1), ne prouve rien a elle seule — voir `fetchAllRows`
     // (paginate.ts), "une page pleine ne prouve pas la fin des donnees".
@@ -209,92 +316,102 @@ describe('fetchEntreesJeu — la borne sur les lectures qui grandissent', () => 
     expect(entrees.evenementsPipeline).toHaveLength(2);
   });
 
-  it('echoue plutot que de boucler sans fin sur une table qui ne rend jamais de page incomplete', async () => {
-    // La seule vraie borne posee ici : `hardLimit`. Elle ne coupe ni une
-    // fenetre de jours ni un historique cumule (voir docstring de
-    // `fetchEntreesJeu`) — elle protege seulement contre un volume qui ne
-    // finit jamais, en echouant bruyamment plutot qu'en rendant une page
-    // partielle pour complete.
+  it('echoue plutot que de boucler sans fin sur une table qui ne rend jamais de page incomplete (pipeline_event)', async () => {
     const { builder } = tableSansFin(() => ligneObservee);
     await expect(
-      fetchEntreesJeu(fakeClient({ pipeline_event: builder }), new Date(), {
-        pageSize: 10,
-        hardLimit: 25,
-      }),
+      fetchEntreesJeu(fakeClient({ pipelineLignes: builder }), new Date(), { pageSize: 10, hardLimit: 25 }),
     ).rejects.toThrow(/25/);
   });
 
   it('la meme garde protege la lecture d interaction', async () => {
     const { builder } = tableSansFin(() => ({ prospect_id: 'p1', occurred_at: '2026-08-20T09:00:00Z' }));
     await expect(
-      fetchEntreesJeu(fakeClient({ interaction: builder }), new Date(), {
-        pageSize: 10,
-        hardLimit: 25,
-      }),
-    ).rejects.toThrow(/25/);
-  });
-
-  it('la meme garde protege la lecture de deployment_event', async () => {
-    const { builder } = tableSansFin(() => ({ prospect_id: 'p1', occurred_at: '2026-08-20T09:00:00Z' }));
-    await expect(
-      fetchEntreesJeu(fakeClient({ deployment_event: builder }), new Date(), {
-        pageSize: 10,
-        hardLimit: 25,
-      }),
+      fetchEntreesJeu(fakeClient({ interaction: builder }), new Date(), { pageSize: 10, hardLimit: 25 }),
     ).rejects.toThrow(/25/);
   });
 });
 
 describe('fetchEntreesJeu — un echec de lecture distinct d un resultat vide', () => {
-  it('trois tables vides rendent des entrees vides, sans lever — le cas normal juste apres la migration', async () => {
+  it('des tables vides et des comptes a zero rendent des entrees au repos, sans lever — le cas normal juste apres la migration', async () => {
     await expect(fetchEntreesJeu(fakeClient({}), new Date())).resolves.toEqual({
       maintenant: expect.any(Date),
       evenementsPipeline: [],
       interactions: [],
-      sitesMisEnLigne: [],
+      historiqueAuDelaDeLaFenetre: false,
+      relancesTenuesCumulees: { connue: false },
+      nombreSitesMisEnLigne: 0,
+      nombreRendezVousObtenus: 0,
     });
   });
 
-  it('un echec sur pipeline_event est nomme et distinct d un vide', async () => {
-    const { builder } = tableEnErreur('RLS a refuse la lecture');
-    await expect(
-      fetchEntreesJeu(fakeClient({ pipeline_event: builder }), new Date()),
-    ).rejects.toThrow(/pipeline_event.*RLS a refuse la lecture/);
+  it('un echec sur la lecture (lignes) de pipeline_event est nomme et distinct d un vide', async () => {
+    const { builder } = tableRangeEnErreur('RLS a refuse la lecture');
+    await expect(fetchEntreesJeu(fakeClient({ pipelineLignes: builder }), new Date())).rejects.toThrow(
+      /pipeline_event.*RLS a refuse la lecture/,
+    );
   });
 
-  it('un echec sur interaction est nomme et distinct d un vide', async () => {
-    const { builder } = tableEnErreur('connexion perdue');
-    await expect(
-      fetchEntreesJeu(fakeClient({ interaction: builder }), new Date()),
-    ).rejects.toThrow(/interaction.*connexion perdue/);
+  it('un echec sur la lecture (lignes) d interaction est nomme et distinct d un vide', async () => {
+    const { builder } = tableRangeEnErreur('connexion perdue');
+    await expect(fetchEntreesJeu(fakeClient({ interaction: builder }), new Date())).rejects.toThrow(
+      /interaction.*connexion perdue/,
+    );
   });
 
-  it('un echec sur deployment_event est nomme et distinct d un vide', async () => {
-    const { builder } = tableEnErreur('timeout');
-    await expect(
-      fetchEntreesJeu(fakeClient({ deployment_event: builder }), new Date()),
-    ).rejects.toThrow(/deployment_event.*timeout/);
+  it('un echec sur le COUNT de deployment_event est nomme et distinct d un vide', async () => {
+    const { builder } = compte({ erreur: { message: 'timeout' } });
+    await expect(fetchEntreesJeu(fakeClient({ deploymentEvent: builder }), new Date())).rejects.toThrow(
+      /deployment_event.*timeout/,
+    );
+  });
+
+  it('un echec sur le COUNT "rendez-vous obtenus" (pipeline_event) est nomme et distinct d un vide', async () => {
+    const { builder } = compte({ erreur: { message: 'rejete' } });
+    await expect(fetchEntreesJeu(fakeClient({ pipelineRdv: builder }), new Date())).rejects.toThrow(
+      /pipeline_event.*rejete/,
+    );
+  });
+
+  it('un echec sur le COUNT "historique au-dela" (pipeline_event) est nomme et distinct d un vide', async () => {
+    const { builder } = compte({ erreur: { message: 'indisponible' } });
+    await expect(fetchEntreesJeu(fakeClient({ pipelineAuDela: builder }), new Date())).rejects.toThrow(
+      /pipeline_event.*indisponible/,
+    );
   });
 });
 
 describe('fetchJeu', () => {
-  it('assemble le jeu complet a partir des trois sources', async () => {
-    const pipeline = tablePaginee([[ligneObservee, { ...ligneObservee, status: 'interesse', next_action_at: null }]]);
-    const interaction = tablePaginee([[{ prospect_id: 'p1', occurred_at: '2026-08-20T10:00:00Z' }]]);
+  it('assemble le jeu complet a partir des cinq sources', async () => {
+    // Echeance posee le 20/08 mais due le jour meme de `now` (02/09) :
+    // l'interaction qui l'honore CE jour-la forme une serie d'un jour — une
+    // relance posee puis honoree loin dans le passe (comme `ligneObservee`
+    // partagee plus haut, due elle aussi le 20/08) ne compterait pour aucune
+    // serie en cours, `serieDeJours` ne remontant que depuis aujourd'hui.
+    const echeanceDueAujourdhui = { ...ligneObservee, next_action_at: '2026-09-02' };
+    const pipelineLignes = tablePaginee([[echeanceDueAujourdhui]]).builder;
+    const interaction = tablePaginee([[{ prospect_id: 'p1', occurred_at: '2026-09-02T10:00:00Z' }]]).builder;
     const jeu = await fetchJeu(
-      fakeClient({ pipeline_event: pipeline.builder, interaction: interaction.builder }),
+      fakeClient({
+        pipelineLignes,
+        interaction,
+        pipelineRdv: compte({ n: 1 }).builder,
+        deploymentEvent: compte({ n: 1 }).builder,
+      }),
       new Date('2026-09-02T00:00:00Z'),
     );
-    // Une relance tenue (p1, 20/08) + un rendez-vous obtenu (statut interesse) :
-    // 40 + 200 = 240 points, palier 1 encore en cours.
-    expect(jeu.palier.points).toBe(240);
-    expect(jeu.palier.numero).toBe(1);
+    // Une relance tenue dans la fenetre (contribue a la serie, pas au
+    // palier — voir le correctif de revue) + 1 site en ligne (compte
+    // serveur) + 1 rendez-vous obtenu (compte serveur) : 120 + 200 = 320
+    // points. La relance tenue ne pese pas ici : `relancesTenuesCumulees`
+    // reste `{connue: false}`, faute de cumul honnete depuis toujours.
+    expect(jeu.palier.points).toBe(320);
+    expect(jeu.serie.jours).toBe(1);
   });
 
   it('sur une base entierement vide, rend un jeu au repos plutot que d echouer', async () => {
     const jeu = await fetchJeu(fakeClient({}), new Date('2026-09-02T00:00:00Z'));
     expect(jeu.objectifDuJour).toEqual({ connue: false });
-    expect(jeu.serie).toBe(0);
+    expect(jeu.serie).toEqual({ jours: 0, borneAtteinte: false });
     expect(jeu.palier).toEqual({ points: 0, seuil: 500, numero: 1, progression: 0 });
     expect(jeu.badges.every((b) => !b.obtenu)).toBe(true);
   });
