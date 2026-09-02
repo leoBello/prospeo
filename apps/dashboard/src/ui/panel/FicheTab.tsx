@@ -82,7 +82,7 @@ export function FicheTab({ prospect }: { prospect: ProspectView }) {
                 // étage manquant, c'est une donnée que la source a retirée.
                 // Confondre les deux ferait relancer un enrichissement qui ne
                 // peut rien rapporter.
-                <Tooltip intitule={t('value.notPublished')} contenu={t('enrichment.reviews.hint')}>
+                <Tooltip intitule={t('field.reviewCount')} contenu={t('enrichment.reviews.hint')}>
                   <span tabIndex={0}>
                     <Absent>{t('value.notPublished')}</Absent>
                   </span>

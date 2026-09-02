@@ -35,8 +35,17 @@ describe('FicheTab', () => {
   it('n invente pas un effectif quand l INSEE n en publie pas', () => {
     // `minHeadcount` rend null pour « unite non employeuse » et « inconnu ».
     // Afficher « 0 salarie » inventerait un fait que la source ne donne pas.
+    //
+    // `queryByText('0 salarié')` seul ne prouve rien : le rendu reel prefixe
+    // toujours d'« au moins » (`unit.employees` / `unit.employees_one`), et
+    // la recherche de Testing Library est exacte sur le noeud entier — donc
+    // aucune chaine ne matche jamais, que la garde nulle soit correcte ou
+    // remplacee par un `?? 0`. On pingle les deux moities de la propriete :
+    // aucun texte contenant un nombre n'apparait dans le champ effectif, et
+    // le texte nomme de l'absence (`value.unknown`) apparait bien a la place.
     renderWithPreferences(<FicheTab prospect={{ ...base, effectifCode: 'NN' }} />);
-    expect(screen.queryByText('0 salarié')).toBeNull();
+    expect(screen.queryByText(/salarié/)).toBeNull();
+    expect(screen.getByText('non renseigné')).toBeDefined();
   });
 
   it('distingue « pas encore collecte » de « non publie par la source »', () => {

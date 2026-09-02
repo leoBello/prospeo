@@ -95,7 +95,7 @@ export const en: Record<keyof typeof fr, string> = {
   'enrichment.not_found': 'No Google listing found',
   'enrichment.ambiguous': 'Match to be decided',
   'enrichment.blocked': 'Enrichment blocked by Google',
-  'enrichment.absent': 'No contact details: the “enrich” stage has not run on this prospect yet.',
+  'enrichment.absent': 'No contact details: the "enrich" stage has not run on this prospect.',
   'enrichment.reviews.hint':
     'Google stopped publishing review counts in August 2026. Re-running enrichment will not fill this field.',
   'enrichment.confidence.hint':
