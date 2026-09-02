@@ -106,12 +106,20 @@ export const fr = {
     'Confiance de l’appariement avec la fiche Google. Sous le seuil haut, le rattachement est un pari — et c’est au téléphone qu’un faux appariement se paie.',
 
   'panel.close': 'Fermer le panneau',
-  'panel.empty': 'Sélectionnez un prospect pour afficher sa fiche.',
+  // « Choisir » et non « Sélectionner » : c'est le mot du geste, pas celui de
+  // l'interface — on ne « sélectionne » pas un client au téléphone.
+  'panel.empty': 'Choisir un prospect pour afficher sa fiche.',
   'panel.section.identity': 'Identité',
   'panel.section.contact': 'Coordonnées',
   'panel.section.web': 'Présence web',
   'panel.section.score': 'Détail du score',
   'panel.position': '{index} sur {total}',
+
+  // Chantier n°6 : les quatre onglets du panneau, un par moment du travail.
+  'panel.tab.fiche': 'Fiche',
+  'panel.tab.site': 'Site',
+  'panel.tab.messages': 'Messages',
+  'panel.tab.historique': 'Historique',
 
   'field.siret': 'SIRET',
   'field.address': 'Adresse',
@@ -138,6 +146,10 @@ export const fr = {
   'panel.section.site': 'Site généré',
   'panel.section.messages': 'Messages de vente',
   'panel.section.pipeline': 'Suivi',
+
+  // Le badge d'en-tête, distinct de `site.online` : celui-ci porte une date
+  // et vit dans l'onglet Site, celui-là tient dans un badge de trois mots.
+  'site.badge.online': 'Site en ligne',
 
   'site.absent': 'Aucune rédaction : l’étage « generate » n’est pas passé sur ce prospect.',
   'site.notPublished': 'Rédaction écrite, rien n’est encore publié.',

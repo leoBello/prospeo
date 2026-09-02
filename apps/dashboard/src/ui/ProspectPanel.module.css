@@ -1,11 +1,60 @@
+/*
+ * 720 px et non 380 (D1).
+ *
+ * L'ancienne largeur imposait une colonne unique pour trente champs, un recu
+ * de score et deux messages entiers. La fiche prend la place ; la liste, qui
+ * ne porte qu'un nom, une raison et un score, en a moins besoin.
+ */
 .panel {
-  width: 380px;
+  width: 720px;
   flex: none;
   border-left: 1px solid var(--color-border);
   background: var(--color-surface);
   overflow-y: auto;
-  padding: var(--space-4);
+  padding: var(--space-4) var(--space-5);
   z-index: var(--z-panel);
+}
+
+.onglets {
+  display: flex;
+  gap: 2px;
+  margin-top: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.onglet {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 var(--space-3);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.onglet[data-active] {
+  color: var(--color-text);
+  font-weight: 600;
+  border-bottom-color: var(--color-accent);
+}
+
+.panneau {
+  padding-top: var(--space-4);
+  outline: none;
+}
+
+.badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: var(--space-2);
+  flex-wrap: wrap;
 }
 
 .placeholder {

@@ -102,12 +102,17 @@ export const en: Record<keyof typeof fr, string> = {
     'Confidence in the match with the Google listing. Below the high threshold the match is a bet — and a wrong match is paid for on the phone.',
 
   'panel.close': 'Close panel',
-  'panel.empty': 'Select a prospect to see its record.',
+  'panel.empty': 'Choose a prospect to see its record.',
   'panel.section.identity': 'Identity',
   'panel.section.contact': 'Contact details',
   'panel.section.web': 'Web presence',
   'panel.section.score': 'Score breakdown',
   'panel.position': '{index} of {total}',
+
+  'panel.tab.fiche': 'Details',
+  'panel.tab.site': 'Site',
+  'panel.tab.messages': 'Messages',
+  'panel.tab.historique': 'History',
 
   'field.siret': 'SIRET',
   'field.address': 'Address',
@@ -133,6 +138,8 @@ export const en: Record<keyof typeof fr, string> = {
   'panel.section.site': 'Generated site',
   'panel.section.messages': 'Sales messages',
   'panel.section.pipeline': 'Follow-up',
+
+  'site.badge.online': 'Site online',
 
   'site.absent': 'No copy yet: the "generate" stage has not run on this prospect.',
   'site.notPublished': 'Copy written, nothing published yet.',
