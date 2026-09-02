@@ -58,7 +58,6 @@
   --font-display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
   --font-ui: 'Instrument Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  --font-sans: var(--font-ui);
 
   --text-xs: 11px;
   --text-sm: 12px;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { renderWithPreferences } from '../../test-utils.js';
+import { ATTENTE_SURVOL, renderWithPreferences } from '../../test-utils.js';
 import { Bientot } from './Bientot.js';
 
 describe('Bientot', () => {
@@ -24,7 +24,9 @@ describe('Bientot', () => {
       </Bientot>,
     );
     await user.hover(screen.getByText('Bientôt'));
-    expect(await screen.findByText(/table d'evenements/)).toBeDefined();
+    // Meme delai de 600 ms que dans `Tooltip.test.tsx`, et meme raison de ne
+    // pas s'en remettre au budget par defaut de 1000 ms.
+    expect(await screen.findByText(/table d'evenements/, {}, ATTENTE_SURVOL)).toBeDefined();
   });
 
   it('retire le contenu du parcours clavier et le signale aux lecteurs d ecran', async () => {

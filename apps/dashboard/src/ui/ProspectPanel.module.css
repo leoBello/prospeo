@@ -1,18 +1,46 @@
 /*
- * 720 px et non 380 (D1).
+ * 720 px et non 380 (D1), mais jamais plus de 45 % de la fenetre.
  *
  * L'ancienne largeur imposait une colonne unique pour trente champs, un recu
  * de score et deux messages entiers. La fiche prend la place ; la liste, qui
  * ne porte qu'un nom, une raison et un score, en a moins besoin.
+ *
+ * « Moins besoin » n'est pas « aucun besoin » : la liste ne disparait jamais
+ * (§9.1), et c'est la premisse du patron liste + panneau. Sans plafond, 720 px
+ * fixes ne lui laissaient que 304 px a 1024 de large, et 180 a 900 — la
+ * comparaison des lignes, qui est la raison d'etre de la liste, n'y survit
+ * pas. Le plafond relatif garde les deux colonnes lisibles jusqu'a la bascule
+ * en superposition ci-dessous.
  */
 .panel {
   width: 720px;
+  max-width: 45vw;
   flex: none;
   border-left: 1px solid var(--color-border);
   background: var(--color-surface);
   overflow-y: auto;
   padding: var(--space-4) var(--space-5);
   z-index: var(--z-panel);
+}
+
+/*
+ * Sous 900 px, deux colonnes rendent chacune illisible : le panneau passe
+ * AU-DESSUS de la liste plutot qu'a cote. C'est ce que le commentaire de
+ * `AppShell.module.css` annoncait sans qu'aucune regle ne l'applique — la
+ * liste retrecissait alors vers zero au lieu de passer derriere.
+ *
+ * `position: absolute` se cale sur le `.body` d'`AppShell`, qui se declare
+ * `position: relative` a la meme largeur. La liste reste montee derriere : on
+ * la retrouve intacte, avec son defilement, en fermant le panneau.
+ */
+@media (max-width: 900px) {
+  .panel {
+    position: absolute;
+    inset: 0;
+    width: auto;
+    max-width: none;
+    border-left: none;
+  }
 }
 
 .onglets {
@@ -155,45 +183,6 @@
   font-size: var(--text-sm);
 }
 
-.scoreGroup {
-  margin-bottom: var(--space-3);
-}
-
-.scoreGroupTitle {
-  margin: 0 0 var(--space-1);
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-  font-weight: 500;
-}
-
-.scoreLine {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-3);
-  font-size: var(--text-sm);
-  padding: 2px 0;
-}
-
-.positif {
-  color: var(--color-accent);
-  font-variant-numeric: tabular-nums;
-}
-
-.negatif {
-  color: var(--color-danger);
-  font-variant-numeric: tabular-nums;
-}
-
-.scoreTotal {
-  display: flex;
-  justify-content: space-between;
-  border-top: 1px solid var(--color-text-muted);
-  margin-top: var(--space-2);
-  padding-top: var(--space-2);
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
 /* --- Site généré, messages et suivi (chantier n°4, tâche 7) --------------- */
 
 .hint {
@@ -289,7 +278,6 @@
   padding: var(--space-2);
   border-radius: var(--radius-sm);
   background: var(--color-bg);
-  font-family: var(--font-sans);
   font-size: var(--text-sm);
   line-height: 1.5;
   white-space: pre-wrap;

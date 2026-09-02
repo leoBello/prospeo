@@ -12,7 +12,7 @@
 |---|---|---|
 | Tokens, trois fontes, contraste AA | `src/ui/theme.css` | livré |
 | `Badge`, `StatusBadge` | `src/ui/kit/Badge.tsx`, `src/ui/kit/StatusBadge.tsx` | livré |
-| `Tooltip` (Base UI) | `src/ui/kit/Tooltip.tsx` | livré |
+| `Tooltip` (Base UI) | `src/ui/kit/Tooltip.tsx` | livré — rattachement ARIA posé à la main, voir plus bas |
 | `Bientot` | `src/ui/kit/Bientot.tsx` | livré |
 | `Card`, `Field`, `Absent` | `src/ui/kit/Card.tsx` | livré |
 | `EmptyState` | `src/ui/kit/EmptyState.tsx` | livré |
@@ -66,6 +66,21 @@ raison : les formes `_one`, que `translate` dérive de la clé nue, et le
 préfixe `interaction.kind.`, composé à l'exécution par `CLE_CANAL` dans
 `PipelineSection.tsx`. Ajouter une composition dynamique impose d'ajouter sa
 ligne à cette liste.
+
+## Ce que Base UI ne fournit pas, contrairement à ce qu'on croyait
+
+`Tooltip.tsx` justifiait sa dépendance à Base UI par quatre apports, dont
+« la sémantique ARIA ». En écrivant les tests qui manquaient, on a constaté
+que `@base-ui/react` 1.7.0 n'en pose aucune pour l'infobulle : la bulle sort
+sans `role`, et le déclencheur sans `aria-describedby`. Une bulle visible à la
+souris et muette au lecteur d'écran, c'est-à-dire inutile précisément là où
+elle compte le plus.
+
+Les deux attributs sont donc posés dans `Tooltip.tsx`, et l'état d'ouverture y
+est contrôlé pour cette seule raison : `aria-describedby` ne doit désigner la
+bulle que tant qu'elle est montée. Deux tests les tiennent. Les trois autres
+apports (placement, délai anti-clignotement, ouverture au clavier) sont bien
+là — la dépendance reste justifiée, sa justification était juste trop large.
 
 ## Ce qui est annoncé mais pas alimenté
 

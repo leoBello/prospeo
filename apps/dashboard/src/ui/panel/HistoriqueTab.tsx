@@ -58,7 +58,11 @@ export function HistoriqueTab({ prospect }: { prospect: ProspectView }) {
         ))}
       </div>
 
-      <Bientot raison={t('histo.detail.reason')}>
+      {/* Deux textes distincts, et non le même deux fois : ce qui est visible
+          dit ce qui viendra, l'infobulle dit ce qui l'empêche. Le même texte
+          aux deux places faisait révéler au survol une phrase déjà lisible
+          deux centimètres plus haut — le geste ne rapportait rien. */}
+      <Bientot raison={t('histo.detail.blocked')}>
         <EmptyState titre={t('histo.detail.title')} detail={t('histo.detail.reason')} />
       </Bientot>
     </div>

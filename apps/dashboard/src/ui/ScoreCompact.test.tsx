@@ -122,6 +122,52 @@ describe('ScoreCompact', () => {
     }
   });
 
+  it('plafonne chaque barre au maximum que computeScore peut reellement emettre', () => {
+    // Les trois plafonds sont epingles parce qu'ils ne se voient pas : une
+    // barre trop haute ne fait que rester a demi pleine, ce qui ressemble a
+    // une donnee mediocre et non a un defaut d'affichage.
+    //
+    // `vitalite` valait 70 (reputation 25 + volume d'avis 10 + fraicheur
+    // sociale 15 + effectif 10 + anciennete 10). Or `reviewsVolume` et
+    // `socialFresh` sont INERTES faute d'ecrivain : le maximum atteignable
+    // etait 45, soit 64 % d'une barre dont les deux voisines montent a 100 %.
+    // Deux prospects a 71 cessaient d'etre comparables d'un coup d'oeil, ce
+    // qui est la seule raison d'avoir trois barres fixes.
+    //
+    // Le jour ou l'une des deux sources revient, ce test est ce qui oblige a
+    // remonter le plafond en meme temps que le bareme.
+    const { container } = renderWithPreferences(<ScoreCompact score={score()} />);
+    const plafonds = [...container.querySelectorAll('[data-groupe]')].map((b) => [
+      b.getAttribute('data-groupe'),
+      b.getAttribute('data-plafond'),
+    ]);
+    expect(plafonds).toEqual([
+      ['presence', '45'],
+      ['vitalite', '45'],
+      ['joignabilite', '20'],
+    ]);
+  });
+
+  it('remplit entierement la barre vitalite au maximum reellement atteignable', () => {
+    // Le pendant visible du test precedent : un prospect qui coche TOUT ce
+    // que `computeScore` sait emettre en vitalite doit voir sa barre pleine.
+    // Avec l'ancien plafond de 70, cette meme barre s'arretait a 64 %.
+    const { container } = renderWithPreferences(
+      <ScoreCompact
+        score={score({
+          breakdown: [
+            { code: 'reputation', label: '4.8 ★', points: 25, group: 'vitalite' },
+            { code: 'staff', label: 'Au moins 6 salariés', points: 10, group: 'vitalite' },
+            { code: 'age', label: 'Créée il y a 7 ans', points: 10, group: 'vitalite' },
+          ],
+        })}
+      />,
+    );
+    const barre = container.querySelector('[data-groupe="vitalite"]');
+    const remplissage = barre?.querySelector('[style*="width"]');
+    expect(remplissage?.getAttribute('style')).toContain('width: 100%');
+  });
+
   it('une absence de score garde le libelle court visible, la phrase longue en survol', () => {
     // ScoreBar.tsx resout deja ce cas : le libelle court reste visible pour le
     // cas majoritaire (114 prospects sur 139), la phrase longue passe en

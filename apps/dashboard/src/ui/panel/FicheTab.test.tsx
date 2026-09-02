@@ -171,10 +171,20 @@ describe('FicheTab', () => {
     },
   );
 
-  it('distingue le telephone jamais collecte du telephone bloque par la source', () => {
-    // Sans le statut visible, les deux cas rendaient le meme "pas encore
-    // collecté" pour le champ téléphone : c'est exactement la confusion
-    // que la doctrine du dépôt interdit.
+  it('porte la distinction dans le badge d en-tete, le champ telephone disant la meme absence dans les deux cas', () => {
+    // LACUNE CONNUE, epinglee telle quelle plutot que masquee par un titre
+    // flatteur. Ce test ne prouve PAS que l'ecran distingue « jamais
+    // collecté » de « bloqué par la source » AU NIVEAU DU CHAMP : les deux
+    // rendent le meme `value.notCollected`. Seul le badge d'en-tete les
+    // separe, et c'est ce que le test verifie reellement.
+    //
+    // Le champ ment d'ailleurs dans un troisieme cas, non couvert ici : avec
+    // `status === 'ok'` et un `phoneE164` nul, il dit « pas encore collecté »
+    // alors que l'etage a tourne ET reussi — la source n'a simplement publie
+    // aucun numero, ce qui est le cas de `value.notPublished`, deja employe
+    // pour le nombre d'avis. Le corriger suppose de decider champ par champ
+    // ce qu'un statut `ok` implique pour chaque colonne nulle ; c'est reporte
+    // au lot 2, et ecrit ici pour ne pas etre redecouvert.
     renderWithPreferences(
       <FicheTab prospect={{ ...base, enrichment: enrichissement('blocked') }} />,
     );
@@ -217,11 +227,20 @@ describe('FicheTab', () => {
     expect(screen.getByText(texte)).toBeDefined();
   });
 
-  it('rend la meme absence pour une presence sondee non classee et pour aucune ligne', () => {
-    // `probe` a tourné, `classify` pas encore : `category` est `null` sans
-    // que la ligne elle-même soit absente. C'est un état réel, distinct
-    // d'un prospect jamais sondé, même si l'écran n'a pas (encore) de texte
-    // dédié pour l'un et pas l'autre.
+  it('LACUNE CONNUE — confond une presence sondee mais non classee avec l absence totale de ligne', () => {
+    // Ce test DOCUMENTE une confusion, il ne la specifie pas. Les deux faits
+    // sont distincts : `presence === null` veut dire que `probe` n'a jamais
+    // tourné ; `category === null` veut dire qu'il a tourné et que `classify`
+    // ne l'a pas suivi. Le second est un pipeline interrompu à mi-chemin, le
+    // premier un pipeline pas commencé — et l'écran affiche « pas encore
+    // sondée » pour les deux, ce qui est faux dans le second cas.
+    //
+    // Reporté et non corrigé : nommer l'état intermédiaire demande une clé de
+    // plus ET un état de plus dans `PresenceView`, alors que `classify` suit
+    // aujourd'hui `probe` dans le même passage du collector — la fenêtre où
+    // l'état existe se compte en secondes. Le jour où les deux étages se
+    // découplent, cette lacune devient visible en base, et ce test est
+    // l'endroit où la retrouver.
     const { unmount } = renderWithPreferences(
       <FicheTab
         prospect={{

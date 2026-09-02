@@ -74,7 +74,13 @@
 
 @media (max-width: 900px) {
   /* Sous cette largeur, deux colonnes rendent chacune illisible : le panneau
-     passe alors au-dessus de la liste, qui reste montee derriere lui. */
+     passe alors au-dessus de la liste, qui reste montee derriere lui.
+
+     La moitie de la regle qui vit ici est le bloc de reference : c'est ce
+     `position: relative` qui donne au panneau absolu son cadre. L'autre
+     moitie — la superposition elle-meme — est dans
+     `ProspectPanel.module.css`, avec le meme point de bascule, parce que
+     c'est le panneau qui se positionne et non la coquille qui le range. */
   .body {
     position: relative;
   }

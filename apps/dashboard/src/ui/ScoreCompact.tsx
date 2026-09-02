@@ -28,16 +28,30 @@ const CLE_GROUPE: Record<string, TranslationKey> = {
  *   le maximum).
  * - `joignabilite` : une seule ligne de téléphone est jamais posée ; même
  *   logique sur le barème `phone`.
- * - `vitalite` : plusieurs lignes peuvent se cumuler (réputation, volume
- *   d'avis, fraîcheur sociale, effectif, ancienneté) ; le plafond en est la
- *   somme. Deux de ces règles sont actuellement INERTES faute de donnée
- *   source (voir les commentaires du barème) — les compter quand même rend le
- *   plafond correct le jour où la donnée revient, sans toucher ce fichier.
+ * - `vitalite` : plusieurs lignes peuvent se cumuler ; le plafond en est la
+ *   somme des seules règles que `computeScore` peut ÉMETTRE aujourd'hui —
+ *   réputation, effectif, ancienneté, soit 45.
+ *
+ * Sur ce dernier point, un plafond « complet » a d'abord été écrit :
+ * `reviewsVolume` (10) et `socialFresh` (15) portés en plus, pour un total de
+ * 70. C'était une erreur. Ces deux règles sont INERTES faute d'écrivain —
+ * personne ne renseigne `review_count` ni `last_social_post_at` (voir les
+ * commentaires du barème) — donc le maximum atteignable valait 45/70, soit
+ * 64 %. Cette barre-là était donc systématiquement sous-remplie face à ses
+ * deux voisines, qui atteignent l'une et l'autre 100 %. Or la raison d'être
+ * des trois barres fixes est que deux prospects à 71 restent comparables d'un
+ * coup d'œil (§ commentaire de `SCORE_BAR_GROUPS`) : une troisième barre
+ * silencieusement dévaluée détruit exactement cette lecture.
+ *
+ * Le jour où l'une de ces deux sources revient, la règle correspondante se
+ * rajoute ici — `+ R.reviewsVolume.points` et/ou `+ R.socialFresh.points`,
+ * pour un plafond de 70 si les deux reviennent. C'est écrit ici pour que la
+ * raison de revenir sur ce calcul ne soit pas à redécouvrir.
  */
 const R = SCORING_RULESET;
 const PLAFOND: Record<ScoreBarGroup, number> = {
   presence: Math.max(...Object.values(R.presence)),
-  vitalite: R.reputation.points + R.reviewsVolume.points + R.socialFresh.points + R.staff.points + R.age.points,
+  vitalite: R.reputation.points + R.staff.points + R.age.points,
   joignabilite: Math.max(R.phone.mobile, R.phone.landline),
 };
 
@@ -138,7 +152,7 @@ export function ScoreCompact({ score }: { score: ScoreView | null }) {
             const detail = lignes.map((l) => `${l.label} (${l.points >= 0 ? '+' : ''}${l.points})`).join(' · ');
             return (
               <Tooltip key={group} intitule={`${t(CLE_GROUPE[group] ?? 'score.group.presence')} · ${points} / ${plafond}`} contenu={detail}>
-                <div className={styles.groupe} tabIndex={0} data-groupe={group}>
+                <div className={styles.groupe} tabIndex={0} data-groupe={group} data-plafond={plafond}>
                   <div className={styles.groupeTete}>
                     <span className={styles.groupeNom}>{t(CLE_GROUPE[group] ?? 'score.group.presence')}</span>
                     <span className={styles.groupePoints}>{points}</span>

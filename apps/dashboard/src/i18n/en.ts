@@ -220,5 +220,7 @@ export const en: Record<keyof typeof fr, string> = {
   'histo.rejected': 'Copy rejected',
   'histo.detail.title': 'Step-by-step deployment log',
   'histo.detail.reason':
-    'Every deployment step will be dated here — repository, project, build, go-live. That needs an events table: `prospect_site` holds a current state, not a history.',
+    'Every deployment step will be dated here: repository created, project opened, build, go-live.',
+  'histo.detail.blocked':
+    'No events table exists: `prospect_site` holds a current state, not a history. Nothing can be dated step by step before the §4.1 migration.',
 };

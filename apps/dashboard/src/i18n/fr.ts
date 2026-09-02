@@ -230,6 +230,12 @@ export const fr = {
   'histo.unpublished': 'Site retiré',
   'histo.rejected': 'Rédaction refusée',
   'histo.detail.title': 'Journal détaillé des étapes',
+  // Deux textes et non un seul : le visible dit CE QUI VIENT, l'infobulle dit
+  // CE QUI BLOQUE. Les deux portaient la même phrase, si bien que survoler le
+  // marqueur « Bientôt » révélait une phrase déjà lisible deux centimètres
+  // plus haut — un geste pour rien, et une infobulle qui n'apprend rien.
   'histo.detail.reason':
-    'Chaque étape de déploiement sera datée ici — dépôt, projet, build, mise en ligne. Il manque pour cela une table d’événements : `prospect_site` ne porte qu’un état courant, pas un historique.',
+    'Chaque étape de déploiement sera datée ici : dépôt créé, projet ouvert, build, mise en ligne.',
+  'histo.detail.blocked':
+    'Aucune table d’événements n’existe : `prospect_site` ne porte qu’un état courant, pas un historique. Rien ne peut donc être daté étape par étape avant la migration §4.1.',
 } as const;

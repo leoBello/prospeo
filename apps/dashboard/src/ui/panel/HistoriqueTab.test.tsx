@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { screen } from '@testing-library/react';
-import { renderWithPreferences } from '../../test-utils.js';
+import userEvent from '@testing-library/user-event';
+import { ATTENTE_SURVOL, renderWithPreferences } from '../../test-utils.js';
 import type { ProspectView } from '../../domain/prospect.js';
 import { HistoriqueTab } from './HistoriqueTab.js';
 
@@ -60,5 +61,21 @@ describe('HistoriqueTab', () => {
     const { container } = renderWithPreferences(<HistoriqueTab prospect={base} />);
     expect(screen.getByText('Bientôt')).toBeDefined();
     expect(container.querySelector('[aria-disabled="true"]')).not.toBeNull();
+  });
+
+  it('dit au survol ce qui bloque, et non ce qui est deja lisible a l ecran', async () => {
+    // Les deux textes etaient le meme : survoler « Bientôt » revelait une
+    // phrase deja affichee deux centimetres plus haut. Une infobulle qui
+    // repete l'ecran est un geste demande pour rien.
+    const user = userEvent.setup();
+    renderWithPreferences(<HistoriqueTab prospect={base} />);
+
+    // Ce qui vient : visible sans aucun geste.
+    expect(screen.getByText(/sera datée ici/)).toBeDefined();
+    // Ce qui bloque : pas encore la.
+    expect(screen.queryByText(/table d’événements/)).toBeNull();
+
+    await user.hover(screen.getByText('Bientôt'));
+    expect(await screen.findByText(/table d’événements/, {}, ATTENTE_SURVOL)).toBeDefined();
   });
 });
