@@ -30,8 +30,15 @@ export interface FollowUpReason {
   params: TranslationParams;
 }
 
-/** Nombre de jours civils entre deux instants, en heure locale. */
-function joursCivils(de: Date, vers: Date): number {
+/**
+ * Nombre de jours civils entre deux instants, en heure locale.
+ *
+ * Exportée : `domain/deployment.ts` en a besoin pour la péremption des sites
+ * (90 jours civils depuis `publishedAt`) et doit compter de la même façon —
+ * un site publié hier à 23 h ne doit pas afficher un jour de moins qu'il n'en
+ * reste parce qu'un appelant aurait soustrait des millisecondes à la place.
+ */
+export function joursCivils(de: Date, vers: Date): number {
   const jour = (d: Date) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
   return Math.round((jour(vers) - jour(de)) / 86_400_000);
 }
