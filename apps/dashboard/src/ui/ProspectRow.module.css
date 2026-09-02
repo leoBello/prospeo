@@ -64,9 +64,14 @@
  * contenu tant que rien ne l'autorise à descendre plus bas) — l'ellipse
  * était donc posée mais ne se déclenchait jamais, et un nom long débordait
  * de la ligne au lieu de se tronquer devant le badge de statut.
+ *
+ * `min-width: 0` SEUL, et surtout pas `flex: 1` : la première version de ce
+ * correctif l'avait ajouté, et le nom prenait alors toute la largeur libre —
+ * ce qui repoussait le badge de statut à l'autre bout de la ligne. La
+ * maquette (Main.dc.html, l.183) le colle au nom, à 7 px. Le nom doit
+ * pouvoir RÉTRÉCIR, pas GRANDIR.
  */
 .name {
-  flex: 1;
   min-width: 0;
   font-size: var(--text-md);
   font-weight: 500;
