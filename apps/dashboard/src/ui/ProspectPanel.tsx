@@ -36,6 +36,14 @@ interface Props {
    * correct tant que la lecture n'a pas abouti.
    */
   events?: DeploymentEventView[];
+  /**
+   * Le message d'une lecture d'événements en échec (tâche 11, relevé de
+   * revue) — voir le docstring de `HistoriqueTab` pour pourquoi ce n'est pas
+   * la même chose que `events` absent.
+   */
+  erreurEvenements?: string | null;
+  /** Rejoue la lecture des événements après un échec. */
+  onReessayerEvenements?: () => void;
   /** Rang affiché dans la file, pour situer le parcours au clavier. */
   position: { index: number; total: number } | null;
   currentRulesetVersion: string;
@@ -62,6 +70,8 @@ export function ProspectPanel({
   onClose,
   actions = null,
   events,
+  erreurEvenements = null,
+  onReessayerEvenements,
 }: Props) {
   const t = useT();
 
@@ -147,7 +157,12 @@ export function ProspectPanel({
         </Tabs.Panel>
 
         <Tabs.Panel className={styles.panneau} value="historique">
-          <HistoriqueTab prospect={prospect} events={events} />
+          <HistoriqueTab
+            prospect={prospect}
+            events={events}
+            erreurEvenements={erreurEvenements}
+            onReessayerEvenements={onReessayerEvenements}
+          />
           <PipelineSection
             pipeline={prospect.pipeline}
             // « En ligne » veut dire déployé ET non retiré : une ligne conserve

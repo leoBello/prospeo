@@ -96,3 +96,25 @@
 .detailJournal[data-echec='true'] {
   color: var(--color-danger);
 }
+
+/* Une lecture en échec (tâche 11) : même ton que la cause d'un échec de
+   déploiement ci-dessus, pour la même raison — c'est un fait qui appelle une
+   action (relire), pas une note. */
+.erreur {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.erreurTitre {
+  margin: 0;
+  font-weight: 600;
+  color: var(--color-danger);
+}
+
+.erreurDetail {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-danger);
+}

@@ -88,10 +88,19 @@ function texteDetail(t: (cle: TranslationKey) => string, e: DeploymentEventView)
  * même lot, et `projet` peut manquer entièrement si le projet Vercel
  * existait déjà. On affiche donc CHAQUE événement, trié par horodatage, sans
  * tenter de les apparier en paires démarré/terminé.
+ *
+ * **Une lecture en échec n'est pas un prospect sans historique** (tâche 11,
+ * relevé de revue) : `erreurEvenements` prend le pas sur l'`EmptyState`
+ * ci-dessus et affiche le message d'`useDeploymentEvents` sous `app.error.*`
+ * — même clé que l'écran entier pour une lecture ratée. Sans ça, une panne
+ * réseau ou un refus RLS se lirait comme le même vide daté qu'un vrai
+ * prospect sans événement, exactement l'ambiguïté que l'app évite ailleurs.
  */
 export function HistoriqueTab({
   prospect,
   events,
+  erreurEvenements = null,
+  onReessayerEvenements,
 }: {
   prospect: ProspectView;
   /**
@@ -110,6 +119,29 @@ export function HistoriqueTab({
    * commodité de compilation.
    */
   events?: DeploymentEventView[];
+  /**
+   * Le message d'une lecture d'événements en échec (`useDeploymentEvents`,
+   * `status: 'error'`), ou `null`/absent si la lecture a réussi ou n'a pas
+   * encore eu lieu.
+   *
+   * Distinct de `events` à dessein : `events: undefined` — le repli en
+   * `[]` juste au-dessus — se lit exactement comme un prospect qui n'a
+   * réellement aucun événement, et c'est le rendu voulu tant qu'aucune
+   * réponse n'est arrivée. Une lecture qui a ÉCHOUÉ (réseau, RLS) n'est pas
+   * ce cas-là : la confondre avec un vide daté ferait passer une panne pour
+   * un fait établi sur ce prospect, ce que la doctrine de l'app (un vide
+   * nommé, jamais une absence blanchie) interdit ailleurs — `app.error.*`,
+   * déjà utilisé par `App.tsx` pour les mêmes lectures en échec.
+   */
+  erreurEvenements?: string | null;
+  /**
+   * Rejoue la lecture des événements après un échec (`useDeploymentEvents.reload`).
+   *
+   * Optionnel : un appelant qui ne câble pas encore de réseau (les tests de
+   * ce composant, par exemple) n'a rien à rejouer, et le bouton ne s'affiche
+   * simplement pas plutôt que d'appeler une fonction absente.
+   */
+  onReessayerEvenements?: () => void;
 }) {
   const t = useT();
   const site = prospect.site;
@@ -155,7 +187,21 @@ export function HistoriqueTab({
       </div>
 
       <Card titre={t('histo.events.title')}>
-        {evenementsTries.length === 0 ? (
+        {erreurEvenements != null ? (
+          // Un vide nommé DIFFÉREMMENT du cas « zéro événement » ci-dessous :
+          // `role="alert"` l'annonce, et le message d'`useDeploymentEvents`
+          // dit la cause plutôt que de laisser croire à un prospect sans
+          // historique.
+          <div className={styles.erreur} role="alert">
+            <p className={styles.erreurTitre}>{t('app.error.title')}</p>
+            <p className={styles.erreurDetail}>{erreurEvenements}</p>
+            {onReessayerEvenements === undefined ? null : (
+              <button type="button" onClick={onReessayerEvenements}>
+                {t('app.error.retry')}
+              </button>
+            )}
+          </div>
+        ) : evenementsTries.length === 0 ? (
           <EmptyState
             titre={t('histo.events.empty.titre')}
             detail={t('histo.events.empty.detail', { date: jour(jalons[jalons.length - 1]!.date) })}

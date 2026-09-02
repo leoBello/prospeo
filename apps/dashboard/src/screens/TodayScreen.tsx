@@ -93,6 +93,10 @@ export function TodayScreen({
    */
   const eventsState = useDeploymentEvents(client, panelOpen ? selectedId : null);
   const events = eventsState.status === 'ready' ? eventsState.events : undefined;
+  // Distinct de `events` absent : un `status: 'error'` est une lecture
+  // ratée, pas un prospect sans historique — voir le docstring de
+  // `HistoriqueTab` sur `erreurEvenements` (tâche 11, relevé de revue).
+  const erreurEvenements = eventsState.status === 'error' ? eventsState.message : null;
 
   useEffect(() => {
     if (selectedId === null) return;
@@ -152,6 +156,8 @@ export function TodayScreen({
             onClose={close}
             actions={actions}
             events={events}
+            erreurEvenements={erreurEvenements}
+            onReessayerEvenements={eventsState.reload}
           />
         ) : null
       }
