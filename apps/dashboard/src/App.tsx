@@ -5,9 +5,11 @@ import { SCORING_RULESET } from '@prospeo/core';
 import { AuthProvider, useAuth } from './auth/AuthProvider.js';
 import { createDashboardClient } from './data/supabase.js';
 import { useProspects } from './data/useProspects.js';
+import { useDeployments } from './data/useDeployments.js';
 import { makePanelActions } from './ui/actions.js';
 import { LoginScreen } from './screens/LoginScreen.js';
 import { TodayScreen } from './screens/TodayScreen.js';
+import { DeploiementsScreen } from './screens/DeploiementsScreen.js';
 import { AppShell } from './ui/AppShell.js';
 import { Nav, useVue } from './ui/Nav.js';
 import { PreferencesProvider, useT } from './ui/preferences.js';
@@ -43,6 +45,9 @@ function Authenticated({ client }: { client: SupabaseClient<Database> }) {
   // donner — deux choses qu'un simple `useState` ne permettrait pas.
   const { vue, aller } = useVue();
   const nav = <Nav vue={vue} aller={aller} />;
+  // Appelé sans condition (règle des hooks) ; `enabled` évite la lecture
+  // Supabase tant que l'écran « Déploiements » n'est pas affiché.
+  const deploymentsState = useDeployments(client, vue === 'deploiements');
 
   // Mémorisées : recréées à chaque rendu, elles changeraient d'identité en
   // permanence et feraient rerendre la fiche entière à chaque frappe dans le
@@ -71,11 +76,11 @@ function Authenticated({ client }: { client: SupabaseClient<Database> }) {
     );
   }
 
-  // Les écrans « Déploiements » et « Gabarit » n'existent pas encore : un
-  // repère minimal, sous la coquille commune, suffit à rendre la navigation
-  // testable dès maintenant. Les lots suivants remplacent ce repère par
-  // l'écran réel, sans toucher à la navigation elle-même.
-  if (vue === 'deploiements' || vue === 'gabarit') {
+  // L'écran « Gabarit » (chantier suivant) n'existe pas encore : un repère
+  // minimal, sous la coquille commune, suffit à rendre la navigation
+  // testable dès maintenant. « Déploiements », lui, est branché ci-dessous
+  // sur l'écran réel (D9).
+  if (vue === 'gabarit') {
     return (
       <AppShell
         nav={nav}
@@ -86,6 +91,50 @@ function Authenticated({ client }: { client: SupabaseClient<Database> }) {
           </p>
         }
         panel={null}
+      />
+    );
+  }
+
+  if (vue === 'deploiements') {
+    if (deploymentsState.status === 'loading') {
+      return (
+        <AppShell
+          nav={nav}
+          onSignOut={() => void signOut()}
+          panel={null}
+          list={
+            <p className={styles.status} aria-live="polite">
+              {t('app.loading')}
+            </p>
+          }
+        />
+      );
+    }
+
+    if (deploymentsState.status === 'error') {
+      return (
+        <AppShell
+          nav={nav}
+          onSignOut={() => void signOut()}
+          panel={null}
+          list={
+            <div className={styles.status} role="alert">
+              <h1>{t('app.error.title')}</h1>
+              <p>{deploymentsState.message}</p>
+              <button type="button" onClick={deploymentsState.reload}>
+                {t('app.error.retry')}
+              </button>
+            </div>
+          }
+        />
+      );
+    }
+
+    return (
+      <DeploiementsScreen
+        deployments={deploymentsState.deployments}
+        onSignOut={() => void signOut()}
+        nav={nav}
       />
     );
   }

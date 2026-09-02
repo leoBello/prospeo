@@ -240,4 +240,75 @@ export const fr = {
     'Chaque étape de déploiement sera datée ici : dépôt créé, projet ouvert, build, mise en ligne.',
   'histo.detail.blocked':
     'Aucune table d’événements n’existe : `prospect_site` ne porte qu’un état courant, pas un historique. Rien ne peut donc être daté étape par étape avant la migration §4.1.',
+
+  // Chantier n°5, D9 — l'écran de suivi des déploiements. Vingt-deux sites
+  // publiés au nom de vraies entreprises : le seul moyen de voir ce que le
+  // pipeline leur a fait, jusqu'ici, était un terminal.
+  'deploiements.title': 'Déploiements',
+  'deploiements.subtitle':
+    'Un site par prospect, généré depuis le gabarit puis construit par Vercel. Chaque ligne dit où en est le sien, et pourquoi il s’y est arrêté.',
+
+  'deploiements.kpi.enLigne': 'en ligne',
+  'deploiements.kpi.enCours': 'en cours',
+  'deploiements.kpi.enEchec': 'en échec',
+  'deploiements.kpi.peremption': 'péremption sous {days} j',
+  'deploiements.kpi.peremption.tipTitre': 'Retrait à 90 jours',
+  'deploiements.kpi.peremption.hint':
+    '{count} sites atteindront leurs 90 jours de publication sous {days} j et seront retirés automatiquement.',
+  'deploiements.kpi.peremption.hint_one':
+    'Un site atteindra ses 90 jours de publication sous {days} j et sera retiré automatiquement.',
+
+  'deploiements.filtre.tous': 'Tous',
+  'deploiements.filtre.enCours': 'En cours',
+  'deploiements.filtre.echec': 'En échec',
+  'deploiements.filtre.jamais': 'Jamais déployé',
+
+  'deploiements.colonnes.prospect': 'Prospect',
+  'deploiements.colonnes.gabarit': 'Gabarit',
+  'deploiements.colonnes.piste': 'Rédaction · Dépôt · Projet · Build · Ligne',
+  'deploiements.colonnes.etat': 'État',
+  'deploiements.colonnes.duree': 'Durée',
+  'deploiements.colonnes.adresse': 'Adresse',
+
+  // Cinq des six étapes réelles du pipeline (voir `ORDRE_ETAPES`,
+  // domain/deployment.ts) ; `retrait` n'a pas de segment sur la piste — voir
+  // le docstring d'`EtapesPiste` — mais garde son libellé, utile ailleurs
+  // (date de retrait, état « Dépublié »).
+  'deploiements.etape.redaction': 'Rédaction',
+  'deploiements.etape.depot': 'Dépôt',
+  'deploiements.etape.projet': 'Projet Vercel',
+  'deploiements.etape.build': 'Build',
+  'deploiements.etape.en_ligne': 'Mise en ligne',
+  'deploiements.etape.retrait': 'Retrait',
+  'deploiements.etape.inconnue': 'étape inconnue',
+
+  'deploiements.etat.jamais': 'Jamais déployé',
+  'deploiements.etat.enCours': '{etape} en cours',
+  'deploiements.etat.echec': '{etape} en échec',
+  'deploiements.etat.enLigne': 'En ligne',
+  'deploiements.etat.retire': 'Dépublié',
+
+  'deploiements.piste.aria': 'Piste de déploiement : {etat}',
+
+  // Le compteur de péremption prime sur le badge « En ligne » dès qu'il
+  // approche (§D5, chantier n°4) : un site publié au nom d'un tiers est
+  // retiré automatiquement à 90 jours, et ce n'est pas une statistique.
+  'deploiements.peremption.badge': 'Péremption dans {days} j',
+  'deploiements.peremption.badge_one': 'Péremption demain',
+  'deploiements.peremption.today': 'Péremption aujourd’hui',
+  'deploiements.peremption.tipDetail':
+    'Publié le {date}. Un site publié au nom d’un tiers est retiré automatiquement 90 jours après sa publication.',
+
+  'deploiements.row.score': 'score {score}',
+  'deploiements.row.duree': '{min} m {sec}',
+  'deploiements.row.adresseAbsente': 'aucune adresse pour le moment',
+  'deploiements.row.horsLigne': 'hors ligne',
+  'deploiements.row.echecSansDetail': 'Le déploiement a échoué, sans détail enregistré.',
+  'deploiements.row.gabaritAbsent': 'aucun gabarit actif',
+
+  'deploiements.empty.titre': 'Aucun déploiement',
+  'deploiements.empty.detail':
+    'Aucun prospect n’a encore de site généré. Cet écran se remplira au fil des rédactions.',
+  'deploiements.empty.filtre.titre': 'Aucun déploiement dans ce filtre',
+  'deploiements.empty.filtre.detail': 'Choisissez « Tous » pour revoir l’ensemble des déploiements.',
 } as const;

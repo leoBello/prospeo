@@ -225,4 +225,65 @@ export const en: Record<keyof typeof fr, string> = {
     'Every deployment step will be dated here: repository created, project opened, build, go-live.',
   'histo.detail.blocked':
     'No events table exists: `prospect_site` holds a current state, not a history. Nothing can be dated step by step before the §4.1 migration.',
+
+  'deploiements.title': 'Deployments',
+  'deploiements.subtitle':
+    'One site per prospect, generated from the template then built by Vercel. Each row says where it stands, and why it stopped there.',
+
+  'deploiements.kpi.enLigne': 'online',
+  'deploiements.kpi.enCours': 'in progress',
+  'deploiements.kpi.enEchec': 'failed',
+  'deploiements.kpi.peremption': 'expiring within {days} d',
+  'deploiements.kpi.peremption.tipTitre': 'Takedown at 90 days',
+  'deploiements.kpi.peremption.hint':
+    '{count} sites will reach 90 days of publication within {days} d and will be taken down automatically.',
+  'deploiements.kpi.peremption.hint_one':
+    'One site will reach 90 days of publication within {days} d and will be taken down automatically.',
+
+  'deploiements.filtre.tous': 'All',
+  'deploiements.filtre.enCours': 'In progress',
+  'deploiements.filtre.echec': 'Failed',
+  'deploiements.filtre.jamais': 'Never deployed',
+
+  'deploiements.colonnes.prospect': 'Prospect',
+  'deploiements.colonnes.gabarit': 'Template',
+  'deploiements.colonnes.piste': 'Draft · Repo · Project · Build · Live',
+  'deploiements.colonnes.etat': 'Status',
+  'deploiements.colonnes.duree': 'Duration',
+  'deploiements.colonnes.adresse': 'Address',
+
+  'deploiements.etape.redaction': 'Draft',
+  'deploiements.etape.depot': 'Repository',
+  'deploiements.etape.projet': 'Vercel project',
+  'deploiements.etape.build': 'Build',
+  'deploiements.etape.en_ligne': 'Go-live',
+  'deploiements.etape.retrait': 'Takedown',
+  'deploiements.etape.inconnue': 'unknown step',
+
+  'deploiements.etat.jamais': 'Never deployed',
+  'deploiements.etat.enCours': '{etape} in progress',
+  'deploiements.etat.echec': '{etape} failed',
+  'deploiements.etat.enLigne': 'Online',
+  'deploiements.etat.retire': 'Unpublished',
+
+  'deploiements.piste.aria': 'Deployment track: {etat}',
+
+  'deploiements.peremption.badge': 'Expires in {days} d',
+  'deploiements.peremption.badge_one': 'Expires tomorrow',
+  'deploiements.peremption.today': 'Expires today',
+  'deploiements.peremption.tipDetail':
+    "Published on {date}. A site published under a third party's name is automatically taken down 90 days after publication.",
+
+  'deploiements.row.score': 'score {score}',
+  'deploiements.row.duree': '{min} m {sec}',
+  'deploiements.row.adresseAbsente': 'no address yet',
+  'deploiements.row.horsLigne': 'offline',
+  'deploiements.row.echecSansDetail': 'The deployment failed, with no detail recorded.',
+  'deploiements.row.gabaritAbsent': 'no active template',
+
+  'deploiements.empty.titre': 'No deployments',
+  'deploiements.empty.detail':
+    'No prospect has a generated site yet. This screen will fill in as drafts are written.',
+  'deploiements.empty.filtre.titre': 'No deployments in this filter',
+  'deploiements.empty.filtre.detail': 'Choose "All" to see every deployment again.',
 };
