@@ -74,14 +74,6 @@ export const fr = {
 
   'today.reason.separator': ' · ',
 
-  // Les deux seuls chiffres non nuls et pleinement vrais de l'écran au jour
-  // de la livraison (voir `domain/today.ts`, `computeKpis`) : retirés avec
-  // `KpiBand` par la première version de la tâche 8, restaurés dans la bande
-  // de progression par sa refonte — `contacted`/`interested` ne reviennent
-  // pas, faute d'écran qui les affiche encore.
-  'today.kpi.inBase': 'En base',
-  'today.kpi.qualified': 'Qualifiés',
-
   // Lot 3, tâche 8 — la bande de progression qui remplace `KpiBand` sous le
   // titre « Aujourd'hui », et le compteur de série de la barre du haut. Voir
   // `ui/BandeProgression.tsx` pour la doctrine des quatre absences distinctes

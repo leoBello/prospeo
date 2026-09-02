@@ -4,15 +4,11 @@ import userEvent from '@testing-library/user-event';
 import { ATTENTE_SURVOL, renderWithPreferences } from '../test-utils.js';
 import type { JeuState } from '../data/useJeu.js';
 import type { EtatBadge, Jeu } from '../domain/jeu.js';
-import type { Kpis } from '../domain/today.js';
 import { BandeProgression, SerieEnTete } from './BandeProgression.js';
 import styles from './BandeProgression.module.css';
 
 /** Circonférence du rail de l'anneau — même calcul que `Anneau` (BandeProgression.tsx), recopié pour ne pas dépendre d'un export interne. */
 const CIRCONFERENCE_ANNEAU = 2 * Math.PI * 22;
-
-/** Les deux compteurs réels — valeurs de la base au 1er septembre 2026 (voir `domain/today.ts`). */
-const KPIS: Kpis = { inBase: 139, qualified: 25 };
 
 /**
  * `Jeu` prêt par défaut, chaque test ne redéfinissant que ce qui l'intéresse
@@ -38,7 +34,7 @@ function jeuPret(overrides: Partial<Jeu> = {}): JeuState {
 describe('BandeProgression — anneau d objectif', () => {
   it('rend le realise et l objectif dans l anneau, quand la mediane est connue', () => {
     renderWithPreferences(
-      <BandeProgression jeu={jeuPret({ objectifDuJour: { connue: true, valeur: 15 }, realiseAujourdHui: 12 })} kpis={KPIS} />,
+      <BandeProgression jeu={jeuPret({ objectifDuJour: { connue: true, valeur: 15 }, realiseAujourdHui: 12 })} />,
     );
     expect(screen.getByText('12')).toBeDefined();
     expect(screen.getByText('/ 15')).toBeDefined();
@@ -53,7 +49,7 @@ describe('BandeProgression — anneau d objectif', () => {
    * les deux. Le nom de la classe, lui, prouve laquelle des deux est active.
    */
   it('ne montre plus la legende « Objectif du jour » en clair quand la mediane est connue — seule l infobulle la porte desormais', () => {
-    const { container } = renderWithPreferences(<BandeProgression jeu={jeuPret()} kpis={KPIS} />);
+    const { container } = renderWithPreferences(<BandeProgression jeu={jeuPret()} />);
     expect(container.getElementsByClassName(styles.objectifLegende!)).toHaveLength(0);
     // L anneau reste NOMME pour un lecteur d ecran malgre tout : la meme
     // phrase migre vers l utilitaire sr-only plutot que de disparaitre.
@@ -63,7 +59,7 @@ describe('BandeProgression — anneau d objectif', () => {
 
   it('garde en revanche la legende visible « Historique encore insuffisant » — c est precisement ce que ce lot doit dire', () => {
     const { container } = renderWithPreferences(
-      <BandeProgression jeu={jeuPret({ objectifDuJour: { connue: false } })} kpis={KPIS} />,
+      <BandeProgression jeu={jeuPret({ objectifDuJour: { connue: false } })} />,
     );
     const legende = container.getElementsByClassName(styles.objectifLegende!);
     expect(legende).toHaveLength(1);
@@ -80,7 +76,7 @@ describe('BandeProgression — anneau d objectif', () => {
    */
   it('remplit l anneau quand l objectif du jour vaut zero et qu une relance a deja ete tenue', () => {
     renderWithPreferences(
-      <BandeProgression jeu={jeuPret({ objectifDuJour: { connue: true, valeur: 0 }, realiseAujourdHui: 1 })} kpis={KPIS} />,
+      <BandeProgression jeu={jeuPret({ objectifDuJour: { connue: true, valeur: 0 }, realiseAujourdHui: 1 })} />,
     );
     const progres = document.querySelector('[data-anneau-partie="progres"]');
     expect(progres).not.toBeNull();
@@ -91,7 +87,7 @@ describe('BandeProgression — anneau d objectif', () => {
     // Un objectif de zero est rempli des sa mesure, meme par un realise nul —
     // c est un objectif vacuement atteint, pas une absence.
     renderWithPreferences(
-      <BandeProgression jeu={jeuPret({ objectifDuJour: { connue: true, valeur: 0 }, realiseAujourdHui: 0 })} kpis={KPIS} />,
+      <BandeProgression jeu={jeuPret({ objectifDuJour: { connue: true, valeur: 0 }, realiseAujourdHui: 0 })} />,
     );
     const progres = document.querySelector('[data-anneau-partie="progres"]');
     expect(Number(progres!.getAttribute('stroke-dashoffset'))).toBeCloseTo(0, 5);
@@ -99,7 +95,7 @@ describe('BandeProgression — anneau d objectif', () => {
 
   it('calcule le decalage de l arc proportionnellement au ratio realise / objectif quand l objectif n est pas nul', () => {
     renderWithPreferences(
-      <BandeProgression jeu={jeuPret({ objectifDuJour: { connue: true, valeur: 15 }, realiseAujourdHui: 12 })} kpis={KPIS} />,
+      <BandeProgression jeu={jeuPret({ objectifDuJour: { connue: true, valeur: 15 }, realiseAujourdHui: 12 })} />,
     );
     const progres = document.querySelector('[data-anneau-partie="progres"]');
     // 12/15 = 80 % : il reste 20 % de rail visible, soit 20 % de la circonference.
@@ -113,7 +109,7 @@ describe('BandeProgression — anneau d objectif', () => {
    */
   it('rend l anneau au rail seul et un denominateur textuel quand l historique est insuffisant', () => {
     renderWithPreferences(
-      <BandeProgression jeu={jeuPret({ objectifDuJour: { connue: false }, realiseAujourdHui: 0 })} kpis={KPIS} />,
+      <BandeProgression jeu={jeuPret({ objectifDuJour: { connue: false }, realiseAujourdHui: 0 })} />,
     );
     expect(screen.getByText('Historique encore insuffisant')).toBeDefined();
     expect(screen.getByText('pas encore')).toBeDefined();
@@ -128,14 +124,14 @@ describe('BandeProgression — anneau d objectif', () => {
   });
 
   it('rend aussi l anneau quand la mediane est connue, meme SVG que le cas insuffisant', () => {
-    renderWithPreferences(<BandeProgression jeu={jeuPret()} kpis={KPIS} />);
+    renderWithPreferences(<BandeProgression jeu={jeuPret()} />);
     expect(document.querySelector('svg[data-anneau="objectif"]')).not.toBeNull();
   });
 
   it('revele au survol l explication complete de l historique insuffisant, aussi explicite qu avant', async () => {
     const user = userEvent.setup();
     renderWithPreferences(
-      <BandeProgression jeu={jeuPret({ objectifDuJour: { connue: false } })} kpis={KPIS} />,
+      <BandeProgression jeu={jeuPret({ objectifDuJour: { connue: false } })} />,
     );
     const declencheur = screen.getByText('Historique encore insuffisant').closest('[tabindex]');
     expect(declencheur).not.toBeNull();
@@ -168,7 +164,6 @@ describe('BandeProgression — anneau d objectif', () => {
             { id: 'serie_sept_jours', etat: 'verrouille' },
           ],
         })}
-        kpis={KPIS}
       />,
     );
     expect(screen.getByText('Historique encore insuffisant')).toBeDefined();
@@ -184,7 +179,7 @@ describe('BandeProgression — palier', () => {
    */
   it('nomme le palier courant et le suivant, comme la maquette, pour le premier palier', () => {
     renderWithPreferences(
-      <BandeProgression jeu={jeuPret({ palier: { points: 340, seuil: 500, numero: 1, progression: 340, complet: true } })} kpis={KPIS} />,
+      <BandeProgression jeu={jeuPret({ palier: { points: 340, seuil: 500, numero: 1, progression: 340, complet: true } })} />,
     );
     expect(screen.getByText('Palier Prospecteur')).toBeDefined();
     expect(screen.getByText('Closer')).toBeDefined();
@@ -193,7 +188,7 @@ describe('BandeProgression — palier', () => {
 
   it('nomme le palier courant meme quand le suivant n a pas de nom dans la maquette', () => {
     renderWithPreferences(
-      <BandeProgression jeu={jeuPret({ palier: { points: 600, seuil: 500, numero: 2, progression: 100, complet: true } })} kpis={KPIS} />,
+      <BandeProgression jeu={jeuPret({ palier: { points: 600, seuil: 500, numero: 2, progression: 100, complet: true } })} />,
     );
     expect(screen.getByText('Palier Closer')).toBeDefined();
     // Repli honnete : la maquette ne nomme pas de troisieme palier.
@@ -202,7 +197,7 @@ describe('BandeProgression — palier', () => {
 
   it('retombe sur « Palier N » pour le courant ET le suivant, au dela des noms de la maquette', () => {
     renderWithPreferences(
-      <BandeProgression jeu={jeuPret({ palier: { points: 1200, seuil: 500, numero: 3, progression: 200, complet: true } })} kpis={KPIS} />,
+      <BandeProgression jeu={jeuPret({ palier: { points: 1200, seuil: 500, numero: 3, progression: 200, complet: true } })} />,
     );
     expect(screen.getByText('Palier 3')).toBeDefined();
     expect(screen.getByText('Palier 4')).toBeDefined();
@@ -212,7 +207,7 @@ describe('BandeProgression — palier', () => {
 
   it('dit que le total est incomplet quand une source ne peut pas encore etre comptee', () => {
     renderWithPreferences(
-      <BandeProgression jeu={jeuPret({ palier: { points: 320, seuil: 500, numero: 1, progression: 320, complet: false } })} kpis={KPIS} />,
+      <BandeProgression jeu={jeuPret({ palier: { points: 320, seuil: 500, numero: 1, progression: 320, complet: false } })} />,
     );
     expect(
       screen.getByText('Total minimal : les relances tenues ne sont pas encore comptées dans ce score.'),
@@ -221,7 +216,7 @@ describe('BandeProgression — palier', () => {
 
   it('ne montre aucune reserve quand le total est complet', () => {
     renderWithPreferences(
-      <BandeProgression jeu={jeuPret({ palier: { points: 340, seuil: 500, numero: 1, progression: 340, complet: true } })} kpis={KPIS} />,
+      <BandeProgression jeu={jeuPret({ palier: { points: 340, seuil: 500, numero: 1, progression: 340, complet: true } })} />,
     );
     expect(
       screen.queryByText('Total minimal : les relances tenues ne sont pas encore comptées dans ce score.'),
@@ -238,7 +233,7 @@ describe('BandeProgression — jalons, en pastilles', () => {
   ];
 
   it('nomme chaque jalon ET son etat dans l aria-label de sa pastille — plus aucun mot visible', () => {
-    renderWithPreferences(<BandeProgression jeu={jeuPret({ badges })} kpis={KPIS} />);
+    renderWithPreferences(<BandeProgression jeu={jeuPret({ badges })} />);
     expect(screen.getByRole('img', { name: 'Obtenu — Première relance tenue' })).toBeDefined();
     expect(screen.getByRole('img', { name: 'Verrouillé — Premier site en ligne' })).toBeDefined();
     expect(screen.getByRole('img', { name: 'Non mesurable — Premier rendez-vous' })).toBeDefined();
@@ -251,7 +246,7 @@ describe('BandeProgression — jalons, en pastilles', () => {
   });
 
   it('donne aux trois etats trois formes distinctes (ton, trait, remplissage), pas deux', () => {
-    renderWithPreferences(<BandeProgression jeu={jeuPret({ badges })} kpis={KPIS} />);
+    renderWithPreferences(<BandeProgression jeu={jeuPret({ badges })} />);
 
     const obtenu = screen.getByRole('img', { name: 'Obtenu — Première relance tenue' });
     const verrouille = screen.getByRole('img', { name: 'Verrouillé — Premier site en ligne' });
@@ -278,7 +273,7 @@ describe('BandeProgression — jalons, en pastilles', () => {
 
   it('explique au survol pourquoi un badge non mesurable ne peut pas se debloquer aujourd hui', async () => {
     const user = userEvent.setup();
-    renderWithPreferences(<BandeProgression jeu={jeuPret({ badges })} kpis={KPIS} />);
+    renderWithPreferences(<BandeProgression jeu={jeuPret({ badges })} />);
     const pastille = screen.getByRole('img', { name: 'Non mesurable — Premier rendez-vous' });
     await user.hover(pastille);
     expect(
@@ -291,31 +286,9 @@ describe('BandeProgression — jalons, en pastilles', () => {
   });
 });
 
-describe('BandeProgression — les deux compteurs reels (en base, qualifies)', () => {
-  it('rend leurs valeurs reelles, quel que soit l etat du jeu', () => {
-    renderWithPreferences(<BandeProgression jeu={jeuPret()} kpis={{ inBase: 139, qualified: 25 }} />);
-    expect(screen.getByText('139')).toBeDefined();
-    expect(screen.getByText('25')).toBeDefined();
-    expect(screen.getByText('En base')).toBeDefined();
-    expect(screen.getByText('Qualifiés')).toBeDefined();
-  });
-
-  it('restent visibles pendant le chargement du jeu, une donnee independante de cette lecture', () => {
-    renderWithPreferences(<BandeProgression jeu={{ status: 'loading' }} kpis={{ inBase: 139, qualified: 25 }} />);
-    expect(screen.getByText('139')).toBeDefined();
-    expect(screen.getByText('25')).toBeDefined();
-  });
-
-  it('restent visibles sur un echec de lecture du jeu', () => {
-    renderWithPreferences(<BandeProgression jeu={{ status: 'error', message: 'x' }} kpis={{ inBase: 139, qualified: 25 }} />);
-    expect(screen.getByText('139')).toBeDefined();
-    expect(screen.getByText('25')).toBeDefined();
-  });
-});
-
 describe('BandeProgression — chargement et erreur, distincts l un de l autre et d un jeu vide', () => {
   it('dit qu elle charge, sans rien affirmer sur l objectif, le palier ou les jalons', () => {
-    renderWithPreferences(<BandeProgression jeu={{ status: 'loading' }} kpis={KPIS} />);
+    renderWithPreferences(<BandeProgression jeu={{ status: 'loading' }} />);
     expect(screen.getByText('Chargement du tableau de jeu…')).toBeDefined();
     expect(screen.queryByText('Objectif du jour')).toBeNull();
     expect(screen.queryByText(/Palier/)).toBeNull();
@@ -329,7 +302,7 @@ describe('BandeProgression — chargement et erreur, distincts l un de l autre e
    * Le nom du test le dit explicitement pour ne rien laisser croire de plus.
    */
   it('expose un role de statut accessible pendant le chargement (pas une preuve de hauteur — voir le rapport de tache)', () => {
-    renderWithPreferences(<BandeProgression jeu={{ status: 'loading' }} kpis={KPIS} />);
+    renderWithPreferences(<BandeProgression jeu={{ status: 'loading' }} />);
     expect(screen.getByRole('status')).toBeDefined();
   });
 
@@ -344,21 +317,21 @@ describe('BandeProgression — chargement et erreur, distincts l un de l autre e
    * reelle, que `jsdom` ne calcule pas.
    */
   it('le squelette du palier imite les quatre rangees reelles (dont la note d incompletude), pas seulement trois', () => {
-    renderWithPreferences(<BandeProgression jeu={{ status: 'loading' }} kpis={KPIS} />);
+    renderWithPreferences(<BandeProgression jeu={{ status: 'loading' }} />);
     const blocPalier = document.querySelector('[data-squelette-bloc="palier"]');
     expect(blocPalier).not.toBeNull();
     expect(blocPalier!.children).toHaveLength(4);
   });
 
   it('nomme l echec de lecture, distinct du chargement et d un jeu vide', () => {
-    renderWithPreferences(<BandeProgression jeu={{ status: 'error', message: 'RLS a refusé' }} kpis={KPIS} />);
+    renderWithPreferences(<BandeProgression jeu={{ status: 'error', message: 'RLS a refusé' }} />);
     expect(screen.getByText('Le tableau de jeu n’a pas pu se charger : RLS a refusé')).toBeDefined();
     expect(screen.queryByText('Chargement du tableau de jeu…')).toBeNull();
     expect(screen.queryByText('Historique encore insuffisant')).toBeNull();
   });
 
   it('un jeu pret mais sans historique reste distinct du chargement et de l erreur', () => {
-    renderWithPreferences(<BandeProgression jeu={jeuPret({ objectifDuJour: { connue: false } })} kpis={KPIS} />);
+    renderWithPreferences(<BandeProgression jeu={jeuPret({ objectifDuJour: { connue: false } })} />);
     expect(screen.getByText('Historique encore insuffisant')).toBeDefined();
     expect(screen.queryByText('Chargement du tableau de jeu…')).toBeNull();
     expect(screen.queryByText(/n’a pas pu se charger/)).toBeNull();

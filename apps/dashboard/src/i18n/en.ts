@@ -62,9 +62,6 @@ export const en: Record<keyof typeof fr, string> = {
 
   'today.reason.separator': ' · ',
 
-  'today.kpi.inBase': 'In database',
-  'today.kpi.qualified': 'Scored',
-
   'jeu.objectif.titre': "Today's goal",
   'jeu.objectif.valeur': '{count} follow-ups honored',
   'jeu.objectif.valeur_one': '{count} follow-up honored',

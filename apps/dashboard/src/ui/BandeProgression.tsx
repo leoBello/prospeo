@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import type { JeuState } from '../data/useJeu.js';
 import { PARAMETRES_PALIER } from '../domain/jeu.js';
 import type { BadgeId, EtatBadge, EtatBadgeValeur, Jeu } from '../domain/jeu.js';
-import type { Kpis } from '../domain/today.js';
 import type { TranslationKey } from '../i18n/translate.js';
 import type { BadgeTon } from './kit/Badge.js';
 import { Badge } from './kit/Badge.js';
@@ -34,11 +33,16 @@ import styles from './BandeProgression.module.css';
  *   dont l'`aria-label` nomme le jalon et son état et dont l'infobulle porte
  *   le sens.
  *
- * Elle restaure aussi « en base » et « qualifiés » (`Compteurs`,
- * `domain/today.ts`) : les deux seuls chiffres non nuls et pleinement vrais
- * de l'écran au jour de la livraison, retirés avec `KpiBand` puis manquants
- * à la première version de cette tâche — voir le rapport de la tâche 8 pour
- * le détail de ce choix, une extension que la maquette ne prévoit pas.
+ * **Alignement sur la maquette — largeur réelle (tâche 8, quatrième passage).**
+ * Le troisième passage avait restauré « en base » et « qualifiés »
+ * (`Compteurs`, `domain/today.ts`), une extension que la maquette ne prévoit
+ * pas. Mesurée dans sa vraie colonne (`ProspectPanel` 720 px + rail 56 px,
+ * pas la fenêtre), la bande n'a que ~664 px à 1440 px d'écran : quatre
+ * cellules n'y tiennent pas, trois oui — le nombre même que dessine la
+ * maquette. `Compteurs` est donc retiré : les deux chiffres qu'il portait
+ * (139 en base, 25 scorés au 1er septembre 2026) quittent l'écran, une
+ * décision du propriétaire consignée dans le rapport de la tâche 8, pas un
+ * oubli.
  *
  * **La doctrine des absences distinctes gouverne tout ce fichier.** Quatre
  * absences de nature différente s'y croisent, et aucune ne se rend par un
@@ -366,33 +370,6 @@ function PalierBande({ palier }: { palier: Jeu['palier'] }) {
 }
 
 /**
- * « En base » et « qualifiés » (`domain/today.ts`, `computeKpis`) : les deux
- * seuls chiffres non nuls et pleinement vrais de l'écran au jour de la
- * livraison — retirés avec `KpiBand` par la première version de cette
- * tâche, restaurés ici (voir le rapport de la tâche 8). Rendus quel que soit
- * `jeu.status` : ils ne dépendent pas de la lecture réseau du jeu, et rien
- * n'oblige à les taire pendant qu'elle charge ou échoue.
- *
- * La maquette ne prévoit pas cette cellule : c'est une extension assumée de
- * la bande, pas une case de son dessin d'origine.
- */
-function Compteurs({ kpis }: { kpis: Kpis }) {
-  const t = useT();
-  return (
-    <div className={styles.compteurs}>
-      <span className={styles.compteur}>
-        <b className={styles.compteurValeur}>{kpis.inBase}</b>
-        <span className={styles.compteurLabel}>{t('today.kpi.inBase')}</span>
-      </span>
-      <span className={styles.compteur}>
-        <b className={styles.compteurValeur}>{kpis.qualified}</b>
-        <span className={styles.compteurLabel}>{t('today.kpi.qualified')}</span>
-      </span>
-    </div>
-  );
-}
-
-/**
  * Le squelette de chargement — même carcasse que la bande chargée (relevé du
  * propriétaire, tâche 8, second passage) : la livraison initiale réduisait
  * `loading` à un unique `<p>`, qui s'effondrait à la hauteur d'une ligne
@@ -460,12 +437,11 @@ function Erreur({ message }: { message: string }) {
   );
 }
 
-export function BandeProgression({ jeu, kpis }: { jeu: JeuState; kpis: Kpis }): ReactNode {
+export function BandeProgression({ jeu }: { jeu: JeuState }): ReactNode {
   if (jeu.status === 'loading') {
     return (
       <div className={styles.bande}>
         <Squelette />
-        <Compteurs kpis={kpis} />
       </div>
     );
   }
@@ -474,7 +450,6 @@ export function BandeProgression({ jeu, kpis }: { jeu: JeuState; kpis: Kpis }): 
     return (
       <div className={styles.bande}>
         <Erreur message={jeu.message} />
-        <Compteurs kpis={kpis} />
       </div>
     );
   }
@@ -490,7 +465,6 @@ export function BandeProgression({ jeu, kpis }: { jeu: JeuState; kpis: Kpis }): 
           ))}
         </div>
       </div>
-      <Compteurs kpis={kpis} />
     </div>
   );
 }

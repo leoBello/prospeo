@@ -3,7 +3,6 @@ import type { ProspectView } from './prospect.js';
 import {
   MAX_ROWS_PER_LIST,
   buildToday,
-  computeKpis,
   followUpReason,
   highlightLines,
   matchesQuery,
@@ -109,25 +108,6 @@ describe('highlightLines', () => {
   });
 });
 
-describe('computeKpis', () => {
-  it('compte en base tous les prospects, y compris ceux qui n ont aucun satellite', () => {
-    const kpis = computeKpis([vue({ id: 'a' }), vue({ id: 'b', score: scoreDe(50) })]);
-    expect(kpis.inBase).toBe(2);
-  });
-
-  it('compte comme qualifie tout prospect portant un score, quel qu en soit le total', () => {
-    // Y compris un score de zero : c'est un jugement rendu, pas une absence de
-    // jugement. C'est la distinction meme que cet indicateur sert a mesurer.
-    const kpis = computeKpis([
-      vue({ id: 'nul', score: scoreDe(0) }),
-      vue({ id: 'haut', score: scoreDe(90) }),
-      vue({ id: 'sans' }),
-    ]);
-    expect(kpis.qualified).toBe(2);
-    expect(kpis.inBase).toBe(3);
-  });
-});
-
 describe('buildToday', () => {
   const enAttente = [vue({ id: 'x1' }), vue({ id: 'x2' })];
   const scores = [
@@ -144,8 +124,8 @@ describe('buildToday', () => {
     // 114 prospects sur 139 sont dans ce cas. Les faire tomber a zero les
     // placerait en bas d'une liste ou ils n'ont rien a faire ; leur donner une
     // file a eux couterait douze arrets aux fleches pour des lignes sur
-    // lesquelles aucune action n'est possible. Leur nombre est porte par
-    // l'indicateur « qualifies », pas par des lignes.
+    // lesquelles aucune action n'est possible. Leur nombre n'est plus compte
+    // nulle part sur cet ecran (voir le rapport de la tache 8).
     const today = buildToday([...enAttente, ...scores], AUJOURDHUI);
     const affiches = [...today.followUps.items, ...today.newHighScore.items].map(
       (r) => r.prospect.id,

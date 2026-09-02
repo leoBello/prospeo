@@ -222,26 +222,16 @@ function rendre(prospects: ProspectView[]) {
 describe('TodayScreen', () => {
   it('n inscrit pas un prospect sans score dans une file de travail', () => {
     // Sur la base reelle, 114 prospects sur 139 n'ont aucun score. Ils n'ont
-    // pas de ligne — aucune action n'est possible dessus. L'ecart entre eux
-    // et les 139 prospects en base est desormais porte par « Qualifies » /
-    // « En base », restaures dans `BandeProgression` par la refonte de la
-    // tache 8 (voir son rapport) — le fait qu'un prospect non score reste
-    // invisible dans les FILES DE TRAVAIL, lui, continue d'etre verifie ici,
-    // et l'est aussi au niveau du domaine (`today.test.ts`, « n inscrit un
-    // prospect sans score dans aucune file de travail »).
+    // pas de ligne — aucune action n'est possible dessus. L'ancien couple
+    // « Qualifies » / « En base » qui portait cet ecart a ete retire de la
+    // bande de progression (voir le rapport de la tache 8, alignement sur la
+    // largeur reelle) : plus rien sur cet ecran ne compte ces prospects, mais
+    // le fait qu'un prospect non score reste invisible dans les FILES DE
+    // TRAVAIL, lui, continue d'etre verifie ici, et l'est aussi au niveau du
+    // domaine (`today.test.ts`, « n inscrit un prospect sans score dans
+    // aucune file de travail »).
     rendre([vue('a'), vue('b', { score: score(30) })]);
     expect(screen.queryByText('ENTREPRISE a')).toBeNull();
-  });
-
-  it('affiche les deux compteurs reels (en base, qualifies) dans la bande de progression', () => {
-    // La bande de progression (tache 8, refonte) restaure ces deux chiffres,
-    // derives de TOUS les prospects de l'ecran, pas de ce que la recherche
-    // locale laisse voir — voir `domain/today.ts`, `computeKpis`.
-    rendre([vue('a'), vue('b', { score: score(30) }), vue('c', { score: score(50) })]);
-    expect(screen.getByText('3')).toBeDefined();
-    expect(screen.getByText('2')).toBeDefined();
-    expect(screen.getByText('En base')).toBeDefined();
-    expect(screen.getByText('Qualifiés')).toBeDefined();
   });
 
   it('dit pourquoi la file de relances est vide, plutot que de rester muette', () => {

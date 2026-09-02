@@ -1,29 +1,51 @@
 /*
  * La bande de progression (maquette, Main.dc.html ~108-165) : anneau
- * d'objectif, palier, jalons, compteurs réels — en une seule rangée sous le
- * titre « Aujourd'hui ». Prend la place de `KpiBand.module.css`.
+ * d'objectif, palier, jalons — en une seule rangée sous le titre
+ * « Aujourd'hui ». Prend la place de `KpiBand.module.css`.
  *
  * Refonte (tâche 8, second passage) : `.corpsJeu` porte la zone qui dépend
  * du chargement du jeu (anneau/palier/jalons, ou son squelette, ou son
- * message d'échec) ; `.compteurs` en est volontairement sorti, puisqu'il ne
- * dépend d'aucune lecture réseau du jeu et reste affiché dans les trois cas.
+ * message d'échec) — `.bande` reste la coquille commune aux trois états
+ * (fond, bordure, coins, marge).
+ *
+ * **Alignement sur la maquette — largeur réelle (tâche 8, quatrième
+ * passage).** `.compteurs` (« en base », « qualifiés »), qui occupait ici
+ * une quatrième cellule, a été retiré : c'est lui qui écrasait la rangée
+ * dans la vraie colonne de l'écran (`ProspectPanel` 720 px + rail 56 px
+ * laissent ~664 px à 1440 px de fenêtre, voir le rapport de la tâche 8).
+ * `.bande` ne contient donc plus qu'un seul enfant (`.corpsJeu`, ou le
+ * conteneur de `Squelette`/`Erreur` qui porte la même classe) : son propre
+ * `gap` n'a donc plus d'effet visuel, mais la valeur suit tout de même la
+ * maquette ci-dessous par fidélité — c'est le `gap` de `.corpsJeu`, plus
+ * bas, qui rend réellement l'espacement entre anneau, palier et jalons que
+ * la maquette dessine sur une seule rangée (elle ne distingue pas les deux
+ * couches).
  */
 .bande {
   display: flex;
   align-items: stretch;
-  gap: var(--space-4);
-  margin-top: var(--space-3);
+  /* 18px (Main.dc.html l.110) : aucun token ne tombe juste (--space-4: 16px,
+     --space-5: 24px) — voir la note ci-dessus sur son absence d'effet visuel
+     tant que `.bande` n'a qu'un seul enfant. */
+  gap: 18px;
+  /* 14px (l.110) : ni --space-3 (12px) ni --space-4 (16px) ne conviennent. */
+  margin-top: 14px;
   margin-bottom: var(--space-4);
-  padding: var(--space-3) var(--space-4);
+  /* 12px 14px (l.110) : le haut/bas correspond à --space-3, le côté n'a pas
+     de token juste — un mélange token/valeur brute plutôt qu'un des deux
+     forcé sur toute la déclaration. */
+  padding: var(--space-3) 14px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-}
-
-@media (max-width: 900px) {
-  .bande {
-    flex-direction: column;
-  }
+  /* 14px (l.110) : --radius-lg vaut 12px et trahirait le dessin. */
+  border-radius: 14px;
+  /* Établit le contexte de requête de conteneur pour `.corpsJeu` ci-dessous :
+     la largeur qui compte est celle de la COLONNE réelle (`.bande` occupe
+     toute la largeur disponible sous `ProspectPanel`), jamais celle de la
+     fenêtre — voir le rapport de la tâche 8 pour le calcul (~664px à 1440,
+     ~1144px à 1920). `inline-size` seul (pas `size`) : la hauteur de `.bande`
+     reste dictée par son contenu, rien ne la fige. */
+  container-type: inline-size;
 }
 
 /*
@@ -47,10 +69,27 @@
   flex: 1;
   min-width: 0;
   min-height: 84px;
-  gap: var(--space-4);
+  /* 18px (Main.dc.html l.110) : c'est ICI, entre anneau/palier/jalons, que
+     ce gap se voit réellement (voir la note sur `.bande` ci-dessus). Aucun
+     token ne tombe juste (--space-4: 16px, --space-5: 24px). */
+  gap: 18px;
 }
 
-@media (max-width: 720px) {
+/*
+ * Alignement sur la maquette — largeur réelle (tâche 8, quatrième passage).
+ *
+ * Les trois cellules (anneau ~52px, palier flexible, jalons ~171px) tiennent
+ * confortablement dès qu'une colonne dépasse ~560px (52 + 18*2 de gap + un
+ * palier lisible d'au moins 150px + 171 ≈ 439px, marge de sécurité incluse) —
+ * elles restent donc en rangée à ~664px (1440 de fenêtre) et ~1144px (1920),
+ * les deux largeurs réelles de la colonne sous `ProspectPanel`. En dessous,
+ * la rangée se romprait avant que la fenêtre elle-même n'ait besoin de
+ * changer quoi que ce soit : `@container`, pas `@media`, pour interroger la
+ * colonne elle-même plutôt que la fenêtre (`.bande` porte le contexte,
+ * ci-dessus) — l'ancien point de 720px regardait la fenêtre et ne se
+ * déclenchait donc jamais dans la colonne réelle à 1440 ni 1920.
+ */
+@container (max-width: 560px) {
   .corpsJeu {
     flex-direction: column;
   }
@@ -70,12 +109,21 @@
 
 /* ---- Anneau d'objectif ---- */
 
+/*
+ * La maquette (l.111) n'écrit que `flex: none` sur ce conteneur : chez elle
+ * il n'entoure que l'anneau (52px), rien d'autre. Le nôtre porte en plus la
+ * légende visible de l'état « historique insuffisant » (`objectifLegende`),
+ * un état que la maquette ne montre jamais — `align-items`/`gap` restent
+ * donc nécessaires pour ce cas réel. Ce que la maquette condamnait, en
+ * revanche, c'était le `min-width: 150px` : un plancher arbitraire qui
+ * laissait ~100px de trou vide à droite de l'anneau dans l'état connu (sans
+ * légende visible) — retiré ici, sans équivalent chez elle.
+ */
 .objectifCellule {
   display: flex;
   align-items: center;
   gap: var(--space-3);
   flex: none;
-  min-width: 150px;
   cursor: default;
 }
 
@@ -117,14 +165,18 @@
 .anneauValeur {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-size: var(--text-md);
+  /* 14px (Main.dc.html l.118) : --text-md vaut 13px, --text-lg 15px — aucun
+     des deux ne tombe juste. */
+  font-size: 14px;
   font-weight: 700;
+  line-height: 1;
 }
 
 .anneauDenominateur {
   font-size: 9px;
   color: var(--color-text-faint);
-  margin-top: 2px;
+  /* Pas de marge (l.119) : `.anneauCentre` pose déjà `gap: 0` entre le
+     chiffre et le dénominateur — cette marge les décollait en plus. */
 }
 
 .objectifLegende {
@@ -136,6 +188,11 @@
 
 /* ---- Palier ---- */
 
+/*
+ * Ni filet ni retrait à gauche (Main.dc.html l.125 : `flex: 1; min-width: 0`,
+ * rien d'autre) — le seul filet de la rangée sépare les jalons (`.jalons`
+ * ci-dessous), pas le palier de l'anneau.
+ */
 .palier {
   display: flex;
   flex-direction: column;
@@ -143,8 +200,6 @@
   gap: 6px;
   flex: 1;
   min-width: 0;
-  padding-left: var(--space-4);
-  border-left: 1px solid var(--color-border);
 }
 
 .palierEntete {
@@ -184,6 +239,8 @@
   flex: none;
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+  /* 11px (Main.dc.html l.128) = --text-xs. */
+  font-size: var(--text-xs);
   color: var(--color-text-faint);
 }
 
@@ -209,7 +266,9 @@
 
 .poids {
   display: flex;
-  gap: var(--space-3);
+  /* 14px (Main.dc.html l.133) : ni --space-3 (12px) ni --space-4 (16px). */
+  gap: 14px;
+  margin-top: var(--space-2);
   font-size: var(--text-xs);
   color: var(--color-text-faint);
   flex-wrap: wrap;
@@ -220,7 +279,8 @@
 .jalons {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  /* 6px (Main.dc.html l.140) : --space-1 vaut 4px, --space-2 8px. */
+  gap: 6px;
   flex: none;
   padding-left: var(--space-4);
   border-left: 1px solid var(--color-border);
@@ -229,7 +289,8 @@
 .pastille {
   width: 34px;
   height: 34px;
-  border-radius: var(--radius-md);
+  /* 10px (Main.dc.html l.142) : --radius-sm vaut 4px, --radius-md 6px. */
+  border-radius: 10px;
   border: 1px solid var(--color-border-strong);
   display: flex;
   align-items: center;
@@ -260,38 +321,6 @@
 }
 .pastille[data-rempli='true'][data-ton='info'] {
   background: color-mix(in srgb, var(--color-info) 14%, transparent);
-}
-
-/* ---- Compteurs réels (en base, qualifiés) ---- */
-
-.compteurs {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  flex: none;
-  padding-left: var(--space-4);
-  border-left: 1px solid var(--color-border);
-}
-
-.compteur {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-
-.compteurValeur {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-size: var(--text-lg);
-  font-weight: 600;
-}
-
-.compteurLabel {
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--color-text-muted);
 }
 
 /* ---- Accessible mais invisible : le texte de chargement du squelette ---- */
@@ -349,7 +378,11 @@
 .squelettePastille {
   width: 34px;
   height: 34px;
-  border-radius: var(--radius-md);
+  /* Même valeur que `.pastille` ci-dessus (10px) : un rayon différent entre
+     le squelette et la forme réelle serait un décalage visible de plus au
+     moment où les données arrivent — exactement ce que ce squelette existe
+     pour éviter (voir son docstring, BandeProgression.tsx). */
+  border-radius: 10px;
 }
 
 @keyframes pulseSquelette {
