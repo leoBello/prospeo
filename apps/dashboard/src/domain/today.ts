@@ -113,6 +113,44 @@ export function matchesQuery(prospect: ProspectView, query: string): boolean {
   );
 }
 
+/**
+ * Les deux compteurs réels de la bande de progression (tâche 8, refonte) —
+ * voir `ui/BandeProgression.tsx`.
+ *
+ * `computeKpis` portait autrefois `contacted`/`interested` en plus
+ * (`KpiBand`, retiré avec la première version de la tâche 8) : ils ne
+ * reviennent pas ici, faute d'écran qui les affiche encore. Seuls `inBase`
+ * et `qualified` sont restaurés — ce sont, au jour de la livraison, les deux
+ * seuls chiffres non nuls et pleinement vrais de tout l'écran ; les retirer
+ * avait vidé le tableau de bord plus que de la simplifier.
+ */
+export interface Kpis {
+  inBase: number;
+  /**
+   * Prospects portant un `prospect_score`.
+   *
+   * Cet indicateur remplace le taux de réponse du §9.2, qui n'est pas
+   * mesurable : `interaction` enregistre le canal d'un échange, jamais son
+   * sens, et le numérateur d'un taux de réponse n'existe donc pas dans le
+   * schéma. Une tuile inerte à demeure valait moins que le seul chiffre qui
+   * dise où en est vraiment la base : 25 sur 139 au 1er septembre 2026.
+   */
+  qualified: number;
+}
+
+/**
+ * Dérivée du même instantané que les listes, donc toujours cohérente avec
+ * elles. Un score de zéro compte comme qualifié : c'est un jugement rendu,
+ * pas une absence de jugement.
+ */
+export function computeKpis(prospects: ProspectView[]): Kpis {
+  let qualified = 0;
+  for (const p of prospects) {
+    if (p.score !== null) qualified += 1;
+  }
+  return { inBase: prospects.length, qualified };
+}
+
 export interface TodayLists {
   followUps: WorkList;
   newHighScore: WorkList;

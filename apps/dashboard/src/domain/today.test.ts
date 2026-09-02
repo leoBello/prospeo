@@ -3,6 +3,7 @@ import type { ProspectView } from './prospect.js';
 import {
   MAX_ROWS_PER_LIST,
   buildToday,
+  computeKpis,
   followUpReason,
   highlightLines,
   matchesQuery,
@@ -105,6 +106,25 @@ describe('highlightLines', () => {
       2,
     );
     expect(lignes.map((l) => l.code)).toEqual(['presence_none', 'reputation']);
+  });
+});
+
+describe('computeKpis', () => {
+  it('compte en base tous les prospects, y compris ceux qui n ont aucun satellite', () => {
+    const kpis = computeKpis([vue({ id: 'a' }), vue({ id: 'b', score: scoreDe(50) })]);
+    expect(kpis.inBase).toBe(2);
+  });
+
+  it('compte comme qualifie tout prospect portant un score, quel qu en soit le total', () => {
+    // Y compris un score de zero : c'est un jugement rendu, pas une absence de
+    // jugement. C'est la distinction meme que cet indicateur sert a mesurer.
+    const kpis = computeKpis([
+      vue({ id: 'nul', score: scoreDe(0) }),
+      vue({ id: 'haut', score: scoreDe(90) }),
+      vue({ id: 'sans' }),
+    ]);
+    expect(kpis.qualified).toBe(2);
+    expect(kpis.inBase).toBe(3);
   });
 });
 

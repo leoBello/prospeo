@@ -74,6 +74,14 @@ export const fr = {
 
   'today.reason.separator': ' · ',
 
+  // Les deux seuls chiffres non nuls et pleinement vrais de l'écran au jour
+  // de la livraison (voir `domain/today.ts`, `computeKpis`) : retirés avec
+  // `KpiBand` par la première version de la tâche 8, restaurés dans la bande
+  // de progression par sa refonte — `contacted`/`interested` ne reviennent
+  // pas, faute d'écran qui les affiche encore.
+  'today.kpi.inBase': 'En base',
+  'today.kpi.qualified': 'Qualifiés',
+
   // Lot 3, tâche 8 — la bande de progression qui remplace `KpiBand` sous le
   // titre « Aujourd'hui », et le compteur de série de la barre du haut. Voir
   // `ui/BandeProgression.tsx` pour la doctrine des quatre absences distinctes
@@ -86,6 +94,11 @@ export const fr = {
   'jeu.objectif.insuffisant.titre': 'Historique encore insuffisant',
   'jeu.objectif.insuffisant.detail':
     'Pas encore un jour civil complet observé : aucune médiane fiable ne peut s’en déduire. Cet objectif apparaîtra dès qu’il y en aura un.',
+  // Le dénominateur de l'anneau (maquette, ~« / 15 ») quand l'objectif est
+  // connu, et son repli textuel — jamais un nombre — quand il ne l'est pas
+  // encore (refonte, tâche 8, second passage).
+  'jeu.objectif.denominateur': '/ {objectif}',
+  'jeu.objectif.denominateur.inconnu': 'pas encore',
 
   'jeu.palier.titre': 'Palier {numero}',
   'jeu.palier.points': '{points} / {seuil} points',
@@ -103,6 +116,11 @@ export const fr = {
   'jeu.badge.etat.non_mesurable': 'Non mesurable',
   'jeu.badge.nonMesurable.hint':
     'Aucun geste ne peut débloquer ce badge aujourd’hui : la mesure qu’il demande n’a pas encore de source fiable côté serveur.',
+  // La pastille (refonte, tâche 8) ne porte plus aucun mot visible : c'est
+  // son `aria-label`, composé ici, qui nomme le jalon ET son état — la règle
+  // du dépôt pour toute pastille à infobulle (voir `BadgeJalon`,
+  // `ui/BandeProgression.tsx`).
+  'jeu.badge.aria': '{etat} — {nom}',
 
   'jeu.serie.titre': 'Série en cours',
   'jeu.serie.jours': '{count} jours d’affilée',

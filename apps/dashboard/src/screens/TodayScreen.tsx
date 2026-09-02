@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@prospeo/db';
 import type { ProspectView, WorkList } from '../domain/prospect.js';
-import { buildToday, matchesQuery } from '../domain/today.js';
+import { buildToday, computeKpis, matchesQuery } from '../domain/today.js';
 import type { TranslationKey } from '../i18n/translate.js';
 import { AppShell } from '../ui/AppShell.js';
 import { BandeProgression, SerieEnTete } from '../ui/BandeProgression.js';
@@ -88,6 +88,10 @@ export function TodayScreen({
   );
 
   const today = useMemo(() => buildToday(prospectsFiltres, instant), [prospectsFiltres, instant]);
+  // Non filtrés eux non plus (même raison que `todaySansRecherche` plus bas) :
+  // « en base » et « qualifiés » décrivent toute la base, pas ce que la
+  // recherche locale laisse voir — voir `ui/BandeProgression.tsx`.
+  const kpis = useMemo(() => computeKpis(prospects), [prospects]);
   // Non filtrée : sert uniquement à distinguer, quand une liste est vide,
   // une recherche sans résultat d'une liste réellement vide pour une autre
   // raison — deux absences que `today.empty.search` et `today.empty.*` ne
@@ -254,7 +258,7 @@ export function TodayScreen({
             <p className={styles.subtitle}>{t('today.subtitle')}</p>
           </div>
 
-          <BandeProgression jeu={jeuState} />
+          <BandeProgression jeu={jeuState} kpis={kpis} />
 
           <p className={styles.hint}>{t('list.keyboardHint')}</p>
 

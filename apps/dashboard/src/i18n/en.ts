@@ -62,6 +62,9 @@ export const en: Record<keyof typeof fr, string> = {
 
   'today.reason.separator': ' · ',
 
+  'today.kpi.inBase': 'In database',
+  'today.kpi.qualified': 'Scored',
+
   'jeu.objectif.titre': "Today's goal",
   'jeu.objectif.valeur': '{count} follow-ups honored',
   'jeu.objectif.valeur_one': '{count} follow-up honored',
@@ -70,6 +73,8 @@ export const en: Record<keyof typeof fr, string> = {
   'jeu.objectif.insuffisant.titre': 'Not enough history yet',
   'jeu.objectif.insuffisant.detail':
     'No full calendar day has been observed yet: no reliable median can be derived from it. This goal will appear once there is one.',
+  'jeu.objectif.denominateur': '/ {objectif}',
+  'jeu.objectif.denominateur.inconnu': 'not yet',
 
   'jeu.palier.titre': 'Tier {numero}',
   'jeu.palier.points': '{points} / {seuil} points',
@@ -87,6 +92,7 @@ export const en: Record<keyof typeof fr, string> = {
   'jeu.badge.etat.non_mesurable': 'Not measurable',
   'jeu.badge.nonMesurable.hint':
     'No action can unlock this badge today: the measurement it needs has no reliable server-side source yet.',
+  'jeu.badge.aria': '{etat} — {nom}',
 
   'jeu.serie.titre': 'Current streak',
   'jeu.serie.jours': '{count} days in a row',

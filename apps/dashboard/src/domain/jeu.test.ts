@@ -381,6 +381,59 @@ describe('calculerBadges', () => {
   });
 });
 
+describe('realiseAujourdHui (via construireJeu) — le numerateur de l anneau', () => {
+  const MAINTENANT = new Date('2026-09-02T09:00:00');
+
+  function jeuAvecRelances(interactions: FaitInteraction[]) {
+    return construireJeu({
+      maintenant: MAINTENANT,
+      // Echeance posee le 20 aout, due le 5 septembre : large marge pour que
+      // chaque interaction testee (hier, aujourd hui, demain) tombe bien DANS
+      // la fenetre [pose, due] que `relancesTenues` exige pour la compter —
+      // seul le decalage en jours jusqu'a `maintenant` doit faire varier
+      // `realiseAujourdHui` d'un test a l'autre, pas la reconnaissance de la
+      // relance elle-meme.
+      evenementsPipeline: [
+        evenement({ prospectId: 'p1', status: 'relance', nextActionAt: '2026-09-05', occurredAt: '2026-08-20T10:00:00' }),
+      ],
+      interactions,
+      historiqueAuDelaDeLaFenetre: false,
+      relancesTenuesCumulees: { connue: false },
+      nombreSitesMisEnLigne: 0,
+      nombreRendezVousObtenus: 0,
+    });
+  }
+
+  it('compte une relance tenue survenue aujourd hui', () => {
+    const jeu = jeuAvecRelances([interaction('p1', '2026-09-02T08:30:00')]);
+    expect(jeu.realiseAujourdHui).toBe(1);
+  });
+
+  it('ne compte pas une relance tenue survenue hier', () => {
+    const jeu = jeuAvecRelances([interaction('p1', '2026-09-01T08:30:00')]);
+    expect(jeu.realiseAujourdHui).toBe(0);
+  });
+
+  it('ne compte pas une relance dont l interaction est datee de demain', () => {
+    const jeu = jeuAvecRelances([interaction('p1', '2026-09-03T08:30:00')]);
+    expect(jeu.realiseAujourdHui).toBe(0);
+  });
+
+  it('cumule plusieurs relances tenues le meme jour, et ignore celles des autres jours', () => {
+    const jeu = jeuAvecRelances([
+      interaction('p1', '2026-09-02T07:00:00'),
+      interaction('p1', '2026-09-02T18:00:00'),
+      interaction('p1', '2026-09-01T07:00:00'),
+    ]);
+    expect(jeu.realiseAujourdHui).toBe(2);
+  });
+
+  it('rend zero — un fait mesure — quand aucune relance n a ete tenue aujourd hui', () => {
+    const jeu = jeuAvecRelances([]);
+    expect(jeu.realiseAujourdHui).toBe(0);
+  });
+});
+
 describe('construireJeu', () => {
   const MAINTENANT = new Date('2026-09-02T09:00:00');
 
@@ -403,6 +456,7 @@ describe('construireJeu', () => {
     });
     expect(jeu.serie).toEqual({ jours: 0, borneAtteinte: false });
     expect(jeu.objectifDuJour).toEqual({ connue: false });
+    expect(jeu.realiseAujourdHui).toBe(0);
     expect(jeu.palier.points).toBe(0);
     expect(jeu.palier.complet).toBe(false);
     expect(jeu.badges.every((b) => b.etat !== 'obtenu')).toBe(true);

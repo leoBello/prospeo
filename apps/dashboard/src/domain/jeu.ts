@@ -251,6 +251,28 @@ export function serieDeJours(
 }
 
 /**
+ * Le réalisé du jour : le nombre de relances tenues dont l'interaction est
+ * survenue AUJOURD'HUI (jour civil courant) — le numérateur qui manquait à
+ * l'anneau de la maquette (Main.dc.html ~114-124, « 12 / 15 ») : `Jeu` ne
+ * portait jusqu'ici que le dénominateur (`objectifDuJour`), sans le réalisé
+ * à mettre en face. Correctif de revue, tâche 8, second passage.
+ *
+ * Réutilise `decalageEnJours`, déjà éprouvé par `serieDeJours` : même
+ * définition du « jour civil courant » des deux côtés, aucune règle
+ * nouvelle. Un FAIT mesuré, jamais une `Mesure<number>` — comme
+ * `serie.jours`, zéro le premier jour est aussi vrai et aussi affichable
+ * qu'un objectif inconnu ; ce sont deux absences de nature différente (voir
+ * le docstring de `BandeProgression`, tâche 8).
+ */
+function relancesTenuesAujourdHui(relances: readonly RelanceTenue[], maintenant: Date): number {
+  let n = 0;
+  for (const r of relances) {
+    if (decalageEnJours(r.occurredAt, maintenant) === 0) n += 1;
+  }
+  return n;
+}
+
+/**
  * Fenêtre de la médiane de l'objectif du jour — §D5, la veille impose 14
  * jours. Réutilisée telle quelle comme plafond pour `serieDeJours` (voir son
  * docstring) et pour dimensionner la lecture bornée par date de
@@ -538,6 +560,8 @@ export interface EntreesJeu {
 /** Le jeu assemblé — ce que `data/jeu.ts` (tâche 7) et l'écran (tâche 8) consomment. */
 export interface Jeu {
   readonly objectifDuJour: Mesure<number>;
+  /** Voir le docstring de `relancesTenuesAujourdHui` : le numérateur de l'anneau, jamais une `Mesure`. */
+  readonly realiseAujourdHui: number;
   readonly serie: Serie;
   readonly palier: Palier;
   readonly badges: readonly EtatBadge[];
@@ -552,6 +576,7 @@ export interface Jeu {
  */
 export function construireJeu(entrees: EntreesJeu): Jeu {
   const relances = relancesTenues(entrees.evenementsPipeline, entrees.interactions);
+  const realiseAujourdHui = relancesTenuesAujourdHui(relances, entrees.maintenant);
   const serie = serieDeJours(relances, entrees.maintenant, FENETRE_OBJECTIF_JOURS);
   const objectif = objectifDuJour(
     entrees.evenementsPipeline,
@@ -571,5 +596,5 @@ export function construireJeu(entrees: EntreesJeu): Jeu {
     serie,
   });
 
-  return { objectifDuJour: objectif, serie, palier, badges };
+  return { objectifDuJour: objectif, realiseAujourdHui, serie, palier, badges };
 }
