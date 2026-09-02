@@ -15,6 +15,8 @@ import type { fr } from './fr.js';
 export const en: Record<keyof typeof fr, string> = {
   'app.name': 'Prospeo',
   'nav.today': 'Today',
+  'nav.deploiements': 'Deployments',
+  'nav.gabarit': 'Template',
   'nav.signOut': 'Sign out',
 
   'theme.toDark': 'Switch to dark theme',

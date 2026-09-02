@@ -13,6 +13,8 @@
 export const fr = {
   'app.name': 'Prospeo',
   'nav.today': "Aujourd'hui",
+  'nav.deploiements': 'Déploiements',
+  'nav.gabarit': 'Gabarit',
   'nav.signOut': 'Se déconnecter',
 
   'theme.toDark': 'Passer au thème sombre',

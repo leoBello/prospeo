@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from 'react';
+import type { ReactNode } from 'react';
 import type { ProspectView } from '../domain/prospect.js';
 import { buildToday, computeKpis } from '../domain/today.js';
 import { AppShell } from '../ui/AppShell.js';
@@ -17,6 +18,12 @@ interface Props {
   onSignOut: () => void;
   /** `null` : écran consultable seul, ce que montent les tests. */
   actions?: PanelActions | null;
+  /**
+   * Le rail de navigation, fourni par `App`. Absent dans les tests de cet
+   * écran, montré seul : `AppShell` s'en passe alors sans rien afficher à
+   * gauche.
+   */
+  nav?: ReactNode;
 }
 
 export function TodayScreen({
@@ -25,6 +32,7 @@ export function TodayScreen({
   now,
   onSignOut,
   actions = null,
+  nav,
 }: Props) {
   const t = useT();
   // Mémorisé : une `Date` reconstruite à chaque rendu changerait d'identité en
@@ -73,6 +81,7 @@ export function TodayScreen({
   return (
     <AppShell
       onSignOut={onSignOut}
+      nav={nav}
       list={
         <>
           <div className={styles.intro}>

@@ -8,6 +8,8 @@ import { useProspects } from './data/useProspects.js';
 import { makePanelActions } from './ui/actions.js';
 import { LoginScreen } from './screens/LoginScreen.js';
 import { TodayScreen } from './screens/TodayScreen.js';
+import { AppShell } from './ui/AppShell.js';
+import { Nav, useVue } from './ui/Nav.js';
 import { PreferencesProvider, useT } from './ui/preferences.js';
 import styles from './App.module.css';
 
@@ -36,6 +38,11 @@ function Authenticated({ client }: { client: SupabaseClient<Database> }) {
   const { signOut } = useAuth();
   const state = useProspects(client);
   const reload = state.reload;
+  // La vue vit dans le fragment d'URL (voir Nav.tsx) : elle survit à un
+  // rechargement, et un lien vers l'écran de déploiement est possible à
+  // donner — deux choses qu'un simple `useState` ne permettrait pas.
+  const { vue, aller } = useVue();
+  const nav = <Nav vue={vue} aller={aller} />;
 
   // Mémorisées : recréées à chaque rendu, elles changeraient d'identité en
   // permanence et feraient rerendre la fiche entière à chaque frappe dans le
@@ -64,12 +71,32 @@ function Authenticated({ client }: { client: SupabaseClient<Database> }) {
     );
   }
 
+  // Les écrans « Déploiements » et « Gabarit » n'existent pas encore : un
+  // repère minimal, sous la coquille commune, suffit à rendre la navigation
+  // testable dès maintenant. Les lots suivants remplacent ce repère par
+  // l'écran réel, sans toucher à la navigation elle-même.
+  if (vue === 'deploiements' || vue === 'gabarit') {
+    return (
+      <AppShell
+        nav={nav}
+        onSignOut={() => void signOut()}
+        list={
+          <p className={styles.status} aria-live="polite">
+            {t('bientot.aria')}
+          </p>
+        }
+        panel={null}
+      />
+    );
+  }
+
   return (
     <TodayScreen
       prospects={state.prospects}
       currentRulesetVersion={SCORING_RULESET.version}
       onSignOut={() => void signOut()}
       actions={actions}
+      nav={nav}
     />
   );
 }

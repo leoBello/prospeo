@@ -1,12 +1,26 @@
+/*
+ * `shell` est une ligne : le rail de navigation (`Nav`, fourni en `nav`)
+ * d'un côté, tout le reste — en-tête et corps — dans `main` de l'autre. Le
+ * rail n'est pas ici : sa mise en page vit dans `Nav.module.css`, pour que
+ * cette feuille reste ignorante de ce qu'elle affiche à sa gauche.
+ */
 .shell {
   display: flex;
+  height: 100%;
+}
+
+.main {
+  display: flex;
   flex-direction: column;
+  flex: 1;
+  min-width: 0;
   height: 100%;
 }
 
 .header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-4);
   padding: var(--space-2) var(--space-4);
   border-bottom: 1px solid var(--color-border);
@@ -19,24 +33,10 @@
   letter-spacing: -0.02em;
 }
 
-.nav {
+.actions {
   display: flex;
-  gap: var(--space-3);
-  flex: 1;
-}
-
-.navItem {
-  font-size: var(--text-sm);
-  color: var(--color-text);
-  background: none;
-  border: none;
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-sm);
-}
-
-.navItemActive {
-  background: color-mix(in srgb, var(--color-accent) 16%, transparent);
-  color: var(--color-accent);
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .action {
