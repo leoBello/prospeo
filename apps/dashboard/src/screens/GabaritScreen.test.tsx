@@ -53,7 +53,7 @@ function rendre(props: Partial<Parameters<typeof GabaritScreen>[0]> = {}) {
 }
 
 const PHRASE_AUCUN_METIER =
-  'Aucun métier actuel n’est gouverné par ce gabarit : les deux métiers déclarent chacun le leur, qui l’emporte. Il s’appliquera au premier métier sans exception.';
+  'Aucun métier actuel n’est gouverné par ce gabarit : chaque métier déclare le sien, qui l’emporte. Il s’appliquera au premier métier sans exception.';
 
 describe('GabaritScreen — la portee reelle du gabarit designe', () => {
   it('dit que le gabarit ne gouverne aucun metier quand TOUS en declarent un', () => {

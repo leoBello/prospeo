@@ -305,7 +305,7 @@ export const en: Record<keyof typeof fr, string> = {
   'gabarit.actif.controle.echecSansDetail': 'Check failed, with no detail recorded.',
   'gabarit.actif.revenir': 'Revert to the default template',
   'gabarit.actif.aucunMetier':
-    'No current trade is governed by this template: both trades declare their own, which wins. It will apply to the first trade without an exception.',
+    'No current trade is governed by this template: each trade declares its own, which wins. It will apply to the first trade without an exception.',
 
   'gabarit.ordre.titre': 'Resolution order',
   'gabarit.ordre.detail':

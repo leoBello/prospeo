@@ -246,6 +246,25 @@ describe('evenementAffiche', () => {
     ];
     expect(evenementAffiche(events, 'en_ligne')?.step).toBe('en_ligne');
   });
+
+  it('en_cours, nomme l etape qui TOURNE et non la plus avancee — meme defaut que l echec, laisse ouvert', () => {
+    // Le cas reel : `deploy.ts` pousse un nouveau commit sur un depot deja en
+    // ligne, puis le rebuild transitoire ne rapporte plus d'URL le temps du
+    // build. `etatDepuisEvenements` rend alors "en_cours" (le plus RECENT est
+    // un "demarre"), mais sans cette redirection, l'ecran affichait quand
+    // meme l'etape la plus avancee du pipeline : "En cours" a cote d'"En
+    // ligne", un badge qui se contredit lui-meme (voir `libellePisteEtat`).
+    const events = [
+      evenement({ step: 'en_ligne', outcome: 'reussi', occurredAt: '2026-09-01T09:06:00Z', detail: 'https://dos.vercel.app' }),
+      evenement({
+        step: 'build',
+        outcome: 'demarre',
+        occurredAt: '2026-09-03T09:00:00Z',
+      }),
+    ];
+    const affiche = evenementAffiche(events, 'en_cours');
+    expect(affiche?.step).toBe('build');
+  });
 });
 
 describe('dernierEvenementPipeline — horodatage illisible', () => {

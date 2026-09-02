@@ -212,21 +212,33 @@ export function etatDepuisEvenements(
  *
  * Deux règles, parce que les deux questions sont différentes :
  *
- * - En `echec`, c'est l'événement le plus récent — celui qui a échoué. Une
- *   ligne rouge qui nommerait l'étape la plus avancée du pipeline afficherait
- *   « En échec » à côté d'« En ligne » et du détail d'un SUCCÈS : elle
- *   nommerait mal l'échec au lieu de ne pas le nommer, ce qui est pire.
+ * - En `echec` ou en `en_cours`, c'est l'événement le plus récent — celui qui
+ *   a échoué, ou celui qui tourne. Une ligne qui nommerait l'étape la plus
+ *   avancée du pipeline afficherait « En échec » à côté d'« En ligne » et du
+ *   détail d'un SUCCÈS ; ou, même défaut côté `en_cours` : un `build/demarre`
+ *   en amont d'un `en_ligne/reussi` plus avancé (`deploy.ts`, quand `publish`
+ *   pousse un nouveau commit sur un dépôt déjà en ligne, puis que le rebuild
+ *   ne rapporte plus d'URL le temps du build) composait « En cours — En
+ *   ligne », un badge qui se contredit lui-même. Les deux nomment mal l'étape
+ *   au lieu de ne pas la nommer, ce qui est pire.
  * - Partout ailleurs, l'étape la plus avancée. `publish` réécrit
  *   `redaction/reussi` à chaque passage : une règle « le plus récent »
  *   ramènerait chaque ligne à « Rédaction » alors que son site est en ligne.
+ *
+ * La redirection ne joue que si l'issue de l'événement le plus récent
+ * correspond bien à la raison de l'état affiché (`echoue` pour `echec`,
+ * `demarre` pour `en_cours`) — même garde des deux côtés, pour que la
+ * fonction reste correcte même appelée avec un état que les événements ne
+ * confirment pas.
  */
 export function evenementAffiche(
   events: readonly DeploymentEventView[],
   etat: DeploymentEtat,
 ): DeploymentEventView | null {
-  if (etat === 'echec') {
+  if (etat === 'echec' || etat === 'en_cours') {
     const recent = dernierEvenementGlobal(events);
-    if (recent !== null && recent.outcome === 'echoue') return recent;
+    const issueAttendue = etat === 'echec' ? 'echoue' : 'demarre';
+    if (recent !== null && recent.outcome === issueAttendue) return recent;
   }
   return dernierEvenementPipeline(events);
 }

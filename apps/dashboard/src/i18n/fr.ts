@@ -342,7 +342,7 @@ export const fr = {
   // L'écran est juste et servira au troisième métier — le taire serait la
   // seule faute.
   'gabarit.actif.aucunMetier':
-    'Aucun métier actuel n’est gouverné par ce gabarit : les deux métiers déclarent chacun le leur, qui l’emporte. Il s’appliquera au premier métier sans exception.',
+    'Aucun métier actuel n’est gouverné par ce gabarit : chaque métier déclare le sien, qui l’emporte. Il s’appliquera au premier métier sans exception.',
 
   // L'infobulle que le brief demande d'afficher, pas seulement d'implémenter :
   // sans elle, personne ne comprend pourquoi un métier ayant son propre
