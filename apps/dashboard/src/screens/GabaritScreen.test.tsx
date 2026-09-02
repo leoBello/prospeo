@@ -135,7 +135,7 @@ describe('GabaritScreen', () => {
 
   it('normalise un champ vide en null avant d appeler onDesigner, jamais une chaine vide', async () => {
     const user = userEvent.setup();
-    const onDesigner = vi.fn();
+    const onDesigner = vi.fn().mockResolvedValue(null);
     rendre({ onDesigner });
     // Le champ dépôt reste vide : c'est précisément le cas qui, avant
     // normalisation, écrirait '' plutôt que null.
@@ -145,7 +145,7 @@ describe('GabaritScreen', () => {
 
   it('designe le depot saisi, branche comprise', async () => {
     const user = userEvent.setup();
-    const onDesigner = vi.fn();
+    const onDesigner = vi.fn().mockResolvedValue(null);
     rendre({ onDesigner });
     await user.type(screen.getByLabelText('Dépôt (org/nom)'), 'prospeo/gabarit-artisan-2026');
     await user.clear(screen.getByLabelText('Branche'));
@@ -156,9 +156,39 @@ describe('GabaritScreen', () => {
 
   it('permet de revenir au gabarit par defaut quand un depot est actif', async () => {
     const user = userEvent.setup();
-    const onDesigner = vi.fn();
+    const onDesigner = vi.fn().mockResolvedValue(null);
     rendre({ template: template({ repoFullName: 'prospeo/gabarit-agence-v2' }), onDesigner });
     await user.click(screen.getByRole('button', { name: 'Revenir au gabarit par défaut' }));
     expect(onDesigner).toHaveBeenCalledWith(null, 'main');
+  });
+
+  it('affiche un message visible et non transitoire quand l ecriture est refusee', async () => {
+    // Relevé de revue (tâche 10) : avant ce correctif, un refus (RLS, réseau)
+    // ne finissait qu'en `console.error` — l'opérateur croyait le changement
+    // pris. `role="alert"` et la clé `action.failed` sont le patron déjà
+    // utilisé par `SiteSection` pour la même famille de refus.
+    const user = userEvent.setup();
+    const onDesigner = vi.fn().mockResolvedValue('RLS : ecriture refusee');
+    rendre({ onDesigner });
+    await user.type(screen.getByLabelText('Dépôt (org/nom)'), 'prospeo/gabarit-artisan-2026');
+    await user.click(screen.getByRole('button', { name: 'Désigner ce dépôt' }));
+    const alerte = await screen.findByRole('alert');
+    expect(alerte.textContent).toBe('Écriture refusée : RLS : ecriture refusee');
+  });
+
+  it('traite un checkOk nul comme un verdict inconnu, jamais comme une reussite', () => {
+    // `checkOk === null` avec `checkedAt` non nul est hors du modèle
+    // documenté, mais lire ce nul comme un succès reste le mauvais défaut
+    // pour l'affichage d'un verdict — relevé de revue (tâche 10).
+    rendre({
+      template: template({
+        repoFullName: 'prospeo/gabarit-agence-v2',
+        checkedAt: '2026-09-01T10:00:00Z',
+        checkOk: null,
+      }),
+    });
+    const absence = screen.getByText('Jamais contrôlé');
+    expect(absence.closest('[data-absent="true"]')).not.toBeNull();
+    expect(screen.queryByText(/Contrôle réussi le/)).toBeNull();
   });
 });

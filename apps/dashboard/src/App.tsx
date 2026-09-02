@@ -64,20 +64,19 @@ function Authenticated({ client }: { client: SupabaseClient<Database> }) {
    * Enregistre la désignation, puis relit la ligne — même parti que
    * `makePanelActions` : l'écran entier doit dériver d'une seule lecture.
    *
-   * `GabaritScreen` ne connaît que `(repoFullName, branch) => void` : il
-   * n'exécute aucun contrôle, seulement une écriture, et son interface ne
-   * porte donc pas de retour de promesse à attendre. Une écriture refusée par
-   * la RLS est journalisée plutôt que silencieusement perdue — signalé au
-   * rapport de tâche 10 comme piste pour la tâche 11 (une zone d'erreur
-   * dédiée, comme `action.failed` ailleurs dans ce dashboard).
+   * Rend `null` en cas de succès et le message d'erreur sinon, comme
+   * `PanelActions` : `GabaritScreen` porte désormais sa propre zone d'erreur
+   * (`role="alert"`, clé `action.failed`) et a besoin de ce retour pour
+   * l'alimenter. Avant ce correctif (relevé de revue, tâche 10) une écriture
+   * refusée par la RLS n'était que journalisée en console — l'opérateur
+   * croyait alors le changement pris.
    */
   const designer = useCallback(
-    (repoFullName: string | null, branch: string) => {
-      void designerGabarit(client, repoFullName, branch).then((erreur) => {
+    (repoFullName: string | null, branch: string): Promise<string | null> =>
+      designerGabarit(client, repoFullName, branch).then((erreur) => {
         if (erreur === null) gabaritReload();
-        else console.error(`site_template : écriture refusée — ${erreur}`);
-      });
-    },
+        return erreur;
+      }),
     [client, gabaritReload],
   );
 

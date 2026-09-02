@@ -118,11 +118,14 @@ export async function definirStatut(
  * plutôt que de laisser passer une chaîne vide qui se lirait, plus tard,
  * comme une désignation.
  *
- * **Ce que cette fonction ne fait pas** : elle ne touche jamais
- * `checked_at` / `check_ok` / `check_detail`. Produire un verdict exigerait
- * un jeton GitHub, qui n'a rien à faire dans ce bundle — c'est le collector,
- * à son prochain passage, qui les mettra à jour pour le dépôt nouvellement
- * désigné.
+ * **Ce que cette fonction ne fait pas** : elle ne PRODUIT jamais de verdict —
+ * `checked_at` / `check_ok` / `check_detail` restent l'affaire du collector,
+ * seul à porter le jeton GitHub qu'un contrôle exige. Mais elle les EFFACE :
+ * relevé de revue (tâche 10), une désignation qui laissait ces trois colonnes
+ * intactes faisait porter au NOUVEAU dépôt le verdict de l'ANCIEN — la carte
+ * pouvait afficher « Contrôle réussi le … » pour un dépôt jamais contrôlé une
+ * seule fois. Les mettre à `null` dans le même `UPDATE` restaure l'état
+ * honnête — « pas encore contrôlé » — jusqu'au prochain passage du collector.
  */
 export async function designerGabarit(
   client: Client,
@@ -136,6 +139,9 @@ export async function designerGabarit(
     .update({
       repo_full_name: repo === undefined || repo === '' ? null : repo,
       branch: brancheNormalisee === '' ? 'main' : brancheNormalisee,
+      checked_at: null,
+      check_ok: null,
+      check_detail: null,
       updated_at: new Date().toISOString(),
     })
     .eq('id', 1);

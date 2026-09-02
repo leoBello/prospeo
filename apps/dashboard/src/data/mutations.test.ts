@@ -138,15 +138,18 @@ describe('designerGabarit', () => {
     expect((appels[0]?.valeurs as Record<string, unknown>)['branch']).toBe('main');
   });
 
-  it('ne touche jamais le verdict du dernier controle', async () => {
-    // Produire ce verdict exige un jeton GitHub, qui n'a rien à faire dans ce
-    // bundle : seul le collector, à son prochain passage, l'écrit.
+  it('annule le verdict du controle precedent a chaque designation', async () => {
+    // Sans ce reset, la carte affichait le verdict de l'ANCIEN dépôt (date et
+    // pastille comprises) à côté du nom du NOUVEAU — jusqu'à « Contrôle
+    // réussi le … » pour un dépôt jamais contrôlé une seule fois. Produire un
+    // nouveau verdict exige un jeton GitHub, qui n'a rien à faire dans ce
+    // bundle ; effacer l'ancien n'en a pas besoin.
     const { client, appels } = fakeClient();
     await designerGabarit(client, 'prospeo/gabarit-agence-v2', 'main');
     const valeurs = appels[0]?.valeurs as Record<string, unknown>;
-    expect(valeurs).not.toHaveProperty('checked_at');
-    expect(valeurs).not.toHaveProperty('check_ok');
-    expect(valeurs).not.toHaveProperty('check_detail');
+    expect(valeurs['checked_at']).toBeNull();
+    expect(valeurs['check_ok']).toBeNull();
+    expect(valeurs['check_detail']).toBeNull();
   });
 
   it('rend le message d’erreur plutôt que de lever', async () => {

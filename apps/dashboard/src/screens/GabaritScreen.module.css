@@ -178,3 +178,11 @@
   color: var(--color-text-faint);
   line-height: 1.6;
 }
+
+/* Meme jeton que ProspectPanel.module.css .error : un refus d'ecriture,
+   jamais une couleur en dur inventee pour l'occasion. */
+.error {
+  margin: var(--space-3) 0 0;
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+}

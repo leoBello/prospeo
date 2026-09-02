@@ -25,11 +25,17 @@ function jour(iso: string): string {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString();
 }
 
-/** Le texte du dernier verdict connu — jamais un contrôle que CET écran aurait fait lui-même. */
-function texteControle(t: Traducteur, template: SiteTemplateView): string {
-  if (template.checkedAt === null) return t('gabarit.actif.controle.jamais');
-  const date = jour(template.checkedAt);
-  return template.checkOk === false
+/**
+ * Le texte d'un verdict CONNU — jamais un contrôle que CET écran aurait fait
+ * lui-même. N'est appelée que quand `checkedAt` et `checkOk` sont tous deux
+ * non nuls : voir `GabaritActifCard`, qui rend l'absence de verdict à part
+ * (via `Absent`), plutôt que de laisser cette fonction improviser un texte
+ * pour un `checkOk` nul — relevé de revue (tâche 10) : un `checkOk === null`
+ * lu comme un succès est le mauvais défaut pour l'affichage d'un verdict.
+ */
+function texteControle(t: Traducteur, checkedAt: string, checkOk: boolean): string {
+  const date = jour(checkedAt);
+  return checkOk === false
     ? t('gabarit.actif.controle.echec', { date })
     : t('gabarit.actif.controle.ok', { date });
 }
@@ -49,9 +55,11 @@ function OrdreResolution() {
 function GabaritActifCard({
   template,
   onDesigner,
+  enCours,
 }: {
   template: SiteTemplateView;
   onDesigner: (repoFullName: string | null, branch: string) => void;
+  enCours: boolean;
 }) {
   const t = useT();
   return (
@@ -66,9 +74,19 @@ function GabaritActifCard({
           </div>
           <div className={styles.actifMeta}>
             <span>{t('gabarit.actif.branche', { branch: template.branch })}</span>
-            <Badge ton={template.checkOk === false ? 'danger' : template.checkedAt === null ? 'neutre' : 'succes'}>
-              {texteControle(t, template)}
-            </Badge>
+            {/* Un verdict CONNU exige les deux : `checkedAt` ET `checkOk` non
+                nuls. Sous le modèle documenté l'un n'arrive jamais sans
+                l'autre, mais lire un `checkOk` nul comme un succès reste le
+                mauvais défaut pour un affichage de verdict (relevé de revue,
+                tâche 10) — l'absence est donc rendue comme telle, via
+                `Absent`, jamais devinée comme une réussite. */}
+            {template.checkedAt !== null && template.checkOk !== null ? (
+              <Badge ton={template.checkOk === false ? 'danger' : 'succes'}>
+                {texteControle(t, template.checkedAt, template.checkOk)}
+              </Badge>
+            ) : (
+              <Absent>{t('gabarit.actif.controle.jamais')}</Absent>
+            )}
           </div>
           {template.checkOk === false ? (
             <p className={styles.detailEchec}>
@@ -78,6 +96,7 @@ function GabaritActifCard({
           <button
             type="button"
             className={styles.revenir}
+            disabled={enCours}
             onClick={() => onDesigner(null, 'main')}
           >
             {t('gabarit.actif.revenir')}
@@ -90,8 +109,10 @@ function GabaritActifCard({
 
 function DesignerCard({
   onDesigner,
+  enCours,
 }: {
   onDesigner: (repoFullName: string | null, branch: string) => void;
+  enCours: boolean;
 }) {
   const t = useT();
   const [repo, setRepo] = useState('');
@@ -144,8 +165,8 @@ function DesignerCard({
             {t('gabarit.verifier.label')}
           </button>
         </Bientot>
-        <button type="submit" className={styles.soumettre}>
-          {t('gabarit.designer.soumettre')}
+        <button type="submit" className={styles.soumettre} disabled={enCours}>
+          {enCours ? t('action.pending') : t('gabarit.designer.soumettre')}
         </button>
       </form>
     </Card>
@@ -172,8 +193,13 @@ function LigneMetier({ trade }: { trade: Trade }) {
 interface Props {
   template: SiteTemplateView;
   trades: readonly Trade[];
-  /** Enregistre la désignation — une écriture en base, rien de plus. Voir `designerGabarit`. */
-  onDesigner: (repoFullName: string | null, branch: string) => void;
+  /**
+   * Enregistre la désignation — une écriture en base, rien de plus. Voir
+   * `designerGabarit`. Rend `null` en cas de succès, le message d'erreur
+   * sinon — même convention que `PanelActions` (`ui/actions.ts`) : jamais
+   * d'exception, que ce bouton devrait alors rattraper.
+   */
+  onDesigner: (repoFullName: string | null, branch: string) => Promise<string | null>;
   onSignOut?: () => void;
   /** Le rail de navigation, fourni par `App` — voir `TodayScreen` pour le même patron. */
   nav?: ReactNode;
@@ -196,9 +222,34 @@ interface Props {
  * (`OrdreResolution`) : le gabarit du métier (`trades.ts`), puis le gabarit
  * actif désigné ici, puis la variable d'environnement. Sans cette infobulle,
  * on désigne un dépôt et on se demande pourquoi tel métier ne l'a pas reçu.
+ *
+ * **Une écriture refusée se voit.** La raison d'être de cet écran est
+ * d'ENREGISTRER une désignation ; un refus (RLS, réseau) qui ne laisserait
+ * qu'une ligne en console tromperait l'opérateur, qui croirait le
+ * changement pris — relevé de revue (tâche 10). `onDesigner` rend donc
+ * `null` ou un message, comme `PanelActions`, et ce message reste affiché
+ * (`role="alert"`, clé `action.failed`) jusqu'à la tentative suivante — pas
+ * un toast qui disparaît avant d'avoir été lu.
  */
 export function GabaritScreen({ template, trades, onDesigner, onSignOut = () => {}, nav }: Props) {
   const t = useT();
+  const [enCours, setEnCours] = useState(false);
+  const [erreur, setErreur] = useState<string | null>(null);
+
+  /**
+   * Enveloppe `onDesigner` : les deux cartes ci-dessous (« revenir au
+   * défaut » et « désigner ») visent la même ligne singleton, un seul
+   * emplacement d'erreur pour l'écran entier suffit donc. `setErreur(null)`
+   * avant de retenter efface un refus précédent, pour ne pas le laisser
+   * affiché à côté d'une tentative en cours qui pourrait, elle, réussir.
+   */
+  const designer = (repoFullName: string | null, branch: string) => {
+    setEnCours(true);
+    setErreur(null);
+    void onDesigner(repoFullName, branch)
+      .then((message) => setErreur(message))
+      .finally(() => setEnCours(false));
+  };
 
   return (
     <AppShell
@@ -213,8 +264,8 @@ export function GabaritScreen({ template, trades, onDesigner, onSignOut = () => 
           </div>
 
           <div className={styles.pile}>
-            <GabaritActifCard template={template} onDesigner={onDesigner} />
-            <DesignerCard onDesigner={onDesigner} />
+            <GabaritActifCard template={template} onDesigner={designer} enCours={enCours} />
+            <DesignerCard onDesigner={designer} enCours={enCours} />
 
             <Card titre={t('gabarit.metiers.titre')}>
               <p className={styles.aide}>{t('gabarit.metiers.aide')}</p>
@@ -225,6 +276,12 @@ export function GabaritScreen({ template, trades, onDesigner, onSignOut = () => 
               </ul>
             </Card>
           </div>
+
+          {erreur !== null ? (
+            <p className={styles.error} role="alert">
+              {t('action.failed', { message: erreur })}
+            </p>
+          ) : null}
 
           <p className={styles.portee}>{t('gabarit.portee')}</p>
         </>
