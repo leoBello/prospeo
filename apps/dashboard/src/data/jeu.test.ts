@@ -96,6 +96,7 @@ function compte(reglage: { n?: number; erreur?: { message: string } | null } = {
     selects: [] as [string, SelectOptions | undefined][],
     eqs: [] as [string, unknown][],
     lts: [] as [string, unknown][],
+    nots: [] as [string, string, unknown][],
   };
   const builder = {
     select(colonnes: string, options?: SelectOptions) {
@@ -108,6 +109,10 @@ function compte(reglage: { n?: number; erreur?: { message: string } | null } = {
     },
     lt(colonne: string, valeur: unknown) {
       appels.lts.push([colonne, valeur]);
+      return builder;
+    },
+    not(colonne: string, operateur: string, valeur: unknown) {
+      appels.nots.push([colonne, operateur, valeur]);
       return builder;
     },
     then(resolve: (v: unknown) => void, reject?: (e: unknown) => void) {
@@ -152,18 +157,18 @@ function fakeClient(config: {
   pipelineAuDela?: ReturnType<typeof compte>['builder'];
   pipelineRdv?: ReturnType<typeof compte>['builder'];
   interaction?: Builder;
-  deploymentEvent?: ReturnType<typeof compte>['builder'];
+  prospectSite?: ReturnType<typeof compte>['builder'];
 }) {
   const pipelineLignes = config.pipelineLignes ?? tablePaginee([[]]).builder;
   const pipelineAuDela = config.pipelineAuDela ?? compte().builder;
   const pipelineRdv = config.pipelineRdv ?? compte().builder;
   const interaction = config.interaction ?? tablePaginee([[]]).builder;
-  const deploymentEvent = config.deploymentEvent ?? compte().builder;
+  const prospectSite = config.prospectSite ?? compte().builder;
 
   return {
     from(table: string) {
       if (table === 'interaction') return interaction;
-      if (table === 'deployment_event') return deploymentEvent;
+      if (table === 'prospect_site') return prospectSite;
       if (table !== 'pipeline_event') throw new Error(`table inattendue dans le test : ${table}`);
       return {
         select(colonnes: string, options?: SelectOptions) {
@@ -269,14 +274,21 @@ describe('pipelineEventRangeReader / interactionRangeReader — la borne PAR DAT
 });
 
 describe('fetchEntreesJeu — les comptes serveur ne transferent aucune ligne', () => {
-  it('demande un count exact, "head" (sans donnees), filtre sur step et outcome, pour les sites mis en ligne', async () => {
+  /**
+   * Les sites en ligne se comptent sur `prospect_site`, PAS sur
+   * `deployment_event` : cette derniere ne connait que ce qui a ete deploye
+   * depuis sa creation, et un site publie avant elle rapportait donc zero
+   * point sous une bande qui annonce « +120 pts · site mis en ligne ».
+   * `published_at` non nul, sans regarder `unpublished_at` : un retrait ne
+   * defait pas le jalon, et le compter ferait regresser un badge acquis.
+   */
+  it('compte les sites mis en ligne sur prospect_site, par published_at non nul, sans transferer de ligne', async () => {
     const { builder, appels } = compte({ n: 3 });
-    const entrees = await fetchEntreesJeu(fakeClient({ deploymentEvent: builder }), new Date('2026-09-02T00:00:00Z'));
+    const entrees = await fetchEntreesJeu(fakeClient({ prospectSite: builder }), new Date('2026-09-02T00:00:00Z'));
     expect(appels.selects).toEqual([['*', { count: 'exact', head: true }]]);
-    expect(appels.eqs).toEqual([
-      ['step', 'en_ligne'],
-      ['outcome', 'reussi'],
-    ]);
+    expect(appels.nots).toEqual([['published_at', 'is', null]]);
+    // Aucun filtre sur `unpublished_at` : un site retire garde son jalon.
+    expect(appels.eqs).toEqual([]);
     expect(entrees.nombreSitesMisEnLigne).toBe(3);
   });
 
@@ -368,10 +380,10 @@ describe('fetchEntreesJeu — un echec de lecture distinct d un resultat vide', 
     );
   });
 
-  it('un echec sur le COUNT de deployment_event est nomme et distinct d un vide', async () => {
+  it('un echec sur le COUNT de prospect_site est nomme et distinct d un vide', async () => {
     const { builder } = compte({ erreur: { message: 'timeout' } });
-    await expect(fetchEntreesJeu(fakeClient({ deploymentEvent: builder }), new Date())).rejects.toThrow(
-      /deployment_event.*timeout/,
+    await expect(fetchEntreesJeu(fakeClient({ prospectSite: builder }), new Date())).rejects.toThrow(
+      /prospect_site.*timeout/,
     );
   });
 
@@ -408,7 +420,7 @@ describe('fetchJeu', () => {
         pipelineLignes,
         interaction,
         pipelineRdv: compte({ n: 1 }).builder,
-        deploymentEvent: compte({ n: 1 }).builder,
+        prospectSite: compte({ n: 1 }).builder,
       }),
       new Date('2026-09-02T00:00:00Z'),
     );

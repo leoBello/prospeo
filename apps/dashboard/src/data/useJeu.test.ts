@@ -31,6 +31,7 @@ function builderImmediat(compte: () => number = () => 0) {
       const fige = {
         select() { return fige; },
         eq() { return fige; },
+        not() { return fige; },
         gte() { return fige; },
         lt() { return fige; },
         or() { return fige; },
@@ -49,6 +50,7 @@ function builderEnErreur(message: string) {
   const b = {
     select() { return b; },
     eq() { return b; },
+    not() { return b; },
     gte() { return b; },
     lt() { return b; },
     or() { return b; },

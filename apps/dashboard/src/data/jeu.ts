@@ -217,15 +217,39 @@ async function lireCompte(
 }
 
 /**
- * Le nombre de sites mis en ligne DEPUIS TOUJOURS — `step: 'en_ligne'` **et**
- * `outcome: 'reussi'` (l'énoncé de la tâche), traduit en clause `.eq` plutôt
- * que rejoué en mémoire. Un `count`, jamais une ligne transférée : voir le
- * docstring du fichier.
+ * Le nombre de sites mis en ligne DEPUIS TOUJOURS.
+ *
+ * **Lu sur `prospect_site`, et non sur `deployment_event`** — c'est une
+ * correction, et elle mérite son explication.
+ *
+ * Le plan tenait cette source pour « débloquée par le lot 2 », qui a créé
+ * `deployment_event` et son couple `en_ligne`/`reussi`. C'est vrai du
+ * schéma et faux des données : cette table ne se remplit qu'aux passages du
+ * collector, et **tout ce qui a été publié avant sa création n'y figure
+ * pas**. Le handoff du lot 2 le disait déjà des sites vivants — « ils n'ont
+ * aucun événement » — mais le jeu, lui, a quand même compté depuis là. Un
+ * site réellement en ligne rapportait donc zéro point, sous une bande qui
+ * annonce « +120 pts · site mis en ligne » : exactement l'affordance qui
+ * promet un fait qu'aucun code ne rend vrai.
+ *
+ * `prospect_site` porte l'état, une ligne par prospect, et sait pour TOUS
+ * les sites — ceux d'avant la table d'événements comme ceux d'après. Compter
+ * ici évite au passage le double comptage qu'un cumul des deux sources
+ * produirait sur les sites à venir.
+ *
+ * **`published_at` non nul, sans regarder `unpublished_at`** : le jalon est
+ * « avoir mis un site en ligne », pas « en avoir un en ligne maintenant ».
+ * Un retrait — un refus, ou la péremption à 90 jours du chantier n°4 — ne
+ * défait pas le travail accompli, et le compter ferait **régresser** le
+ * palier et reverrouiller un badge acquis, ce que la doctrine du jeu
+ * interdit. `unpublish` n'efface d'ailleurs jamais `published_at`
+ * (`collector/src/cli.ts`, il n'écrit que `unpublished_at`), donc ce compte
+ * ne peut que croître.
  */
 async function compterSitesMisEnLigne(client: Client): Promise<number> {
   return lireCompte(
-    'deployment_event',
-    client.from('deployment_event').select('*', { count: 'exact', head: true }).eq('step', 'en_ligne').eq('outcome', 'reussi'),
+    'prospect_site (sites mis en ligne)',
+    client.from('prospect_site').select('*', { count: 'exact', head: true }).not('published_at', 'is', null),
   );
 }
 
