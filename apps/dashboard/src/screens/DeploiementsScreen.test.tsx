@@ -147,6 +147,52 @@ describe('DeploiementsScreen', () => {
     expect(screen.getByText('En ligne')).toBeDefined();
   });
 
+  it('affiche encore le badge de peremption pile au seuil de sept jours', () => {
+    // SEUIL_PEREMPTION_JOURS vaut 7 et le badge se declenche sur `<=` : un
+    // decalage d'un jour dans un sens ou l'autre doit faire echouer ce test.
+    rendre([
+      deployment('a', {
+        etat: 'en_ligne',
+        etapeCourante: 'en_ligne',
+        deploymentUrl: 'https://a.vercel.app',
+        publishedAt: '2026-06-01T00:00:00Z',
+        peremptionDans: 7,
+      }),
+    ]);
+    expect(screen.getByText('Péremption dans 7 j')).toBeDefined();
+  });
+
+  it('n affiche plus le badge de peremption un jour au dela du seuil', () => {
+    rendre([
+      deployment('a', {
+        etat: 'en_ligne',
+        etapeCourante: 'en_ligne',
+        deploymentUrl: 'https://a.vercel.app',
+        publishedAt: '2026-06-01T00:00:00Z',
+        peremptionDans: 8,
+      }),
+    ]);
+    expect(screen.queryByText(/Péremption/)).toBeNull();
+    expect(screen.getByText('En ligne')).toBeDefined();
+  });
+
+  it('utilise la forme singuliere du badge de peremption a un jour', () => {
+    // `translate` selectionne `deploiements.peremption.badge_one` des que
+    // `count < 2` en francais (voir `estSingulier`) : « Péremption demain »,
+    // pas « Péremption dans 1 j ». Rien ne l'affirmait avant ce test.
+    rendre([
+      deployment('a', {
+        etat: 'en_ligne',
+        etapeCourante: 'en_ligne',
+        deploymentUrl: 'https://a.vercel.app',
+        publishedAt: '2026-06-01T00:00:00Z',
+        peremptionDans: 1,
+      }),
+    ]);
+    expect(screen.getByText('Péremption demain')).toBeDefined();
+    expect(screen.queryByText('Péremption dans 1 j')).toBeNull();
+  });
+
   it('rend le cas majoritaire du jour un : un site en ligne sans aucun evenement', () => {
     // 22 sites en ligne, zero ligne dans deployment_event : la table vient
     // d etre creee. L etape courante est nulle, la duree est nulle.
@@ -165,6 +211,12 @@ describe('DeploiementsScreen', () => {
     expect(screen.getByText('Plomberie Guérin & Fils')).toBeDefined();
     expect(screen.getByText('En ligne')).toBeDefined();
     expect(screen.getByRole('link').getAttribute('href')).toBe('https://plomberie-guerin.vercel.app');
+    // La colonne Duree doit nommer l'absence (`value.unknown`, rendu par
+    // `Absent`) plutot que de laisser une cellule vide : c'est le meme parti
+    // pris que le score ou le gabarit absents, et c'est precisement le champ
+    // que ce cas majoritaire (durationMs: null) met a l'epreuve.
+    const dureeAbsente = screen.getByText('non renseigné');
+    expect(dureeAbsente.getAttribute('data-absent')).toBe('true');
   });
 
   it('dit qu il n y a aucun deploiement, plutot que de rendre une page blanche', () => {

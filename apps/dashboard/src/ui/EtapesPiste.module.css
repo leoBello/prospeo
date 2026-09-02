@@ -27,13 +27,22 @@
   border: 1px solid transparent;
 }
 
+/*
+ * Le hachurage de `fail` et `run` se mélange à `--color-border-strong`, pas à
+ * `black` : ce token est déjà, dans ce même fichier, la marque structurelle
+ * posée sur un segment (la bordure de `empty`). Il porte en plus la bonne
+ * direction dans les deux thèmes sans aucune règle conditionnelle — sombre
+ * dans le thème sombre, où il fonce le motif comme prévu ; clair dans le
+ * thème clair, où foncer encore une couleur d'état déjà saturée aurait noyé
+ * le motif au lieu de le dessiner.
+ */
 .segment[data-etat='fail'] {
   border: 1px solid transparent;
   background-color: var(--color-danger);
   background-image: repeating-linear-gradient(
     45deg,
     transparent 0 3px,
-    color-mix(in srgb, black 35%, transparent) 3px 6px
+    color-mix(in srgb, var(--color-border-strong) 35%, transparent) 3px 6px
   );
 }
 
@@ -43,7 +52,7 @@
   background-image: repeating-linear-gradient(
     -45deg,
     transparent 0 4px,
-    color-mix(in srgb, black 30%, transparent) 4px 8px
+    color-mix(in srgb, var(--color-border-strong) 30%, transparent) 4px 8px
   );
   background-size: 200% 100%;
   animation: glissement 1.2s linear infinite;
