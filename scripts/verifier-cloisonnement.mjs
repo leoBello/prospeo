@@ -81,8 +81,23 @@ if (temoin === undefined) {
   console.log(`compte de vérification existant : ${temoin.id}`);
 }
 
-const proprietaire = comptes.users.find((u) => u.email !== EMAIL);
-console.log(`propriétaire : ${proprietaire?.email} (${proprietaire?.id})\n`);
+/**
+ * Le propriétaire est FIGÉ sur son uuid, jamais déduit par élimination.
+ *
+ * « Le premier qui n'est pas le témoin » se trompait déjà au troisième
+ * compte créé sur l'instance : il aurait désigné un compte arbitraire,
+ * inséré un prospect chez lui, et fait tourner les assertions ci-dessous
+ * sans plus rien vérifier — SANS RIEN LE SIGNALER. Un contrôle qui ment est
+ * pire qu'un contrôle absent ; figer l'uuid et échouer bruyamment s'il
+ * manque vaut mieux qu'une déduction qui se trompe en silence.
+ */
+const PROPRIETAIRE_ID = '131ab48e-055a-4a15-af4b-79ed7a2e4465';
+const proprietaire = comptes.users.find((u) => u.id === PROPRIETAIRE_ID);
+if (proprietaire === undefined) {
+  console.log(`propriétaire introuvable : aucun compte ${PROPRIETAIRE_ID} sur cette instance.`);
+  process.exit(1);
+}
+console.log(`propriétaire : ${proprietaire.email} (${proprietaire.id})\n`);
 
 // -------------------------------------------- une ligne qui lui appartient
 // Sans elle, on ne pourrait pas distinguer « cloisonné » de « tout verrouillé ».
@@ -137,6 +152,32 @@ for (const table of TABLES.filter((t) => t !== 'prospect')) {
   }
   dire(count === 0, `${table} : ${count} ligne(s), 0 attendue`);
 }
+
+// -------------------------------------- les deux objets de l'application
+// `TABLES` les exclut (C4) parce qu'ils n'appartiennent à aucun client — mais
+// exclus du filtrage ne veut pas dire exclus du contrôle : une politique
+// cassée ici ne serait vue par AUCUN test si ce script se taisait sur elles
+// aussi. Ce qu'on attend d'elles se VÉRIFIE, plutôt que de se supposer :
+// - toutes deux lisibles par n'importe quel compte authentifié ;
+// - `site_template` est de plus ÉCRITE par n'importe quel compte
+//   authentifié : c'est le trou connu et borné, consigné dans HANDOFF.md,
+//   pas un oubli — ce contrôle doit le CONSTATER, pas le taire.
+for (const table of ['site_template', 'worker_heartbeat']) {
+  const { error } = await client.from(table).select('*', { count: 'exact', head: true });
+  dire(error === null, `${table} : lisible par le témoin authentifié (attendu, C4)`);
+}
+
+// `updated_at` seul, jamais `repo_full_name` ni `branch` : la valeur du
+// gabarit désigné est un réglage réel de l'instance, et ce contrôle n'a pas
+// à le perturber pour prouver que l'écriture passe.
+const { error: erreurEcritureGabarit } = await client
+  .from('site_template')
+  .update({ updated_at: new Date().toISOString() })
+  .eq('id', 1);
+dire(
+  erreurEcritureGabarit === null,
+  'site_template : écrivable par le témoin authentifié (le trou connu, borné — voir HANDOFF.md)',
+);
 
 // ------------------------------------------- et qu'il ne peut rien écrire
 // `with check` autant que `using` : sans lui, le témoin pourrait ÉCRIRE une

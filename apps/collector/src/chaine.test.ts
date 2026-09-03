@@ -7,6 +7,9 @@ import {
   decideGeneration,
   decidePublication,
   decideRedaction,
+  fetchPitchCandidates,
+  fetchSiteCandidates,
+  fetchSiteRows,
   traiterProspect,
   type ChaineDeps,
 } from './chaine.js';
@@ -196,28 +199,61 @@ describe('decideRedaction', () => {
 });
 
 /**
+ * Une requête telle que `clientSimule` l'a vue construire : la table visée,
+ * le littéral passé à `select`, et chaque `.eq(colonne, valeur)` enchaîné.
+ *
+ * C'est le CÂBLAGE qu'on éprouve pour le correctif n°1 — quelle colonne,
+ * quelle valeur, quelle relation — pas la forme du résultat : un `.eq()` qui
+ * n'enregistre rien laisse la garde `service_role` sans témoin, comme
+ * `fetchSiteCandidates` avait perdu la sienne avant ce correctif.
+ */
+interface AppelRequete {
+  table: string;
+  select?: string;
+  filtres: [string, string][];
+}
+
+/**
  * Un client simulé réduit à ce que `generer` lit : la liste des prospects et
  * celle des lignes `prospect_site`.
  *
  * Aucun réseau, aucune base : ce qu'on éprouve ici est la DÉCISION de `generer`
  * quand le prospect n'est pas candidat, pas la forme des requêtes — celle-ci
  * est déjà couverte par les étages eux-mêmes.
+ *
+ * `appels` rend visible ce que `eq` et `select` reçoivent réellement : sans
+ * cet enregistrement, un `.eq('owner_id', proprietaire)` retiré du code de
+ * production ne ferait rougir aucun test — `service_role` ne lève pas, il
+ * rend simplement plus de lignes.
  */
-function clientSimule(prospects: unknown[], sites: unknown[] = []): SupabaseClient<Database> {
-  const table = (lignes: unknown[]): Record<string, unknown> => {
+function clientSimule(
+  prospects: unknown[],
+  sites: unknown[] = [],
+): { client: SupabaseClient<Database>; appels: AppelRequete[] } {
+  const appels: AppelRequete[] = [];
+  const table = (nom: string, lignes: unknown[]): Record<string, unknown> => {
+    const appel: AppelRequete = { table: nom, filtres: [] };
+    appels.push(appel);
     const b: Record<string, unknown> = {
-      select: () => b,
+      select: (colonnes: string) => {
+        appel.select = colonnes;
+        return b;
+      },
       order: () => b,
-      eq: () => b,
+      eq: (colonne: string, valeur: string) => {
+        appel.filtres.push([colonne, valeur]);
+        return b;
+      },
       limit: () => Promise.resolve({ data: lignes, error: null }),
       range: () => Promise.resolve({ data: lignes, error: null }),
       upsert: () => Promise.resolve({ error: null }),
     };
     return b;
   };
-  return {
-    from: (nom: string) => table(nom === 'prospect' ? prospects : sites),
+  const client = {
+    from: (nom: string) => table(nom, nom === 'prospect' ? prospects : sites),
   } as unknown as SupabaseClient<Database>;
+  return { client, appels };
 }
 
 /** Un prospect que `fetchSiteCandidates` accepte : les cas de refus le dérivent. */
@@ -263,7 +299,7 @@ describe('chaineDeps.generer', () => {
     // `publier` levait « aucun contenu a publier — la redaction n a rien
     // ecrit » : la ligne affichait un motif FAUX, et « Rejouer » proposait de
     // recommencer un echec certain, indefiniment.
-    const client = clientSimule([prospectCandidat(surcharge)]);
+    const { client } = clientSimule([prospectCandidat(surcharge)]);
 
     // Motif lu dans `chaine.ts`, jamais reecrit de memoire : c est ce texte-la
     // que le worker ecrit dans `campaign_job.last_error` et que la ligne de
@@ -277,11 +313,57 @@ describe('chaineDeps.generer', () => {
     // `decideGeneration` → `deja_fait` : un contenu ecrit et non rejete n est
     // pas une erreur, c est un rejeu qui n a rien a repayer. Le confondre avec
     // le refus ci-dessus ferait echouer un job qui n avait rien a faire.
-    const client = clientSimule(
+    const { client } = clientSimule(
       [prospectCandidat()],
       [{ prospect_id: 'p-1', content: { titre: 'x' }, content_rejected_at: null }],
     );
 
     await expect(chaineDeps(client, PROPRIETAIRE).generer('p-1')).resolves.toBeNull();
+  });
+});
+
+/**
+ * Le correctif n°1 de la revue finale : ce que `service_role` ne refusera
+ * jamais, un test doit le prouver lui-même.
+ *
+ * `service_role` contourne RLS par construction — un `.eq('owner_id', …)`
+ * retiré du code ne fait lever aucune erreur, il rend simplement plus de
+ * lignes. Les trois lectures ci-dessous sont donc éprouvées sur la requête
+ * CONSTRUITE (`appels`), pas sur son résultat : c'est le seul endroit où ce
+ * cloisonnement se voit.
+ */
+describe('cloisonnement des lectures', () => {
+  it('fetchSiteCandidates filtre sur le proprietaire recu, pas sur une valeur inventee', async () => {
+    const { client, appels } = clientSimule([]);
+
+    await fetchSiteCandidates(client, PROPRIETAIRE, undefined);
+
+    const appel = appels.find((a) => a.table === 'prospect');
+    expect(appel?.filtres).toContainEqual(['owner_id', PROPRIETAIRE]);
+  });
+
+  it('fetchPitchCandidates filtre sur le proprietaire recu, pas sur une valeur inventee', async () => {
+    const { client, appels } = clientSimule([]);
+
+    await fetchPitchCandidates(client, PROPRIETAIRE);
+
+    const appel = appels.find((a) => a.table === 'prospect');
+    expect(appel?.filtres).toContainEqual(['owner_id', PROPRIETAIRE]);
+  });
+
+  it('fetchSiteRows filtre sur le proprietaire via la relation, ET la jointure est INNER', async () => {
+    // Les deux gardes sont distinctes. Sans `.eq('prospect.owner_id', …)`, le
+    // filtre n'existe pas. Sans `!inner` dans le `select`, PostgREST ne
+    // restreint pas les lignes de `prospect_site` : il vide seulement la
+    // relation embarquée et rend TOUTES les lignes, `prospect: null`. Mesuré
+    // contre l'instance le 3 septembre 2026 — sans `!inner`, 2 lignes sur 2
+    // pour un propriétaire étranger ; avec, 0.
+    const { client, appels } = clientSimule([], []);
+
+    await fetchSiteRows(client, PROPRIETAIRE);
+
+    const appel = appels.find((a) => a.table === 'prospect_site');
+    expect(appel?.filtres).toContainEqual(['prospect.owner_id', PROPRIETAIRE]);
+    expect(appel?.select).toContain('prospect!inner()');
   });
 });

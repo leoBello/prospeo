@@ -644,6 +644,30 @@ aujourd'hui : un seul compte réel, et le changement est visible et réversible.
 **À fermer quand une distinction administrateur existera** — pas avant, sous
 peine de casser un écran pour rien.
 
+**`worker_heartbeat` reste lisible par n'importe quel utilisateur
+authentifié**, de la même façon et pour la même raison (`FORME 3` de
+`supabase/migrations/20260904092000_politiques_cloisonnees.sql`) : ligne
+unique (`worker_heartbeat_singleton check (id)`, migration
+`20260903090000_campagne_file.sql`), elle décrit un processus et
+n'appartient à aucun client — C4 l'exclut donc du filtrage par propriétaire,
+comme `site_template`.
+
+Or D8 prévoit **un worker par utilisateur**. Au deuxième compte, deux workers
+écriront tour à tour la même ligne unique, et l'écran « Campagne » de chacun
+(`apps/dashboard/src/data/campagne.ts`) lira un `beat_at` et un `in_flight`
+qui peuvent être ceux de l'autre worker. « Le collector est à l'écoute »
+deviendrait alors une affordance qui annonce un fait qu'aucun code ne rend
+vrai.
+
+Borné aujourd'hui pour la même raison que `site_template` : **un seul compte
+réel, donc un seul worker, donc une seule ligne qui ne peut être que la
+sienne** — la lecture large ne change rien à ce que l'écran affiche. **À
+fermer quand l'étape « worker par utilisateur » de D8 sera posée** : elle
+demande une ligne par propriétaire (une clé primaire `owner_id` plutôt que le
+singleton actuel) et un filtre sur `campagne.ts`, pas avant, pour la même
+raison que `site_template` — fermer un trou sans client pour l'ouvrir ne fait
+que déplacer le risque.
+
 ### Une leçon de méthode, payée dans ce chantier
 
 `pnpm -r typecheck` a été annoncé vert au départ d'une tâche alors qu'il était
