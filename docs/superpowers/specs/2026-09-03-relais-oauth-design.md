@@ -195,6 +195,15 @@ mention contraire :
 son stockage (base64, ou tel quel si l'environnement Vercel le permet) se
 tranche à l'implémentation (§6).
 
+**Trois valeurs de plus, configurables mais pas secrètes** (relais
+uniquement) : `PROSPEO_GITHUB_INSTALL_URL` (le lien d'installation
+`github.com/apps/<nom-choisi-a-la-creation>/installations/new`, dépend d'un
+nom que seul le propriétaire connaît), `PROSPEO_VERCEL_INSTALL_URL` (même
+raison, `vercel.com/integrations/<slug>/new`), et
+`PROSPEO_VERCEL_REDIRECT_URI` (doit correspondre EXACTEMENT au Redirect URL
+enregistré dans la console Vercel — un codé en dur diverge silencieusement si
+le domaine change).
+
 ---
 
 ## 5. Tests
