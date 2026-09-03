@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.122.0",
+    "@prospeo/coffre": "workspace:*",
     "@prospeo/core": "workspace:*",
     "@prospeo/db": "workspace:*",
     "@supabase/supabase-js": "^2.45.0",

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { lireCleMaitresse, type CleMaitresse } from './coffre.js';
+import { lireCleMaitresse, type CleMaitresse } from '@prospeo/coffre';
 
 const schema = z.object({
   SUPABASE_URL: z.string().url(),

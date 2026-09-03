@@ -26,6 +26,9 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.122.0
         version: 0.122.0(zod@3.25.76)
+      '@prospeo/coffre':
+        specifier: workspace:*
+        version: link:../../packages/coffre
       '@prospeo/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -140,6 +143,8 @@ importers:
       vitest:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@26.4.0)(jsdom@25.0.1)(vite@8.2.2(@types/node@26.4.0)(esbuild@0.28.2)(tsx@4.23.13)(yaml@2.9.0))
+
+  packages/coffre: {}
 
   packages/core:
     dependencies:
