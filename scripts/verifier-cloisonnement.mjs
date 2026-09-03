@@ -33,8 +33,12 @@ const env = Object.fromEntries(
 const EMAIL = 'verification-cloisonnement@prospeo.invalid';
 const MOT_DE_PASSE = 'verification-cloisonnement-2026';
 
-/** Les quatorze tables qui portent des données de client. `site_template` et
- *  `worker_heartbeat` en sont exclues : ce sont des objets de l'application. */
+/** Les quinze tables qui portent des données de client. `site_template` et
+ *  `worker_heartbeat` en sont exclues : ce sont des objets de l'application.
+ *  `connexion_secret` en est exclue aussi, mais pour la raison inverse : elle
+ *  n'a AUCUNE politique, donc ce contrôle générique — qui suppose une
+ *  politique filtrée par propriétaire — ne s'y applique pas ; elle a son
+ *  propre contrôle, plus strict, plus bas. */
 const TABLES = [
   'prospect',
   'prospect_enrichment',
@@ -50,6 +54,7 @@ const TABLES = [
   'message_send',
   'campaign',
   'campaign_job',
+  'connexion_plateforme',
 ];
 
 const admin = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
@@ -127,6 +132,60 @@ if (sien === null) {
   console.log('  ok   le témoin a déjà son prospect (passage précédent)');
 }
 
+// ------------------------------- le témoin, connecté à vercel (le coffre)
+// Un contrôle qui vérifie que `connexion_secret` rend zéro ligne passerait
+// aussi bien si la table était vide. Il faut donc, AVEC service_role, y
+// écrire un secret pour le témoin avant de vérifier plus bas qu'il reste
+// invisible depuis sa propre session — sans quoi le contrôle ne prouve rien.
+const { data: connexionExistante } = await admin
+  .from('connexion_plateforme')
+  .select('id')
+  .eq('owner_id', temoin.id)
+  .eq('plateforme', 'vercel')
+  .maybeSingle();
+
+let connexionTemoinId = connexionExistante?.id;
+if (connexionExistante === null) {
+  const { data: connexionCreee, error: erreurConnexion } = await admin
+    .from('connexion_plateforme')
+    .insert({ owner_id: temoin.id, plateforme: 'vercel', compte_libelle: 'témoin — vérification' })
+    .select('id')
+    .single();
+  dire(
+    erreurConnexion === null,
+    `connexion_plateforme créée pour le témoin${erreurConnexion ? ` — ${erreurConnexion.message}` : ''}`,
+  );
+  connexionTemoinId = connexionCreee?.id;
+} else {
+  console.log('  ok   le témoin a déjà sa connexion vercel (passage précédent)');
+}
+
+if (connexionTemoinId !== undefined) {
+  const { data: secretExistant } = await admin
+    .from('connexion_secret')
+    .select('connexion_id')
+    .eq('connexion_id', connexionTemoinId)
+    .maybeSingle();
+  if (secretExistant === null) {
+    // La forme suffit — ce contrôle prouve l'INVISIBILITÉ de la ligne, pas
+    // le déchiffrement d'un vrai jeton : ces octets ne représentent aucun
+    // secret réel.
+    const { error: erreurSecret } = await admin.from('connexion_secret').insert({
+      connexion_id: connexionTemoinId,
+      chiffre: '\\x00',
+      vecteur: '\\x00',
+      etiquette: '\\x00',
+      cle_id: 'verification-cloisonnement',
+    });
+    dire(
+      erreurSecret === null,
+      `connexion_secret créé pour le témoin${erreurSecret ? ` — ${erreurSecret.message}` : ''}`,
+    );
+  } else {
+    console.log('  ok   le témoin a déjà son secret (passage précédent)');
+  }
+}
+
 // -------------------------------------------------- ce que le témoin voit
 const client = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY, {
   auth: { persistSession: false },
@@ -149,6 +208,35 @@ console.log('-- ce que le TÉMOIN voit (sa session, clé publique) --');
 const { count: siens } = await client.from('prospect').select('*', { count: 'exact', head: true });
 dire(siens >= 1, `prospect : ${siens} ligne(s) visible(s), au moins la sienne attendue`);
 
+// ------------------------------------------------------ le coffre à jetons
+// La connexion elle-même se lit — c'est un fait qu'un écran doit pouvoir
+// montrer (« Vercel connecté depuis… »). C'est le sens POSITIF, symétrique à
+// celui du prospect ci-dessus.
+const { data: connexionVue, error: erreurConnexionVue } = await client
+  .from('connexion_plateforme')
+  .select('id')
+  .eq('id', connexionTemoinId)
+  .maybeSingle();
+dire(
+  erreurConnexionVue === null && connexionVue !== null,
+  'connexion_plateforme : le témoin voit la sienne',
+);
+
+// L'ASSERTION NEUVE — la seule qui prouve V2. La ligne vient d'être écrite
+// juste au-dessus avec service_role : elle EXISTE et appartient au témoin.
+// Sa propre session, clé publique, ne doit pourtant ni la lire ni même
+// détecter qu'elle existe — `connexion_secret` ne porte AUCUNE politique,
+// pas même une qui filtrerait par propriétaire.
+const { data: secretVu, error: erreurSecretVu } = await client
+  .from('connexion_secret')
+  .select('connexion_id')
+  .eq('connexion_id', connexionTemoinId)
+  .maybeSingle();
+dire(
+  secretVu === null,
+  `connexion_secret : invisible même pour son propriétaire${erreurSecretVu ? ` (${erreurSecretVu.message.slice(0, 40)})` : ''}`,
+);
+
 /**
  * Le sens NÉGATIF, table par table, et sur une ligne NOMMÉE.
  *
@@ -170,6 +258,7 @@ for (const table of TABLES) {
     prospect: (q) => q.eq('owner_id', proprietaire.id),
     campaign: (q) => q.eq('owner_id', proprietaire.id),
     campaign_job: (q) => q.eq('requested_by', proprietaire.id),
+    connexion_plateforme: (q) => q.eq('owner_id', proprietaire.id),
   };
   // Six satellites n'ont PAS de colonne `id` : leur clé primaire EST
   // `prospect_id` (voir la migration initiale). Prendre `id` partout faisait
