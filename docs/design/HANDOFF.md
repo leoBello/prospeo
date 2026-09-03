@@ -588,6 +588,70 @@ filet des en-têtes en plein milieu. **524 tests verts ne l'ont pas vu**, et
 `jsdom` ne pouvait pas le voir. C'est le quatrième défaut de mise en page de ce
 dépôt trouvé en regardant l'écran plutôt qu'en lisant du code.
 
+## Chantier n°8, étape 1 — le cloisonnement : ce qu'il protège, et ce qu'il ne protège pas
+
+**Appliqué à l'instance le 3 septembre 2026.** Ne pas lire ce tableau comme clos.
+
+### Ce qui est protégé, et prouvé
+
+`prospect` et `campaign` portent un `owner_id` ; `campaign_job` emploie
+`requested_by` ; les onze satellites déduisent le propriétaire par une
+remontée indexée. Quinze politiques remplacent les anciens
+`authenticated_all using (true)`.
+
+**Prouvé dans les deux sens**, avec la clé publique et une vraie session —
+jamais avec `service_role`, qui contourne RLS et ferait passer n'importe quoi :
+
+- un compte témoin voit **sa** ligne sur `prospect` et **zéro** sur les treize
+  autres tables ;
+- écrire sur le prospect d'un autre est refusé (`with check`, pas seulement
+  `using`) ;
+- déposer un job en usurpant l'identifiant d'un autre est refusé (`42501`) ;
+- le **même SIRET** appartient désormais à deux propriétaires — c'est
+  l'exception doctrinale du chantier, et elle sert.
+
+Le contrôle vit dans `scripts/verifier-cloisonnement.mjs` et se rejoue à
+chaque chantier qui touche aux politiques.
+
+### Ce qui n'est PAS protégé, et c'est le point important
+
+**La RLS ne protège pas le collector.** Il emploie la clé `service_role`, qui
+la contourne par construction. Aucune politique ne le retiendra jamais, et
+**aucun test ne verra une lecture oubliée** : `service_role` ne lève pas, il
+rend simplement plus de lignes.
+
+La seule barrière est un filtre explicite, posé sur les 42 lectures recensées
+(`grep -rn "\.from('" apps/collector/src --include=*.ts | grep -v test` en
+rend 44, dont 2 sont des objets de l'application).
+
+**La forme du filtre a dû être mesurée, pas raisonnée.** Sans `!inner`, un
+filtre sur une relation embarquée ne restreint pas les lignes de la table
+principale — il vide seulement la relation. Mesuré contre l'instance : un
+propriétaire étranger voyait **2 lignes sur 2** de `prospect_site` et **109**
+de `web_presence` ; avec `prospect!inner()`, zéro. C'est la panne silencieuse
+type de ce chantier.
+
+### Le trou connu, borné, à fermer
+
+**`site_template` reste écrite par n'importe quel utilisateur authentifié.**
+Le spec prévoyait de la passer en lecture seule ; `designerGabarit`
+(`dashboard/src/data/mutations.ts`) y écrit, et la verrouiller aurait laissé
+l'écran « Gabarit » avec un formulaire que la RLS refuse — l'affordance que la
+doctrine interdit.
+
+Un utilisateur pourrait donc **repointer le gabarit de tous**. Borné
+aujourd'hui : un seul compte réel, et le changement est visible et réversible.
+**À fermer quand une distinction administrateur existera** — pas avant, sous
+peine de casser un écran pour rien.
+
+### Une leçon de méthode, payée dans ce chantier
+
+`pnpm -r typecheck` a été annoncé vert au départ d'une tâche alors qu'il était
+**déjà rouge** : la migration venait de rendre `owner_id` obligatoire, et
+`discover.ts` insérait sans lui. L'état avait été vérifié **avant**
+l'application, pas après. **Après toute migration suivie de `db:types`, le
+typecheck se revérifie** avant d'annoncer quoi que ce soit.
+
 ## La question ouverte du lot 3
 
 `prospect_pipeline` ne porte que `status` et `updated_at`. Savoir qu'une
