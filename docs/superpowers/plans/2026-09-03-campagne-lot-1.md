@@ -1054,7 +1054,9 @@ Attendu : les cinq tests de `traiterProspect` verts.
 
 - [ ] **Étape 5 : Prouver que les assertions peuvent échouer**
 
-1. remplacer `cout === null ? montant : cout + montant` par `(cout ?? 0) + montant` → le test « cout nul quand aucune etape » doit rougir ;
+1. **retirer le garde** `if (montant === null) return;` **et** remplacer `cout === null ? montant : cout + montant` par `cout = (cout ?? 0) + (montant ?? 0)` → le test « cout nul quand aucune etape » doit rougir sur `expected +0 to be null`.
+
+   > **Les deux moitiés sont nécessaires.** Remplacer le seul cumul, garde intact, est un **no-op** : le garde a déjà exclu `montant === null`, donc `(cout ?? 0) + montant` et `cout === null ? montant : cout + montant` rendent exactement la même valeur, et la suite reste entièrement verte. Vérifié en rejouant les deux variantes. Une cassure qui ne rougit pas ne prouve rien — et une consigne de cassure inopérante est pire qu'aucune consigne, puisqu'elle fait croire la preuve faite.
 2. remplacer le `return` du `catch` par un `continue` → les tests « s arrete au premier echec » doivent rougir ;
 3. inverser deux entrées du tableau `etapes` → le test « enchaine dans l ordre » doit rougir.
 
