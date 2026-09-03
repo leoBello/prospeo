@@ -32,7 +32,15 @@ export async function traiterRappelGithub(
     return { ok: false, raison: 'installation_id manquant' };
   }
 
-  const installation = await deps.lireInstallation(params.installationId);
-  await deps.ecrireConnexion(verif.charge.ownerId, params.installationId, installation.compteLibelle);
-  return { ok: true };
+  // Un refus réseau (GitHub) ou d'écriture (Supabase) reste une exception
+  // dans ses dépendances — capturée ICI pour ne jamais fuir au-delà de cette
+  // fonction : l'appelant (l'enveloppe API) doit toujours pouvoir rendre la
+  // page générique de R5, jamais une exception non gérée.
+  try {
+    const installation = await deps.lireInstallation(params.installationId);
+    await deps.ecrireConnexion(verif.charge.ownerId, params.installationId, installation.compteLibelle);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, raison: e instanceof Error ? e.message : String(e) };
+  }
 }

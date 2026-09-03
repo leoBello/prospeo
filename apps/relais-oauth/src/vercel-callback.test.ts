@@ -71,4 +71,17 @@ describe('traiterRappelVercel', () => {
     const [, compteLibelle] = ecrireConnexion.mock.calls[0] as [string, string, Scelle];
     expect(compteLibelle).toBe('compte personnel');
   });
+
+  it('rend un échec générique — jamais ne lève — quand Vercel refuse l échange de code (R5)', async () => {
+    await expect(
+      traiterRappelVercel(
+        deps({
+          echangerCode: async () => {
+            throw new Error('Vercel a répondu 401 : { "error": "invalid_grant" }');
+          },
+        }),
+        { code: 'c1', state: 'x' },
+      ),
+    ).resolves.toEqual({ ok: false, raison: expect.any(String) });
+  });
 });

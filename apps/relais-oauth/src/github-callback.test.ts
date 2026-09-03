@@ -60,4 +60,17 @@ describe('traiterRappelGithub', () => {
     expect(r).toEqual({ ok: true });
     expect(ecrireConnexion).toHaveBeenCalledWith('owner-1', '999', 'mon-org');
   });
+
+  it('rend un échec générique — jamais ne lève — quand l écriture de la connexion échoue (R5)', async () => {
+    await expect(
+      traiterRappelGithub(
+        deps({
+          ecrireConnexion: async () => {
+            throw new Error('Supabase a répondu 500 : { "message": "connection refused" }');
+          },
+        }),
+        { installationId: '999', setupAction: 'install', state: 'x' },
+      ),
+    ).resolves.toEqual({ ok: false, raison: expect.any(String) });
+  });
 });

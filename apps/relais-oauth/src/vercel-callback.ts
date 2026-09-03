@@ -28,9 +28,17 @@ export async function traiterRappelVercel(
   }
   if (params.code === undefined) return { ok: false, raison: 'code manquant' };
 
-  const jeton = await deps.echangerCode(params.code, deps.redirectUri);
-  const scelle = chiffrer(jeton.accessToken, deps.cle);
-  const compteLibelle = jeton.teamId ?? 'compte personnel';
-  await deps.ecrireConnexion(verif.charge.ownerId, compteLibelle, scelle);
-  return { ok: true };
+  // Un refus réseau (Vercel) ou d'écriture (Supabase) reste une exception
+  // dans ses dépendances — capturée ICI pour ne jamais fuir au-delà de cette
+  // fonction : l'appelant (l'enveloppe API) doit toujours pouvoir rendre la
+  // page générique de R5, jamais une exception non gérée.
+  try {
+    const jeton = await deps.echangerCode(params.code, deps.redirectUri);
+    const scelle = chiffrer(jeton.accessToken, deps.cle);
+    const compteLibelle = jeton.teamId ?? 'compte personnel';
+    await deps.ecrireConnexion(verif.charge.ownerId, compteLibelle, scelle);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, raison: e instanceof Error ? e.message : String(e) };
+  }
 }

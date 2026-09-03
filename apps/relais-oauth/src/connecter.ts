@@ -34,7 +34,7 @@ export async function construireRedirection(
   }
   const existe = await deps.proprietaireExiste(ownerId);
   if (!existe) {
-    return { ok: false, statut: 404, raison: `aucun utilisateur ${ownerId}.` };
+    return { ok: false, statut: 404, raison: 'utilisateur introuvable.' };
   }
   const state = deps.signerState({ ownerId, plateforme });
   const base = plateforme === 'github' ? liens.githubInstallUrl : liens.vercelInstallUrl;
