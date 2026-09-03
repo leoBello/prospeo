@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { traiterProspect, type ChaineDeps } from './chaine.js';
+import {
+  decideDeploiement,
+  decideGeneration,
+  decidePublication,
+  decideRedaction,
+  traiterProspect,
+  type ChaineDeps,
+} from './chaine.js';
 
 function deps(surcharges: Partial<ChaineDeps> = {}): ChaineDeps {
   return {
@@ -84,5 +91,93 @@ describe('traiterProspect', () => {
     // Un total partiel, pas un total faux. Traiter le `null` comme zero
     // sous-declarerait la depense sans que rien ne le signale.
     expect(resultat.coutEur).toBeCloseTo(0.02, 5);
+  });
+});
+
+describe('decideGeneration', () => {
+  it('rend faire quand rien n a encore ete ecrit', () => {
+    expect(decideGeneration(undefined)).toEqual({ faire: true });
+  });
+
+  it('refuse de repayer un contenu deja ecrit et non rejete', () => {
+    const decision = decideGeneration({ content: { titre: 'x' }, content_rejected_at: null });
+
+    expect(decision).toEqual({ faire: false, motif: 'deja_fait' });
+  });
+
+  it('refait un contenu ecrit puis rejete a la relecture', () => {
+    // Un contenu REJETE n est pas « deja fait » : c est precisement le cas que
+    // le bouton du dashboard doit pouvoir relancer sans --force.
+    const decision = decideGeneration({
+      content: { titre: 'x' },
+      content_rejected_at: '2026-09-01T00:00:00Z',
+    });
+
+    expect(decision).toEqual({ faire: true });
+  });
+});
+
+describe('decidePublication', () => {
+  it('rend faire quand rien n a ete retire', () => {
+    expect(decidePublication({ unpublished_at: null })).toEqual({ faire: true });
+    expect(decidePublication(undefined)).toEqual({ faire: true });
+  });
+
+  it('refuse un site retire par un humain', () => {
+    // Le point grave du correctif : un site depublie (ne_pas_contacter, perdu)
+    // ne doit jamais etre republie au nom d une entreprise qui a demande son
+    // retrait. Ce n est pas un « rien a faire » silencieux.
+    const decision = decidePublication({ unpublished_at: '2026-09-01T00:00:00Z' });
+
+    expect(decision).toEqual({ faire: false, motif: 'retire' });
+  });
+});
+
+describe('decideDeploiement', () => {
+  it('rend faire quand rien n est ni deploye ni retire', () => {
+    expect(decideDeploiement({ unpublished_at: null, deployment_url: null })).toEqual({
+      faire: true,
+    });
+  });
+
+  it('ne redeploie pas un site deja en ligne', () => {
+    const decision = decideDeploiement({
+      unpublished_at: null,
+      deployment_url: 'https://x.vercel.app',
+    });
+
+    expect(decision).toEqual({ faire: false, motif: 'deja_fait' });
+  });
+
+  it('refuse un site retire, meme s il n a pas encore d URL', () => {
+    const decision = decideDeploiement({
+      unpublished_at: '2026-09-01T00:00:00Z',
+      deployment_url: null,
+    });
+
+    expect(decision).toEqual({ faire: false, motif: 'retire' });
+  });
+
+  it('le retrait l emporte sur « deja en ligne » quand les deux sont vrais', () => {
+    // C est le cas qu un booleen ne peut pas distinguer : ici, deux motifs de
+    // silence sont vrais a la fois, et un seul doit lever.
+    const decision = decideDeploiement({
+      unpublished_at: '2026-09-01T00:00:00Z',
+      deployment_url: 'https://x.vercel.app',
+    });
+
+    expect(decision).toEqual({ faire: false, motif: 'retire' });
+  });
+});
+
+describe('decideRedaction', () => {
+  it('rend faire quand aucun message n a encore ete redige', () => {
+    expect(decideRedaction(false)).toEqual({ faire: true });
+  });
+
+  it('refuse de reecrire un message deja redige', () => {
+    // L ecriture est un insert, pas un upsert : rejouer sans cette garde
+    // empile des generated_message en double sur le meme prospect.
+    expect(decideRedaction(true)).toEqual({ faire: false, motif: 'deja_fait' });
   });
 });

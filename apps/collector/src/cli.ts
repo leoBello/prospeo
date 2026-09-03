@@ -1781,7 +1781,29 @@ async function main(argv: string[]): Promise<number> {
       const deps = chaineDeps(client);
 
       const traiterUn = async (): Promise<boolean> => {
-        const job = await prendreProchain(fileDeps);
+        // `prendreProchain` lit puis écrit sur Supabase, et `fileDeps` fait un
+        // `throw new Error(...)` sur toute erreur réseau — un blip pendant un
+        // balayage suffit. Cette lecture n'a AUCUN job « en_cours » en main :
+        // la laisser rejeter hors de tout `try` ferait remonter la rejection
+        // jusqu'à `drainer`, puis jusqu'aux deux appels fire-and-forget plus
+        // bas ; depuis Node 15, une rejection non gérée termine le processus,
+        // et un job qu'un tour précédent a laissé `en_cours` resterait bloqué
+        // à jamais derrière l'index unique partiel `campaign_job_actif_unique`
+        // — plus aucune nouvelle demande sur ce prospect, sans intervention
+        // manuelle en base. On distingue donc « la file n'a pas pu être lue »
+        // (un incident, à journaliser — le balayage suivant réessaiera) de
+        // « la file est vide » (l'état normal, qui ne mérite aucun bruit) :
+        // les replier sur le même `return false` silencieux masquerait
+        // l'incident.
+        let job: Awaited<ReturnType<typeof prendreProchain>>;
+        try {
+          job = await prendreProchain(fileDeps);
+        } catch (cause) {
+          process.stderr.write(
+            `worker : lecture de la file échouée — ${cause instanceof Error ? cause.message : String(cause)}\n`,
+          );
+          return false;
+        }
         if (job === null) return false;
 
         enCours += 1;
@@ -1812,11 +1834,48 @@ async function main(argv: string[]): Promise<number> {
         return true;
       };
 
-      /** Vide la file, un job à la fois. */
+      /**
+       * Vide la file, un job à la fois.
+       *
+       * **Ne doit JAMAIS rejeter.** `drainer` est appelé en fire-and-forget
+       * depuis le callback Realtime et depuis le balayage périodique : une
+       * rejection non rattrapée ici tuerait le worker en pleine gestion d'un
+       * job, qui resterait `en_cours` pour toujours derrière l'index unique
+       * partiel — exactement le scénario que ce `try/catch` existe pour
+       * empêcher. `traiterUn` protège déjà sa propre lecture de la file, mais
+       * ce filet-ci reste en place : c'est lui, et non une relecture de
+       * `traiterUn`, qui garantit que « le balayage rattrape Realtime » reste
+       * vrai même si `traiterUn` change un jour.
+       */
       const drainer = async (): Promise<void> => {
-        while (!arret && (await traiterUn())) {
-          // Rien : la condition fait le travail.
+        try {
+          while (!arret && (await traiterUn())) {
+            // Rien : la condition fait le travail.
+          }
+        } catch (cause) {
+          process.stderr.write(
+            `worker : balayage interrompu par une erreur inattendue — ${cause instanceof Error ? cause.message : String(cause)}\n`,
+          );
         }
+      };
+
+      /**
+       * Lance `drainer` en tâche de fond, sans jamais laisser filer une
+       * rejection.
+       *
+       * Garde redondante avec le `try/catch` interne de `drainer` ci-dessus,
+       * et volontairement : un simple `void drainer()` suffit tant que
+       * `drainer` ne rejette pas, mais cesse de protéger le worker dès que ce
+       * invariant se rompt — par exemple si une future modification de
+       * `drainer` ajoute du code après la boucle, hors du `try`. Un job laissé
+       * `en_cours` par un worker mort ne se rattrape qu'à la main, en base.
+       */
+      const lancerDrainage = (): void => {
+        void drainer().catch((cause: unknown) => {
+          process.stderr.write(
+            `worker : drainer a rejeté de façon inattendue — ${cause instanceof Error ? cause.message : String(cause)}\n`,
+          );
+        });
       };
 
       // Realtime réveille ; le balayage rattrape ce qu'une déconnexion aurait
@@ -1826,12 +1885,12 @@ async function main(argv: string[]): Promise<number> {
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'campaign_job' },
-          () => void drainer(),
+          () => lancerDrainage(),
         )
         .subscribe();
 
       const battement = setInterval(() => void battre(), PERIODE_BATTEMENT_MS);
-      const balayage = setInterval(() => void drainer(), PERIODE_BALAYAGE_MS);
+      const balayage = setInterval(() => lancerDrainage(), PERIODE_BALAYAGE_MS);
 
       // Arrêt propre : on cesse de prendre, on laisse finir ce qui est en
       // cours. Un job abandonné en « en cours » bloquerait le prospect

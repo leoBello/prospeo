@@ -133,6 +133,82 @@ export function construireDepsDeploiement(
   };
 }
 
+/**
+ * Ce qu'une garde de rejeu doit dire avant d'agir sur UN prospect.
+ *
+ * Un booléen ne suffit pas : « rien à faire » recouvre deux situations que
+ * `chaineDeps` doit traiter à l'opposé l'une de l'autre. Un travail déjà fait
+ * se tait — `chaineDeps` rend `null`, un rejeu de la chaîne ne coûte rien. Un
+ * site retiré par un humain (`unpublished_at`) ne doit au contraire JAMAIS se
+ * taire : le republier au nom d'une entreprise qui a demandé son retrait est
+ * ce que ce dépôt prend le plus au sérieux, et `chaineDeps` doit lever.
+ */
+export type DecisionEtape =
+  | { faire: true }
+  | { faire: false; motif: 'deja_fait' }
+  | { faire: false; motif: 'retire' };
+
+/**
+ * Faut-il (re)générer le contenu d'un prospect ?
+ *
+ * Même critère que le mode lot de `cli.ts` (`case 'generate'`, filtre
+ * `aFaire`) : un contenu déjà écrit et non rejeté n'est pas repayé — c'est le
+ * seul étage qui dépense de l'argent sur un appel au modèle. Une rédaction
+ * REJETÉE à la relecture fait exception et doit être refaite : c'est
+ * précisément ce que le bouton du dashboard sert à déclencher, sans qu'il
+ * faille se souvenir de passer `--force`.
+ */
+export function decideGeneration(
+  ligne: Pick<LigneSite, 'content' | 'content_rejected_at'> | undefined,
+): DecisionEtape {
+  const dejaEcrit = ligne?.content != null && ligne.content_rejected_at === null;
+  return dejaEcrit ? { faire: false, motif: 'deja_fait' } : { faire: true };
+}
+
+/**
+ * Faut-il publier ce prospect ?
+ *
+ * Un site dépublié (`unpublished_at !== null`) l'a été SANS DÉLAI, au moment
+ * où le prospect est passé « ne pas contacter » ou « perdu » (D5). Le
+ * republier n'est pas un cas silencieux qu'un `null` pourrait laisser passer
+ * inaperçu : c'est une exception forte.
+ */
+export function decidePublication(
+  ligne: Pick<LigneSite, 'unpublished_at'> | undefined,
+): DecisionEtape {
+  if (ligne?.unpublished_at != null) return { faire: false, motif: 'retire' };
+  return { faire: true };
+}
+
+/**
+ * Faut-il déployer ce prospect ?
+ *
+ * Les deux motifs de silence coexistent ici, contrairement aux autres
+ * gardes : un site déjà en ligne (`deployment_url` renseignée) n'a rien à
+ * gagner à un redéploiement — même critère que `case 'deploy'` en lot. Le
+ * retrait est vérifié EN PREMIER : un site retiré ne redéploie jamais, même
+ * s'il n'a par ailleurs aucune URL encore enregistrée.
+ */
+export function decideDeploiement(
+  ligne: Pick<LigneSite, 'unpublished_at' | 'deployment_url'> | undefined,
+): DecisionEtape {
+  if (ligne?.unpublished_at != null) return { faire: false, motif: 'retire' };
+  if (ligne?.deployment_url != null) return { faire: false, motif: 'deja_fait' };
+  return { faire: true };
+}
+
+/**
+ * Faut-il rédiger un message pour ce prospect ?
+ *
+ * Même critère que le mode lot de `cli.ts` (`case 'pitch'`,
+ * `fetchProspectsDejaRediges`) : l'écriture dans `generated_message` est un
+ * `insert`, pas un `upsert` — rejouer sans cette garde empile des messages en
+ * double sur le même prospect.
+ */
+export function decideRedaction(dejaRedige: boolean): DecisionEtape {
+  return dejaRedige ? { faire: false, motif: 'deja_fait' } : { faire: true };
+}
+
 export type EtapeChaine = 'generate' | 'publish' | 'deploy' | 'pitch';
 
 export interface ResultatChaine {
@@ -435,10 +511,16 @@ export function chaineDeps(client: SupabaseClient<Database>): ChaineDeps {
       const genConfig = loadGenerateConfig(process.env);
       const candidats = await fetchSiteCandidates(client, undefined);
       const cible = candidats.find((c) => c.id === prospectId);
-      // Non éligible à la génération (déjà généré, ou hors des critères de
-      // `fetchSiteCandidates`) : ce n'est pas un échec. `publish` reprendra
-      // le contenu déjà écrit, et un rejeu ne doit pas repayer un appel.
+      // Hors des critères de `fetchSiteCandidates` (score, métier, éligibilité
+      // web) : ce n'est pas un échec, juste rien à générer pour ce prospect.
       if (cible === undefined) return null;
+
+      const rows = await fetchSiteRows(client);
+      const decision = decideGeneration(rows[prospectId]);
+      // `deja_fait` : un contenu est déjà écrit et n'a pas été rejeté à la
+      // relecture. Un rejeu ne doit pas repayer un appel au modèle — c'est le
+      // seul étage de la chaîne qui coûte de l'argent.
+      if (!decision.faire) return null;
 
       const trade = getTrade(cible.faits.metier.slug);
       if (trade === undefined) throw new Error(`métier inconnu : ${cible.faits.metier.slug}`);
@@ -481,6 +563,17 @@ export function chaineDeps(client: SupabaseClient<Database>): ChaineDeps {
         throw new Error('aucun contenu à publier — la rédaction n’a rien écrit');
       }
 
+      const decision = decidePublication(ligne);
+      if (!decision.faire) {
+        // `decidePublication` ne rend jamais `deja_fait` : ici, `motif` vaut
+        // toujours `retire`. Un site dépublié l'a été SANS DÉLAI, au moment où
+        // le prospect est passé « ne pas contacter » ou « perdu » (D5). Le
+        // republier au nom d'une entreprise qui a demandé son retrait est ce
+        // que ce dépôt prend le plus au sérieux : ce n'est pas un « rien à
+        // faire » silencieux, la chaîne doit s'arrêter net et le dire.
+        throw new Error('publication refusée : le site a été retiré (unpublished_at renseigné)');
+      }
+
       const gabaritActif = await lireGabaritActif(client);
       const deps = construireDepsPublication(client, {
         github: createGithubClient({ token: pubConfig.githubToken, org: pubConfig.githubOrg }),
@@ -520,6 +613,19 @@ export function chaineDeps(client: SupabaseClient<Database>): ChaineDeps {
         throw new Error('aucun dépôt à déployer');
       }
 
+      const decision = decideDeploiement(ligne);
+      if (!decision.faire) {
+        if (decision.motif === 'retire') {
+          // Même gravité que pour `publier`, et pour la même raison : un site
+          // retiré ne doit jamais redéployer, même s'il n'a par ailleurs
+          // aucune URL de production encore enregistrée.
+          throw new Error('déploiement refusé : le site a été retiré (unpublished_at renseigné)');
+        }
+        // `deja_fait` : `deployment_url` est déjà renseignée, le site est en
+        // ligne — rien à gagner à relancer un déploiement identique.
+        return;
+      }
+
       const report = await runDeploy(
         [
           {
@@ -549,6 +655,22 @@ export function chaineDeps(client: SupabaseClient<Database>): ChaineDeps {
       // segment.
       if (cible === undefined) return null;
 
+      // Même critère que le mode lot (`fetchProspectsDejaRediges`) : interrogé
+      // pour UN prospect plutôt que la table entière, puisque c'est tout ce
+      // dont on a besoin ici.
+      const { data: messagesExistants, error: lectureError } = await client
+        .from('generated_message')
+        .select('prospect_id')
+        .eq('prospect_id', prospectId)
+        .limit(1);
+      if (lectureError) throw new Error(lectureError.message);
+
+      const decision = decideRedaction((messagesExistants ?? []).length > 0);
+      // `deja_fait` : l'écriture ci-dessous est un `insert`, pas un `upsert` —
+      // rejouer sans cette garde empile des `generated_message` en double sur
+      // le même prospect.
+      if (!decision.faire) return null;
+
       const resultat = await runPitch(
         [{ prospectId, faits: cible.faits }],
         createPitchRedacteur({
@@ -557,6 +679,16 @@ export function chaineDeps(client: SupabaseClient<Database>): ChaineDeps {
         }),
       );
       if (resultat.report.failed > 0) throw new Error('la rédaction du message a échoué');
+      // Symétrique à `generer` ci-dessus : `runPitch` incrémente `rejected`
+      // quand le contenu sort de son contrat, et ne pousse alors RIEN dans
+      // `messages` — sans lever. Comme on ne passe qu'un prospect, un rejet
+      // laisserait `messages` vide, la boucle d'écriture ne ferait rien, et la
+      // fonction rendrait `null` : le job se clorait `termine`, sans le
+      // moindre `generated_message` écrit ni `last_error` — un échec réel
+      // rendu indiscernable d'un succès.
+      if (resultat.report.rejected > 0) {
+        throw new Error('message refusé par le schéma — rejouer la rédaction');
+      }
       if (resultat.report.refusedEditeur > 0) {
         throw new Error('éditeur non renseigné — voir EDITEUR dans packages/core');
       }
