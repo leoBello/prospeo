@@ -140,17 +140,80 @@ if (erreurSession !== null) {
   process.exit(1);
 }
 
-console.log('\n-- ce que le TÉMOIN voit (sa session, clé publique) --');
-const { count: siens } = await client.from('prospect').select('*', { count: 'exact', head: true });
-dire(siens === 1, `prospect : ${siens} ligne(s), la sienne seule attendue`);
+console.log('');
+console.log('-- ce que le TÉMOIN voit (sa session, clé publique) --');
 
-for (const table of TABLES.filter((t) => t !== 'prospect')) {
-  const { count, error } = await client.from(table).select('*', { count: 'exact', head: true });
+// Le sens POSITIF : il voit bien la sienne. Sans cette assertion, une
+// politique qui cacherait tout à tout le monde passerait le contrôle
+// ci-dessous sans rien protéger, et casserait le dashboard.
+const { count: siens } = await client.from('prospect').select('*', { count: 'exact', head: true });
+dire(siens >= 1, `prospect : ${siens} ligne(s) visible(s), au moins la sienne attendue`);
+
+/**
+ * Le sens NÉGATIF, table par table, et sur une ligne NOMMÉE.
+ *
+ * **Pourquoi pas « le témoin voit zéro ligne ».** Il en possède
+ * légitimement — son prospect, et un job qu'on lui a déposé. Attendre zéro
+ * partout faisait échouer ce contrôle sur une situation parfaitement saine,
+ * et un contrôle qui crie au loup finit par ne plus être lu.
+ *
+ * L'invariant juste n'est pas « il ne voit rien », c'est « il ne voit rien
+ * DE L'AUTRE ». On prend donc, avec `service_role`, une ligne qui appartient
+ * au propriétaire, et on vérifie qu'elle est invisible pour le témoin —
+ * preuve plus étroite et bien plus sûre qu'un décompte.
+ */
+for (const table of TABLES) {
+  // La colonne qui rattache une ligne au propriétaire diffère d'une table à
+  // l'autre : directe, par le demandeur, ou par le prospect dont elle pend.
+  const parProspect = (q) => q.eq('prospect.owner_id', proprietaire.id);
+  const selon = {
+    prospect: (q) => q.eq('owner_id', proprietaire.id),
+    campaign: (q) => q.eq('owner_id', proprietaire.id),
+    campaign_job: (q) => q.eq('requested_by', proprietaire.id),
+  };
+  // Six satellites n'ont PAS de colonne `id` : leur clé primaire EST
+  // `prospect_id` (voir la migration initiale). Prendre `id` partout faisait
+  // échouer le contrôle sur une erreur de schéma, pas sur une fuite.
+  const CLE_PROSPECT = new Set([
+    'prospect_enrichment',
+    'web_presence',
+    'prospect_score',
+    'prospect_pipeline',
+    'prospect_site',
+    'prospect_contact',
+  ]);
+  const cle = CLE_PROSPECT.has(table) ? 'prospect_id' : 'id';
+  const direct = table in selon;
+  const colonnes = direct ? cle : `${cle}, prospect!inner(owner_id)`;
+
+  const { data: sienne, error: erreurReference } = await (selon[table] ?? parProspect)(
+    admin.from(table).select(colonnes),
+  )
+    .limit(1)
+    .maybeSingle();
+
+  if (erreurReference !== null) {
+    dire(false, `${table} : lecture de référence impossible — ${erreurReference.message.slice(0, 50)}`);
+    continue;
+  }
+  if (sienne === null) {
+    console.log(`  --    ${table} : le propriétaire n'a aucune ligne, rien à cacher ici`);
+    continue;
+  }
+
+  const { data: vue, error } = await client
+    .from(table)
+    .select(cle)
+    .eq(cle, sienne[cle])
+    .maybeSingle();
   if (error !== null) {
     dire(false, `${table} : ${error.message.slice(0, 60)}`);
     continue;
   }
-  dire(count === 0, `${table} : ${count} ligne(s), 0 attendue`);
+  dire(
+    vue === null,
+    `${table} : la ligne ${String(sienne[cle]).slice(0, 8)}… du propriétaire est invisible`,
+  );
 }
 
 // -------------------------------------- les deux objets de l'application
