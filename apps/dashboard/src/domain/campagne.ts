@@ -26,6 +26,7 @@ export type EtatLigne =
   | { nom: 'mail_a_relire' }
   | { nom: 'adresse_manquante' }
   | { nom: 'envoi_incertain' }
+  | { nom: 'envoi_echec' }
   | { nom: 'envoye'; le: string };
 
 export interface FaitsProspect {
@@ -85,68 +86,114 @@ export interface FaitsLigne {
   envoi: { state: Enums<'send_state'>; sentAt: string | null } | null;
 }
 
+/**
+ * Le segment « site », depuis son seul fait d'aboutissement et, à défaut,
+ * l'avancement du job.
+ *
+ * `siteEnLigne` est la vérité terrain : un job qui échoue APRÈS coup (un
+ * rejeu, par exemple) ne doit jamais l'écraser. Le job n'est consulté que
+ * quand ce fait ne tranche pas encore.
+ */
+function segmentSite(f: FaitsLigne): SegmentEtat {
+  if (f.siteEnLigne) return 'ok';
+  if (f.job === null) return 'vide';
+  if (f.job.state === 'echoue') return 'echec';
+  if (f.job.state === 'en_cours') return 'en_cours';
+  // 'en_attente', 'termine', 'annule' : rien de plus precis a dire ici que
+  // « pas encore en ligne » — le badge, lui, nomme l'attente s'il y en a une.
+  return 'vide';
+}
+
+/** Le segment « mail », depuis son seul fait : rien d'autre ne le fait varier. */
+function segmentMail(f: FaitsLigne): SegmentEtat {
+  return f.mailRedige ? 'ok' : 'vide';
+}
+
+/**
+ * Le segment « envoi », depuis l'envoi lui-même et l'adresse qui le
+ * conditionne.
+ *
+ * Bloqué ≠ échoué (D9, et le test « distingue BLOQUE de ECHOUE ») : une
+ * adresse manquante attend un humain, elle n'a rien raté. Ce segment ne rend
+ * donc 'bloque' que si le mail est prêt à partir et qu'aucun envoi n'a
+ * encore été tenté.
+ */
+function segmentEnvoi(f: FaitsLigne): SegmentEtat {
+  if (f.envoi !== null) {
+    if (f.envoi.state === 'envoye') return 'ok';
+    if (f.envoi.state === 'echoue') return 'echec';
+    return 'en_cours'; // f.envoi.state === 'en_cours'
+  }
+  return f.mailRedige && f.adresse === null ? 'bloque' : 'vide';
+}
+
+/**
+ * Le badge, choisi APRÈS les trois segments et par ordre de priorité : c'est
+ * la seule chose que la ligne dit en un mot, et c'est là — et seulement
+ * là — que l'ordre compte.
+ */
+function choisirEtat(
+  f: FaitsLigne,
+  site: SegmentEtat,
+  mail: SegmentEtat,
+  envoi: SegmentEtat,
+): EtatLigne {
+  if (f.envoi !== null && f.envoi.state === 'envoye') {
+    return { nom: 'envoye', le: f.envoi.sentAt ?? '' };
+  }
+
+  if (envoi === 'echec') return { nom: 'envoi_echec' };
+  if (envoi === 'en_cours') return { nom: 'envoi_incertain' };
+
+  if (f.job !== null && f.job.state === 'echoue') {
+    // Choix assumé : un job en échec reste l'information la plus actionnable
+    // et la plus récente, même quand le site est déjà en ligne et le mail
+    // déjà prêt (`site` et `mail` le disent, honnêtement, à 'ok'). Le badge
+    // nomme la dernière tentative, pas l'état du site — les deux cohabitent
+    // sans se contredire : « échec » ne prétend jamais que le site est tombé.
+    return {
+      nom: 'site_echec',
+      // Le détail de l'étape prime sur `last_error` : il vient de l'API qui a
+      // refusé, là où `last_error` porte le préfixe d'étape ajouté par le
+      // worker. C'est la phrase que la ligne affiche.
+      detail: f.derniereEtape?.detail ?? f.job.lastError ?? '',
+    };
+  }
+
+  if (site === 'ok' && mail === 'ok') {
+    return envoi === 'bloque' ? { nom: 'adresse_manquante' } : { nom: 'mail_a_relire' };
+  }
+
+  if (f.job !== null && f.job.state === 'en_cours') {
+    return {
+      nom: 'site_en_cours',
+      // `redaction` est la première étape de `deployment_step` : un job pris
+      // dont aucun événement n'est encore écrit en est là, et non nulle part.
+      etape: f.derniereEtape?.step ?? 'redaction',
+    };
+  }
+
+  if (f.job !== null && f.job.state === 'en_attente') {
+    return { nom: 'en_file', rang: f.job.rang };
+  }
+
+  // Reste ici : aucun job (jamais rien demandé), ou un job 'termine'/'annule'
+  // qui n'a fait avancer ni site, ni mail, ni adresse, ni envoi. Choix
+  // assumé et verrouillé par les tests : sans qu'aucun de ces faits ait
+  // bougé, nommer autre chose que « jamais » inventerait un fait qu'aucun
+  // code ne peut rendre vrai.
+  return { nom: 'jamais' };
+}
+
 export function etatLigne(f: FaitsLigne): {
   site: SegmentEtat;
   mail: SegmentEtat;
   envoi: SegmentEtat;
   etat: EtatLigne;
 } {
-  // L'ordre des cas suit celui de la chaîne, du plus avancé au moins avancé :
-  // un mail parti prime sur tout le reste, et un échec de dépôt sur ce qui ne
-  // s'est jamais produit.
-  if (f.envoi !== null && f.envoi.state === 'envoye') {
-    return {
-      site: 'ok',
-      mail: 'ok',
-      envoi: 'ok',
-      etat: { nom: 'envoye', le: f.envoi.sentAt ?? '' },
-    };
-  }
+  const site = segmentSite(f);
+  const mail = segmentMail(f);
+  const envoi = segmentEnvoi(f);
 
-  if (f.envoi !== null && f.envoi.state === 'en_cours') {
-    return { site: 'ok', mail: 'ok', envoi: 'en_cours', etat: { nom: 'envoi_incertain' } };
-  }
-
-  if (f.job !== null && f.job.state === 'echoue') {
-    return {
-      site: 'echec',
-      mail: 'vide',
-      envoi: 'vide',
-      // Le détail de l'étape prime sur `last_error` : il vient de l'API qui a
-      // refusé, là où `last_error` porte le préfixe d'étape ajouté par le
-      // worker. C'est la phrase que la ligne affiche.
-      etat: { nom: 'site_echec', detail: f.derniereEtape?.detail ?? f.job.lastError ?? '' },
-    };
-  }
-
-  if (f.siteEnLigne && f.mailRedige) {
-    return f.adresse === null
-      ? { site: 'ok', mail: 'ok', envoi: 'bloque', etat: { nom: 'adresse_manquante' } }
-      : { site: 'ok', mail: 'ok', envoi: 'vide', etat: { nom: 'mail_a_relire' } };
-  }
-
-  if (f.job !== null && f.job.state === 'en_cours') {
-    return {
-      site: 'en_cours',
-      mail: 'vide',
-      envoi: 'vide',
-      etat: {
-        nom: 'site_en_cours',
-        // `redaction` est la première étape de `deployment_step` : un job pris
-        // dont aucun événement n'est encore écrit en est là, et non nulle part.
-        etape: f.derniereEtape?.step ?? 'redaction',
-      },
-    };
-  }
-
-  if (f.job !== null && f.job.state === 'en_attente') {
-    return {
-      site: 'vide',
-      mail: 'vide',
-      envoi: 'vide',
-      etat: { nom: 'en_file', rang: f.job.rang },
-    };
-  }
-
-  return { site: 'vide', mail: 'vide', envoi: 'vide', etat: { nom: 'jamais' } };
+  return { site, mail, envoi, etat: choisirEtat(f, site, mail, envoi) };
 }

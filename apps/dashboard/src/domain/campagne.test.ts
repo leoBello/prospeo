@@ -171,4 +171,73 @@ describe('etatLigne', () => {
     expect(r).toMatchObject({ site: 'ok', mail: 'ok', envoi: 'ok' });
     expect(r.etat).toEqual({ nom: 'envoye', le: '2026-09-03T14:02:00Z' });
   });
+
+  it('rend le segment envoi a « echec » avec un badge dedie, jamais « mail a relire »', () => {
+    // Un envoi qui a echoue n est pas un mail jamais tente : les confondre
+    // ferait disparaitre l echec derriere « mail a relire », alors que
+    // SegmentEtat porte deja 'echec' pour exactement ce cas.
+    const r = etatLigne(
+      ligne({
+        siteEnLigne: true,
+        mailRedige: true,
+        adresse: 'contact@exemple.fr',
+        envoi: { state: 'echoue', sentAt: null },
+      }),
+    );
+
+    expect(r).toMatchObject({ site: 'ok', mail: 'ok', envoi: 'echec' });
+    expect(r.etat).toEqual({ nom: 'envoi_echec' });
+  });
+
+  it('garde le segment mail a « ok » quand un job echoue apres que le mail ait ete redige', () => {
+    // Le mail existe deja : un rejeu de job qui echoue plus tard ne doit pas
+    // effacer ce fait. Le site n est pas en ligne ici (siteEnLigne reste a
+    // false) : c est bien le job qui porte l echec du segment site.
+    const r = etatLigne(
+      ligne({
+        mailRedige: true,
+        job: { state: 'echoue', lastError: 'pitch : timeout', rang: 1 },
+        derniereEtape: { step: 'retrait', outcome: 'echoue', detail: 'timeout fournisseur' },
+      }),
+    );
+
+    expect(r.mail).toBe('ok');
+    expect(r.site).toBe('echec');
+    expect(r.etat).toEqual({ nom: 'site_echec', detail: 'timeout fournisseur' });
+  });
+
+  it('garde le badge d echec de job au-dessus de « mail a relire », meme site en ligne', () => {
+    // Choix assume : un job en echec reste l information la plus actionnable
+    // et la plus recente, meme quand le site est deja en ligne et le mail
+    // deja pret. Le segment `site` le dit honnetement a 'ok' — le badge, lui,
+    // nomme la derniere tentative, pas l etat du site : les deux cohabitent
+    // sans se contredire, l un ne pretend rien que l autre dementirait.
+    const r = etatLigne(
+      ligne({
+        siteEnLigne: true,
+        mailRedige: true,
+        adresse: 'contact@exemple.fr',
+        job: { state: 'echoue', lastError: 'depot : nom deja pris', rang: 1 },
+        derniereEtape: { step: 'depot', outcome: 'echoue', detail: 'nom deja pris' },
+      }),
+    );
+
+    expect(r.site).toBe('ok');
+    expect(r.mail).toBe('ok');
+    expect(r.etat).toEqual({ nom: 'site_echec', detail: 'nom deja pris' });
+  });
+
+  it.each([
+    ['annule', 'annule' as const],
+    ['termine', 'termine' as const],
+  ])('retombe sur « jamais » pour un job %s qui n a fait avancer aucun fait', (_libelle, state) => {
+    // Choix assume et verrouille : 'annule' et 'termine' sont des etats
+    // terminaux du job, mais aucun n est porteur de sens a lui seul — ce sont
+    // siteEnLigne / mailRedige / adresse / envoi qui disent ce qui a
+    // vraiment avance. Sans qu aucun d eux ait bouge, nommer autre chose que
+    // « jamais » inventerait un fait qu aucun code ne peut rendre vrai.
+    const r = etatLigne(ligne({ job: { state, lastError: null, rang: 1 } }));
+
+    expect(r.etat).toEqual({ nom: 'jamais' });
+  });
 });

@@ -1689,7 +1689,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: `Enums` de `@prospeo/db`.
 - Produces:
   - `export type SegmentEtat = 'vide' | 'en_cours' | 'ok' | 'echec' | 'bloque'`
-  - `export type EtatLigne = { nom: 'jamais' } | { nom: 'en_file'; rang: number } | { nom: 'site_en_cours'; etape: Enums<'deployment_step'> } | { nom: 'site_echec'; detail: string } | { nom: 'mail_a_relire' } | { nom: 'adresse_manquante' } | { nom: 'envoi_incertain' } | { nom: 'envoye'; le: string }`
+  - `export type EtatLigne = { nom: 'jamais' } | { nom: 'en_file'; rang: number } | { nom: 'site_en_cours'; etape: Enums<'deployment_step'> } | { nom: 'site_echec'; detail: string } | { nom: 'mail_a_relire' } | { nom: 'adresse_manquante' } | { nom: 'envoi_incertain' } | { nom: 'envoi_echec' } | { nom: 'envoye'; le: string }`
   - `export interface FaitsProspect { prospectId: string; denomination: string; ville: string; tradeSlug: string; score: number | null; presence: Enums<'web_presence_category'> | null; statut: Enums<'pipeline_status'>; aInteraction: boolean; aMessage: boolean; sitePublie: boolean }`
   - `export interface Lot { lignes: FaitsProspect[]; sansScore: number }`
   - `export function classerLot(faits: readonly FaitsProspect[], taille: number): Lot`
@@ -1880,6 +1880,75 @@ describe('etatLigne', () => {
     expect(r).toMatchObject({ site: 'ok', mail: 'ok', envoi: 'ok' });
     expect(r.etat).toEqual({ nom: 'envoye', le: '2026-09-03T14:02:00Z' });
   });
+
+  it('rend le segment envoi a « echec » avec un badge dedie, jamais « mail a relire »', () => {
+    // Un envoi qui a echoue n est pas un mail jamais tente : les confondre
+    // ferait disparaitre l echec derriere « mail a relire », alors que
+    // SegmentEtat porte deja 'echec' pour exactement ce cas.
+    const r = etatLigne(
+      ligne({
+        siteEnLigne: true,
+        mailRedige: true,
+        adresse: 'contact@exemple.fr',
+        envoi: { state: 'echoue', sentAt: null },
+      }),
+    );
+
+    expect(r).toMatchObject({ site: 'ok', mail: 'ok', envoi: 'echec' });
+    expect(r.etat).toEqual({ nom: 'envoi_echec' });
+  });
+
+  it('garde le segment mail a « ok » quand un job echoue apres que le mail ait ete redige', () => {
+    // Le mail existe deja : un rejeu de job qui echoue plus tard ne doit pas
+    // effacer ce fait. Le site n est pas en ligne ici (siteEnLigne reste a
+    // false) : c est bien le job qui porte l echec du segment site.
+    const r = etatLigne(
+      ligne({
+        mailRedige: true,
+        job: { state: 'echoue', lastError: 'pitch : timeout', rang: 1 },
+        derniereEtape: { step: 'retrait', outcome: 'echoue', detail: 'timeout fournisseur' },
+      }),
+    );
+
+    expect(r.mail).toBe('ok');
+    expect(r.site).toBe('echec');
+    expect(r.etat).toEqual({ nom: 'site_echec', detail: 'timeout fournisseur' });
+  });
+
+  it('garde le badge d echec de job au-dessus de « mail a relire », meme site en ligne', () => {
+    // Choix assume : un job en echec reste l information la plus actionnable
+    // et la plus recente, meme quand le site est deja en ligne et le mail
+    // deja pret. Le segment `site` le dit honnetement a 'ok' — le badge, lui,
+    // nomme la derniere tentative, pas l etat du site : les deux cohabitent
+    // sans se contredire, l un ne pretend rien que l autre dementirait.
+    const r = etatLigne(
+      ligne({
+        siteEnLigne: true,
+        mailRedige: true,
+        adresse: 'contact@exemple.fr',
+        job: { state: 'echoue', lastError: 'depot : nom deja pris', rang: 1 },
+        derniereEtape: { step: 'depot', outcome: 'echoue', detail: 'nom deja pris' },
+      }),
+    );
+
+    expect(r.site).toBe('ok');
+    expect(r.mail).toBe('ok');
+    expect(r.etat).toEqual({ nom: 'site_echec', detail: 'nom deja pris' });
+  });
+
+  it.each([
+    ['annule', 'annule' as const],
+    ['termine', 'termine' as const],
+  ])('retombe sur « jamais » pour un job %s qui n a fait avancer aucun fait', (_libelle, state) => {
+    // Choix assume et verrouille : 'annule' et 'termine' sont des etats
+    // terminaux du job, mais aucun n est porteur de sens a lui seul — ce sont
+    // siteEnLigne / mailRedige / adresse / envoi qui disent ce qui a
+    // vraiment avance. Sans qu aucun d eux ait bouge, nommer autre chose que
+    // « jamais » inventerait un fait qu aucun code ne peut rendre vrai.
+    const r = etatLigne(ligne({ job: { state, lastError: null, rang: 1 } }));
+
+    expect(r.etat).toEqual({ nom: 'jamais' });
+  });
 });
 ```
 
@@ -1924,6 +1993,7 @@ export type EtatLigne =
   | { nom: 'mail_a_relire' }
   | { nom: 'adresse_manquante' }
   | { nom: 'envoi_incertain' }
+  | { nom: 'envoi_echec' }
   | { nom: 'envoye'; le: string };
 
 export interface FaitsProspect {
@@ -1985,70 +2055,116 @@ export interface FaitsLigne {
   envoi: { state: Enums<'send_state'>; sentAt: string | null } | null;
 }
 
+/**
+ * Le segment « site », depuis son seul fait d'aboutissement et, à défaut,
+ * l'avancement du job.
+ *
+ * `siteEnLigne` est la vérité terrain : un job qui échoue APRÈS coup (un
+ * rejeu, par exemple) ne doit jamais l'écraser. Le job n'est consulté que
+ * quand ce fait ne tranche pas encore.
+ */
+function segmentSite(f: FaitsLigne): SegmentEtat {
+  if (f.siteEnLigne) return 'ok';
+  if (f.job === null) return 'vide';
+  if (f.job.state === 'echoue') return 'echec';
+  if (f.job.state === 'en_cours') return 'en_cours';
+  // 'en_attente', 'termine', 'annule' : rien de plus precis a dire ici que
+  // « pas encore en ligne » — le badge, lui, nomme l'attente s'il y en a une.
+  return 'vide';
+}
+
+/** Le segment « mail », depuis son seul fait : rien d'autre ne le fait varier. */
+function segmentMail(f: FaitsLigne): SegmentEtat {
+  return f.mailRedige ? 'ok' : 'vide';
+}
+
+/**
+ * Le segment « envoi », depuis l'envoi lui-même et l'adresse qui le
+ * conditionne.
+ *
+ * Bloqué ≠ échoué (D9, et le test « distingue BLOQUE de ECHOUE ») : une
+ * adresse manquante attend un humain, elle n'a rien raté. Ce segment ne rend
+ * donc 'bloque' que si le mail est prêt à partir et qu'aucun envoi n'a
+ * encore été tenté.
+ */
+function segmentEnvoi(f: FaitsLigne): SegmentEtat {
+  if (f.envoi !== null) {
+    if (f.envoi.state === 'envoye') return 'ok';
+    if (f.envoi.state === 'echoue') return 'echec';
+    return 'en_cours'; // f.envoi.state === 'en_cours'
+  }
+  return f.mailRedige && f.adresse === null ? 'bloque' : 'vide';
+}
+
+/**
+ * Le badge, choisi APRÈS les trois segments et par ordre de priorité : c'est
+ * la seule chose que la ligne dit en un mot, et c'est là — et seulement
+ * là — que l'ordre compte.
+ */
+function choisirEtat(
+  f: FaitsLigne,
+  site: SegmentEtat,
+  mail: SegmentEtat,
+  envoi: SegmentEtat,
+): EtatLigne {
+  if (f.envoi !== null && f.envoi.state === 'envoye') {
+    return { nom: 'envoye', le: f.envoi.sentAt ?? '' };
+  }
+
+  if (envoi === 'echec') return { nom: 'envoi_echec' };
+  if (envoi === 'en_cours') return { nom: 'envoi_incertain' };
+
+  if (f.job !== null && f.job.state === 'echoue') {
+    // Choix assumé : un job en échec reste l'information la plus actionnable
+    // et la plus récente, même quand le site est déjà en ligne et le mail
+    // déjà prêt (`site` et `mail` le disent, honnêtement, à 'ok'). Le badge
+    // nomme la dernière tentative, pas l'état du site — les deux cohabitent
+    // sans se contredire : « échec » ne prétend jamais que le site est tombé.
+    return {
+      nom: 'site_echec',
+      // Le détail de l'étape prime sur `last_error` : il vient de l'API qui a
+      // refusé, là où `last_error` porte le préfixe d'étape ajouté par le
+      // worker. C'est la phrase que la ligne affiche.
+      detail: f.derniereEtape?.detail ?? f.job.lastError ?? '',
+    };
+  }
+
+  if (site === 'ok' && mail === 'ok') {
+    return envoi === 'bloque' ? { nom: 'adresse_manquante' } : { nom: 'mail_a_relire' };
+  }
+
+  if (f.job !== null && f.job.state === 'en_cours') {
+    return {
+      nom: 'site_en_cours',
+      // `redaction` est la première étape de `deployment_step` : un job pris
+      // dont aucun événement n'est encore écrit en est là, et non nulle part.
+      etape: f.derniereEtape?.step ?? 'redaction',
+    };
+  }
+
+  if (f.job !== null && f.job.state === 'en_attente') {
+    return { nom: 'en_file', rang: f.job.rang };
+  }
+
+  // Reste ici : aucun job (jamais rien demandé), ou un job 'termine'/'annule'
+  // qui n'a fait avancer ni site, ni mail, ni adresse, ni envoi. Choix
+  // assumé et verrouillé par les tests : sans qu'aucun de ces faits ait
+  // bougé, nommer autre chose que « jamais » inventerait un fait qu'aucun
+  // code ne peut rendre vrai.
+  return { nom: 'jamais' };
+}
+
 export function etatLigne(f: FaitsLigne): {
   site: SegmentEtat;
   mail: SegmentEtat;
   envoi: SegmentEtat;
   etat: EtatLigne;
 } {
-  // L'ordre des cas suit celui de la chaîne, du plus avancé au moins avancé :
-  // un mail parti prime sur tout le reste, et un échec de dépôt sur ce qui ne
-  // s'est jamais produit.
-  if (f.envoi !== null && f.envoi.state === 'envoye') {
-    return {
-      site: 'ok',
-      mail: 'ok',
-      envoi: 'ok',
-      etat: { nom: 'envoye', le: f.envoi.sentAt ?? '' },
-    };
-  }
+  const site = segmentSite(f);
+  const mail = segmentMail(f);
+  const envoi = segmentEnvoi(f);
 
-  if (f.envoi !== null && f.envoi.state === 'en_cours') {
-    return { site: 'ok', mail: 'ok', envoi: 'en_cours', etat: { nom: 'envoi_incertain' } };
-  }
-
-  if (f.job !== null && f.job.state === 'echoue') {
-    return {
-      site: 'echec',
-      mail: 'vide',
-      envoi: 'vide',
-      // Le détail de l'étape prime sur `last_error` : il vient de l'API qui a
-      // refusé, là où `last_error` porte le préfixe d'étape ajouté par le
-      // worker. C'est la phrase que la ligne affiche.
-      etat: { nom: 'site_echec', detail: f.derniereEtape?.detail ?? f.job.lastError ?? '' },
-    };
-  }
-
-  if (f.siteEnLigne && f.mailRedige) {
-    return f.adresse === null
-      ? { site: 'ok', mail: 'ok', envoi: 'bloque', etat: { nom: 'adresse_manquante' } }
-      : { site: 'ok', mail: 'ok', envoi: 'vide', etat: { nom: 'mail_a_relire' } };
-  }
-
-  if (f.job !== null && f.job.state === 'en_cours') {
-    return {
-      site: 'en_cours',
-      mail: 'vide',
-      envoi: 'vide',
-      etat: {
-        nom: 'site_en_cours',
-        // `redaction` est la première étape de `deployment_step` : un job pris
-        // dont aucun événement n'est encore écrit en est là, et non nulle part.
-        etape: f.derniereEtape?.step ?? 'redaction',
-      },
-    };
-  }
-
-  if (f.job !== null && f.job.state === 'en_attente') {
-    return {
-      site: 'vide',
-      mail: 'vide',
-      envoi: 'vide',
-      etat: { nom: 'en_file', rang: f.job.rang },
-    };
-  }
-
-  return { site: 'vide', mail: 'vide', envoi: 'vide', etat: { nom: 'jamais' } };
+  return { site, mail, envoi, etat: choisirEtat(f, site, mail, envoi) };
 }
 ```
 
@@ -2066,8 +2182,12 @@ Ce sont les assertions qui gardent la doctrine ; elles doivent être prouvées, 
 
 1. dans `classerLot`, remplacer `.filter((f) => f.score !== null)` par `.map((f) => ({ ...f, score: f.score ?? 0 }))` → le test « exclut et COMPTE les prospects jamais scores » doit rougir ;
 2. dans `classerLot`, calculer `sansScore` sur `faits` au lieu de `recevables` → le test « ne compte pas comme sans score un prospect deja disqualifie » doit rougir ;
-3. dans `etatLigne`, remplacer `envoi: 'bloque'` par `envoi: 'echec'` → le test « distingue BLOQUE de ECHOUE » doit rougir ;
-4. supprimer la branche `state === 'en_cours'` de l'envoi → le test « envoi incertain » doit rougir.
+3. dans `segmentEnvoi`, remplacer `return 'bloque'` par `return 'echec'` → le test « distingue BLOQUE de ECHOUE » doit rougir ;
+4. dans `segmentEnvoi`, supprimer la branche `state === 'en_cours'` → le test « envoi incertain » doit rougir ;
+5. dans `segmentEnvoi`, ne plus rendre `'echec'` sur `state === 'echoue'` → le test « rend le segment envoi a « echec » » doit rougir ;
+6. dans `segmentMail`, faire dépendre le résultat de `f.job?.state === 'echoue'` (réintroduire le bug IMPORTANT) → « garde le segment mail a « ok » quand un job echoue » doit rougir ;
+7. dans `segmentSite`, faire passer la vérification de `f.job.state === 'echoue'` avant celle de `f.siteEnLigne` (réintroduire le bug CRITIQUE côté site) → « garde le badge d echec de job au-dessus de « mail a relire », meme site en ligne » doit rougir sur `r.site` ;
+8. dans `choisirEtat`, faire retourner autre chose que `{ nom: 'jamais' }` pour un job `'termine'`/`'annule'` → les deux cas du test `it.each` « retombe sur « jamais » » doivent rougir.
 
 Après chaque cassure : `pnpm --filter @prospeo/dashboard test`, observer le rouge, restaurer, observer le vert.
 
@@ -2085,6 +2205,12 @@ remediation qui n existe pas.
 Bloque n est pas echoue : une adresse manquante attend un humain, elle n a
 rien rate. Et un envoi reste « en cours » est un troisieme etat honnete —
 le presenter comme parti ou comme jamais parti mentirait dans les deux sens.
+
+Chaque segment (site, mail, envoi) se derive desormais de ses propres
+faits, et le badge se choisit ensuite par ordre de priorite : un job en
+echec ne peut plus effacer un mail deja redige ni un site deja en ligne,
+et un envoi echoue rend son propre etat (`envoi_echec`) plutot que de se
+confondre avec « mail a relire ».
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ```
@@ -2535,6 +2661,7 @@ Dans `apps/dashboard/src/i18n/fr.ts`, à la suite du bloc `deploiements.*`, ajou
   'campagne.etat.mailARelire': 'Mail à relire',
   'campagne.etat.adresseManquante': 'Adresse manquante',
   'campagne.etat.envoiIncertain': 'Envoi incertain',
+  'campagne.etat.envoiEchec': 'Envoi en échec',
   'campagne.etat.envoye': 'Envoyé',
 
   'campagne.piste.site': 'Site',
@@ -2981,6 +3108,8 @@ function cleEtat(etat: EtatLigne): TranslationKey {
       return 'campagne.etat.adresseManquante';
     case 'envoi_incertain':
       return 'campagne.etat.envoiIncertain';
+    case 'envoi_echec':
+      return 'campagne.etat.envoiEchec';
     case 'envoye':
       return 'campagne.etat.envoye';
   }
