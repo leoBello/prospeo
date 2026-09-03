@@ -146,23 +146,104 @@ Davantage qu'il n'y paraît, et une chose s'en trouve **renforcée** :
 | **`worker_heartbeat`** | ligne unique, donc un seul worker pour tous : tenable, mais à décider explicitement |
 | **Le plafond Google** | `gmail.send` est un scope **sensible**. En « External + Testing » on plafonne à **100 utilisateurs** ; au-delà, la **vérification Google** est exigée — semaines de délai, vidéo de démonstration, politique de confidentialité. C'est un prérequis produit, pas une case à cocher. |
 
-## 6. Questions encore ouvertes — à trancher avant d'écrire le spec
+## 6. Les six questions, tranchées le 3 septembre 2026
 
-1. **Que deviennent les 139 prospects nantais et le site déjà publié ?**
-   Rattachés au compte du propriétaire, ou repartis de zéro ?
-2. **Le worker : un seul pour tous, ou un par utilisateur ?** Un seul est plus
-   simple et suffit au volume ; mais un utilisateur dont le jeton GitHub est
-   invalide ne doit pas bloquer la file des autres.
-3. **La file d'enrichissement est-elle la même que `campaign_job`, ou une
-   seconde file ?** Elles n'ont ni le même rythme ni la même granularité.
-4. **Le gabarit doit-il être public** pour que `runPublish` puisse en dériver
-   un dépôt chez l'utilisateur, ou la GitHub App a-t-elle accès aux deux ?
-5. **Que voit un utilisateur pendant les 14 premières minutes ?** L'écran doit
-   nommer « base en cours de constitution » sans promettre de délai qu'aucun
-   code ne peut tenir.
-6. **La péremption à 90 jours et la dépublication (D5 du chantier n°4)**
-   s'exécutent-elles pour le compte de l'utilisateur, sur son Vercel, même
-   s'il ne se connecte plus ?
+### D5 — L'existant est rattaché au compte du propriétaire
+
+Les 139 prospects nantais et le site de LUCIAN LAZA deviennent ceux du
+premier locataire.
+
+*Pourquoi :* les 139 portent scores, sondes et historique, payés d'environ 40
+minutes de scraping. Surtout, **le site de LAZA est en ligne au nom d'une
+entreprise réelle** et l'horloge des 90 jours de D5 (chantier n°4) tourne.
+Effacer la ligne orphelinerait un site vivant, sans plus rien pour le
+dépublier. Les jetons qui l'ont créé sont déjà ceux du propriétaire : le
+rattachement est cohérent, pas arbitraire.
+
+### D6 — Le gabarit devient public
+
+*Pourquoi :* GitHub dérive un dépôt d'un modèle en **un** appel (`/generate`),
+avec **un** jeton. Or un jeton de GitHub App est porté sur une seule
+installation : celui de l'utilisateur ne peut pas lire un modèle privé chez
+l'application. Un modèle public est lisible par tous les jetons, et le
+problème disparaît sans écrire une ligne. C'est un squelette de vitrine
+générique — il n'y a rien à y cacher. `templateRepoFor` continue de gouverner
+lequel est employé.
+
+### D7 — Deux files, drainées par le même worker, la campagne d'abord
+
+L'enrichissement et la campagne n'ont ni le même rythme (des heures contre
+~70 s), ni la même granularité (une tranche de 50 contre un prospect), ni le
+même mode d'échec (Google bloque contre GitHub refuse).
+
+*Pourquoi deux :* une file unique ferait attendre un clic de 70 secondes
+derrière 14 minutes de scraping — or **la réactivité du déclenchement est
+toute la raison d'être de la file**. Le worker sert la campagne d'abord.
+
+### D8 — Un worker par utilisateur
+
+**Décision du propriétaire, contre la recommandation initiale.** Elle porte un
+avantage qui avait été sous-pesé : chaque worker ne détient que les jetons de
+son utilisateur, ce qui supprime la résolution des jetons par job.
+
+*Ce qu'elle coûte, et qu'il faut assumer :*
+
+- un **superviseur** qui démarre, surveille et arrête un processus résident
+  par inscrit — une charge d'exploitation qui croît avec les clients ;
+- **`worker_heartbeat` ne convient plus.** C'est une table à ligne unique
+  (`id boolean primary key`, `constraint worker_heartbeat_singleton
+  check (id)`), et le dépôt interdit de modifier ou supprimer un objet
+  existant. Il faut une **table sœur**, portant un battement par utilisateur,
+  et l'ancienne devient morte — ou reste au service du processus de
+  maintenance de D10.
+
+### D9 — L'écran s'ouvre tout de suite et se remplit
+
+`discover` a posé l'univers en quelques minutes : l'écran peut donc annoncer
+un chiffre **vrai** (« 2 934 prospects trouvés, 50 enrichis ») et voir les
+lignes apparaître au fil de l'eau par Realtime, exactement comme pendant un
+déploiement.
+
+*La règle qui l'accompagne, et qui n'est pas négociable :* **aucune durée
+restante n'est annoncée tant qu'aucune tranche n'a été mesurée.** La bande de
+campagne applique déjà cette retenue — elle n'affiche « ~9 min restantes »
+qu'après avoir observé des durées réelles.
+
+### D10 — L'application garde la capacité de dépublier
+
+Les jetons de l'utilisateur sont conservés et renouvelés ; la péremption les
+emploie même s'il ne se connecte plus.
+
+*Pourquoi :* c'est la seule lecture qui sauve D5 du chantier n°4 — « un site
+portant le nom d'un tiers, publié sans son accord, ne doit pas vivre
+indéfiniment sans surveillance ».
+
+*Deux exigences qui viennent avec :* les conditions d'utilisation doivent le
+dire, et **un jeton révoqué rend la dépublication impossible** — il faut alors
+alerter et consigner, jamais se taire.
+
+## 6 bis. La conséquence que D8 et D10 produisent ensemble
+
+Aucune des deux ne la portait seule, et elle change l'architecture :
+
+**D8 dit que le worker appartient à l'utilisateur. D10 dit que l'application
+doit pouvoir dépublier quand cet utilisateur a disparu.** Un worker qui ne
+tourne que pour un utilisateur actif ne peut donc pas porter la péremption.
+
+Il faut **deux exécutants de natures différentes** :
+
+| | Qui | Quand | Avec quels jetons |
+|---|---|---|---|
+| Worker de campagne | un par utilisateur | tant qu'il est actif | ceux de son utilisateur, tenus en mémoire |
+| Processus de péremption | **un seul, à l'application** | en permanence | **lus dans un coffre**, pour n'importe quel utilisateur |
+
+**Conséquence : le coffre à jetons chiffré n'est pas évitable.** L'avantage
+que D8 semblait offrir — « pas de résolution de jetons par job » — ne vaut que
+pour la chaîne de campagne. La péremption, elle, doit pouvoir lire les jetons
+de quelqu'un qui n'est pas là. Il faut donc le coffre **et** les workers par
+utilisateur, pas l'un à la place de l'autre.
+
+C'est un coût réel, à connaître avant d'écrire le spec plutôt qu'au milieu.
 
 ## 7. Ordre suggéré
 
