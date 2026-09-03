@@ -515,6 +515,79 @@ lignes ne sont pas cliquables, leur unique lien étant l'URL du site publié.
   vue par déploiement et la frise des étapes, pas le journal lui-même.
 
 
+## Chantier n°7, lot 1 — la campagne : ce qui marche, et ce qui reste inerte
+
+**Mesuré le 3 septembre 2026, pas supposé.** Ce tableau ne doit pas se lire
+comme clos : il vieillit dès qu'un lot suivant est livré.
+
+### Ce qui marche réellement
+
+- **La file et le worker.** `prospeo worker` reste résident, écoute
+  `campaign_job` en Realtime et balaye toutes les 30 s. Vérifié contre
+  l'instance : un `INSERT` déclenche bien un réveil, le battement de
+  `worker_heartbeat` avance toutes les 10 s, et la prise d'un job est
+  conditionnée à son état — deux workers ne peuvent pas prendre le même.
+- **La chaîne sur un prospect.** Éprouvée de bout en bout sur un prospect
+  volontairement inéligible : le job est pris, la chaîne s'arrête au premier
+  échec, **l'étape fautive est nommée** (`publish : aucun contenu à publier`)
+  et le job est clos. Aucun appel GitHub, aucun jeton LLM dépensé.
+- **L'écran, en lecture et en déclenchement.** Les vingt mieux notés, les
+  trois segments, les huit états, la bande de conditions, et un bouton qui
+  dépose une demande que le worker exécute.
+- **L'unicité.** Un second job actif sur le même prospect est refusé en base
+  (`23505`), et l'interface traite ce refus comme un succès — c'est la
+  garantie qui joue son rôle, pas une panne.
+
+### Ce qui est annoncé par la maquette et **pas encore alimenté**
+
+| Zone | Ce qui manque | Débloqué par |
+|---|---|---|
+| Le panneau de relecture du mail | rien ne le construit ; l'écran n'a pas de panneau latéral | le lot « Google + envoi » |
+| Le compte d'envoi Gmail dans la bande de conditions | `AuthProvider` ne connaît que `signInWithPassword` ; aucun jeton d'envoi n'existe | idem |
+| Le destinataire | `prospect_contact` existe et **est vide** : aucun étage ne la remplit, et aucune saisie manuelle n'est construite | l'étage `contacts` + la saisie |
+| La bande de campagne (anneau, compteurs, coût, suspension) | `campaign` existe et **est vide** : rien ne crée de campagne | le lot « campagne de 10 » |
+| Le mode automatique et ses quatre bornes | rien | le lot « mode auto » |
+| Le détail d'un déploiement au clic | `DeploiementDetail.dc.html` reste **la maquette sans écran** | le dernier lot |
+
+**Aucune de ces zones n'est esquissée dans l'écran.** Pas d'emplacement grisé,
+pas de bouton inerte : un « Détail » désactivé aurait annoncé un écran que ce
+lot ne construit pas.
+
+### `cost_eur` restera nul, et ce n'est pas un oubli
+
+Les étages comptent des **jetons**, à trois tarifs distincts (entrée, écriture
+de cache, lecture de cache, sortie). Rien dans ce dépôt ne porte de table de
+prix. Convertir en euros demanderait d'en inventer une, c'est-à-dire de
+produire un chiffre fondé sur rien. La colonne existe, elle reste nulle, et le
+total d'une campagne devra s'annoncer **partiel** plutôt qu'exact.
+
+### Le point ouvert qui devient bloquant au lot suivant
+
+**La durée de vie réelle du `provider_token` Google n'a pas été mesurée** —
+le lot 1 n'ouvre aucune session Google. Supabase ne renouvelle pas ce jeton, et
+le comportement exact dépend de la version de `supabase-js` (`^2.45.0` ici).
+Le rendu de l'état « jeton expiré » en dépend, et il se mesure au plus tard à
+l'entrée du lot « Google + envoi ». **À mesurer, pas à supposer.**
+
+### Un arbitrage rendu, et sa trace
+
+« Site en panne ou obsolète » s'affiche en **vert**. `TON_PRESENCE`
+(`ui/presence.ts`, extrait de `panel/FicheTab.tsx` à ce lot) fait suivre au
+ton la **valeur de vente** et non la qualité du site : un site mort est une
+meilleure cible qu'un site vivant, et `has_site` vaut -100. `Campagne.dc.html`
+le dessinait en rose ; le propriétaire a tranché pour le vocabulaire du kit, et
+**la maquette a été corrigée**, raison écrite à l'intérieur.
+
+### Ce qu'aucun test ne verra jamais, et ce que le jalon a trouvé
+
+Le tableau portait **trois en-têtes pour quatre colonnes**. En
+`table-layout: fixed`, ce sont les cellules de la première rangée qui fixent
+les largeurs : la colonne d'actions n'en recevait aucune et absorbait 347 px au
+lieu de 96, éloignant les boutons de l'état qu'ils commentent et coupant le
+filet des en-têtes en plein milieu. **524 tests verts ne l'ont pas vu**, et
+`jsdom` ne pouvait pas le voir. C'est le quatrième défaut de mise en page de ce
+dépôt trouvé en regardant l'écran plutôt qu'en lisant du code.
+
 ## La question ouverte du lot 3
 
 `prospect_pipeline` ne porte que `status` et `updated_at`. Savoir qu'une
