@@ -11,7 +11,7 @@ import {
   loadPublishConfig,
 } from './config.js';
 import type { Json } from '@prospeo/db';
-import { createClient } from './supabase.js';
+import { createClient, PAGE_SIZE } from './supabase.js';
 import { createGoogleMapsSource } from './sources/google-maps.js';
 import { fetchStatusBySiret } from './sources/recherche-entreprises.js';
 import { planScoreWrite, type ScoreRowInput } from './stages/classify-score.js';
@@ -33,14 +33,7 @@ import {
   type StoredEnrichment,
 } from './stages/calibrate.js';
 import { applyReviewDecision, type ReviewDecision } from './stages/review.js';
-import {
-  assembleFacts,
-  assemblePitchFacts,
-  segmentsSms,
-  type ContenuPublie,
-  type PitchFacts,
-  type SiteFacts,
-} from '@prospeo/core';
+import { segmentsSms, type ContenuPublie } from '@prospeo/core';
 import { createPitchRedacteur, createRedacteur } from './sources/anthropic.js';
 import { createGithubClient } from './sources/github.js';
 import { createVercelClient } from './sources/vercel.js';
@@ -56,7 +49,17 @@ import {
   type UnpublishDeps,
 } from './stages/unpublish.js';
 import { gabaritDefautPourPublication, lireGabaritActif } from './site-template.js';
-import { construireDepsDeploiement, construireDepsPublication } from './chaine.js';
+import {
+  attendreUrl,
+  chaineDeps,
+  construireDepsDeploiement,
+  construireDepsPublication,
+  fetchPitchCandidates,
+  fetchSiteCandidates,
+  fetchSiteRows,
+  traiterProspect,
+} from './chaine.js';
+import { prendreProchain, type FileDeps } from './stages/file.js';
 
 // `.env` vit a la racine du depot. Ni tsx ni Node ne le chargent tout seuls :
 // sans cette ligne, la procedure documentee (« copier .env.example en .env »)
@@ -82,6 +85,7 @@ Commandes
   deploy                                       Déploie et enregistre les URL
   unpublish [--dry-run]                        Dépublie les refus et les périmés
   pitch [--force]                              Rédige email, SMS et script d'appel
+  worker                                       Draine la file du dashboard, en continu
 
 Options
   --limit <n>          Plafond d'enregistrements traités
@@ -157,9 +161,6 @@ Supprimer des prospects, en deux temps
      les deux passes, la dérogation ne vaut plus et rien n'est supprimé.
 `;
 
-/** Taille de page des lectures Supabase (PostgREST plafonne a max_rows = 1000). */
-const PAGE_SIZE = 500;
-
 /**
  * Plafond de prospects enrichis par jour.
  *
@@ -210,6 +211,7 @@ const COMMANDS = [
   'deploy',
   'unpublish',
   'pitch',
+  'worker',
 ] as const;
 
 function flag(argv: string[], name: string): string | undefined {
@@ -264,171 +266,6 @@ async function fetchClosedIds(client: ReturnType<typeof createClient>): Promise<
   return closed;
 }
 
-/**
- * Les prospects éligibles à un site, du meilleur score au moins bon.
- *
- * L'ordre n'est pas cosmétique : c'est lui qui donne son sens à `--limit`.
- * « Trois prospects » doit vouloir dire les trois meilleurs, pas trois au
- * hasard — sans quoi éprouver prudemment un étage neuf sur un petit lot
- * reviendrait à l'éprouver sur un échantillon quelconque.
- *
- * Le filtrage final est délégué à `assembleFacts`, qui écarte déjà les
- * prospects sans téléphone et les métiers inconnus. Le refaire ici en dupliquerait
- * la règle, et les deux divergeraient.
- */
-async function fetchSiteCandidates(
-  client: ReturnType<typeof createClient>,
-  tradeSlug: string | undefined,
-): Promise<{ id: string; faits: SiteFacts; total: number }[]> {
-  const lignes: { id: string; faits: SiteFacts; total: number }[] = [];
-
-  for (let from = 0; ; from += PAGE_SIZE) {
-    let query = client
-      .from('prospect')
-      .select(
-        'id, siret, denomination, denomination_usuelle, trade_slug, address, postal_code, city, date_creation, latitude, longitude, is_closed, prospect_enrichment(status, matched_name, phone_e164, rating, maps_url), web_presence(category), prospect_score(total)',
-      )
-      .order('id')
-      .range(from, from + PAGE_SIZE - 1);
-    if (tradeSlug !== undefined) query = query.eq('trade_slug', tradeSlug);
-
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
-
-    for (const row of data ?? []) {
-      // Un établissement cessé n'est pas un prospect : lui publier un site au
-      // nom d'une entreprise qui n'existe plus serait le pire des envois.
-      if (row.is_closed === true) continue;
-
-      const one = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
-      const enr = one(row.prospect_enrichment);
-      const wp = one(row.web_presence);
-      const sc = one(row.prospect_score);
-
-      // `has_site` est écarté ici comme il l'est du barème : proposer une
-      // vitrine à qui en a déjà une correcte n'a pas de sens. Une catégorie
-      // absente veut dire « pas encore sondé », donc pas encore décidable.
-      if (wp === null || wp.category === null || wp.category === 'has_site') continue;
-      if (sc === null) continue;
-
-      const faits = assembleFacts({
-        siret: row.siret,
-        denomination: row.denomination,
-        denominationUsuelle: row.denomination_usuelle,
-        tradeSlug: row.trade_slug,
-        address: row.address,
-        postalCode: row.postal_code,
-        city: row.city,
-        dateCreation: row.date_creation,
-        latitude: row.latitude,
-        longitude: row.longitude,
-        enrichment:
-          enr === null
-            ? null
-            : {
-                status: enr.status,
-                matchedName: enr.matched_name,
-                phoneE164: enr.phone_e164,
-                rating: enr.rating,
-                mapsUrl: enr.maps_url,
-              },
-      });
-      if (faits === null) continue;
-
-      lignes.push({ id: row.id, faits, total: sc.total });
-    }
-    if ((data ?? []).length < PAGE_SIZE) break;
-  }
-
-  return lignes.sort((a, b) => b.total - a.total);
-}
-
-/**
- * Les prospects à qui l'on peut écrire, du meilleur score au moins bon.
- *
- * Le filtrage est délégué à `assemblePitchFacts`, qui porte les quatre refus —
- * le prospect a dit non, il n'a pas de site en ligne, il en a déjà un correct,
- * ou `assembleFacts` l'écarte déjà. Les refaire ici en dupliquerait la règle,
- * et les deux divergeraient : la version SQL est celle qu'on relit le moins.
- *
- * La jointure sur `prospect_site` n'est pas un filtre serveur mais un
- * enrichissement : un prospect sans site remonte avec `site: null`, et c'est
- * `assemblePitchFacts` qui le renvoie. Filtrer côté serveur rendrait le
- * décompte des écartés impossible à établir.
- */
-async function fetchPitchCandidates(
-  client: ReturnType<typeof createClient>,
-): Promise<{ id: string; faits: PitchFacts; total: number }[]> {
-  const lignes: { id: string; faits: PitchFacts; total: number }[] = [];
-
-  for (let from = 0; ; from += PAGE_SIZE) {
-    const { data, error } = await client
-      .from('prospect')
-      .select(
-        'id, siret, denomination, denomination_usuelle, trade_slug, address, postal_code, city, date_creation, is_closed, prospect_enrichment(status, matched_name, phone_e164, rating, maps_url), web_presence(category, domain_free_name), prospect_score(total), prospect_pipeline(status), prospect_site(deployment_url, unpublished_at)',
-      )
-      .order('id')
-      .range(from, from + PAGE_SIZE - 1);
-    if (error) throw new Error(error.message);
-
-    for (const row of data ?? []) {
-      // Un établissement cessé n'est pas un prospect : lui écrire au nom d'une
-      // entreprise qui n'existe plus serait le pire des envois.
-      if (row.is_closed === true) continue;
-
-      const one = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
-      const enr = one(row.prospect_enrichment);
-      const wp = one(row.web_presence);
-      const sc = one(row.prospect_score);
-      const pl = one(row.prospect_pipeline);
-      const site = one(row.prospect_site);
-
-      const faits = assemblePitchFacts({
-        prospect: {
-          siret: row.siret,
-          denomination: row.denomination,
-          denominationUsuelle: row.denomination_usuelle,
-          tradeSlug: row.trade_slug,
-          address: row.address,
-          postalCode: row.postal_code,
-          city: row.city,
-          dateCreation: row.date_creation,
-          // Le message de vente n'a pas de carte : ces deux champs ne servent
-          // qu'à satisfaire le contrat partagé avec `assembleFacts`.
-          latitude: null,
-          longitude: null,
-          enrichment:
-            enr === null
-              ? null
-              : {
-                  status: enr.status,
-                  matchedName: enr.matched_name,
-                  phoneE164: enr.phone_e164,
-                  rating: enr.rating,
-                  mapsUrl: enr.maps_url,
-                },
-        },
-        site:
-          site === null
-            ? null
-            : {
-                deploymentUrl: site.deployment_url,
-                unpublishedAt: site.unpublished_at === null ? null : new Date(site.unpublished_at),
-              },
-        presenceWeb: wp?.category ?? null,
-        domaineLibre: wp?.domain_free_name ?? null,
-        pipelineStatus: pl?.status ?? null,
-      });
-      if (faits === null) continue;
-
-      lignes.push({ id: row.id, faits, total: sc?.total ?? 0 });
-    }
-    if ((data ?? []).length < PAGE_SIZE) break;
-  }
-
-  return lignes.sort((a, b) => b.total - a.total);
-}
-
 /** Les prospects qui ont déjà au moins un message archivé. */
 async function fetchProspectsDejaRediges(
   client: ReturnType<typeof createClient>,
@@ -445,57 +282,6 @@ async function fetchProspectsDejaRediges(
     if ((data ?? []).length < PAGE_SIZE) break;
   }
   return vus;
-}
-
-/** L'état de site déjà enregistré, par prospect. */
-async function fetchSiteRows(client: ReturnType<typeof createClient>) {
-  const rows: Record<string, {
-    content: unknown;
-    repo_full_name: string | null;
-    repo_url: string | null;
-    content_hash: string | null;
-    content_rejected_at: string | null;
-    published_at: string | null;
-    unpublished_at: string | null;
-    vercel_project_id: string | null;
-    deployment_url: string | null;
-  }> = {};
-  for (let from = 0; ; from += PAGE_SIZE) {
-    const { data, error } = await client
-      .from('prospect_site')
-      .select(
-        'prospect_id, content, repo_full_name, repo_url, content_hash, content_rejected_at, published_at, unpublished_at, vercel_project_id, deployment_url',
-      )
-      .order('prospect_id')
-      .range(from, from + PAGE_SIZE - 1);
-    if (error) throw new Error(error.message);
-    for (const r of data ?? []) rows[r.prospect_id] = r;
-    if ((data ?? []).length < PAGE_SIZE) break;
-  }
-  return rows;
-}
-
-/**
- * Attend qu'un déploiement devienne joignable, dans une limite raisonnable.
- *
- * Un build Astro d'une page prend une dizaine de secondes ; on laisse large
- * pour la file d'attente Vercel. Passé le délai, on rend `null` plutôt que
- * d'attendre indéfiniment : le run se termine, la ligne garde son URL nulle,
- * et le prochain `deploy` la reprendra sans rien recréer.
- */
-const ATTENTE_DEPLOIEMENT_TENTATIVES = 40;
-const ATTENTE_DEPLOIEMENT_INTERVALLE_MS = 5_000;
-
-async function attendreUrl(
-  vercel: ReturnType<typeof createVercelClient>,
-  projectId: string,
-): Promise<string | null> {
-  for (let essai = 0; essai < ATTENTE_DEPLOIEMENT_TENTATIVES; essai += 1) {
-    const url = await vercel.urlProduction(projectId);
-    if (url !== null) return url;
-    await new Promise((r) => setTimeout(r, ATTENTE_DEPLOIEMENT_INTERVALLE_MS));
-  }
-  return null;
 }
 
 async function main(argv: string[]): Promise<number> {
@@ -1915,6 +1701,166 @@ async function main(argv: string[]): Promise<number> {
               `${report.failed} en échec\n`),
       );
       return dryRun ? 0 : unpublishExitCode(report);
+    }
+
+    case 'worker': {
+      const config = loadConfig(process.env);
+      const client = createClient(config);
+
+      // 10 s : assez court pour qu'un worker mort se voie vite à l'écran (qui
+      // le déclare arrêté au-delà de 60 s), assez long pour ne pas écrire en
+      // base en permanence.
+      const PERIODE_BATTEMENT_MS = 10_000;
+      // Le filet sous Realtime. Un worker qui ne dépend que d'un socket est
+      // un worker qui s'endort sans le dire : une déconnexion silencieuse
+      // laisserait la file grossir sans que rien n'en sorte.
+      const PERIODE_BALAYAGE_MS = 30_000;
+
+      let enCours = 0;
+      let arret = false;
+
+      const battre = async (): Promise<void> => {
+        const { error } = await client
+          .from('worker_heartbeat')
+          .update({ beat_at: new Date().toISOString(), in_flight: enCours })
+          .eq('id', true);
+        // Journalisé, jamais fatal : perdre un battement est un désagrément,
+        // interrompre un déploiement en cours en est un autre. Même doctrine
+        // que `createEventSink`.
+        if (error) process.stderr.write(`worker : battement échoué — ${error.message}\n`);
+      };
+
+      const fileDeps: FileDeps = {
+        async listerEnAttente() {
+          const { data, error } = await client
+            .from('campaign_job')
+            .select('id,prospect_id,campaign_id,attempts')
+            .eq('state', 'en_attente')
+            .order('requested_at', { ascending: true })
+            .limit(20);
+          if (error) throw new Error(error.message);
+          return data ?? [];
+        },
+        async prendre(id) {
+          // Conditionnée à l'état : c'est CETTE clause qui fait perdre la
+          // course proprement quand un autre worker est passé entre la
+          // lecture et l'écriture.
+          const { data, error } = await client
+            .from('campaign_job')
+            .update({ state: 'en_cours', started_at: new Date().toISOString() })
+            .eq('id', id)
+            .eq('state', 'en_attente')
+            .select('id');
+          if (error) throw new Error(error.message);
+          return (data ?? []).length === 1;
+        },
+      };
+
+      /** Clore un job. Local au worker : la prise n'en a pas besoin. */
+      const clore = async (
+        id: number,
+        issue: 'termine' | 'echoue',
+        erreur: string | null,
+        cout: number | null,
+      ): Promise<void> => {
+        const { error } = await client
+          .from('campaign_job')
+          .update({
+            state: issue,
+            last_error: erreur,
+            cost_eur: cout,
+            finished_at: new Date().toISOString(),
+          })
+          .eq('id', id);
+        // Journalisé et non relancé : une exception ici sortirait de
+        // `traiterUn` par le `finally`, et la boucle s'arrêterait sur un
+        // problème d'écriture alors que le déploiement, lui, a réussi.
+        if (error) process.stderr.write(`worker : clôture échouée — ${error.message}\n`);
+      };
+
+      const deps = chaineDeps(client);
+
+      const traiterUn = async (): Promise<boolean> => {
+        const job = await prendreProchain(fileDeps);
+        if (job === null) return false;
+
+        enCours += 1;
+        await battre();
+        try {
+          const resultat = await traiterProspect(job.prospectId, deps);
+          await clore(
+            job.id,
+            resultat.echec === null ? 'termine' : 'echoue',
+            resultat.echec === null ? null : `${resultat.echec.etape} : ${resultat.echec.message}`,
+            resultat.coutEur,
+          );
+        } catch (cause) {
+          // Un échec HORS chaîne (lecture, réseau, RLS) : le job doit être
+          // clos malgré tout, faute de quoi il resterait « en cours » pour
+          // toujours et l'index unique bloquerait toute nouvelle demande sur
+          // ce prospect.
+          await clore(
+            job.id,
+            'echoue',
+            cause instanceof Error ? cause.message : String(cause),
+            null,
+          );
+        } finally {
+          enCours -= 1;
+          await battre();
+        }
+        return true;
+      };
+
+      /** Vide la file, un job à la fois. */
+      const drainer = async (): Promise<void> => {
+        while (!arret && (await traiterUn())) {
+          // Rien : la condition fait le travail.
+        }
+      };
+
+      // Realtime réveille ; le balayage rattrape ce qu'une déconnexion aurait
+      // laissé passer. Les deux, et non l'un ou l'autre.
+      const canal = client
+        .channel('campagne-file')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'campaign_job' },
+          () => void drainer(),
+        )
+        .subscribe();
+
+      const battement = setInterval(() => void battre(), PERIODE_BATTEMENT_MS);
+      const balayage = setInterval(() => void drainer(), PERIODE_BALAYAGE_MS);
+
+      // Arrêt propre : on cesse de prendre, on laisse finir ce qui est en
+      // cours. Un job abandonné en « en cours » bloquerait le prospect
+      // jusqu'à une intervention manuelle, à cause de l'index unique partiel.
+      const fermer = async (): Promise<void> => {
+        arret = true;
+        clearInterval(battement);
+        clearInterval(balayage);
+        await canal.unsubscribe();
+        process.stdout.write('worker : arrêt demandé, plus aucune prise\n');
+      };
+      process.on('SIGINT', () => void fermer());
+      process.on('SIGTERM', () => void fermer());
+
+      process.stdout.write('worker : à l’écoute de campaign_job\n');
+      await battre();
+      await drainer();
+
+      // La commande ne rend la main que sur signal : `worker` est un
+      // processus résident, pas un run borné comme les autres commandes.
+      await new Promise<void>((resoudre) => {
+        const attendre = setInterval(() => {
+          if (arret && enCours === 0) {
+            clearInterval(attendre);
+            resoudre();
+          }
+        }, 500);
+      });
+      return 0;
     }
 
     default:
