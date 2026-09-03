@@ -27,6 +27,14 @@
 .table {
   width: 100%;
   border-collapse: collapse;
+  /* `fixed`, et ce n'est pas un detail de style : en disposition `auto` — le
+     defaut — un `white-space: nowrap` fixe la largeur MINIMALE de la colonne
+     a celle du texte entier. Le navigateur elargit alors la colonne au lieu
+     de tronquer, et comme `AppShell` ne pose aucun `overflow-x`, rien
+     n'absorbe le debordement : une raison sociale longue pousse le tableau
+     hors de sa colonne. C'est la classe de defaut que `jsdom` ne calcule pas
+     et que ce depot a deja payee deux fois. */
+  table-layout: fixed;
 }
 
 .table th {
@@ -49,7 +57,7 @@
 /* Les deux colonnes de droite ont une largeur fixe (maquette, Campagne.html) ;
    la colonne prospect prend le reste. */
 .colPiste {
-  width: 175px;
+  width: 152px;
 }
 
 .colEtat {
@@ -68,10 +76,25 @@
   background: color-mix(in srgb, var(--color-warning) 6%, transparent);
 }
 
+/* La seule ligne en mouvement de l'ecran, teintee comme dans la maquette :
+   c'est celle qu'on regarde quand on vient d'appuyer sur un bouton. */
+.table tbody tr[data-etat='site_en_cours'] {
+  background: color-mix(in srgb, var(--color-accent) 6%, transparent);
+}
+
 .identite {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
+}
+
+/* Le nom et son badge de presence sur une meme ligne : le badge garde sa
+   taille, le nom absorbe ce qui reste et s'abrege. */
+.ligneNom {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   min-width: 0;
 }
 
@@ -84,7 +107,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 42ch;
 }
 
 .meta {

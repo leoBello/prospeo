@@ -23,6 +23,61 @@ function fait(surcharges: Partial<FaitsProspect> = {}): FaitsProspect {
 const VIVANT = { beatAt: new Date().toISOString(), inFlight: 0 };
 
 describe('CampagneScreen', () => {
+  it('porte la presence web, qui est l argument de vente de la ligne', () => {
+    // Valeur lue dans src/i18n/fr.ts, cle `presence.dead_site`. « Votre site
+    // ne repond plus, en voici un qui fonctionne » est l argumentaire le plus
+    // fort du lot : le badge qui le designe ne peut pas manquer de la ligne.
+    renderWithPreferences(
+      <CampagneScreen
+        lot={{ lignes: [fait({ presence: 'dead_site' })], sansScore: 0 }}
+        lignes={new Map<string, FaitsLigne>()}
+        totalProspects={12}
+        heartbeat={VIVANT}
+        onSignOut={() => {}}
+        nav={null}
+      />,
+    );
+
+    expect(screen.getByText('Site en panne ou obsolète')).toBeTruthy();
+  });
+
+  it('nomme une presence jamais sondee au lieu de laisser la case vide', () => {
+    // `null` n est pas une categorie : c est « pas encore sonde ». Valeur lue
+    // dans fr.ts, cle `presence.absent`. La taire ferait lire l absence de
+    // badge comme une absence de presence web, ce qui est un autre fait.
+    renderWithPreferences(
+      <CampagneScreen
+        lot={{ lignes: [fait({ presence: null })], sansScore: 0 }}
+        lignes={new Map<string, FaitsLigne>()}
+        totalProspects={12}
+        heartbeat={VIVANT}
+        onSignOut={() => {}}
+        nav={null}
+      />,
+    );
+
+    expect(screen.getByText('Présence web pas encore sondée')).toBeTruthy();
+  });
+
+  it('rend le libelle du metier, pas son identifiant technique', () => {
+    // `getTrade('plombier').label` vaut « Plombier » (packages/core/src/trades.ts).
+    // Afficher le slug ferait lire un identifiant de base a l operateur.
+    renderWithPreferences(
+      <CampagneScreen
+        lot={{ lignes: [fait({ tradeSlug: 'plombier' })], sansScore: 0 }}
+        lignes={new Map<string, FaitsLigne>()}
+        totalProspects={12}
+        heartbeat={VIVANT}
+        onSignOut={() => {}}
+        nav={null}
+      />,
+    );
+
+    // `getByText` compare le texte ENTIER du noeud : la ligne meta porte le
+    // metier, la ville et le score, d ou la regex plutot qu une egalite.
+    expect(screen.getByText(/Plombier · Nantes/)).toBeTruthy();
+  });
+
   it('affiche une ligne par prospect du lot', () => {
     renderWithPreferences(
       <CampagneScreen

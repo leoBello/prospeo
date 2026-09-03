@@ -3192,9 +3192,24 @@ export function CampagneScreen({
                   return (
                     <tr key={p.prospectId}>
                       <td>
-                        <span className={styles.nom}>{p.denomination}</span>
+                        <div className={styles.ligneNom}>
+                          <span className={styles.nom}>{p.denomination}</span>
+                          {/* La présence web porte l'argument de vente — « votre
+                              site ne répond plus, en voici un qui fonctionne »
+                              est le plus fort du lot. `null` n'est pas une
+                              catégorie mais « pas encore sondé » : on le nomme,
+                              sur un ton neutre. `TON_PRESENCE`/`CLE_PRESENCE`
+                              viennent de `ui/presence.ts` — jamais réécrits. */}
+                          <Badge
+                            ton={p.presence === null ? 'neutre' : TON_PRESENCE[p.presence]}
+                            taille="compacte"
+                          >
+                            {t(p.presence === null ? 'presence.absent' : CLE_PRESENCE[p.presence])}
+                          </Badge>
+                        </div>
                         <span className={styles.meta}>
-                          {p.ville} · <span className={styles.score}>{p.score}</span>
+                          {getTrade(p.tradeSlug)?.label ?? p.tradeSlug} · {p.ville} ·{' '}
+                          <span className={styles.score}>{p.score}</span>
                         </span>
                       </td>
                       <td>
@@ -3235,7 +3250,9 @@ export function CampagneScreen({
 >
 > **`campagne.etat.enFile` porte `{rang}`** : c'est la seule clé de cet écran qui prenne un paramètre, d'où le ternaire sur `t()`. Passer un objet vide ailleurs évite d'avoir à écrire deux appels.
 
-Créer `CampagneScreen.module.css` en reprenant les classes de `DeploiementsScreen.module.css` — **uniquement des `var(--…)`**, et `text-overflow: ellipsis` posé sur le nœud de texte et jamais sur un conteneur `flex` ou `grid` (`guidelines.test.ts` le vérifie).
+Créer `CampagneScreen.module.css` en reprenant les classes de `DeploiementsScreen.module.css`.
+
+> **Le tableau doit porter `table-layout: fixed`.** En disposition `auto` — le défaut — un `white-space: nowrap` fixe la largeur *minimale* de la colonne à celle du texte entier : le navigateur élargit la colonne au lieu de tronquer, et `AppShell` ne pose aucun `overflow-x` pour absorber le débordement. Une raison sociale longue pousse alors le tableau hors de sa colonne. C'est la classe de défaut que `jsdom` ne calcule pas et que ce dépôt a déjà payée deux fois. — **uniquement des `var(--…)`**, et `text-overflow: ellipsis` posé sur le nœud de texte et jamais sur un conteneur `flex` ou `grid` (`guidelines.test.ts` le vérifie).
 
 - [ ] **Étape 8 : Brancher dans `App.tsx`**
 

@@ -1,5 +1,6 @@
 import type { ReactElement, ReactNode } from 'react';
 import type { EtatLigne, FaitsLigne, Lot } from '../domain/campagne.js';
+import { getTrade } from '@prospeo/core';
 import { etatLigne } from '../domain/campagne.js';
 import type { TranslationKey } from '../i18n/translate.js';
 import { AppShell } from '../ui/AppShell.js';
@@ -7,6 +8,7 @@ import { PisteCampagne } from '../ui/PisteCampagne.js';
 import { Badge } from '../ui/kit/Badge.js';
 import type { BadgeTon } from '../ui/kit/Badge.js';
 import { EmptyState } from '../ui/kit/EmptyState.js';
+import { CLE_PRESENCE, TON_PRESENCE } from '../ui/presence.js';
 import { useT } from '../ui/preferences.js';
 import styles from './CampagneScreen.module.css';
 
@@ -148,9 +150,29 @@ export function CampagneScreen({
                     <tr key={p.prospectId} data-etat={r.etat.nom}>
                       <td>
                         <div className={styles.identite}>
-                          <span className={styles.nom}>{p.denomination}</span>
+                          <div className={styles.ligneNom}>
+                            <span className={styles.nom}>{p.denomination}</span>
+                            {/* La presence web n'est pas decorative : c'est
+                                elle qui porte l'argument de vente. « Votre
+                                site ne repond plus, en voici un qui
+                                fonctionne » est le plus fort du lot, et ce
+                                badge le designe d'un coup d'oeil.
+
+                                `null` n'est pas une categorie : c'est
+                                « pas encore sonde ». On le NOMME plutot que
+                                de laisser la case vide, et sur un ton neutre
+                                pour ne pas lui preter une valeur de vente
+                                qu'aucune sonde n'a mesuree. */}
+                            <Badge
+                              ton={p.presence === null ? 'neutre' : TON_PRESENCE[p.presence]}
+                              taille="compacte"
+                            >
+                              {t(p.presence === null ? 'presence.absent' : CLE_PRESENCE[p.presence])}
+                            </Badge>
+                          </div>
                           <span className={styles.meta}>
-                            {p.ville} · <span className={styles.score}>{p.score}</span>
+                            {getTrade(p.tradeSlug)?.label ?? p.tradeSlug} · {p.ville} ·{' '}
+                            <span className={styles.score}>{p.score}</span>
                           </span>
                         </div>
                       </td>
