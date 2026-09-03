@@ -52,13 +52,13 @@ describe('chiffrer / dechiffrer', () => {
     // base se dechiffrerait en n importe quoi, et le collector enverrait un
     // jeton fabrique a Vercel au lieu d echouer.
     const s = chiffrer('jeton-vercel-secret', CLE);
-    s.chiffre[0] = s.chiffre[0] ^ 0xff;
+    s.chiffre[0] = (s.chiffre[0] ?? 0) ^ 0xff;
     expect(dechiffrer(s, CLE)).toEqual({ ouvert: false, motif: 'altere' });
   });
 
   it('refuse une etiquette altere', () => {
     const s = chiffrer('jeton-vercel-secret', CLE);
-    s.etiquette[0] = s.etiquette[0] ^ 0xff;
+    s.etiquette[0] = (s.etiquette[0] ?? 0) ^ 0xff;
     expect(dechiffrer(s, CLE)).toEqual({ ouvert: false, motif: 'altere' });
   });
 

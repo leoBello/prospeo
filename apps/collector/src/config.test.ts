@@ -1,5 +1,7 @@
+import { randomBytes } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import {
+  loadCoffreConfig,
   loadDeployConfig,
   loadPitchConfig,
   loadGenerateConfig,
@@ -81,6 +83,23 @@ describe('configuration de la chaîne de vente', () => {
     const p = loadPublishConfig({ ...complet, PROSPEO_GITHUB_TEMPLATE_REPO: '' });
     expect(p.githubTemplateRepo).toBeUndefined();
     expect(p.githubOrg).toBe('prospeo');
+  });
+});
+
+describe('loadCoffreConfig', () => {
+  const cleValide = `v1:${randomBytes(32).toString('base64')}`;
+
+  it('refuse de démarrer si PROSPEO_COFFRE_CLE manque', () => {
+    // Le nom de la variable doit apparaître dans le message : c'est lui qui
+    // évite à l'opérateur de deviner laquelle des deux dizaines de variables
+    // d'environnement a été oubliée.
+    expect(() => loadCoffreConfig({})).toThrow(/PROSPEO_COFFRE_CLE/);
+  });
+
+  it('lit une clé maîtresse bien formée', () => {
+    const config = loadCoffreConfig({ PROSPEO_COFFRE_CLE: cleValide });
+    expect(config.cle.id).toBe('v1');
+    expect(config.cle.octets).toHaveLength(32);
   });
 });
 
