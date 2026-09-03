@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import userEvent from '@testing-library/user-event';
 import { screen } from '@testing-library/react';
 import { renderWithPreferences } from '../test-utils.js';
 import { CampagneScreen } from './CampagneScreen.js';
@@ -22,6 +23,9 @@ function fait(surcharges: Partial<FaitsProspect> = {}): FaitsProspect {
 
 const VIVANT = { beatAt: new Date().toISOString(), inFlight: 0 };
 
+/** Aucun de ces tests n'exerce le déclenchement : il a sa propre suite. */
+const RIEN = async (): Promise<string | null> => null;
+
 describe('CampagneScreen', () => {
   it('porte la presence web, qui est l argument de vente de la ligne', () => {
     // Valeur lue dans src/i18n/fr.ts, cle `presence.dead_site`. « Votre site
@@ -33,6 +37,8 @@ describe('CampagneScreen', () => {
         lignes={new Map<string, FaitsLigne>()}
         totalProspects={12}
         heartbeat={VIVANT}
+        onDeposer={RIEN}
+        onRetirer={RIEN}
         onSignOut={() => {}}
         nav={null}
       />,
@@ -51,6 +57,8 @@ describe('CampagneScreen', () => {
         lignes={new Map<string, FaitsLigne>()}
         totalProspects={12}
         heartbeat={VIVANT}
+        onDeposer={RIEN}
+        onRetirer={RIEN}
         onSignOut={() => {}}
         nav={null}
       />,
@@ -68,6 +76,8 @@ describe('CampagneScreen', () => {
         lignes={new Map<string, FaitsLigne>()}
         totalProspects={12}
         heartbeat={VIVANT}
+        onDeposer={RIEN}
+        onRetirer={RIEN}
         onSignOut={() => {}}
         nav={null}
       />,
@@ -85,6 +95,8 @@ describe('CampagneScreen', () => {
         lignes={new Map<string, FaitsLigne>()}
         totalProspects={12}
         heartbeat={VIVANT}
+        onDeposer={RIEN}
+        onRetirer={RIEN}
         onSignOut={() => {}}
         nav={null}
       />,
@@ -106,6 +118,8 @@ describe('CampagneScreen', () => {
         lignes={new Map<string, FaitsLigne>()}
         totalProspects={12}
         heartbeat={VIVANT}
+        onDeposer={RIEN}
+        onRetirer={RIEN}
         onSignOut={() => {}}
         nav={null}
       />,
@@ -126,6 +140,8 @@ describe('CampagneScreen', () => {
         lignes={new Map<string, FaitsLigne>()}
         totalProspects={12}
         heartbeat={VIVANT}
+        onDeposer={RIEN}
+        onRetirer={RIEN}
         onSignOut={() => {}}
         nav={null}
       />,
@@ -145,6 +161,8 @@ describe('CampagneScreen', () => {
         lignes={new Map<string, FaitsLigne>()}
         totalProspects={12}
         heartbeat={VIVANT}
+        onDeposer={RIEN}
+        onRetirer={RIEN}
         onSignOut={() => {}}
         nav={null}
       />,
@@ -167,6 +185,8 @@ describe('CampagneScreen', () => {
         lignes={new Map<string, FaitsLigne>()}
         totalProspects={0}
         heartbeat={VIVANT}
+        onDeposer={RIEN}
+        onRetirer={RIEN}
         onSignOut={() => {}}
         nav={null}
       />,
@@ -174,5 +194,77 @@ describe('CampagneScreen', () => {
 
     expect(screen.getByText(aucunProspect)).toBeTruthy();
     expect(screen.queryByText(lotFini)).toBeNull();
+  });
+});
+
+describe('CampagneScreen — le declenchement', () => {
+  const MORT = { beatAt: '2020-01-01T00:00:00Z', inFlight: 0 };
+
+  it('depose une demande pour LE prospect de la ligne cliquee', async () => {
+    // Le seul geste de cet ecran. Se tromper de prospect deploierait un site
+    // au nom d'une entreprise qu'on ne visait pas — et un depot GitHub ne se
+    // « de-cree » pas. Libelle lu dans fr.ts, cle `campagne.action.deployer`.
+    const deposer = vi.fn(async () => null);
+    renderWithPreferences(
+      <CampagneScreen
+        lot={{ lignes: [fait({ prospectId: 'p-42' })], sansScore: 0 }}
+        lignes={new Map<string, FaitsLigne>()}
+        totalProspects={12}
+        heartbeat={VIVANT}
+        onDeposer={deposer}
+        onRetirer={RIEN}
+        onSignOut={() => {}}
+        nav={null}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Déployer' }));
+    expect(deposer).toHaveBeenCalledWith('p-42');
+  });
+
+  it('eteint le bouton quand le collector est a l arret', async () => {
+    // Un bouton actionnable alors que rien ne l'executera est l'affordance que
+    // la doctrine interdit : la demande partirait en base et n'en sortirait
+    // jamais, sans que l'operateur sache pourquoi.
+    const deposer = vi.fn(async () => null);
+    renderWithPreferences(
+      <CampagneScreen
+        lot={{ lignes: [fait()], sansScore: 0 }}
+        lignes={new Map<string, FaitsLigne>()}
+        totalProspects={12}
+        heartbeat={MORT}
+        onDeposer={deposer}
+        onRetirer={RIEN}
+        onSignOut={() => {}}
+        nav={null}
+      />,
+    );
+
+    const bouton = screen.getByRole('button', { name: 'Déployer' });
+    expect(bouton).toHaveProperty('disabled', true);
+    // Et il PORTE sa raison : un bouton grise muet envoie chercher une
+    // remediation qui n'existe pas.
+    expect(bouton.getAttribute('title')).toContain('collector');
+  });
+
+  it('affiche l echec d une ecriture au lieu de le taire', async () => {
+    // Une ecriture refusee qui ne remonte pas laisse croire que le
+    // declenchement est parti. Le message RESTE affiche jusqu'a la tentative
+    // suivante — pas un message fugace.
+    renderWithPreferences(
+      <CampagneScreen
+        lot={{ lignes: [fait()], sansScore: 0 }}
+        lignes={new Map<string, FaitsLigne>()}
+        totalProspects={12}
+        heartbeat={VIVANT}
+        onDeposer={async () => 'RLS'}
+        onRetirer={RIEN}
+        onSignOut={() => {}}
+        nav={null}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Déployer' }));
+    expect(await screen.findByRole('alert')).toBeTruthy();
   });
 });

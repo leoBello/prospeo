@@ -238,3 +238,59 @@ export async function journaliserInteraction(
   });
   return error === null ? null : error.message;
 }
+
+/**
+ * Code Postgres d'une violation de contrainte d'unicité.
+ *
+ * Nommé plutôt qu'écrit en clair au point d'usage : `'23505'` ne dit rien à
+ * qui relit, et c'est précisément le code dont dépend la décision de traiter
+ * un refus comme un succès.
+ */
+const VIOLATION_UNICITE = '23505';
+
+/**
+ * Dépose une demande de traitement pour un prospect.
+ *
+ * **C'est tout le contrat de l'écran côté déclenchement.** Le dashboard
+ * n'appelle ni GitHub ni Vercel — ce sont des secrets, et l'architecture du
+ * chantier n°1 n'a pas de backend : il écrit une ligne, et le collector
+ * résident la prend. Ce contrat resterait vrai si un backend remplaçait un
+ * jour le worker, et l'interface n'aurait pas à changer.
+ *
+ * **Une violation d'unicité n'est pas une erreur.** L'index partiel
+ * `campaign_job_actif_unique` refuse un second job actif sur le même
+ * prospect ; c'est la garantie qui joue son rôle, et l'écran affiche déjà
+ * « en file d'attente ». Remonter une erreur ferait recliquer sur une
+ * demande déjà déposée, ou pire, croire à une panne.
+ */
+export async function deposerJob(client: Client, prospectId: string): Promise<string | null> {
+  const { error } = await client
+    .from('campaign_job')
+    .insert({ prospect_id: prospectId, kind: 'chaine', state: 'en_attente' });
+
+  if (error === null) return null;
+  if (error.code === VIOLATION_UNICITE) return null;
+  return error.message;
+}
+
+/**
+ * Retire une demande **encore en attente**.
+ *
+ * Le second filtre sur l'état n'est pas une précaution de style : un job déjà
+ * pris par le worker ne se retire pas depuis l'interface. Le dépôt GitHub est
+ * peut-être créé, le projet Vercel amorcé — annuler la ligne ferait mentir
+ * l'écran sur ce qui existe réellement au nom d'une entreprise.
+ *
+ * `annule` et non une suppression : ce qu'on a demandé, puis retiré, fait
+ * partie de ce qu'on doit pouvoir relire. C'est aussi un état terminal, donc
+ * invisible des lectures de l'écran.
+ */
+export async function retirerJob(client: Client, prospectId: string): Promise<string | null> {
+  const { error } = await client
+    .from('campaign_job')
+    .update({ state: 'annule', finished_at: new Date().toISOString() })
+    .eq('prospect_id', prospectId)
+    .eq('state', 'en_attente');
+
+  return error === null ? null : error.message;
+}

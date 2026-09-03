@@ -375,6 +375,11 @@ export const en: Record<keyof typeof fr, string> = {
   'campagne.sansScore_one':
     '{count} prospect has never been scored: it cannot be ranked, and does not appear in this batch.',
 
+  'campagne.action.deployer': 'Deploy',
+  'campagne.action.rejouer': 'Replay',
+  'campagne.action.retirer': 'Remove',
+  'campagne.action.impossible':
+    'The collector is stopped: a request filed now would not go anywhere.',
   'campagne.worker.ecoute': 'Collector listening',
   'campagne.worker.arret': 'Collector stopped',
   'campagne.worker.arret.raison':

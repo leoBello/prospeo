@@ -413,13 +413,13 @@ export const fr = {
   'deploiements.empty.filtre.titre': 'Aucun déploiement dans ce filtre',
   'deploiements.empty.filtre.detail': 'Choisissez « Tous » pour revoir l’ensemble des déploiements.',
 
-  // Chantier n°7, tâche 8-9 — l'écran de campagne, en LECTURE SEULE dans ce
-  // lot : aucun bouton n'agit encore (le déclenchement est la tâche 11), donc
-  // aucune clé de libellé de bouton n'est ajoutée ici (`campagne.action.*`
-  // du plan) — l'écrire sans exécutant derrière serait une affordance qui
-  // annonce un fait qu'aucun code ne rend vrai, et `i18n.test.ts` la
-  // signalerait de toute façon orpheline. Les libellés viennent des artboards approuvés
-  // (Campagne.html, CampagneEtats.html), lus et recopiés, jamais inventés.
+  // Chantier n°7 — l'écran de campagne. Les libellés viennent des artboards
+  // approuvés (Campagne.html, CampagneEtats.html), lus et recopiés, jamais
+  // inventés. Les clés de bouton (`campagne.action.*`) et de conditions
+  // (`campagne.worker.*`) n'ont été écrites qu'AVEC leur exécutant, et non
+  // d'avance : un libellé sans code derrière est une affordance qui annonce
+  // un fait que rien ne rend vrai — et `i18n.test.ts` l'aurait de toute
+  // façon signalé orphelin.
   'nav.campagne': 'Campagne',
 
   'campagne.title': 'Campagne de prospection',
@@ -458,6 +458,11 @@ export const fr = {
   'campagne.sansScore_one':
     "{count} prospect n'a jamais été scoré : il ne peut pas être classé, et n'apparaît pas dans ce lot.",
 
+  'campagne.action.deployer': 'Déployer',
+  'campagne.action.rejouer': 'Rejouer',
+  'campagne.action.retirer': 'Retirer',
+  'campagne.action.impossible':
+    'Le collector est à l’arrêt : une demande déposée maintenant ne partirait pas.',
   'campagne.worker.ecoute': "Collector à l'écoute",
   'campagne.worker.arret': "Collector à l'arrêt",
   'campagne.worker.arret.raison':

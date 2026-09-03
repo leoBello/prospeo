@@ -84,6 +84,44 @@ export function useCampagne(
     };
   }, [client, tentative, enabled]);
 
+  /**
+   * Le suivi sans rechargement.
+   *
+   * **Realtime plutôt qu'un sondage** : une campagne dure une quinzaine de
+   * minutes, et interroger la base toutes les deux secondes pendant ce
+   * temps-là multiplierait les lectures sans rien gagner en fraîcheur.
+   *
+   * **La relecture est COMPLÈTE, pas incrémentale.** Composer un état à
+   * partir d'événements partiels rouvrirait la question de leur ordre
+   * d'arrivée — un `INSERT` sur `deployment_event` peut précéder l'`UPDATE`
+   * du job qui l'a produit — pour un lot de vingt lignes qui se relit en une
+   * requête. On relit.
+   *
+   * Deux tables, parce qu'elles disent deux choses différentes :
+   * `campaign_job` porte le passage en file puis en cours, `deployment_event`
+   * l'avancée à l'intérieur d'un traitement. S'abonner à la première seule
+   * figerait la ligne pendant toute la durée du déploiement.
+   */
+  useEffect(() => {
+    if (!enabled) return;
+
+    const canal = client
+      .channel('campagne-ecran')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'campaign_job' }, () =>
+        setTentative((n) => n + 1),
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'deployment_event' },
+        () => setTentative((n) => n + 1),
+      )
+      .subscribe();
+
+    return () => {
+      void client.removeChannel(canal);
+    };
+  }, [client, enabled]);
+
   const reload = useCallback(() => setTentative((n) => n + 1), []);
 
   return { ...state, reload };

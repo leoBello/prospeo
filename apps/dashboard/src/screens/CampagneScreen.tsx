@@ -1,10 +1,11 @@
+import { useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 import type { EtatLigne, FaitsLigne, Lot } from '../domain/campagne.js';
 import { getTrade } from '@prospeo/core';
 import { etatLigne } from '../domain/campagne.js';
 import type { TranslationKey } from '../i18n/translate.js';
 import { AppShell } from '../ui/AppShell.js';
-import { BandeConditions } from '../ui/BandeConditions.js';
+import { BandeConditions, workerVivant } from '../ui/BandeConditions.js';
 import { PisteCampagne } from '../ui/PisteCampagne.js';
 import { Badge } from '../ui/kit/Badge.js';
 import type { BadgeTon } from '../ui/kit/Badge.js';
@@ -83,6 +84,16 @@ export interface CampagneScreenProps {
    * afficherait « depuis 0 min », un chiffre que rien ne mesure.
    */
   heartbeat: { beatAt: string; inFlight: number } | null;
+  /**
+   * Déposer une demande, et la retirer. Rendent `null` en cas de succès et le
+   * message d'erreur sinon — la convention de `designerGabarit` et de
+   * `PanelActions`, adoptée après qu'une écriture refusée par la RLS n'ait été
+   * journalisée qu'en console, l'opérateur croyant le changement pris.
+   *
+   * L'écran ne connaît pas le client Supabase : c'est `App` qui les câble.
+   */
+  onDeposer: (prospectId: string) => Promise<string | null>;
+  onRetirer: (prospectId: string) => Promise<string | null>;
   onSignOut: () => void;
   nav: ReactNode;
 }
@@ -102,10 +113,25 @@ export function CampagneScreen({
   lignes,
   totalProspects,
   heartbeat,
+  onDeposer,
+  onRetirer,
   onSignOut,
   nav,
 }: CampagneScreenProps): ReactElement {
   const t = useT();
+  const maintenant = new Date();
+  // Le worker mort n'éteint pas les boutons par prudence : il les éteint
+  // parce qu'une demande déposée maintenant ne partirait pas. La raison est
+  // portée par `BandeConditions`, juste au-dessus, et l'infobulle du bouton
+  // la répète là où le geste se fait.
+  const executable = workerVivant(heartbeat?.beatAt ?? null, maintenant);
+  // Reste affichée jusqu'à la tentative suivante — pas un message fugace qui
+  // disparaît avant d'avoir été lu (même parti que `GabaritScreen`).
+  const [erreur, setErreur] = useState<string | null>(null);
+
+  const agir = (action: Promise<string | null>): void => {
+    void action.then(setErreur);
+  };
 
   return (
     <AppShell
@@ -119,7 +145,7 @@ export function CampagneScreen({
             <p className={styles.sousTitre}>{t('campagne.subtitle')}</p>
           </header>
 
-          <BandeConditions heartbeat={heartbeat} maintenant={new Date()} />
+          <BandeConditions heartbeat={heartbeat} maintenant={maintenant} />
 
           {lot.lignes.length === 0 ? (
             // Deux vides de natures différentes, deux écrans. Le second ne se
@@ -196,12 +222,49 @@ export function CampagneScreen({
                           <p className={styles.cause}>{r.etat.detail}</p>
                         ) : null}
                       </td>
+                      <td className={styles.colAction}>
+                        {/* Trois etats seulement portent un geste. « Site en
+                            cours » n'en porte AUCUN : il n'y a rien a faire
+                            pendant qu'il tourne, et un bouton « Detail »
+                            promettrait un ecran que ce lot ne construit pas.
+                            Les autres etats attendent l'envoi, qui n'existe
+                            pas encore. */}
+                        {r.etat.nom === 'jamais' || r.etat.nom === 'site_echec' ? (
+                          <button
+                            type="button"
+                            className={styles.action}
+                            disabled={!executable}
+                            title={executable ? undefined : t('campagne.action.impossible')}
+                            onClick={() => agir(onDeposer(p.prospectId))}
+                          >
+                            {t(
+                              r.etat.nom === 'jamais'
+                                ? 'campagne.action.deployer'
+                                : 'campagne.action.rejouer',
+                            )}
+                          </button>
+                        ) : r.etat.nom === 'en_file' ? (
+                          <button
+                            type="button"
+                            className={styles.action}
+                            onClick={() => agir(onRetirer(p.prospectId))}
+                          >
+                            {t('campagne.action.retirer')}
+                          </button>
+                        ) : null}
+                      </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
           )}
+
+          {erreur !== null ? (
+            <p className={styles.erreur} role="alert">
+              {t('action.failed', { message: erreur })}
+            </p>
+          ) : null}
 
           {lot.sansScore > 0 ? (
             <p className={styles.sansScore}>{t('campagne.sansScore', { count: lot.sansScore })}</p>

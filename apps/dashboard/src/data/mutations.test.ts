@@ -3,10 +3,12 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@prospeo/db';
 import {
   annulerRejet,
+  deposerJob,
   definirStatut,
   designerGabarit,
   journaliserInteraction,
   rejeterRedaction,
+  retirerJob,
 } from './mutations.js';
 
 /**
@@ -23,9 +25,15 @@ import {
  * l'inverse) est justement ce que ce fichier doit prouver. `erreur` reste le
  * réglage global déjà utilisé par les autres suites, pour ne rien casser.
  */
+/**
+ * `code` est optionnel et n'existait pas avant `deposerJob` : PostgREST rend
+ * un code SQL (`23505` pour une violation d'unicité) que l'appelant doit
+ * pouvoir distinguer d'un refus RLS. Sans lui, ce fichier ne saurait pas
+ * simuler la garantie que porte `campaign_job_actif_unique`.
+ */
 function fakeClient(
-  erreur: { message: string } | null = null,
-  erreurParTable: Record<string, { message: string }> = {},
+  erreur: { message: string; code?: string } | null = null,
+  erreurParTable: Record<string, { message: string; code?: string }> = {},
 ) {
   const appels: { table: string; verbe: string; valeurs: unknown; filtre?: [string, string]; options?: unknown }[] = [];
 
@@ -36,12 +44,27 @@ function fakeClient(
         update(valeurs: unknown) {
           const appel = { table, verbe: 'update', valeurs };
           appels.push(appel);
-          return {
+          // `eq` est CHAÎNABLE et thenable à la fois : `retirerJob` en
+          // enchaîne deux (le prospect, puis l'état), là où les autres
+          // mutations n'en posent qu'un et attendent directement le résultat.
+          const chainable = {
             eq(colonne: string, valeur: string) {
+              const filtres = ((appel as Record<string, unknown>)['filtres'] ?? []) as [
+                string,
+                string,
+              ][];
+              filtres.push([colonne, valeur]);
+              (appel as Record<string, unknown>)['filtres'] = filtres;
               (appel as Record<string, unknown>)['filtre'] = [colonne, valeur];
-              return reponse;
+              return chainable;
+            },
+            then<T>(
+              resoudre: (v: { error: { message: string } | null }) => T,
+            ): Promise<T> {
+              return reponse.then(resoudre);
             },
           };
+          return chainable;
         },
         upsert(valeurs: unknown, options?: unknown) {
           appels.push({ table, verbe: 'upsert', valeurs, options });
@@ -279,5 +302,61 @@ describe('journaliserInteraction', () => {
     const { client, appels } = fakeClient();
     await journaliserInteraction(client, 'p1', 'email', 'Relance envoyée');
     expect(appels[0]?.valeurs).not.toHaveProperty('occurred_at');
+  });
+});
+
+describe('deposerJob', () => {
+  it('depose une demande en attente sur la table de la file', () => {
+    // C'est le CÂBLAGE qu'on éprouve : le dashboard n'appelle ni GitHub ni
+    // Vercel, il écrit une ligne. Se tromper de table ou d'état laisserait
+    // une demande qu'aucun worker ne draine, sans la moindre erreur.
+    const { client, appels } = fakeClient();
+    void deposerJob(client, 'p1');
+
+    expect(appels[0]?.table).toBe('campaign_job');
+    expect(appels[0]?.verbe).toBe('insert');
+    expect(appels[0]?.valeurs).toMatchObject({ prospect_id: 'p1', state: 'en_attente' });
+  });
+
+  it('rend null quand l insertion reussit', async () => {
+    const { client } = fakeClient();
+    expect(await deposerJob(client, 'p1')).toBeNull();
+  });
+
+  it('rend le message quand la RLS refuse, au lieu de le taire', async () => {
+    // Une écriture refusée qui ne remonte pas laisse l'opérateur croire que
+    // le déclenchement est parti. C'est le défaut relevé sur `designerGabarit`.
+    const { client } = fakeClient({ message: 'RLS' });
+    expect(await deposerJob(client, 'p1')).toBe('RLS');
+  });
+
+  it('traite une violation d unicite comme un succes, pas comme une erreur', async () => {
+    // L'index partiel `campaign_job_actif_unique` refuse un second job actif
+    // sur le même prospect. Ce n'est pas une panne : c'est la garantie qui
+    // joue son rôle, et l'écran affiche déjà « en file d'attente ». Remonter
+    // une erreur ferait recliquer sur une demande déjà déposée.
+    const { client } = fakeClient({ code: '23505', message: 'duplicate key' });
+    expect(await deposerJob(client, 'p1')).toBeNull();
+  });
+});
+
+describe('retirerJob', () => {
+  it('n annule QUE ce qui attend encore', async () => {
+    // Un job déjà pris par le worker ne se retire pas depuis l'interface : le
+    // dépôt GitHub est peut-être créé, et l'effacer ferait mentir l'écran sur
+    // ce qui existe réellement. Le second filtre est la garantie.
+    const { client, appels } = fakeClient();
+    await retirerJob(client, 'p1');
+
+    expect(appels[0]?.table).toBe('campaign_job');
+    expect((appels[0] as Record<string, unknown>)['filtres']).toEqual([
+      ['prospect_id', 'p1'],
+      ['state', 'en_attente'],
+    ]);
+  });
+
+  it('rend le message d erreur plutot que de lever', async () => {
+    const { client } = fakeClient({ message: 'RLS' });
+    expect(await retirerJob(client, 'p1')).toBe('RLS');
   });
 });

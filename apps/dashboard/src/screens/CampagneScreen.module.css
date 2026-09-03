@@ -133,3 +133,35 @@
   font-size: var(--text-sm);
   color: var(--color-text-muted);
 }
+
+/* La colonne d'actions : largeur fixe (maquette, Campagne.html), boutons
+   alignes a droite pour que l'oeil les retrouve d'une ligne a l'autre. */
+.colAction {
+  width: 96px;
+  text-align: right;
+}
+
+.action {
+  height: 26px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-strong);
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+/* Eteint ET porteur de sa raison (via `title`) : un bouton grise muet envoie
+   chercher une remediation qui n'existe pas. */
+.action:disabled {
+  color: var(--color-text-faint);
+  border-color: var(--color-border);
+  cursor: not-allowed;
+}
+
+.erreur {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-md);
+  color: var(--color-danger);
+}

@@ -4,7 +4,7 @@ import type { Database } from '@prospeo/db';
 import { SCORING_RULESET, TRADES } from '@prospeo/core';
 import { AuthProvider, useAuth } from './auth/AuthProvider.js';
 import { createDashboardClient } from './data/supabase.js';
-import { designerGabarit } from './data/mutations.js';
+import { deposerJob, designerGabarit, retirerJob } from './data/mutations.js';
 import { useProspects } from './data/useProspects.js';
 import { useDeployments } from './data/useDeployments.js';
 import { useCampagne } from './data/useCampagne.js';
@@ -55,6 +55,7 @@ function Authenticated({ client }: { client: SupabaseClient<Database> }) {
   const deploymentsState = useDeployments(client, vue === 'deploiements');
   // Même garde pour « Campagne » (chantier n°7).
   const campagneState = useCampagne(client, vue === 'campagne');
+  const campagneReload = campagneState.reload;
   // Même garde pour « Gabarit » (D10, chantier n°10).
   const gabaritState = useSiteTemplate(client, vue === 'gabarit');
   const gabaritReload = gabaritState.reload;
@@ -82,6 +83,32 @@ function Authenticated({ client }: { client: SupabaseClient<Database> }) {
         return erreur;
       }),
     [client, gabaritReload],
+  );
+
+  /**
+   * Déposer une demande, et la retirer.
+   *
+   * On relit après une écriture réussie **en plus** de l'abonnement Realtime
+   * de `useCampagne` : le même parti que le worker, qui écoute ET balaye. Une
+   * socket muette ne doit pas laisser l'écran figé sur un clic qui, lui, est
+   * bien parti.
+   */
+  const deposer = useCallback(
+    (prospectId: string): Promise<string | null> =>
+      deposerJob(client, prospectId).then((erreur) => {
+        if (erreur === null) campagneReload();
+        return erreur;
+      }),
+    [client, campagneReload],
+  );
+
+  const retirer = useCallback(
+    (prospectId: string): Promise<string | null> =>
+      retirerJob(client, prospectId).then((erreur) => {
+        if (erreur === null) campagneReload();
+        return erreur;
+      }),
+    [client, campagneReload],
   );
 
   // L'écran « Gabarit » (D10, chantier n°10) : branché sur l'écran réel,
@@ -176,6 +203,8 @@ function Authenticated({ client }: { client: SupabaseClient<Database> }) {
         lot={campagneState.lot}
         lignes={campagneState.lignes}
         totalProspects={campagneState.totalProspects}
+        onDeposer={deposer}
+        onRetirer={retirer}
         heartbeat={campagneState.heartbeat}
         onSignOut={() => void signOut()}
         nav={nav}
