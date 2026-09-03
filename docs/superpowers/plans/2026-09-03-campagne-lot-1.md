@@ -244,15 +244,45 @@ create policy authenticated_all on campaign_job
 create policy authenticated_all on worker_heartbeat
   for all to authenticated using (true) with check (true);
 
--- REALTIME. Sans ces deux lignes, `postgres_changes` ne rend rien et l'écran
+-- REALTIME. Sans cet ajout, `postgres_changes` ne rend rien et l'écran
 -- reste figé jusqu'à un rechargement manuel — le worker, lui, ne serait
 -- jamais réveillé par un dépôt et n'avancerait qu'au balayage périodique.
 --
 -- `alter publication ... add table` n'altère NI ne supprime la table :
 -- il l'ajoute à un flux. `deployment_event` existe depuis le lot 2 du
 -- chantier n°6 et n'est pas modifiée ici.
-alter publication supabase_realtime add table campaign_job;
-alter publication supabase_realtime add table deployment_event;
+--
+-- GARDÉ, ET NON NU : l'état de `supabase_realtime` n'est pas connaissable
+-- depuis ce dépôt. `deployment_event` a pu être ajoutée à la publication
+-- depuis l'interface Supabase — aucune migration ne la manipule — et
+-- `add table` sur une table déjà membre lève une erreur qui ferait échouer
+-- la migration ENTIÈRE, sur une instance de production sans retour en
+-- arrière. Deux autres cas nus lèveraient de même : la publication peut ne
+-- pas exister du tout, ou avoir été créée `for all tables`, auquel cas y
+-- ajouter une table nommée est refusé alors qu'elle y est déjà de fait.
+do $$
+declare
+  nom_table text;
+begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+     and not exists (
+       select 1 from pg_publication
+       where pubname = 'supabase_realtime' and puballtables
+     )
+  then
+    foreach nom_table in array array['campaign_job', 'deployment_event']
+    loop
+      if not exists (
+        select 1 from pg_publication_tables
+        where pubname = 'supabase_realtime'
+          and schemaname = 'public'
+          and tablename = nom_table
+      ) then
+        execute format('alter publication supabase_realtime add table %I', nom_table);
+      end if;
+    end loop;
+  end if;
+end $$;
 ```
 
 - [ ] **Étape 2 : Écrire la migration du destinataire**

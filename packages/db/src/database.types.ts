@@ -14,6 +14,99 @@ export type Database = {
   }
   public: {
     Tables: {
+      campaign: {
+        Row: {
+          auto_send: boolean
+          auto_send_at: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          label: string
+          size: number
+          state: Database["public"]["Enums"]["campaign_state"]
+        }
+        Insert: {
+          auto_send?: boolean
+          auto_send_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          label: string
+          size: number
+          state?: Database["public"]["Enums"]["campaign_state"]
+        }
+        Update: {
+          auto_send?: boolean
+          auto_send_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          label?: string
+          size?: number
+          state?: Database["public"]["Enums"]["campaign_state"]
+        }
+        Relationships: []
+      }
+      campaign_job: {
+        Row: {
+          attempts: number
+          campaign_id: string | null
+          cost_eur: number | null
+          finished_at: string | null
+          id: number
+          kind: Database["public"]["Enums"]["campaign_job_kind"]
+          last_error: string | null
+          prospect_id: string
+          requested_at: string
+          requested_by: string | null
+          started_at: string | null
+          state: Database["public"]["Enums"]["campaign_job_state"]
+        }
+        Insert: {
+          attempts?: number
+          campaign_id?: string | null
+          cost_eur?: number | null
+          finished_at?: string | null
+          id?: never
+          kind?: Database["public"]["Enums"]["campaign_job_kind"]
+          last_error?: string | null
+          prospect_id: string
+          requested_at?: string
+          requested_by?: string | null
+          started_at?: string | null
+          state?: Database["public"]["Enums"]["campaign_job_state"]
+        }
+        Update: {
+          attempts?: number
+          campaign_id?: string | null
+          cost_eur?: number | null
+          finished_at?: string | null
+          id?: never
+          kind?: Database["public"]["Enums"]["campaign_job_kind"]
+          last_error?: string | null
+          prospect_id?: string
+          requested_at?: string
+          requested_by?: string | null
+          started_at?: string | null
+          state?: Database["public"]["Enums"]["campaign_job_state"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_job_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_job_prospect_id_fkey"
+            columns: ["prospect_id"]
+            isOneToOne: false
+            referencedRelation: "prospect"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deployment_event: {
         Row: {
           detail: string | null
@@ -125,6 +218,66 @@ export type Database = {
           },
         ]
       }
+      message_send: {
+        Row: {
+          channel: string
+          error: string | null
+          generated_message_id: string | null
+          id: string
+          prospect_id: string
+          provider: string
+          provider_message_id: string | null
+          recipient: string
+          sent_at: string | null
+          sent_by: string | null
+          started_at: string
+          state: Database["public"]["Enums"]["send_state"]
+        }
+        Insert: {
+          channel: string
+          error?: string | null
+          generated_message_id?: string | null
+          id?: string
+          prospect_id: string
+          provider: string
+          provider_message_id?: string | null
+          recipient: string
+          sent_at?: string | null
+          sent_by?: string | null
+          started_at?: string
+          state?: Database["public"]["Enums"]["send_state"]
+        }
+        Update: {
+          channel?: string
+          error?: string | null
+          generated_message_id?: string | null
+          id?: string
+          prospect_id?: string
+          provider?: string
+          provider_message_id?: string | null
+          recipient?: string
+          sent_at?: string | null
+          sent_by?: string | null
+          started_at?: string
+          state?: Database["public"]["Enums"]["send_state"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_send_generated_message_id_fkey"
+            columns: ["generated_message_id"]
+            isOneToOne: false
+            referencedRelation: "generated_message"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_send_prospect_id_fkey"
+            columns: ["prospect_id"]
+            isOneToOne: false
+            referencedRelation: "prospect"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pipeline_event: {
         Row: {
           id: number
@@ -228,6 +381,44 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      prospect_contact: {
+        Row: {
+          candidates: Json
+          email: string
+          found_at: string
+          origin: Database["public"]["Enums"]["contact_origin"]
+          prospect_id: string
+          source_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          candidates?: Json
+          email: string
+          found_at?: string
+          origin: Database["public"]["Enums"]["contact_origin"]
+          prospect_id: string
+          source_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          candidates?: Json
+          email?: string
+          found_at?: string
+          origin?: Database["public"]["Enums"]["contact_origin"]
+          prospect_id?: string
+          source_url?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prospect_contact_prospect_id_fkey"
+            columns: ["prospect_id"]
+            isOneToOne: true
+            referencedRelation: "prospect"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       prospect_enrichment: {
         Row: {
@@ -506,6 +697,27 @@ export type Database = {
           },
         ]
       }
+      worker_heartbeat: {
+        Row: {
+          beat_at: string
+          id: boolean
+          in_flight: number
+          version: string | null
+        }
+        Insert: {
+          beat_at: string
+          id?: boolean
+          in_flight?: number
+          version?: string | null
+        }
+        Update: {
+          beat_at?: string
+          id?: boolean
+          in_flight?: number
+          version?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -514,6 +726,15 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      campaign_job_kind: "chaine"
+      campaign_job_state:
+        | "en_attente"
+        | "en_cours"
+        | "termine"
+        | "echoue"
+        | "annule"
+      campaign_state: "en_cours" | "suspendue" | "terminee" | "annulee"
+      contact_origin: "collecte" | "saisie"
       deployment_outcome: "demarre" | "reussi" | "echoue" | "ignore"
       deployment_step:
         | "redaction"
@@ -533,6 +754,7 @@ export type Database = {
         | "gagne"
         | "perdu"
         | "ne_pas_contacter"
+      send_state: "en_cours" | "envoye" | "echoue"
       web_presence_category:
         | "none"
         | "social_only"
@@ -666,6 +888,16 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      campaign_job_kind: ["chaine"],
+      campaign_job_state: [
+        "en_attente",
+        "en_cours",
+        "termine",
+        "echoue",
+        "annule",
+      ],
+      campaign_state: ["en_cours", "suspendue", "terminee", "annulee"],
+      contact_origin: ["collecte", "saisie"],
       deployment_outcome: ["demarre", "reussi", "echoue", "ignore"],
       deployment_step: [
         "redaction",
@@ -687,6 +919,7 @@ export const Constants = {
         "perdu",
         "ne_pas_contacter",
       ],
+      send_state: ["en_cours", "envoye", "echoue"],
       web_presence_category: [
         "none",
         "social_only",
