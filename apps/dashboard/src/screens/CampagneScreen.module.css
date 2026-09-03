@@ -1,0 +1,175 @@
+.page {
+  padding: var(--space-4) var(--space-5) var(--space-5);
+
+  /* Une mesure de lecture, pas toute la fenetre. Sans ce plafond, la colonne
+     « Prospect » absorbe tout l'espace restant et repousse les boutons a plus
+     de mille pixels de l'etat qu'ils commentent — l'oeil ne fait plus le lien.
+     La maquette montre l'ecran AVEC le panneau de relecture, qui occupe la
+     droite ; tant qu'il n'existe pas, c'est ce plafond qui tient la densite,
+     et il cessera de mordre le jour ou le panneau prendra sa place. */
+  max-width: 1080px;
+}
+
+.entete {
+  margin-bottom: var(--space-4);
+}
+
+.titre {
+  margin: 0;
+  /* Titre d'écran : la maquette le confie à la fonte d'affichage, comme tous
+     les h1-h4 (règle globale de Main.dc.html) — même patron que
+     DeploiementsScreen.module.css. */
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-xl);
+  letter-spacing: -0.02em;
+}
+
+.sousTitre {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  max-width: 62ch;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  /* `fixed`, et ce n'est pas un detail de style : en disposition `auto` — le
+     defaut — un `white-space: nowrap` fixe la largeur MINIMALE de la colonne
+     a celle du texte entier. Le navigateur elargit alors la colonne au lieu
+     de tronquer, et comme `AppShell` ne pose aucun `overflow-x`, rien
+     n'absorbe le debordement : une raison sociale longue pousse le tableau
+     hors de sa colonne. C'est la classe de defaut que `jsdom` ne calcule pas
+     et que ce depot a deja payee deux fois. */
+  table-layout: fixed;
+}
+
+.table th {
+  text-align: left;
+  padding: 0 var(--space-3) var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-faint);
+  font-weight: 600;
+}
+
+.table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+
+/* Les deux colonnes de droite ont une largeur fixe (maquette, Campagne.html) ;
+   la colonne prospect prend le reste. */
+.colPiste {
+  width: 152px;
+}
+
+.colEtat {
+  width: 186px;
+}
+
+/* Teinte de ligne selon l'état — même parti que `.ligne[data-etat=…]` de
+   DeploiementsScreen.module.css : un échec ou une attente se voient avant
+   même de lire le badge. */
+.table tbody tr[data-etat='site_echec'],
+.table tbody tr[data-etat='envoi_echec'] {
+  background: color-mix(in srgb, var(--color-danger) 6%, transparent);
+}
+
+.table tbody tr[data-etat='adresse_manquante'] {
+  background: color-mix(in srgb, var(--color-warning) 6%, transparent);
+}
+
+/* La seule ligne en mouvement de l'ecran, teintee comme dans la maquette :
+   c'est celle qu'on regarde quand on vient d'appuyer sur un bouton. */
+.table tbody tr[data-etat='site_en_cours'] {
+  background: color-mix(in srgb, var(--color-accent) 6%, transparent);
+}
+
+.identite {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* Le nom et son badge de presence sur une meme ligne : le badge garde sa
+   taille, le nom absorbe ce qui reste et s'abrege. */
+.ligneNom {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.nom {
+  font-size: var(--text-md);
+  font-weight: 500;
+  /* L'ellipse est posée sur ce nœud de texte, jamais sur `.identite` (flex) :
+     guidelines.test.ts le vérifie, et ce piège a déjà coûté deux corrections
+     à ce dépôt. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.score {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.cause {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  color: var(--color-danger);
+}
+
+.sansScore {
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* La colonne d'actions : largeur fixe (maquette, Campagne.html), boutons
+   alignes a droite pour que l'oeil les retrouve d'une ligne a l'autre. */
+.colAction {
+  width: 96px;
+  text-align: right;
+}
+
+.action {
+  height: 26px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-strong);
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+/* Eteint ET porteur de sa raison (via `title`) : un bouton grise muet envoie
+   chercher une remediation qui n'existe pas. */
+.action:disabled {
+  color: var(--color-text-faint);
+  border-color: var(--color-border);
+  cursor: not-allowed;
+}
+
+.erreur {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-md);
+  color: var(--color-danger);
+}

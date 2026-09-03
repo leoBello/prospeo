@@ -11,7 +11,9 @@ Les maquettes qui accompagnent
 
 ## Ce qu'il y a ici
 
-Huit artboards, répartis en trois pages dans `canvas.json`.
+Dix artboards, répartis en quatre pages dans `canvas.json`. Les huit premiers
+viennent du chantier n°6 ; les deux derniers, de la campagne de prospection
+(chantier n°7).
 
 | Fichier | Page | Ce qu'il montre |
 |---|---|---|
@@ -23,6 +25,8 @@ Huit artboards, répartis en trois pages dans `canvas.json`.
 | `DirectionA.dc.html` | Directions | « Console calme » — écartée (D11). |
 | `DirectionB.dc.html` | Directions | « Cockpit » — **retenue** (D11). |
 | `DirectionC.dc.html` | Directions | « Dossier éditorial » — écartée (D11). |
+| `Campagne.dc.html` | Campagne | L'écran nominal : les 20 prospects jamais touchés, la piste Site · Mail · Envoi, la bande de conditions, le panneau de relecture du mail. |
+| `CampagneEtats.dc.html` | Campagne | Les états qui décident : conditions manquantes, réglage d'envoi automatique, quatre listes vides de causes différentes, l'adresse manquante. |
 
 `canvas.json` porte la mise en page du canvas : position et taille de chaque
 artboard, pages, et les notes qui les commentent.
@@ -60,6 +64,23 @@ l'implémentation :
 - les cinq étapes de déploiement, dans l'ordre de `stages/publish.ts` et
   `sources/vercel.ts` ;
 - l'ordre de résolution des gabarits de `templateRepoFor`.
+
+**Les deux artboards « Campagne » montrent quatre choses que la base ne sait
+pas encore**, et qu'aucune ligne de code ne rend vraie aujourd'hui :
+
+- **la file `campaign_job`** et le worker qui la draine — le badge « Collector
+  à l'écoute » n'a aucune table derrière lui ;
+- **`prospect_contact`** et l'origine de l'adresse (collectée / saisie) —
+  aucune colonne du schéma ne porte d'email, ce qui est le blocage nommé au
+  §« l'adresse manquante » ;
+- **le jeton d'envoi Gmail** — `AuthProvider` ne connaît aujourd'hui que
+  `signInWithPassword` ;
+- **le coût cumulé d'une campagne** — rien ne le compte encore côté dashboard.
+
+Tant que ces quatre-là n'existent pas, l'écran ne doit pas être construit
+au-delà de ce qu'elles permettent : c'est exactement la règle « ne jamais
+construire une affordance qui annonce un fait qu'aucun code ne peut rendre
+vrai ».
 
 Les liens `href="#"` dans les maquettes sont des leurres : ils ne mènent nulle
 part par construction.

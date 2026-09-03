@@ -2,7 +2,8 @@
   "pages": [
     { "id": "page-1", "name": "Application" },
     { "id": "page-2", "name": "Déploiement" },
-    { "id": "page-3", "name": "Directions" }
+    { "id": "page-3", "name": "Directions" },
+    { "id": "page-4", "name": "Campagne" }
   ],
   "artboards": [
     { "file": "Main.dc.html", "page": "page-1", "x": 0, "y": 0, "w": 1440, "h": 900, "title": "Aujourd'hui — refonte", "is_interactive": true },
@@ -14,7 +15,10 @@
 
     { "file": "DirectionA.dc.html", "page": "page-3", "x": 0, "y": 0, "w": 560, "h": 880, "title": "A — Console calme" },
     { "file": "DirectionB.dc.html", "page": "page-3", "x": 680, "y": 0, "w": 560, "h": 880, "title": "B — Cockpit gamifié" },
-    { "file": "DirectionC.dc.html", "page": "page-3", "x": 1360, "y": 0, "w": 560, "h": 880, "title": "C — Dossier éditorial" }
+    { "file": "DirectionC.dc.html", "page": "page-3", "x": 1360, "y": 0, "w": 560, "h": 880, "title": "C — Dossier éditorial" },
+
+    { "file": "Campagne.dc.html", "page": "page-4", "x": 0, "y": 0, "w": 1440, "h": 900, "title": "Campagne de prospection" },
+    { "file": "CampagneEtats.dc.html", "page": "page-4", "x": 1560, "y": 0, "w": 1440, "h": 1300, "title": "Campagne — les états qui décident" }
   ],
   "annotations": [
     {
@@ -64,6 +68,22 @@
       "y": -200,
       "w": 900,
       "text": "Trois partis pris sur le même prospect, pour comparer à contenu égal. Chacun porte son pari et sa contrepartie en pied d'artboard.\n\nB est celui que les autres écrans utilisent — c'est le seul qui accueille vraiment la gamification demandée. A est plus sobre et plus dense ; C se lit mieux mais montre moins. Dites lequel tient, et je reconstruis le reste dessus."
+    },
+    {
+      "id": "note-campagne",
+      "page": "page-4",
+      "x": 0,
+      "y": -230,
+      "w": 900,
+      "text": "Le chantier n°7. Trois maillons, dont deux que le navigateur ne peut pas exécuter : le déploiement (jetons GitHub/Vercel) et la rédaction (clé LLM) passent par une file en base que le collector résident draine ; seul l'envoi part vraiment d'ici, par l'API Gmail et le jeton OAuth de l'opérateur.\n\nLa bande de conditions sous le titre n'est pas décorative : elle porte les deux faits dont dépendent les boutons au-dessus d'elle. Worker mort ou jeton absent, les boutons s'éteignent et disent pourquoi — sans quoi ce sont des affordances qui annoncent un fait qu'aucun code ne peut rendre vrai.\n\nLa piste replie les cinq étapes de déploiement en un seul segment : Site · Mail · Envoi. Les cinq restent celles de l'artboard « Suivi des déploiements », qu'on ne redessine pas."
+    },
+    {
+      "id": "note-campagne-etats",
+      "page": "page-4",
+      "x": 1560,
+      "y": -230,
+      "w": 900,
+      "text": "L'artboard qui existe parce que les guidelines en font un critère d'« important » : un composant qui rend une absence, une erreur ou un chargement est précisément là où ce dépôt s'est trompé le plus souvent.\n\nQuatre listes vides de causes différentes, trois états de destinataire, quatre conditions manquantes, et le réglage d'envoi automatique — qui rouvre D6 (« le système rédige, l'humain envoie ») et doit donc se demander explicitement, dire ce qu'il fait perdre, et rester visible tant qu'il dure.\n\nBloqué n'est pas échoué : une adresse manquante porte des tirets ambre, pas un segment rouge. Une campagne où un prospect manque d'adresse n'est pas une campagne en panne."
     }
   ],
   "launch": { "view": "canvas", "page": "page-1" }

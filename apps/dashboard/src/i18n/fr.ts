@@ -413,6 +413,71 @@ export const fr = {
   'deploiements.empty.filtre.titre': 'Aucun déploiement dans ce filtre',
   'deploiements.empty.filtre.detail': 'Choisissez « Tous » pour revoir l’ensemble des déploiements.',
 
+  // Chantier n°7 — l'écran de campagne. Les libellés viennent des artboards
+  // approuvés (Campagne.html, CampagneEtats.html), lus et recopiés, jamais
+  // inventés. Les clés de bouton (`campagne.action.*`) et de conditions
+  // (`campagne.worker.*`) n'ont été écrites qu'AVEC leur exécutant, et non
+  // d'avance : un libellé sans code derrière est une affordance qui annonce
+  // un fait que rien ne rend vrai — et `i18n.test.ts` l'aurait de toute
+  // façon signalé orphelin.
+  'nav.campagne': 'Campagne',
+
+  'campagne.title': 'Campagne de prospection',
+  'campagne.subtitle':
+    "Les 20 prospects les mieux notés que personne n'a encore touchés, plus ceux que vous avez déjà lancés. Un site, un mail, un envoi — dans cet ordre.",
+
+  'campagne.col.prospect': 'Prospect',
+  'campagne.col.piste': 'Site · Mail · Envoi',
+  'campagne.col.etat': 'État',
+
+  // Les neuf variantes de `EtatLigne` (domain/campagne.ts) : une clé chacune,
+  // pour que `cleEtat` (CampagneScreen.tsx) reste un switch exhaustif que le
+  // compilateur referme lui-même si une variante manque.
+  'campagne.etat.jamais': 'Jamais déployé',
+  'campagne.etat.enFile': "En file d'attente · {rang}e",
+  'campagne.etat.siteEnCours': 'Site en cours',
+  'campagne.etat.siteEchec': 'Déploiement en échec',
+  'campagne.etat.mailARelire': 'Mail à relire',
+  'campagne.etat.adresseManquante': 'Adresse manquante',
+  'campagne.etat.envoiIncertain': 'Envoi incertain',
+  'campagne.etat.envoiEchec': 'Envoi en échec',
+  'campagne.etat.envoye': 'Envoyé',
+
+  'campagne.piste.site': 'Site',
+  'campagne.piste.mail': 'Mail',
+  'campagne.piste.envoi': 'Envoi',
+  'campagne.piste.segment': '{segment} : {etat}',
+  'campagne.piste.etat.vide': 'pas commencé',
+  'campagne.piste.etat.enCours': 'en cours',
+  'campagne.piste.etat.ok': 'terminé',
+  'campagne.piste.etat.echec': 'en échec',
+  'campagne.piste.etat.bloque': 'en attente d’une information',
+
+  'campagne.sansScore':
+    "{count} prospects n'ont jamais été scorés : ils ne peuvent pas être classés, et n'apparaissent pas dans ce lot.",
+  'campagne.sansScore_one':
+    "{count} prospect n'a jamais été scoré : il ne peut pas être classé, et n'apparaît pas dans ce lot.",
+
+  'campagne.action.deployer': 'Déployer',
+  'campagne.action.rejouer': 'Rejouer',
+  'campagne.action.retirer': 'Retirer',
+  'campagne.action.impossible':
+    'Le collector est à l’arrêt : une demande déposée maintenant ne partirait pas.',
+  'campagne.worker.ecoute': "Collector à l'écoute",
+  'campagne.worker.arret': "Collector à l'arrêt",
+  'campagne.worker.arret.raison':
+    'Aucun signe de vie depuis {minutes} min. Les demandes déposées maintenant attendront son retour.',
+  'campagne.worker.arret.remede':
+    'Le relancer avec pnpm --filter @prospeo/collector start worker. Rien n’est perdu : la file vit en base.',
+  'campagne.worker.inconnu': 'État du collector inconnu',
+  'campagne.worker.inconnu.raison':
+    'Aucun battement n’a jamais été enregistré. Tant qu’on ne sait rien de lui, on le tient pour arrêté.',
+  'campagne.vide.lotFini': 'Le lot est fini',
+  'campagne.vide.lotFini.detail': 'Les prospects les mieux notés ont tous été touchés.',
+  'campagne.vide.aucunProspect': 'Aucun prospect',
+  'campagne.vide.aucunProspect.detail':
+    "La base ne contient aucun prospect. Rien n'a été filtré : il n'y a rien.",
+
   // Chantier n°10, D10 — l'écran du gabarit. Il ENREGISTRE le dépôt désigné,
   // il ne vérifie rien lui-même : le contrôle exigerait un jeton GitHub, qui
   // n'a rien à faire dans un bundle navigateur. Le bouton « Vérifier » reste

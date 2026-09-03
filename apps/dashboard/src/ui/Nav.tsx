@@ -5,10 +5,10 @@ import type { TranslationKey } from '../i18n/translate.js';
 import { Tooltip } from './kit/Tooltip.js';
 import styles from './Nav.module.css';
 
-/** Les trois écrans de l'application. Voir §« Pourquoi pas de routeur ». */
-export type Vue = 'today' | 'deploiements' | 'gabarit';
+/** Les quatre écrans de l'application. Voir §« Pourquoi pas de routeur ». */
+export type Vue = 'today' | 'campagne' | 'deploiements' | 'gabarit';
 
-const VUES: readonly Vue[] = ['today', 'deploiements', 'gabarit'];
+const VUES: readonly Vue[] = ['today', 'campagne', 'deploiements', 'gabarit'];
 const PREFIXE_FRAGMENT = '#/';
 
 /**
@@ -65,14 +65,23 @@ const TRAIT = {
 } as const;
 
 /**
- * Trois icônes, un seul style : trait, grille de 20 px, jamais d'emoji. Les
- * tracés reprennent ceux du rail de `Main.dc.html`, pour que ce composant
- * rende la maquette plutôt qu'une réinterprétation.
+ * Quatre icônes, un seul style : trait, grille de 20 px, jamais d'emoji. Les
+ * tracés reprennent ceux du rail de `Main.dc.html`/`Campagne.html`, pour que
+ * ce composant rende la maquette plutôt qu'une réinterprétation.
  */
 function IconeToday() {
   return (
     <svg {...TRAIT}>
       <path d="M3 12h4l3 8 4-16 3 8h4" />
+    </svg>
+  );
+}
+
+function IconeCampagne() {
+  return (
+    <svg {...TRAIT}>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M3 8l9 6 9-6" />
     </svg>
   );
 }
@@ -102,6 +111,7 @@ interface Entree {
 
 const ENTREES: readonly Entree[] = [
   { vue: 'today', libelleKey: 'nav.today', Icone: IconeToday },
+  { vue: 'campagne', libelleKey: 'nav.campagne', Icone: IconeCampagne },
   { vue: 'deploiements', libelleKey: 'nav.deploiements', Icone: IconeDeploiements },
   { vue: 'gabarit', libelleKey: 'nav.gabarit', Icone: IconeGabarit },
 ];

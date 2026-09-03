@@ -82,6 +82,9 @@ describe('useVue et Nav', () => {
   it('nomme chaque entree malgre son icone seule', () => {
     renderWithPreferences(<Harnais />);
     expect(screen.getByRole('button', { name: fr['nav.today'] })).toBeDefined();
+    // Campagne (chantier n°7) : deuxième entrée du rail, entre Aujourd'hui et
+    // Déploiements — mêmes gardes que les trois entrées historiques.
+    expect(screen.getByRole('button', { name: fr['nav.campagne'] })).toBeDefined();
     expect(screen.getByRole('button', { name: fr['nav.deploiements'] })).toBeDefined();
     expect(screen.getByRole('button', { name: fr['nav.gabarit'] })).toBeDefined();
   });

@@ -340,6 +340,61 @@ export const en: Record<keyof typeof fr, string> = {
   'deploiements.empty.filtre.titre': 'No deployments in this filter',
   'deploiements.empty.filtre.detail': 'Choose "All" to see every deployment again.',
 
+  'nav.campagne': 'Campaign',
+
+  'campagne.title': 'Prospecting campaign',
+  'campagne.subtitle':
+    'The 20 highest-scoring prospects nobody has touched yet, plus the ones you have already started. A site, an email, a send — in that order.',
+
+  'campagne.col.prospect': 'Prospect',
+  'campagne.col.piste': 'Site · Email · Send',
+  'campagne.col.etat': 'Status',
+
+  'campagne.etat.jamais': 'Never deployed',
+  'campagne.etat.enFile': 'Queued · #{rang}',
+  'campagne.etat.siteEnCours': 'Site in progress',
+  'campagne.etat.siteEchec': 'Deployment failed',
+  'campagne.etat.mailARelire': 'Email to review',
+  'campagne.etat.adresseManquante': 'Missing address',
+  'campagne.etat.envoiIncertain': 'Send uncertain',
+  'campagne.etat.envoiEchec': 'Send failed',
+  'campagne.etat.envoye': 'Sent',
+
+  'campagne.piste.site': 'Site',
+  'campagne.piste.mail': 'Email',
+  'campagne.piste.envoi': 'Send',
+  'campagne.piste.segment': '{segment}: {etat}',
+  'campagne.piste.etat.vide': 'not started',
+  'campagne.piste.etat.enCours': 'in progress',
+  'campagne.piste.etat.ok': 'done',
+  'campagne.piste.etat.echec': 'failed',
+  'campagne.piste.etat.bloque': 'waiting on information',
+
+  'campagne.sansScore':
+    '{count} prospects have never been scored: they cannot be ranked, and do not appear in this batch.',
+  'campagne.sansScore_one':
+    '{count} prospect has never been scored: it cannot be ranked, and does not appear in this batch.',
+
+  'campagne.action.deployer': 'Deploy',
+  'campagne.action.rejouer': 'Replay',
+  'campagne.action.retirer': 'Remove',
+  'campagne.action.impossible':
+    'The collector is stopped: a request filed now would not go anywhere.',
+  'campagne.worker.ecoute': 'Collector listening',
+  'campagne.worker.arret': 'Collector stopped',
+  'campagne.worker.arret.raison':
+    'No sign of life for {minutes} min. Requests filed now will wait for its return.',
+  'campagne.worker.arret.remede':
+    'Restart it with pnpm --filter @prospeo/collector start worker. Nothing is lost: the queue lives in the database.',
+  'campagne.worker.inconnu': 'Collector state unknown',
+  'campagne.worker.inconnu.raison':
+    'No heartbeat has ever been recorded. As long as we know nothing about it, we treat it as stopped.',
+  'campagne.vide.lotFini': 'The batch is done',
+  'campagne.vide.lotFini.detail': 'The highest-scoring prospects have all been reached.',
+  'campagne.vide.aucunProspect': 'No prospects',
+  'campagne.vide.aucunProspect.detail':
+    'The database holds no prospects. Nothing was filtered out: there is nothing.',
+
   'gabarit.title': 'Site template',
   'gabarit.subtitle':
     'Every published site is generated from a GitHub repository marked as a template. Designating one here replaces the template shipped with the application, without touching any code.',
