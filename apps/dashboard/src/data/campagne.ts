@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { getTrade, normalizePhone } from '@prospeo/core';
 import type { Database, Enums } from '@prospeo/db';
 import type { FaitsLigne, FaitsProspect } from '../domain/campagne.js';
 import { fetchAllRows, type RangeReader } from './paginate.js';
@@ -44,6 +45,12 @@ export const CAMPAGNE_SELECT = [
   'denomination',
   'city',
   'trade_slug',
+  // `is_closed` et le téléphone ne servent NI à l'affichage NI à D3 : ils
+  // servent à ne pas proposer un déploiement que la chaîne refuserait — voir
+  // `eligibleHorsScore` (domain/campagne.ts) et `fetchSiteCandidates`
+  // (apps/collector/src/chaine.ts), dont ils reprennent les critères.
+  'is_closed',
+  'prospect_enrichment(phone_e164)',
   'prospect_score(total)',
   'web_presence(category)',
   'prospect_pipeline(status)',
@@ -103,6 +110,16 @@ export function toFaitsProspect(raw: unknown): FaitsProspect | null {
     aMessage: nonVide(o['generated_message']),
     // Un dépôt créé n'est pas un site publié : seule `published_at` le dit.
     sitePublie: site !== null && texte(site['published_at']) !== null,
+    estFerme: o['is_closed'] === true,
+    // `normalizePhone` plutôt qu'un test de nullité, pour la même raison qui
+    // le fait employer par `assembleFacts` : la colonne est censée porter du
+    // E.164 mais elle est alimentée par du scraping. Se fier à « elle n'est
+    // pas nulle » ferait entrer dans le lot un prospect que la chaîne
+    // écarterait ensuite — la divergence même que ces champs corrigent.
+    aTelephone: normalizePhone(texte(unique(o['prospect_enrichment'])?.['phone_e164'])) !== null,
+    // Dernier refus d'`assembleFacts` : sans métier au catalogue, il n'y a ni
+    // gabarit de site ni argumentaire à écrire.
+    metierConnu: getTrade(texte(o['trade_slug']) ?? '') !== undefined,
   };
 }
 

@@ -74,6 +74,70 @@ describe('toFaitsProspect', () => {
     expect(enCours?.sitePublie).toBe(false);
   });
 
+  it('lit les trois faits dont depend la chaine, et non les seuls criteres de D3', () => {
+    // `fetchSiteCandidates` (collector) refuse un etablissement cesse, un
+    // metier hors catalogue et un telephone qu on ne saurait pas composer. Sans
+    // ces trois faits ici, l ecran ne peut pas savoir ce qu il promet.
+    const f = toFaitsProspect({
+      id: 'p-1',
+      denomination: 'Aquatech',
+      city: 'Nantes',
+      trade_slug: 'plombier',
+      is_closed: false,
+      prospect_score: { total: 70 },
+      web_presence: { category: 'none' },
+      prospect_pipeline: null,
+      prospect_enrichment: { phone_e164: '+33612345678' },
+      interaction: [],
+      generated_message: [],
+      prospect_site: null,
+    });
+
+    expect(f).toMatchObject({ estFerme: false, aTelephone: true, metierConnu: true });
+  });
+
+  it('ne compte pas comme joignable un numero que le normaliseur refuse', () => {
+    // La colonne est censee porter du E.164, mais elle est alimentee par du
+    // scraping — c est la raison pour laquelle `assembleFacts` la refait
+    // passer par `normalizePhone`. Se fier a « la colonne n est pas nulle »
+    // ferait entrer dans le lot un prospect que la chaine ecarterait ensuite.
+    const f = toFaitsProspect({
+      id: 'p-1',
+      denomination: 'Aquatech',
+      city: 'Nantes',
+      trade_slug: 'plombier',
+      is_closed: false,
+      prospect_score: { total: 70 },
+      web_presence: { category: 'none' },
+      prospect_pipeline: null,
+      prospect_enrichment: { phone_e164: '00' },
+      interaction: [],
+      generated_message: [],
+      prospect_site: null,
+    });
+
+    expect(f?.aTelephone).toBe(false);
+  });
+
+  it('lit un etablissement cesse et un metier hors catalogue', () => {
+    const f = toFaitsProspect({
+      id: 'p-1',
+      denomination: 'Aquatech',
+      city: 'Nantes',
+      trade_slug: 'astronaute',
+      is_closed: true,
+      prospect_score: { total: 70 },
+      web_presence: { category: 'none' },
+      prospect_pipeline: null,
+      prospect_enrichment: null,
+      interaction: [],
+      generated_message: [],
+      prospect_site: null,
+    });
+
+    expect(f).toMatchObject({ estFerme: true, metierConnu: false, aTelephone: false });
+  });
+
   it('ecarte une ligne sans identifiant plutot que de la forcer', () => {
     // Meme doctrine que `typeDeTelephone` dans queries.ts : une ligne que la
     // base ne nomme pas ne peut pas peser sur un classement.

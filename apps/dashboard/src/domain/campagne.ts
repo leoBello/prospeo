@@ -41,6 +41,15 @@ export interface FaitsProspect {
   aInteraction: boolean;
   aMessage: boolean;
   sitePublie: boolean;
+  /** `is_closed` : un établissement cessé n'est plus un prospect. */
+  estFerme: boolean;
+  /**
+   * Un numéro que `normalizePhone` sait composer — pas « la colonne est
+   * renseignée ». Voir `toFaitsProspect` : la colonne vient du scraping.
+   */
+  aTelephone: boolean;
+  /** Le `trade_slug` est dans le catalogue de `packages/core/src/trades.ts`. */
+  metierConnu: boolean;
 }
 
 export interface Lot {
@@ -50,14 +59,46 @@ export interface Lot {
    *
    * Ce compte porte une promesse — « les scorer les ferait entrer » — et ne
    * doit donc contenir QUE des prospects que le scoring débloquerait
-   * réellement. Un prospect en « ne pas contacter » n'en fait pas partie.
+   * réellement. Un prospect en « ne pas contacter » n'en fait pas partie, ni
+   * un prospect sans téléphone : le scorer ne lui en donnerait pas un, et la
+   * chaîne le refuserait toujours (voir `eligibleHorsScore`).
    */
   sansScore: number;
 }
 
-/** Tout sauf le score : la partie de D3 qu'un scoring ne changerait pas. */
+/**
+ * Tout sauf le score : la partie de D3 qu'un scoring ne changerait pas, **et
+ * ce que la chaîne sait effectivement traiter.**
+ *
+ * **Pourquoi la seconde moitié existe.** Les quatre premiers critères viennent
+ * de D3 : qui a le droit d'entrer dans le lot. Les quatre suivants n'en
+ * viennent pas — ils viennent de `fetchSiteCandidates`
+ * (`apps/collector/src/chaine.ts`), c'est-à-dire de ce que le collector accepte
+ * de traiter : un établissement vivant, une présence web sondée et pas déjà
+ * correcte, un métier du catalogue, un téléphone composable (les deux derniers
+ * sont les refus d'`assembleFacts`, que `fetchSiteCandidates` délègue).
+ *
+ * Les deux listes DOIVENT rester ensemble. Quand elles ont divergé, l'écran
+ * proposait « Déployer » sur des prospects que la chaîne refusait en silence :
+ * `generer` rendait `null`, `publier` levait « aucun contenu à publier — la
+ * rédaction n'a rien écrit », et la ligne affichait donc un motif faux, avec un
+ * bouton « Rejouer » qui rejouait le même échec indéfiniment. Trois des vingt
+ * lignes du lot étaient dans ce cas, et 92 des 126 prospects scorés recevables
+ * n'avaient aucun téléphone. Toucher l'une de ces deux listes sans l'autre
+ * recrée exactement ce défaut.
+ */
 function eligibleHorsScore(f: FaitsProspect): boolean {
-  return f.statut === 'a_contacter' && !f.aInteraction && !f.aMessage && !f.sitePublie;
+  return (
+    f.statut === 'a_contacter' &&
+    !f.aInteraction &&
+    !f.aMessage &&
+    !f.sitePublie &&
+    !f.estFerme &&
+    f.presence !== null &&
+    f.presence !== 'has_site' &&
+    f.metierConnu &&
+    f.aTelephone
+  );
 }
 
 /**
@@ -205,10 +246,20 @@ function choisirEtat(
     };
   }
 
-  if (site === 'ok' && mail === 'ok') {
-    return envoi === 'bloque' ? { nom: 'adresse_manquante' } : { nom: 'mail_a_relire' };
-  }
-
+  // Un job ACTIF passe avant tout état dérivé de faits acquis : il décrit ce
+  // qui se passe MAINTENANT, là où « mail à relire » et « adresse manquante »
+  // décrivent un acquis qui sera toujours vrai au prochain rendu.
+  //
+  // LE DÉFAUT QUE CET ORDRE CORRIGE. Testées après « site ok + mail ok », ces
+  // deux branches restaient inatteignables sur un prospect déjà publié : la
+  // ligne affichait « Rejouer », le clic remettait le job `en_attente`, l'état
+  // retombait sur « mail à relire » — sans bouton. Aucun retour visible au
+  // clic, aucun rang annoncé, et plus aucun moyen de retirer la demande.
+  //
+  // Ce que cet ordre ne bouscule PAS : un envoi parti reste au-dessus de tout
+  // (branches ci-dessus), et « bloqué » ne devient jamais « échoué » — le
+  // segment `envoi` continue de porter 'bloque', et l'adresse manquante
+  // réapparaît telle quelle dès le job clos.
   if (f.job !== null && f.job.state === 'en_cours') {
     return {
       nom: 'site_en_cours',
@@ -220,6 +271,10 @@ function choisirEtat(
 
   if (f.job !== null && f.job.state === 'en_attente') {
     return { nom: 'en_file', rang: f.job.rang };
+  }
+
+  if (site === 'ok' && mail === 'ok') {
+    return envoi === 'bloque' ? { nom: 'adresse_manquante' } : { nom: 'mail_a_relire' };
   }
 
   // Reste ici : aucun job (jamais rien demandé), ou un job 'termine'/'annule'

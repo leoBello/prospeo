@@ -13,6 +13,9 @@ function fait(surcharges: Partial<FaitsProspect> = {}): FaitsProspect {
     aInteraction: false,
     aMessage: false,
     sitePublie: false,
+    estFerme: false,
+    aTelephone: true,
+    metierConnu: true,
     ...surcharges,
   };
 }
@@ -65,6 +68,32 @@ describe('classerLot', () => {
   ])('exclut un prospect avec %s', (_libelle, surcharge) => {
     const lot = classerLot([fait(surcharge)], 10);
     expect(lot.lignes).toHaveLength(0);
+  });
+
+  it.each([
+    ['aucun telephone', { aTelephone: false }],
+    ['une presence web deja correcte', { presence: 'has_site' as const }],
+    ['une presence web jamais sondee', { presence: null }],
+    ['un etablissement cesse', { estFerme: true }],
+    ['un metier que le catalogue ne connait pas', { metierConnu: false }],
+  ])('exclut un prospect que la chaine ne saurait pas traiter : %s', (_libelle, surcharge) => {
+    // Ces criteres-la ne viennent pas de D3 mais de `fetchSiteCandidates`
+    // (apps/collector/src/chaine.ts). Sans eux, l ecran proposait
+    // « Deployer » sur un prospect que la chaine refuse en silence, et le job
+    // revenait en echec sous un motif faux — « la redaction n a rien ecrit »,
+    // alors qu elle n avait jamais ete tentee.
+    const lot = classerLot([fait(surcharge)], 10);
+    expect(lot.lignes).toHaveLength(0);
+  });
+
+  it('ne compte pas comme « sans score » un prospect que la chaine refuserait de toute facon', () => {
+    // Meme promesse que pour « ne pas contacter » : le compte annonce des
+    // prospects qu un scoring ferait entrer. Un prospect sans telephone n en
+    // fait pas partie — le scorer ne lui en donnerait pas un.
+    const lot = classerLot([fait({ prospectId: 'x', score: null, aTelephone: false })], 10);
+
+    expect(lot.lignes).toHaveLength(0);
+    expect(lot.sansScore).toBe(0);
   });
 });
 
@@ -225,6 +254,76 @@ describe('etatLigne', () => {
     expect(r.site).toBe('ok');
     expect(r.mail).toBe('ok');
     expect(r.etat).toEqual({ nom: 'site_echec', detail: 'nom deja pris' });
+  });
+
+  it('annonce le rang en file meme quand le site est deja en ligne et le mail redige', () => {
+    // LE DEFAUT QUE CE TEST FERME. Une ligne « site en ligne + mail redige »
+    // dont le job avait echoue affichait « Rejouer ». Au clic, le job repassait
+    // `en_attente` : la branche « job echoue » ne s appliquait plus, et l etat
+    // retombait sur « mail a relire » — SANS bouton. Le clic ne produisait donc
+    // aucun retour visible, le rang n etait jamais annonce, et la demande ne
+    // pouvait plus etre retiree.
+    const r = etatLigne(
+      ligne({
+        siteEnLigne: true,
+        mailRedige: true,
+        adresse: 'contact@exemple.fr',
+        job: { state: 'en_attente', lastError: null, rang: 2 },
+      }),
+    );
+
+    expect(r.etat).toEqual({ nom: 'en_file', rang: 2 });
+  });
+
+  it('annonce le rang en file plutot qu une adresse manquante, sans jamais dire « echoue »', () => {
+    // Un job actif dit ce qui se passe MAINTENANT. L adresse manquante, elle,
+    // reste vraie et reapparaitra une fois le job clos : c est un fait acquis,
+    // pas un evenement. Le segment `envoi` continue de la porter a 'bloque' —
+    // « bloque » ne devient jamais « echoue ».
+    const r = etatLigne(
+      ligne({
+        siteEnLigne: true,
+        mailRedige: true,
+        adresse: null,
+        job: { state: 'en_attente', lastError: null, rang: 1 },
+      }),
+    );
+
+    expect(r.envoi).toBe('bloque');
+    expect(r.etat).toEqual({ nom: 'en_file', rang: 1 });
+  });
+
+  it('annonce « site en cours » meme quand le site precedent est deja en ligne', () => {
+    // Un rejeu sur un prospect deja publie : ce qui tourne prime sur ce qui
+    // est acquis, sinon la ligne resterait figee sur « mail a relire » pendant
+    // toute la duree du traitement.
+    const r = etatLigne(
+      ligne({
+        siteEnLigne: true,
+        mailRedige: true,
+        adresse: 'contact@exemple.fr',
+        job: { state: 'en_cours', lastError: null, rang: 0 },
+        derniereEtape: { step: 'build', outcome: 'demarre', detail: null },
+      }),
+    );
+
+    expect(r.etat).toEqual({ nom: 'site_en_cours', etape: 'build' });
+  });
+
+  it('garde « envoye » au-dessus d un job actif', () => {
+    // Un envoi parti est le fait le plus lourd de la ligne : rien ne le
+    // recouvre, pas meme un job relance apres coup.
+    const r = etatLigne(
+      ligne({
+        siteEnLigne: true,
+        mailRedige: true,
+        adresse: 'contact@exemple.fr',
+        envoi: { state: 'envoye', sentAt: '2026-09-03T14:02:00Z' },
+        job: { state: 'en_attente', lastError: null, rang: 4 },
+      }),
+    );
+
+    expect(r.etat).toEqual({ nom: 'envoye', le: '2026-09-03T14:02:00Z' });
   });
 
   it.each([

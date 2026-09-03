@@ -1,5 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@prospeo/db';
 import {
+  chaineDeps,
   decideDeploiement,
   decideGeneration,
   decidePublication,
@@ -179,5 +182,96 @@ describe('decideRedaction', () => {
     // L ecriture est un insert, pas un upsert : rejouer sans cette garde
     // empile des generated_message en double sur le meme prospect.
     expect(decideRedaction(true)).toEqual({ faire: false, motif: 'deja_fait' });
+  });
+});
+
+/**
+ * Un client simulé réduit à ce que `generer` lit : la liste des prospects et
+ * celle des lignes `prospect_site`.
+ *
+ * Aucun réseau, aucune base : ce qu'on éprouve ici est la DÉCISION de `generer`
+ * quand le prospect n'est pas candidat, pas la forme des requêtes — celle-ci
+ * est déjà couverte par les étages eux-mêmes.
+ */
+function clientSimule(prospects: unknown[], sites: unknown[] = []): SupabaseClient<Database> {
+  const table = (lignes: unknown[]): Record<string, unknown> => {
+    const b: Record<string, unknown> = {
+      select: () => b,
+      order: () => b,
+      eq: () => b,
+      limit: () => Promise.resolve({ data: lignes, error: null }),
+      range: () => Promise.resolve({ data: lignes, error: null }),
+      upsert: () => Promise.resolve({ error: null }),
+    };
+    return b;
+  };
+  return {
+    from: (nom: string) => table(nom === 'prospect' ? prospects : sites),
+  } as unknown as SupabaseClient<Database>;
+}
+
+/** Un prospect que `fetchSiteCandidates` accepte : les cas de refus le dérivent. */
+function prospectCandidat(surcharges: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: 'p-1',
+    siret: '12345678900012',
+    denomination: 'AQUATECH',
+    denomination_usuelle: null,
+    trade_slug: 'plombier',
+    address: '37 RUE JACQUES CARTIER 44300 NANTES',
+    postal_code: '44300',
+    city: 'NANTES',
+    date_creation: '2015-04-01',
+    latitude: 47.2,
+    longitude: -1.55,
+    is_closed: false,
+    prospect_enrichment: { status: 'matched', matched_name: null, phone_e164: '+33612345678', rating: null, maps_url: null },
+    web_presence: { category: 'none' },
+    prospect_score: { total: 70 },
+    ...surcharges,
+  };
+}
+
+describe('chaineDeps.generer', () => {
+  // `loadGenerateConfig` exige cette variable AVANT toute lecture : sans elle,
+  // le test échouerait sur la configuration et n'éprouverait rien.
+  const cle = process.env['ANTHROPIC_API_KEY'];
+  beforeEach(() => {
+    process.env['ANTHROPIC_API_KEY'] = 'cle-de-test';
+  });
+  afterEach(() => {
+    if (cle === undefined) delete process.env['ANTHROPIC_API_KEY'];
+    else process.env['ANTHROPIC_API_KEY'] = cle;
+  });
+
+  it.each([
+    ['sans telephone joignable', { prospect_enrichment: null }],
+    ['deja pourvu d un site correct', { web_presence: { category: 'has_site' } }],
+    ['cesse', { is_closed: true }],
+  ])('leve en nommant la cause pour un prospect %s', async (_libelle, surcharge) => {
+    // LE DEFAUT QUE CE TEST FERME. `generer` rendait `null` en silence, puis
+    // `publier` levait « aucun contenu a publier — la redaction n a rien
+    // ecrit » : la ligne affichait un motif FAUX, et « Rejouer » proposait de
+    // recommencer un echec certain, indefiniment.
+    const client = clientSimule([prospectCandidat(surcharge)]);
+
+    // Motif lu dans `chaine.ts`, jamais reecrit de memoire : c est ce texte-la
+    // que le worker ecrit dans `campaign_job.last_error` et que la ligne de
+    // l ecran affiche.
+    await expect(chaineDeps(client).generer('p-1')).rejects.toThrow(
+      /hors des critères de la chaîne/,
+    );
+  });
+
+  it('se tait, sans lever, quand le contenu existe deja', async () => {
+    // `decideGeneration` → `deja_fait` : un contenu ecrit et non rejete n est
+    // pas une erreur, c est un rejeu qui n a rien a repayer. Le confondre avec
+    // le refus ci-dessus ferait echouer un job qui n avait rien a faire.
+    const client = clientSimule(
+      [prospectCandidat()],
+      [{ prospect_id: 'p-1', content: { titre: 'x' }, content_rejected_at: null }],
+    );
+
+    await expect(chaineDeps(client).generer('p-1')).resolves.toBeNull();
   });
 });

@@ -166,6 +166,20 @@ export function decideGeneration(
 }
 
 /**
+ * Ce que `decidePublication` peut dire — **deux issues, pas trois.**
+ *
+ * `deja_fait` n'a aucun cas légitime à cet étage, et le type le dit plutôt que
+ * de le laisser croire. L'idempotence de la publication ne se décide pas ici :
+ * `runPublish` compare l'EMPREINTE du contenu à celle déjà poussée dans le
+ * dépôt, ce qui est plus fin que tout ce qu'on saurait trancher depuis
+ * `prospect_site`. Un `deja_fait` fondé sur `published_at` gèlerait justement
+ * le cas que cette comparaison existe pour servir : un contenu regénéré après
+ * un rejet, sur un prospect déjà publié, ne serait jamais poussé — et rien ne
+ * le dirait.
+ */
+export type DecisionPublication = { faire: true } | { faire: false; motif: 'retire' };
+
+/**
  * Faut-il publier ce prospect ?
  *
  * Un site dépublié (`unpublished_at !== null`) l'a été SANS DÉLAI, au moment
@@ -175,7 +189,7 @@ export function decideGeneration(
  */
 export function decidePublication(
   ligne: Pick<LigneSite, 'unpublished_at'> | undefined,
-): DecisionEtape {
+): DecisionPublication {
   if (ligne?.unpublished_at != null) return { faire: false, motif: 'retire' };
   return { faire: true };
 }
@@ -511,9 +525,25 @@ export function chaineDeps(client: SupabaseClient<Database>): ChaineDeps {
       const genConfig = loadGenerateConfig(process.env);
       const candidats = await fetchSiteCandidates(client, undefined);
       const cible = candidats.find((c) => c.id === prospectId);
-      // Hors des critères de `fetchSiteCandidates` (score, métier, éligibilité
-      // web) : ce n'est pas un échec, juste rien à générer pour ce prospect.
-      if (cible === undefined) return null;
+      if (cible === undefined) {
+        // LÈVE, et ne se tait plus. Ce `return null` silencieux laissait la
+        // chaîne continuer jusqu'à `publier`, qui levait alors « aucun contenu
+        // à publier — la rédaction n'a rien écrit » : la ligne de l'écran
+        // affichait une cause FAUSSE, puisque la rédaction n'avait jamais été
+        // tentée, et son bouton « Rejouer » rejouait le même échec
+        // indéfiniment. Le motif ci-dessous énumère les refus réels de
+        // `fetchSiteCandidates` et d'`assembleFacts` ; c'est lui que l'écran
+        // affichera dans la ligne, via `campaign_job.last_error`.
+        //
+        // À distinguer du silence légitime plus bas (`decideGeneration` →
+        // `deja_fait`) : là, il n'y a rien à faire ; ici, il n'y a rien à
+        // faire ET il ne fallait pas demander.
+        throw new Error(
+          'prospect hors des critères de la chaîne : établissement cessé, présence web ' +
+            'jamais sondée ou déjà correcte, score absent, métier hors catalogue, ' +
+            'ou aucun téléphone composable',
+        );
+      }
 
       const rows = await fetchSiteRows(client);
       const decision = decideGeneration(rows[prospectId]);
@@ -565,8 +595,9 @@ export function chaineDeps(client: SupabaseClient<Database>): ChaineDeps {
 
       const decision = decidePublication(ligne);
       if (!decision.faire) {
-        // `decidePublication` ne rend jamais `deja_fait` : ici, `motif` vaut
-        // toujours `retire`. Un site dépublié l'a été SANS DÉLAI, au moment où
+        // `DecisionPublication` n'a que deux issues : ici, `motif` vaut
+        // forcément `retire`, et le type le prouve plutôt qu'un commentaire.
+        // Un site dépublié l'a été SANS DÉLAI, au moment où
         // le prospect est passé « ne pas contacter » ou « perdu » (D5). Le
         // republier au nom d'une entreprise qui a demandé son retrait est ce
         // que ce dépôt prend le plus au sérieux : ce n'est pas un « rien à

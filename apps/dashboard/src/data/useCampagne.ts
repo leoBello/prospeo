@@ -14,6 +14,31 @@ import { fetchCampagne, fetchHeartbeat } from './campagne.js';
  */
 const TAILLE_LOT = 20;
 
+/**
+ * Période de relecture du battement du worker.
+ *
+ * **Pourquoi une relecture périodique existe.** Tout le reste de cet écran se
+ * rafraîchit sur Realtime — un job qui bouge, un événement de déploiement qui
+ * s'écrit. Or un worker mort n'émet AUCUN signal : c'est exactement la panne
+ * silencieuse que `worker_heartbeat` existe pour rendre visible, et c'était le
+ * seul fait de l'écran qu'aucun événement ne venait jamais corriger. L'écran
+ * affichait « Collector à l'écoute » et un bouton actif dix minutes après sa
+ * mort, et ne se reprenait qu'APRÈS le clic qu'il aurait dû empêcher.
+ *
+ * **Pourquoi 15 s.** Le worker bat toutes les 10 s et `SEUIL_WORKER_MORT_MS`
+ * le déclare mort à 60 s de silence (`ui/BandeConditions.tsx`). Une période
+ * plus courte que le battement lirait plusieurs fois la même valeur ; une
+ * période proche du seuil laisserait l'écran mentir presque deux fois plus
+ * longtemps que le seuil ne le promet. À 15 s, l'écran se corrige dans le
+ * quart du seuil au pire, soit 75 s après la mort réelle — la borne annoncée
+ * par la bande de conditions reste tenue.
+ *
+ * Cette relecture ne relit QUE le battement : refaire la lecture complète du
+ * lot toutes les quinze secondes coûterait plusieurs requêtes paginées pour un
+ * fait qui tient en une ligne.
+ */
+export const PERIODE_RELECTURE_BATTEMENT_MS = 15_000;
+
 export type CampagneState =
   | { status: 'loading' }
   | {
@@ -128,6 +153,38 @@ export function useCampagne(
     return () => {
       void client.removeChannel(canal);
     };
+  }, [client, enabled]);
+
+  /**
+   * La relecture périodique du battement — voir
+   * `PERIODE_RELECTURE_BATTEMENT_MS` pour le pourquoi et le choix de la
+   * période.
+   *
+   * L'état est RÉÉCRIT à chaque tour, même quand le battement n'a pas bougé :
+   * c'est ce nouvel objet qui provoque le rendu, et donc le recalcul du
+   * `new Date()` de `CampagneScreen`. Sans lui, un battement figé resterait
+   * comparé à un « maintenant » figé, et le franchissement du seuil ne se
+   * verrait jamais.
+   *
+   * Une lecture ratée rend `null` — « on ne sait rien de lui », que
+   * `BandeConditions` distingue de « il s'est tu il y a quatorze minutes ».
+   * Elle ne fait pas basculer l'écran en erreur : même parti que la lecture
+   * initiale ci-dessus.
+   */
+  useEffect(() => {
+    if (!enabled) return;
+
+    const battement = setInterval(() => {
+      void fetchHeartbeat(client)
+        .catch(() => null)
+        .then((heartbeat) => {
+          setState((precedent) =>
+            precedent.status === 'ready' ? { ...precedent, heartbeat } : precedent,
+          );
+        });
+    }, PERIODE_RELECTURE_BATTEMENT_MS);
+
+    return () => clearInterval(battement);
   }, [client, enabled]);
 
   const reload = useCallback(() => setTentative((n) => n + 1), []);

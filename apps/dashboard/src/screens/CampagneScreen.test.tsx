@@ -17,6 +17,9 @@ function fait(surcharges: Partial<FaitsProspect> = {}): FaitsProspect {
     aInteraction: false,
     aMessage: false,
     sitePublie: false,
+    estFerme: false,
+    aTelephone: true,
+    metierConnu: true,
     ...surcharges,
   };
 }
@@ -86,6 +89,30 @@ describe('CampagneScreen', () => {
     // `getByText` compare le texte ENTIER du noeud : la ligne meta porte le
     // metier, la ville et le score, d ou la regex plutot qu une egalite.
     expect(screen.getByText(/Plombier · Nantes/)).toBeTruthy();
+  });
+
+  it('nomme un score absent au lieu de laisser la ligne se terminer sur un separateur', () => {
+    // `classerLot` garde deliberement un suivi sans score : React rend `null`
+    // comme RIEN, et la ligne s arretait sur « Plombier · Nantes · ». Le
+    // domaine tient la doctrine, le rendu la perdait au dernier metre. Valeur
+    // lue dans fr.ts, cle `score.absent` — la meme que `DeploiementsScreen` et
+    // `ScoreBar` emploient pour cette absence-la.
+    renderWithPreferences(
+      <CampagneScreen
+        lot={{ lignes: [fait({ score: null })], sansScore: 0 }}
+        lignes={new Map<string, FaitsLigne>()}
+        totalProspects={12}
+        heartbeat={VIVANT}
+        onDeposer={RIEN}
+        onRetirer={RIEN}
+        onSignOut={() => {}}
+        nav={null}
+      />,
+    );
+
+    // Le score vit dans son propre `<span>` : `getByText` compare le texte
+    // ENTIER du noeud, et l egalite stricte suffit donc ici.
+    expect(screen.getByText('pas encore scoré')).toBeTruthy();
   });
 
   it('affiche une ligne par prospect du lot', () => {

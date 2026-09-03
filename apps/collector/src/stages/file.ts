@@ -55,3 +55,40 @@ export async function prendreProchain(deps: FileDeps): Promise<Job | null> {
   // parti ailleurs. L'appelant réessaiera au prochain tour.
   return null;
 }
+
+/**
+ * Borne à UNE l'exécution simultanée d'un drainage.
+ *
+ * **Pourquoi `prendre` ne suffit pas.** La prise conditionnée à l'état garantit
+ * qu'un job n'est jamais traité deux fois — elle ne borne rien d'autre. Deux
+ * boucles de drainage prennent simplement deux jobs DIFFÉRENTS et les traitent
+ * de front : l'unicité du job est sauve, le parallélisme ne l'est pas.
+ *
+ * **Pourquoi ce parallélisme est un problème.** Le worker déclenche un drainage
+ * sur chaque événement Realtime ET toutes les 30 s en filet. Sans garde, une
+ * file de cinq jobs à 45–200 s chacun voyait une boucle de plus toutes les
+ * 30 s, et cinq clics rapprochés en produisaient cinq d'un coup. Ce ne sont pas
+ * des boucles gratuites : chacune appelle GitHub, Vercel et Anthropic, dont les
+ * quotas sont la vraie limite de cette chaîne. Le §6 du spec demande une
+ * concurrence bornée, réglable, à 1 par défaut ; c'est le 1 par défaut.
+ *
+ * La rejection n'est PAS avalée : elle remonte à l'appelant, qui la journalise.
+ * La garde se libère dans tous les cas — laissée fermée par une exception, elle
+ * arrêterait le worker pour toujours, sans rien dire.
+ */
+export function unSeulALaFois(action: () => Promise<void>): () => Promise<void> {
+  let enCours = false;
+
+  return async () => {
+    // Le tour écarté n'est pas perdu : le balayage périodique du worker
+    // rappelle `drainer`, et la boucle en cours vide de toute façon la file
+    // tant qu'elle y trouve du travail.
+    if (enCours) return;
+    enCours = true;
+    try {
+      await action();
+    } finally {
+      enCours = false;
+    }
+  };
+}

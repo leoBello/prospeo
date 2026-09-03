@@ -209,7 +209,16 @@ export function CampagneScreen({
                           </div>
                           <span className={styles.meta}>
                             {getTrade(p.tradeSlug)?.label ?? p.tradeSlug} · {p.ville} ·{' '}
-                            <span className={styles.score}>{p.score}</span>
+                            {/* React rend `null` comme RIEN : la ligne
+                                s'arrêtait sur « Plombier · Nantes · ».
+                                `classerLot` garde délibérément un suivi sans
+                                score — le domaine tenait la doctrine, le rendu
+                                la perdait au dernier mètre. Même clé que
+                                `DeploiementsScreen` et `ScoreBar` : une seule
+                                façon de nommer cette absence-là. */}
+                            <span className={styles.score}>
+                              {p.score === null ? t('score.absent') : p.score}
+                            </span>
                           </span>
                         </div>
                       </td>

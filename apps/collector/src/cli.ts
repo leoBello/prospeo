@@ -59,7 +59,7 @@ import {
   fetchSiteRows,
   traiterProspect,
 } from './chaine.js';
-import { prendreProchain, type FileDeps } from './stages/file.js';
+import { prendreProchain, unSeulALaFois, type FileDeps } from './stages/file.js';
 
 // `.env` vit a la racine du depot. Ni tsx ni Node ne le chargent tout seuls :
 // sans cette ligne, la procedure documentee (« copier .env.example en .env »)
@@ -1835,7 +1835,16 @@ async function main(argv: string[]): Promise<number> {
       };
 
       /**
-       * Vide la file, un job à la fois.
+       * Vide la file, un job à la fois — et **un seul drainage à la fois.**
+       *
+       * `unSeulALaFois` borne le parallélisme que `prendre` ne borne pas : la
+       * prise conditionnée à l'état empêche deux workers de traiter le MÊME
+       * job, elle n'empêche pas N boucles d'en traiter N différents de front.
+       * Or `drainer` est rappelé sur chaque événement Realtime et toutes les
+       * 30 s : sans garde, la concurrence grimpait d'une unité toutes les 30 s
+       * sur une file longue, et chaque boucle consomme des quotas GitHub,
+       * Vercel et Anthropic — la vraie limite de cette chaîne, et la raison du
+       * « concurrence bornée à 1 par défaut » du §6 du spec.
        *
        * **Ne doit JAMAIS rejeter.** `drainer` est appelé en fire-and-forget
        * depuis le callback Realtime et depuis le balayage périodique : une
@@ -1847,7 +1856,7 @@ async function main(argv: string[]): Promise<number> {
        * `traiterUn`, qui garantit que « le balayage rattrape Realtime » reste
        * vrai même si `traiterUn` change un jour.
        */
-      const drainer = async (): Promise<void> => {
+      const drainer = unSeulALaFois(async (): Promise<void> => {
         try {
           while (!arret && (await traiterUn())) {
             // Rien : la condition fait le travail.
@@ -1857,7 +1866,7 @@ async function main(argv: string[]): Promise<number> {
             `worker : balayage interrompu par une erreur inattendue — ${cause instanceof Error ? cause.message : String(cause)}\n`,
           );
         }
-      };
+      });
 
       /**
        * Lance `drainer` en tâche de fond, sans jamais laisser filer une
