@@ -81,6 +81,16 @@
 
 <div style="width: 1440px; height: 900px; display: flex; background: var(--bg); overflow: hidden">
 
+  <!-- TON DES BADGES DE PRÉSENCE : il suit `TON_PRESENCE`
+       (apps/dashboard/src/ui/presence.ts), lui-même tiré de `PRESENCE_POINTS`
+       de @prospeo/core. Le ton dit la VALEUR DE VENTE, pas la qualité du
+       site : un site mort ou une simple page sociale rapporte plus de points
+       qu'un site vivant, parce que c'est une meilleure cible — `has_site`
+       vaut -100 et disqualifie presque le prospect. D'où un vert sur « site
+       en panne », qui surprend tant qu'on ignore la règle.
+       Cette maquette portait des tons inventés (rose sur le site en panne) ;
+       l'arbitrage du 3 septembre garde le vocabulaire du kit et corrige la
+       maquette. -->
   <!-- ================= RAIL =================
        Quatre entrées, pas cinq : « Base » reste hors périmètre et n'a aucun
        écran derrière lui. Un rail qui l'annoncerait promettrait un écran qui
@@ -237,7 +247,7 @@
             <div style="flex: 1; min-width: 0">
               <div style="display: flex; align-items: center; gap: 7px">
                 <span class="ell" style="font-size: 13px; font-weight: 500">Aquatech Nantes</span>
-                <span class="badge b-mute" style="height: 18px; font-size: 10px; flex: none">Aucune présence</span>
+                <span class="badge b-blue" style="height: 18px; font-size: 10px; flex: none">Aucune présence web</span>
               </div>
               <div class="ell" style="font-size: 11px; color: var(--muted)">Plombier &middot; Nantes centre &middot; score <span class="num">86</span></div>
             </div>
@@ -255,7 +265,7 @@
             <div style="flex: 1; min-width: 0">
               <div style="display: flex; align-items: center; gap: 7px">
                 <span class="ell" style="font-size: 13px; font-weight: 500">Nantes Chauffe-Eau</span>
-                <span class="badge b-rose" style="height: 18px; font-size: 10px; flex: none">Site en panne</span>
+                <span class="badge b-mint" style="height: 18px; font-size: 10px; flex: none">Site en panne ou obsolète</span>
               </div>
               <div class="ell" style="font-size: 11px; color: var(--muted)">Plombier &middot; Rezé &middot; score <span class="num">75</span></div>
             </div>
@@ -270,7 +280,7 @@
             <div style="flex: 1; min-width: 0">
               <div style="display: flex; align-items: center; gap: 7px">
                 <span class="ell" style="font-size: 13px; font-weight: 500">Souleymane Dosso &mdash; DOS Services</span>
-                <span class="badge b-rose" style="height: 18px; font-size: 10px; flex: none">Site en panne</span>
+                <span class="badge b-mint" style="height: 18px; font-size: 10px; flex: none">Site en panne ou obsolète</span>
               </div>
               <div class="ell" style="font-size: 11px; color: var(--muted)">Plombier &middot; Nantes nord &middot; score <span class="num">95</span></div>
             </div>
@@ -285,7 +295,7 @@
             <div style="flex: 1; min-width: 0">
               <div style="display: flex; align-items: center; gap: 7px">
                 <span class="ell" style="font-size: 13px; font-weight: 500">Chauffage Bellevue</span>
-                <span class="badge b-mute" style="height: 18px; font-size: 10px; flex: none">Réseaux seuls</span>
+                <span class="badge b-mint" style="height: 18px; font-size: 10px; flex: none">Page sociale, aucun site</span>
               </div>
               <div class="ell" style="font-size: 11px; color: var(--rose)">Dépôt : le nom &laquo; chauffage-bellevue &raquo; est déjà pris</div>
             </div>
@@ -300,7 +310,7 @@
             <div style="flex: 1; min-width: 0">
               <div style="display: flex; align-items: center; gap: 7px">
                 <span class="ell" style="font-size: 13px; font-weight: 500">Aquatio &mdash; Vincent Combe</span>
-                <span class="badge b-rose" style="height: 18px; font-size: 10px; flex: none">Site en panne</span>
+                <span class="badge b-mint" style="height: 18px; font-size: 10px; flex: none">Site en panne ou obsolète</span>
               </div>
               <div class="ell" style="font-size: 11px; color: var(--muted)">Plombier &middot; Saint-Herblain &middot; score <span class="num">60</span></div>
             </div>
@@ -320,7 +330,7 @@
             <div style="flex: 1; min-width: 0">
               <div style="display: flex; align-items: center; gap: 7px">
                 <span class="ell" style="font-size: 13px; font-weight: 500">Serrurier Express 44</span>
-                <span class="badge b-mute" style="height: 18px; font-size: 10px; flex: none">Annuaire seul</span>
+                <span class="badge b-violet" style="height: 18px; font-size: 10px; flex: none">Fiche annuaire uniquement</span>
               </div>
               <div class="ell" style="font-size: 11px; color: var(--muted)">Serrurier &middot; Saint-Herblain &middot; score <span class="num">79</span></div>
             </div>
@@ -340,7 +350,7 @@
             <div style="flex: 1; min-width: 0">
               <div style="display: flex; align-items: center; gap: 7px">
                 <span class="ell" style="font-size: 13px; font-weight: 500">Plomberie Océane</span>
-                <span class="badge b-mute" style="height: 18px; font-size: 10px; flex: none">Aucune présence</span>
+                <span class="badge b-blue" style="height: 18px; font-size: 10px; flex: none">Aucune présence web</span>
               </div>
               <div class="ell" style="font-size: 11px; color: var(--amber)">Le mail est écrit : la collecte n'a trouvé aucune adresse</div>
             </div>
@@ -357,7 +367,7 @@
             <div style="flex: 1; min-width: 0">
               <div style="display: flex; align-items: center; gap: 7px">
                 <span class="ell" style="font-size: 13px; font-weight: 500">Sanitaire Loire</span>
-                <span class="badge b-mute" style="height: 18px; font-size: 10px; flex: none">Aucune présence</span>
+                <span class="badge b-mute" style="height: 18px; font-size: 10px; flex: none">Présence web pas encore sondée</span>
               </div>
               <div class="ell" style="font-size: 11px; color: var(--muted)">Plombier &middot; Vertou &middot; score <span class="num">58</span></div>
             </div>
