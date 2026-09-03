@@ -1,0 +1,39 @@
+/*
+ * La bande de conditions, sous le titre et au-dessus de la liste — la place
+ * que lui donne la maquette (`Campagne.html`), et elle n'est pas arbitraire :
+ * une condition qui gouverne des boutons se lit à côté d'eux, pas dans un
+ * coin de l'écran.
+ */
+.bande {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+/*
+ * `min-width: 0` : sans lui, un texte long refuserait de se replier et
+ * pousserait le badge hors de la bande — le conteneur est en `flex`, et un
+ * enfant y prend par défaut sa largeur de contenu.
+ */
+.raison {
+  flex: 1;
+  min-width: 0;
+}
+
+.raisonTexte {
+  margin: 0;
+  font-size: var(--text-md);
+  color: var(--color-text);
+}
+
+.remede {
+  margin: 2px 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}

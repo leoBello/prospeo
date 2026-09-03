@@ -3446,10 +3446,13 @@ export function BandeConditions({
 }): ReactElement {
   const t = useT();
   const vivant = workerVivant(heartbeat?.beatAt ?? null, maintenant);
-  const minutes =
-    heartbeat === null
-      ? null
-      : Math.floor((maintenant.getTime() - Date.parse(heartbeat.beatAt)) / 60_000);
+
+  // TROIS états, et non deux. « Jamais entendu parler de lui » n'est pas
+  // « silencieux depuis quatorze minutes » : les replier ferait afficher
+  // « depuis 0 min », un chiffre que rien ne mesure. C'est la même règle qui
+  // sépare « pas encore » de « jamais » partout ailleurs dans ce dépôt, et
+  // elle demande sa propre clé (`campagne.worker.inconnu`).
+  const etat = vivant ? 'ecoute' : heartbeat === null ? 'inconnu' : 'arret';
 
   return (
     <div className={styles.bande}>

@@ -375,6 +375,15 @@ export const en: Record<keyof typeof fr, string> = {
   'campagne.sansScore_one':
     '{count} prospect has never been scored: it cannot be ranked, and does not appear in this batch.',
 
+  'campagne.worker.ecoute': 'Collector listening',
+  'campagne.worker.arret': 'Collector stopped',
+  'campagne.worker.arret.raison':
+    'No sign of life for {minutes} min. Requests filed now will wait for its return.',
+  'campagne.worker.arret.remede':
+    'Restart it with pnpm --filter @prospeo/collector start worker. Nothing is lost: the queue lives in the database.',
+  'campagne.worker.inconnu': 'Collector state unknown',
+  'campagne.worker.inconnu.raison':
+    'No heartbeat has ever been recorded. As long as we know nothing about it, we treat it as stopped.',
   'campagne.vide.lotFini': 'The batch is done',
   'campagne.vide.lotFini.detail': 'The highest-scoring prospects have all been reached.',
   'campagne.vide.aucunProspect': 'No prospects',

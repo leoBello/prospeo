@@ -4,6 +4,7 @@ import { getTrade } from '@prospeo/core';
 import { etatLigne } from '../domain/campagne.js';
 import type { TranslationKey } from '../i18n/translate.js';
 import { AppShell } from '../ui/AppShell.js';
+import { BandeConditions } from '../ui/BandeConditions.js';
 import { PisteCampagne } from '../ui/PisteCampagne.js';
 import { Badge } from '../ui/kit/Badge.js';
 import type { BadgeTon } from '../ui/kit/Badge.js';
@@ -23,10 +24,10 @@ import styles from './CampagneScreen.module.css';
  * ci-dessous, contrairement à la maquette `Campagne.html` : elle montre
  * l'écran complet, celui-ci n'en est que la lecture.
  *
- * **La bande de conditions (état du worker, boîte d'envoi) n'est pas ici non
- * plus** : c'est `BandeConditions`, composant d'une tâche ultérieure. `Lot`
- * porte déjà `heartbeat` pour cette raison-là — le lire maintenant sans rien
- * en afficher serait prématuré, pas manquant.
+ * **La bande de conditions y est**, elle, et à sa place de la maquette :
+ * juste sous l'en-tête, au-dessus de la liste. Une condition qui gouverne des
+ * boutons se lit à côté d'eux. Elle ne porte encore que la moitié « worker »
+ * — la boîte d'envoi Gmail arrive avec la connexion Google.
  */
 
 /**
@@ -76,9 +77,10 @@ export interface CampagneScreenProps {
   lignes: Map<string, FaitsLigne>;
   totalProspects: number;
   /**
-   * `null` : le battement n'a pas pu être lu. Porté dans les props dès ce lot
-   * (voir `useCampagne`) pour que la tâche qui affiche `BandeConditions` n'ait
-   * pas à retoucher cette interface — mais rien ici ne le lit encore.
+   * `null` : aucun battement n'a jamais été enregistré, ou la lecture a
+   * échoué. `BandeConditions` en fait un état à part — « on ne sait rien de
+   * lui » n'est pas « il s'est tu il y a quatorze minutes », et les replier
+   * afficherait « depuis 0 min », un chiffre que rien ne mesure.
    */
   heartbeat: { beatAt: string; inFlight: number } | null;
   onSignOut: () => void;
@@ -99,6 +101,7 @@ export function CampagneScreen({
   lot,
   lignes,
   totalProspects,
+  heartbeat,
   onSignOut,
   nav,
 }: CampagneScreenProps): ReactElement {
@@ -115,6 +118,8 @@ export function CampagneScreen({
             <h1 className={styles.titre}>{t('campagne.title')}</h1>
             <p className={styles.sousTitre}>{t('campagne.subtitle')}</p>
           </header>
+
+          <BandeConditions heartbeat={heartbeat} maintenant={new Date()} />
 
           {lot.lignes.length === 0 ? (
             // Deux vides de natures différentes, deux écrans. Le second ne se

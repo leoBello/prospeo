@@ -418,9 +418,7 @@ export const fr = {
   // aucune clé de libellé de bouton n'est ajoutée ici (`campagne.action.*`
   // du plan) — l'écrire sans exécutant derrière serait une affordance qui
   // annonce un fait qu'aucun code ne rend vrai, et `i18n.test.ts` la
-  // signalerait de toute façon orpheline. Même raison pour la bande de
-  // conditions du worker (`campagne.worker.*`) : son composant arrive à la
-  // tâche suivante. Les libellés viennent des artboards approuvés
+  // signalerait de toute façon orpheline. Les libellés viennent des artboards approuvés
   // (Campagne.html, CampagneEtats.html), lus et recopiés, jamais inventés.
   'nav.campagne': 'Campagne',
 
@@ -460,6 +458,15 @@ export const fr = {
   'campagne.sansScore_one':
     "{count} prospect n'a jamais été scoré : il ne peut pas être classé, et n'apparaît pas dans ce lot.",
 
+  'campagne.worker.ecoute': "Collector à l'écoute",
+  'campagne.worker.arret': "Collector à l'arrêt",
+  'campagne.worker.arret.raison':
+    'Aucun signe de vie depuis {minutes} min. Les demandes déposées maintenant attendront son retour.',
+  'campagne.worker.arret.remede':
+    'Le relancer avec pnpm --filter @prospeo/collector start worker. Rien n’est perdu : la file vit en base.',
+  'campagne.worker.inconnu': 'État du collector inconnu',
+  'campagne.worker.inconnu.raison':
+    'Aucun battement n’a jamais été enregistré. Tant qu’on ne sait rien de lui, on le tient pour arrêté.',
   'campagne.vide.lotFini': 'Le lot est fini',
   'campagne.vide.lotFini.detail': 'Les prospects les mieux notés ont tous été touchés.',
   'campagne.vide.aucunProspect': 'Aucun prospect',
