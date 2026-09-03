@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CampagneEtats — maquette Prospeo</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+  <style>
+    :root {
+      --bg: #0b0d12; --surface: #14171f; --surface2: #1a1e28; --surface3: #232936;
+      --border: #252b38; --border2: #333c4e;
+      --text: #e4e8f0; --muted: #98a1b4; --faint: #6b7488;
+      --blue: #6d92ff; --mint: #4fd1a5; --amber: #f0b45c; --rose: #ff7a85; --violet: #a78bfa;
+      --display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+      --ui: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
+      --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--ui); font-size: 13px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+    a { color: var(--blue); text-decoration: none; }
+    h1, h2, h3 { margin: 0; font-family: var(--display); font-weight: 600; letter-spacing: -0.02em; }
+    button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+    .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+    .ell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .badge { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 999px;
+      font-size: 11px; font-weight: 600; border: 1px solid transparent; white-space: nowrap; }
+    .badge .dot { width: 5px; height: 5px; border-radius: 999px; background: currentColor; flex: none; }
+    .b-blue { color: #a9c2ff; background: rgba(109,146,255,0.13); border-color: rgba(109,146,255,0.28); }
+    .b-mint { color: #86e3c1; background: rgba(79,209,165,0.13); border-color: rgba(79,209,165,0.28); }
+    .b-amber { color: #f5cd92; background: rgba(240,180,92,0.13); border-color: rgba(240,180,92,0.28); }
+    .b-rose { color: #ffa8b0; background: rgba(255,122,133,0.13); border-color: rgba(255,122,133,0.28); }
+    .b-violet { color: #c4b5fd; background: rgba(167,139,250,0.13); border-color: rgba(167,139,250,0.3); }
+    .b-mute { color: var(--muted); background: rgba(152,161,180,0.10); border-color: var(--border2); }
+
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 30px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--border2); font-size: 12px; white-space: nowrap; }
+    .btn-p { background: var(--blue); color: #0b0d12; border-color: var(--blue); font-weight: 600; }
+    .btn-s { height: 26px; padding: 0 10px; font-size: 11.5px; border-radius: 8px; }
+    /* Désactivé : grisé ET porteur de sa raison. Un bouton éteint qui ne dit
+       pas pourquoi envoie chercher une remédiation qui n'existe pas. */
+    .btn-off { color: var(--faint); border-color: var(--border); background: transparent; cursor: not-allowed; }
+
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
+    .lab { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--faint); font-weight: 600; }
+    .cap { font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+    .sect { font-family: var(--display); font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+
+    .sw { width: 32px; height: 18px; border-radius: 999px; background: var(--surface3); border: 1px solid var(--border2); position: relative; flex: none; }
+    .sw > i { position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 999px; background: var(--faint); }
+    .sw-on { background: rgba(240,180,92,0.22); border-color: rgba(240,180,92,0.55); }
+    .sw-on > i { left: auto; right: 2px; background: var(--amber); }
+
+    .track { display: flex; gap: 3px; }
+    .seg { width: 46px; height: 5px; border-radius: 999px; background: #232936; }
+    .seg-ok { background: var(--mint); }
+    .seg-wait { background: repeating-linear-gradient(90deg, var(--amber) 0 4px, #232936 4px 8px); }
+  </style>
+<style>body { margin: 0; background: #0b0d12; }</style>
+</head>
+<body>
+<div style="width: 1440px; height: 1320px; background: var(--bg); padding: 30px 32px; display: flex; flex-direction: column; gap: 22px; overflow: hidden">
+
+  <!-- ================= EN-TÊTE ================= -->
+  <div>
+    <h1 style="font-size: 22px">Campagne &mdash; les états qui décident</h1>
+    <p class="cap" style="margin: 5px 0 0; max-width: 940px">Ce second artboard existe parce que ce dépôt s'est trompé quatre fois exactement là : une bande de progression sans son anneau, un état vide qui cassait une rangée, une cellule inventée qui écrasait la mise en page, une maquette sans écran. Aucun test ne voit une mise en page &mdash; ce qui suit est le seul contrôle qui la voie.</p>
+  </div>
+
+  <!-- ================= 1. QUAND UNE CONDITION MANQUE ================= -->
+  <div>
+    <div style="display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px">
+      <span class="sect">1 &middot; Quand une condition manque</span>
+      <span class="cap">Le bouton s'éteint <em>et</em> dit pourquoi. Quatre manques de natures différentes, quatre formulations.</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 10px">
+
+      <!-- 1a — le worker est mort -->
+      <div class="card" style="border-color: rgba(255,122,133,0.3); padding: 12px 16px; display: flex; align-items: center; gap: 14px">
+        <span class="lab" style="width: 90px; flex: none">Worker</span>
+        <span class="badge b-rose" style="flex: none"><span class="dot"></span>Collector à l'arrêt</span>
+        <div style="flex: 1; min-width: 0">
+          <div style="font-size: 12.5px">Aucun signe de vie depuis <span class="num">14 min</span>. Les demandes déposées maintenant attendront son retour.</div>
+          <div class="cap">Le relancer avec <span class="num">pnpm --filter @prospeo/collector start worker</span>. Rien n'est perdu : la file vit en base.</div>
+        </div>
+        <button class="btn btn-off" style="flex: none">Déployer la sélection</button>
+        <button class="btn btn-off" style="flex: none">Lancer une campagne de <span class="num">10</span></button>
+      </div>
+
+      <!-- 1b — connecté, mais pas par Google : aucun jeton d'envoi -->
+      <div class="card" style="border-color: rgba(240,180,92,0.3); padding: 12px 16px; display: flex; align-items: center; gap: 14px">
+        <span class="lab" style="width: 90px; flex: none">Envoi</span>
+        <span class="badge b-amber" style="flex: none"><span class="dot"></span>Aucun compte d'envoi</span>
+        <div style="flex: 1; min-width: 0">
+          <div style="font-size: 12.5px">Session ouverte par mot de passe. Le déploiement et la rédaction fonctionnent ; l'envoi, non.</div>
+          <div class="cap">Envoyer demande un jeton Google, qui ne s'obtient qu'à la connexion. Déployer et rédiger restent disponibles d'ici là.</div>
+        </div>
+        <button class="btn" style="flex: none">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 8l9 6 9-6"/></svg>
+          Se reconnecter avec Google
+        </button>
+      </div>
+
+      <!-- 1c — le jeton a expiré EN COURS de campagne : cas différent du 1b -->
+      <div class="card" style="border-color: rgba(240,180,92,0.3); padding: 12px 16px; display: flex; align-items: center; gap: 14px">
+        <span class="lab" style="width: 90px; flex: none">Envoi</span>
+        <span class="badge b-amber" style="flex: none"><span class="dot"></span>Jeton expiré</span>
+        <div style="flex: 1; min-width: 0">
+          <div style="font-size: 12.5px">La campagne est en pause sur &laquo; prêt à envoyer &raquo; &mdash; <span class="num">4</span> mails attendent, aucun n'est perdu.</div>
+          <div class="cap">Le jeton d'envoi vit une heure et ne se renouvelle pas seul. Se reconnecter reprend la campagne où elle s'est arrêtée.</div>
+        </div>
+        <button class="btn btn-p" style="flex: none">Se reconnecter et reprendre</button>
+      </div>
+
+      <!-- 1d — l'écran a été fermé pendant le mode auto -->
+      <div class="card" style="padding: 12px 16px; display: flex; align-items: center; gap: 14px">
+        <span class="lab" style="width: 90px; flex: none">Reprise</span>
+        <span class="badge b-mute" style="flex: none"><span class="dot"></span>Campagne interrompue</span>
+        <div style="flex: 1; min-width: 0">
+          <div style="font-size: 12.5px">Arrêtée à <span class="num">6</span> sur <span class="num">10</span> hier à <span class="num">18 h 12</span>, quand cet écran a été fermé.</div>
+          <div class="cap">Les sites ont continué à se déployer &mdash; c'est le collector qui les porte. Seuls les envois se sont arrêtés : ils partent depuis ce navigateur.</div>
+        </div>
+        <button class="btn" style="flex: none">Reprendre les <span class="num">4</span> restants</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 2. LE MODE AUTOMATIQUE ================= -->
+  <div>
+    <div style="display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px">
+      <span class="sect">2 &middot; L'envoi automatique</span>
+      <span class="cap">Un réglage qui rouvre une décision prise le 1<sup>er</sup> septembre. Il se demande explicitement, et il se voit tant qu'il dure.</span>
+    </div>
+
+    <div style="display: flex; gap: 14px; align-items: stretch">
+
+      <!-- 2a — la demande de confirmation -->
+      <div class="card" style="width: 460px; flex: none; padding: 17px 19px; box-shadow: 0 8px 24px rgba(0,0,0,0.45)">
+        <div style="display: flex; align-items: center; gap: 10px">
+          <div style="width: 30px; height: 30px; border-radius: 9px; background: rgba(240,180,92,0.14); color: var(--amber); display: flex; align-items: center; justify-content: center; flex: none">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 8v5M12 16.5v.5"/><circle cx="12" cy="12" r="9"/></svg>
+          </div>
+          <h3 style="font-size: 15px">Activer l'envoi automatique</h3>
+        </div>
+
+        <p style="margin: 12px 0 0; font-size: 12.5px; line-height: 1.55">Les mails de cette campagne partiront <strong>sans qu'un humain les relise</strong>, au nom d'entreprises réelles, depuis <span class="num">leo.bello@gmail.com</span>.</p>
+
+        <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 7px">
+          <div style="display: flex; gap: 8px; align-items: flex-start">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--mint)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex: none; margin-top: 3px"><path d="M20 6L9 17l-5-5"/></svg>
+            <span class="cap" style="color: var(--text)">Ce qui ne change pas : le modèle ne reçoit que des faits vérifiés de la base, et il lui reste interdit d'en inventer.</span>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: flex-start">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--mint)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex: none; margin-top: 3px"><path d="M20 6L9 17l-5-5"/></svg>
+            <span class="cap" style="color: var(--text)">L'espacement de <span class="num">90 s</span> tient, et l'écran doit rester ouvert.</span>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: flex-start">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2.4" stroke-linecap="round" style="flex: none; margin-top: 3px"><path d="M12 5v9M12 17.5v.5"/></svg>
+            <span class="cap" style="color: var(--text)">Ce que vous perdez : le dernier contrôle humain sur un texte qui nomme quelqu'un. Un détail malvenu part sans recours.</span>
+          </div>
+        </div>
+
+        <div style="margin-top: 13px; padding: 9px 11px; background: var(--surface2); border: 1px solid var(--border); border-radius: 9px">
+          <span class="cap">Vous avez relu <span class="num">2</span> des mails de cette campagne. Les <span class="num">8</span> autres partiront non lus.</span>
+        </div>
+
+        <div style="display: flex; gap: 8px; margin-top: 14px">
+          <button class="btn" style="flex: 1">Annuler</button>
+          <button class="btn btn-p" style="flex: 1">Activer pour cette campagne</button>
+        </div>
+      </div>
+
+      <!-- 2b — à quoi ressemble l'écran quand c'est actif -->
+      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px">
+        <div class="card" style="border-color: rgba(240,180,92,0.35); background: rgba(240,180,92,0.04); padding: 11px 14px; display: flex; align-items: center; gap: 12px">
+          <span style="display: inline-flex; align-items: center; gap: 8px; flex: none">
+            <span class="sw sw-on"><i></i></span>
+            <span style="font-size: 12px; color: var(--muted)">Envoi automatique &middot; <span style="color: var(--amber); font-weight: 700">actif</span></span>
+          </span>
+          <span style="width: 1px; height: 22px; background: var(--border); flex: none"></span>
+          <span class="cap" style="flex: 1; min-width: 0">Prochain envoi dans <span class="num">42 s</span> &mdash; Aquatio, sans relecture.</span>
+          <button class="btn btn-s" style="flex: none">Désactiver</button>
+        </div>
+
+        <div class="card" style="padding: 13px 15px">
+          <div class="lab" style="margin-bottom: 8px">Ce que la bande de campagne ajoute en mode auto</div>
+          <div style="display: flex; align-items: center; gap: 18px">
+            <div><div class="num" style="font-size: 17px; font-weight: 700; line-height: 1.15; color: var(--mint)">4</div><div style="font-size: 10.5px; color: var(--muted)">envoyés</div></div>
+            <div><div class="num" style="font-size: 17px; font-weight: 700; line-height: 1.15">3</div><div style="font-size: 10.5px; color: var(--muted)">en attente d'espacement</div></div>
+            <div><div class="num" style="font-size: 17px; font-weight: 700; line-height: 1.15; color: var(--amber)">1</div><div style="font-size: 10.5px; color: var(--muted)">sans adresse, ignoré</div></div>
+            <div style="flex: 1"></div>
+            <button class="btn" style="flex: none">Tout suspendre</button>
+          </div>
+          <p class="cap" style="margin: 11px 0 0; padding-top: 10px; border-top: 1px solid var(--border)">Le prospect sans adresse n'est pas un échec : il est <strong>ignoré et compté à part</strong>, et il reste dans la liste avec son bouton &laquo; Saisir &raquo;. Le confondre avec un échec ferait croire à une panne là où il manque une information.</p>
+        </div>
+
+        <!-- Les bornes du mode auto : ce qu'il ne fera jamais, quoi qu'il arrive -->
+        <div class="card" style="flex: 1; padding: 13px 15px">
+          <div class="lab" style="margin-bottom: 9px">Ce que le mode auto ne fait jamais</div>
+          <div style="display: flex; flex-direction: column; gap: 7px">
+            <div style="display: flex; gap: 9px; align-items: flex-start">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--rose)" stroke-width="2.4" stroke-linecap="round" style="flex: none; margin-top: 3px"><path d="M6 6l12 12M18 6L6 18"/></svg>
+              <span class="cap" style="color: var(--text)">Il ne dépasse pas les <span class="num">10</span> du lot. La campagne suivante se relance à la main.</span>
+            </div>
+            <div style="display: flex; gap: 9px; align-items: flex-start">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--rose)" stroke-width="2.4" stroke-linecap="round" style="flex: none; margin-top: 3px"><path d="M6 6l12 12M18 6L6 18"/></svg>
+              <span class="cap" style="color: var(--text)">Il n'écrit jamais à un prospect passé en &laquo; ne pas contacter &raquo;, même s'il était dans le lot au départ.</span>
+            </div>
+            <div style="display: flex; gap: 9px; align-items: flex-start">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--rose)" stroke-width="2.4" stroke-linecap="round" style="flex: none; margin-top: 3px"><path d="M6 6l12 12M18 6L6 18"/></svg>
+              <span class="cap" style="color: var(--text)">Il n'envoie jamais deux fois au même : un envoi consigné exclut définitivement le prospect du lot.</span>
+            </div>
+            <div style="display: flex; gap: 9px; align-items: flex-start">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--rose)" stroke-width="2.4" stroke-linecap="round" style="flex: none; margin-top: 3px"><path d="M6 6l12 12M18 6L6 18"/></svg>
+              <span class="cap" style="color: var(--text)">Il ne survit pas à la fermeture de l'écran, ni au réglage : le désactiver arrête le prochain envoi, pas celui qui part.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 3. QUATRE VIDES ================= -->
+  <div>
+    <div style="display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px">
+      <span class="sect">3 &middot; Quatre listes vides, quatre causes</span>
+      <span class="cap">&laquo; Pas encore &raquo; n'est pas &laquo; jamais &raquo;, et &laquo; je n'ai pas pu lire &raquo; n'est ni l'un ni l'autre.</span>
+    </div>
+
+    <div style="display: flex; gap: 12px">
+
+      <div class="card" style="flex: 1; min-width: 0; padding: 16px; text-align: center">
+        <div style="width: 34px; height: 34px; border-radius: 10px; background: rgba(79,209,165,0.13); color: var(--mint); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 9px">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+        </div>
+        <div style="font-size: 12.5px; font-weight: 600">Le lot est fini</div>
+        <p class="cap" style="margin: 5px 0 11px">Les <span class="num">20</span> mieux notés ont tous été touchés. Il en reste <span class="num">61</span> plus bas au classement.</p>
+        <button class="btn btn-s">Élargir à <span class="num">50</span></button>
+      </div>
+
+      <div class="card" style="flex: 1; min-width: 0; padding: 16px; text-align: center">
+        <div style="width: 34px; height: 34px; border-radius: 10px; background: rgba(152,161,180,0.10); color: var(--faint); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 9px">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg>
+        </div>
+        <div style="font-size: 12.5px; font-weight: 600">Aucun prospect qualifié</div>
+        <p class="cap" style="margin: 5px 0 11px">La base n'en contient aucun pour ce métier. Rien n'a été filtré : il n'y a rien.</p>
+        <button class="btn btn-s">Lancer une collecte</button>
+      </div>
+
+      <div class="card" style="flex: 1; min-width: 0; padding: 16px; text-align: center">
+        <div style="width: 34px; height: 34px; border-radius: 10px; background: rgba(240,180,92,0.13); color: var(--amber); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 9px">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 7v6M12 16.5v.5"/><circle cx="12" cy="12" r="9"/></svg>
+        </div>
+        <div style="font-size: 12.5px; font-weight: 600">Jamais scorés</div>
+        <p class="cap" style="margin: 5px 0 11px"><span class="num">14</span> prospects n'ont pas de score. Ce n'est pas un score de zéro : on ne peut pas les classer.</p>
+        <button class="btn btn-s">Les scorer</button>
+      </div>
+
+      <div class="card" style="flex: 1; min-width: 0; padding: 16px; text-align: center; border-color: rgba(255,122,133,0.3)">
+        <div style="width: 34px; height: 34px; border-radius: 10px; background: rgba(255,122,133,0.13); color: var(--rose); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 9px">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 9v4M12 16.5v.5"/><path d="M10.3 3.9L2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+        </div>
+        <div style="font-size: 12.5px; font-weight: 600">Liste illisible</div>
+        <p class="cap" style="margin: 5px 0 11px">La lecture a échoué. La liste n'est pas vide &mdash; on ne sait pas ce qu'elle contient.</p>
+        <button class="btn btn-s">Réessayer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 4. L'ADRESSE MANQUANTE ================= -->
+  <div>
+    <div style="display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px">
+      <span class="sect">4 &middot; L'adresse manquante</span>
+      <span class="cap">L'étage de collecte ne trouve pas tout. Ce qu'il n'a pas trouvé se dit, et se complète à la main sans quitter la liste.</span>
+    </div>
+
+    <div style="display: flex; gap: 14px">
+
+      <div class="card" style="width: 460px; flex: none; padding: 16px 18px">
+        <div class="lab" style="margin-bottom: 9px">Saisie, dans la ligne</div>
+        <div style="display: flex; align-items: center; gap: 9px">
+          <div style="flex: 1; min-width: 0; height: 32px; border: 1px solid var(--blue); border-radius: 9px; background: var(--surface2); display: flex; align-items: center; padding: 0 11px">
+            <span class="num ell" style="font-size: 12px; color: var(--faint)">adresse@entreprise.fr</span>
+          </div>
+          <button class="btn" style="flex: none">Annuler</button>
+          <button class="btn btn-p" style="flex: none">Enregistrer</button>
+        </div>
+        <p class="cap" style="margin: 11px 0 0">Enregistrée, elle portera le badge <span class="badge b-mute" style="height: 18px; font-size: 10px">Saisie</span> et non <span class="badge b-violet" style="height: 18px; font-size: 10px">Collectée</span>. Deux origines, deux badges : ce qu'on engage en écrivant à une adresse relevée par un robot n'est pas ce qu'on engage avec une adresse vérifiée à la main.</p>
+      </div>
+
+      <div class="card" style="flex: 1; min-width: 0; padding: 16px 18px">
+        <div class="lab" style="margin-bottom: 11px">Les trois états du destinataire, dans la piste</div>
+
+        <div style="display: flex; flex-direction: column; gap: 11px">
+          <div style="display: flex; align-items: center; gap: 14px">
+            <div class="track" style="flex: none"><span class="seg seg-ok"></span><span class="seg seg-ok"></span><span class="seg seg-ok"></span></div>
+            <span style="width: 152px; flex: none"><span class="badge b-mint"><span class="dot"></span>Envoyé</span></span>
+            <span class="cap" style="flex: 1; min-width: 0">Adresse connue, mail parti.</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 14px">
+            <div class="track" style="flex: none"><span class="seg seg-ok"></span><span class="seg seg-ok"></span><span class="seg seg-wait"></span></div>
+            <span style="width: 152px; flex: none"><span class="badge b-amber"><span class="dot"></span>Adresse manquante</span></span>
+            <span class="cap" style="flex: 1; min-width: 0">Le site est en ligne, le mail est écrit &mdash; il n'a pas de destinataire. Rien n'a échoué.</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 14px">
+            <div class="track" style="flex: none"><span class="seg seg-ok"></span><span class="seg seg-ok"></span><span class="seg seg-wait"></span></div>
+            <span style="width: 152px; flex: none"><span class="badge b-mute"><span class="dot"></span>Collecte en cours</span></span>
+            <span class="cap" style="flex: 1; min-width: 0">L'étage cherche encore. &laquo; Pas encore trouvée &raquo; n'est pas &laquo; introuvable &raquo; : le même segment, un mot différent.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

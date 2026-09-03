@@ -1,0 +1,497 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+  <style>
+    :root {
+      --bg: #0b0d12; --surface: #14171f; --surface2: #1a1e28; --surface3: #232936;
+      --border: #252b38; --border2: #333c4e;
+      --text: #e4e8f0; --muted: #98a1b4; --faint: #6b7488;
+      --blue: #6d92ff; --mint: #4fd1a5; --amber: #f0b45c; --rose: #ff7a85; --violet: #a78bfa;
+      --display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+      --ui: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
+      --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--ui); font-size: 13px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+    a { color: var(--blue); text-decoration: none; }
+    h1, h2, h3 { margin: 0; font-family: var(--display); font-weight: 600; letter-spacing: -0.02em; }
+    button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+    .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+    /* L'ellipse est posée sur le NŒUD DE TEXTE, jamais sur son conteneur
+       flex : c'est le piège que `guidelines.test.ts` traque, et il a déjà
+       coûté deux corrections à ce dépôt. */
+    .ell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .tip { position: relative; display: inline-flex; }
+    .tip > .tipBody {
+      position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%) translateY(3px);
+      background: #030509; border: 1px solid var(--border2); color: var(--text);
+      padding: 7px 10px; border-radius: 8px; font-size: 11.5px; line-height: 1.4; width: max-content; max-width: 260px;
+      opacity: 0; pointer-events: none; transition: opacity 140ms ease, transform 140ms ease; z-index: 40;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.55);
+    }
+    .tip:hover > .tipBody { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .tipK { color: var(--faint); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 2px; }
+
+    .badge { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 999px;
+      font-size: 11px; font-weight: 600; letter-spacing: 0.01em; border: 1px solid transparent; white-space: nowrap; }
+    .badge .dot { width: 5px; height: 5px; border-radius: 999px; background: currentColor; flex: none; }
+    .b-blue { color: #a9c2ff; background: rgba(109,146,255,0.13); border-color: rgba(109,146,255,0.28); }
+    .b-mint { color: #86e3c1; background: rgba(79,209,165,0.13); border-color: rgba(79,209,165,0.28); }
+    .b-amber { color: #f5cd92; background: rgba(240,180,92,0.13); border-color: rgba(240,180,92,0.28); }
+    .b-rose { color: #ffa8b0; background: rgba(255,122,133,0.13); border-color: rgba(255,122,133,0.28); }
+    .b-violet { color: #c4b5fd; background: rgba(167,139,250,0.13); border-color: rgba(167,139,250,0.3); }
+    .b-mute { color: var(--muted); background: rgba(152,161,180,0.10); border-color: var(--border2); }
+
+    /* Piste de campagne : trois segments — Site, Mail, Envoi. Les cinq
+       sous-étapes du site restent celles de `Deploiements` ; on ne les
+       redessine pas ici, on les replie derrière le premier segment. */
+    .track { display: flex; gap: 3px; }
+    .seg { width: 46px; height: 5px; border-radius: 999px; background: #232936; }
+    .seg-ok { background: var(--mint); }
+    .seg-run { background: linear-gradient(90deg, var(--blue) 50%, #232936 50%); background-size: 200% 100%; animation: slide 1.4s linear infinite; }
+    .seg-fail { background: var(--rose); }
+    /* Bloqué n'est pas échoué : une adresse manquante attend un humain, elle
+       n'a rien raté. Deux natures d'arrêt, deux rendus. */
+    .seg-wait { background: repeating-linear-gradient(90deg, var(--amber) 0 4px, #232936 4px 8px); }
+    @keyframes slide { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+
+    .row { display: flex; align-items: center; gap: 14px; padding: 10px 14px; border-radius: 11px; border: 1px solid transparent; }
+    .row:hover { background: var(--surface2); border-color: var(--border); }
+
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 30px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--border2); font-size: 12px; white-space: nowrap; }
+    .btn-p { background: var(--blue); color: #0b0d12; border-color: var(--blue); font-weight: 600; }
+    .btn-s { height: 26px; padding: 0 10px; font-size: 11.5px; border-radius: 8px; }
+
+    .cell { flex: none; }
+    .colhead { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--faint); font-weight: 600; }
+
+    /* Interrupteur : la couleur ne dit jamais seule l'état — le mot est à côté. */
+    .sw { width: 32px; height: 18px; border-radius: 999px; background: var(--surface3); border: 1px solid var(--border2); position: relative; flex: none; }
+    .sw > i { position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 999px; background: var(--faint); }
+  </style>
+</helmet>
+
+<div style="width: 1440px; height: 900px; display: flex; background: var(--bg); overflow: hidden">
+
+  <!-- ================= RAIL =================
+       Quatre entrées, pas cinq : « Base » reste hors périmètre et n'a aucun
+       écran derrière lui. Un rail qui l'annoncerait promettrait un écran qui
+       n'existe pas. -->
+  <div style="width: 56px; flex: none; border-right: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; align-items: center; padding: 12px 0; gap: 6px">
+    <div style="width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(150deg, var(--blue), var(--violet)); display: flex; align-items: center; justify-content: center; font-family: var(--display); font-weight: 700; font-size: 15px; color: #0b0d12; margin-bottom: 10px">P</div>
+    <div class="tip">
+      <div style="width: 36px; height: 36px; border-radius: 10px; color: var(--faint); display: flex; align-items: center; justify-content: center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>
+      </div>
+      <span class="tipBody"><span class="tipK">Aujourd'hui</span>Les relances dues et les nouveaux prospects à fort score.</span>
+    </div>
+    <div class="tip">
+      <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(109,146,255,0.14); color: var(--blue); display: flex; align-items: center; justify-content: center; position: relative">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 8l9 6 9-6"/></svg>
+        <span style="position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; border-radius: 999px; background: var(--blue); border: 2px solid var(--surface)"></span>
+      </div>
+      <span class="tipBody"><span class="tipK">Campagne</span>Une campagne en cours : 4 prospects sur 10 traités.</span>
+    </div>
+    <div class="tip">
+      <div style="width: 36px; height: 36px; border-radius: 10px; color: var(--faint); display: flex; align-items: center; justify-content: center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+      </div>
+      <span class="tipBody"><span class="tipK">Déploiements</span>Le suivi par site, avec ses cinq étapes.</span>
+    </div>
+    <div class="tip">
+      <div style="width: 36px; height: 36px; border-radius: 10px; color: var(--faint); display: flex; align-items: center; justify-content: center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
+      </div>
+      <span class="tipBody"><span class="tipK">Gabarit</span>Le dépôt GitHub qui sert de modèle aux sites.</span>
+    </div>
+  </div>
+
+  <div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+
+    <!-- ================= BARRE HAUTE ================= -->
+    <header style="height: 52px; flex: none; border-bottom: 1px solid var(--border); background: var(--surface); display: flex; align-items: center; gap: 14px; padding: 0 16px">
+      <span style="font-family: var(--display); font-weight: 700; font-size: 15px; letter-spacing: -0.02em">Prospeo</span>
+      <span style="color: var(--faint); font-size: 12px">Nantes &middot; plomberie &amp; serrurerie</span>
+      <div style="flex: 1"></div>
+      <div class="tip">
+        <span class="badge b-amber"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3c3 4 5 6 5 9a5 5 0 0 1-10 0c0-1.6.8-3 2-4.4.3 1.6 1 2.4 2 2.4 1.2 0 1.6-1.2 1-7z"/></svg><span class="num">6</span> jours</span>
+        <span class="tipBody" style="left: auto; right: 0; transform: none"><span class="tipK">Série en cours</span>6 jours d'affilée avec au moins une relance tenue.</span>
+      </div>
+      <div style="width: 30px; height: 30px; border-radius: 999px; background: var(--surface3); border: 1px solid var(--border2); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: var(--muted)">LB</div>
+    </header>
+
+    <div style="flex: 1; min-height: 0; display: flex">
+
+      <!-- ================= COLONNE LISTE ================= -->
+      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; padding: 18px 20px 0">
+
+        <!-- titre + une seule action primaire -->
+        <div style="display: flex; align-items: flex-start; gap: 14px">
+          <div style="flex: 1; min-width: 0">
+            <h1 style="font-size: 22px">Campagne de prospection</h1>
+            <p style="margin: 4px 0 0; color: var(--muted); font-size: 12px">Les 20 prospects les mieux notés que personne n'a encore touchés. Un site, un mail, un envoi &mdash; dans cet ordre.</p>
+          </div>
+          <button class="btn" style="flex: none">Déployer la sélection <span class="num">(1)</span></button>
+          <button class="btn btn-p" style="flex: none">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            Lancer une campagne de <span class="num">10</span>
+          </button>
+        </div>
+
+        <!-- ================= BANDE DE CONDITIONS =================
+             Les deux faits dont dépendent les boutons ci-dessus, posés juste
+             sous eux. Un bouton « Déployer » alors que le worker est mort
+             annoncerait un fait qu'aucun code ne peut rendre vrai. -->
+        <div style="display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 8px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 11px">
+          <div class="tip">
+            <span class="badge b-mint"><span class="dot"></span>Collector à l'écoute</span>
+            <span class="tipBody"><span class="tipK">Ce qui exécute</span>Le dashboard n'appelle ni GitHub ni Vercel : il dépose une demande en base, que le collector draine. Dernier signe de vie il y a 2 s.</span>
+          </div>
+          <div class="tip">
+            <span class="badge b-mint"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 8l9 6 9-6"/></svg>leo.bello@gmail.com</span>
+            <span class="tipBody"><span class="tipK">Compte expéditeur</span>Les mails partent de cette boîte, avec sa signature ; les réponses y arrivent. Jeton d'envoi valide encore 47 min.</span>
+          </div>
+          <span style="color: var(--border2)">|</span>
+          <span style="font-size: 11.5px; color: var(--muted)"><span class="num">3</span> envois aujourd'hui sur <span class="num">500</span></span>
+
+          <div style="flex: 1"></div>
+
+          <!-- l'interrupteur qui rouvre D6, avec le mot à côté de la couleur -->
+          <div class="tip">
+            <span style="display: inline-flex; align-items: center; gap: 8px">
+              <span class="sw"><i></i></span>
+              <span style="font-size: 12px; color: var(--muted)">Envoi automatique &middot; <span style="color: var(--text); font-weight: 600">inactif</span></span>
+            </span>
+            <span class="tipBody" style="left: auto; right: 0; transform: none"><span class="tipK">Ce que l'activation change</span>Aujourd'hui : la campagne déploie et rédige seule, puis s'arrête ; chaque mail est relu avant de partir. Activé : les mails partent sans relecture, espacés de 90 s, tant que cet écran reste ouvert.</span>
+          </div>
+        </div>
+
+        <!-- ================= BANDE DE CAMPAGNE ================= -->
+        <div style="display: flex; align-items: center; gap: 18px; margin-top: 11px; padding: 12px 16px; background: var(--surface); border: 1px solid rgba(109,146,255,0.25); border-radius: 13px">
+
+          <!-- l'anneau : la bande de progression ne va jamais sans lui -->
+          <div style="position: relative; width: 52px; height: 52px; flex: none">
+            <svg width="52" height="52" viewBox="0 0 52 52">
+              <circle cx="26" cy="26" r="22" fill="none" stroke="#232936" stroke-width="5"/>
+              <circle cx="26" cy="26" r="22" fill="none" stroke="var(--blue)" stroke-width="5" stroke-linecap="round"
+                      stroke-dasharray="55.3 138.2" transform="rotate(-90 26 26)"/>
+            </svg>
+            <div style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; flex-direction: column">
+              <span class="num" style="font-size: 15px; font-weight: 700; line-height: 1">4</span>
+              <span class="num" style="font-size: 9.5px; color: var(--faint); line-height: 1.1">/10</span>
+            </div>
+          </div>
+
+          <div style="min-width: 0">
+            <div style="font-size: 13.5px; font-weight: 600">Campagne du 3 septembre</div>
+            <div style="font-size: 11.5px; color: var(--muted)">Lancée à <span class="num">13 h 48</span> &middot; 10 prospects &middot; relecture avant chaque envoi</div>
+          </div>
+
+          <div style="width: 1px; height: 34px; background: var(--border)"></div>
+
+          <!-- quatre chiffres, aucun décoratif -->
+          <div style="display: flex; gap: 22px">
+            <div><div class="num" style="font-size: 17px; font-weight: 700; line-height: 1.15">3</div><div style="font-size: 10.5px; color: var(--muted)">sites en ligne</div></div>
+            <div><div class="num" style="font-size: 17px; font-weight: 700; line-height: 1.15">2</div><div style="font-size: 10.5px; color: var(--muted)">mails rédigés</div></div>
+            <div><div class="num" style="font-size: 17px; font-weight: 700; line-height: 1.15; color: var(--mint)">1</div><div style="font-size: 10.5px; color: var(--muted)">envoyé</div></div>
+            <div><div class="num" style="font-size: 17px; font-weight: 700; line-height: 1.15; color: var(--rose)">1</div><div style="font-size: 10.5px; color: var(--muted)">en échec</div></div>
+          </div>
+
+          <div style="flex: 1"></div>
+
+          <div style="text-align: right">
+            <div class="tip" style="display: block">
+              <div style="font-size: 11.5px; color: var(--muted)">~<span class="num">9 min</span> restantes</div>
+              <span class="tipBody" style="left: auto; right: 0; transform: none"><span class="tipK">D'où vient cette estimation</span>La durée moyenne des 4 prospects déjà traités dans cette campagne, multipliée par les 6 restants. Avant le premier, rien n'est affiché plutôt qu'une durée devinée.</span>
+            </div>
+            <div class="num" style="font-size: 11.5px; color: var(--faint)">0,38 &euro; dépensés</div>
+          </div>
+          <button class="btn" style="flex: none">Suspendre</button>
+        </div>
+
+        <!-- ================= EN-TÊTES DE COLONNES ================= -->
+        <div class="colhead" style="display: flex; align-items: center; gap: 14px; padding: 15px 14px 8px; border-bottom: 1px solid var(--border)">
+          <span class="cell" style="width: 16px"></span>
+          <span style="flex: 1; min-width: 0">Prospect</span>
+          <span class="cell" style="width: 152px">Site &middot; Mail &middot; Envoi</span>
+          <span class="cell" style="width: 186px">État</span>
+          <span class="cell" style="width: 96px">&nbsp;</span>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 1px; padding-top: 5px; overflow: hidden">
+
+          <!-- 1 — build en cours : la seule ligne animée.
+               L'adresse du destinataire ne figure PAS dans la ligne : le
+               troisième segment et le badge disent déjà s'il y en a une, et
+               l'y répéter tronquait une adresse sur deux sans rien ajouter. -->
+          <div class="row" style="background: rgba(109,146,255,0.06); border-color: rgba(109,146,255,0.22)">
+            <span class="cell" style="width: 16px; height: 16px; border: 1px solid var(--border2); border-radius: 5px"></span>
+            <div style="flex: 1; min-width: 0">
+              <div style="display: flex; align-items: center; gap: 7px">
+                <span class="ell" style="font-size: 13px; font-weight: 500">Aquatech Nantes</span>
+                <span class="badge b-mute" style="height: 18px; font-size: 10px; flex: none">Aucune présence</span>
+              </div>
+              <div class="ell" style="font-size: 11px; color: var(--muted)">Plombier &middot; Nantes centre &middot; score <span class="num">86</span></div>
+            </div>
+            <div class="cell" style="width: 152px"><div class="track"><span class="seg seg-run"></span><span class="seg"></span><span class="seg"></span></div></div>
+            <div class="cell" style="width: 186px; display: flex; align-items: center; gap: 8px">
+              <span class="badge b-blue"><span class="dot"></span>Build Vercel</span>
+              <span class="num" style="font-size: 11px; color: var(--faint)">0 m 24</span>
+            </div>
+            <div class="cell" style="width: 96px; display: flex; justify-content: flex-end"><button class="btn btn-s">Détail</button></div>
+          </div>
+
+          <!-- 2 — mail à relire, ligne sélectionnée : le panneau de droite la montre -->
+          <div class="row" style="background: var(--surface2); border-color: var(--border2)">
+            <span class="cell" style="width: 16px; height: 16px; border: 1px solid var(--border2); border-radius: 5px"></span>
+            <div style="flex: 1; min-width: 0">
+              <div style="display: flex; align-items: center; gap: 7px">
+                <span class="ell" style="font-size: 13px; font-weight: 500">Nantes Chauffe-Eau</span>
+                <span class="badge b-rose" style="height: 18px; font-size: 10px; flex: none">Site en panne</span>
+              </div>
+              <div class="ell" style="font-size: 11px; color: var(--muted)">Plombier &middot; Rezé &middot; score <span class="num">75</span></div>
+            </div>
+            <div class="cell" style="width: 152px"><div class="track"><span class="seg seg-ok"></span><span class="seg seg-ok"></span><span class="seg"></span></div></div>
+            <div class="cell" style="width: 186px"><span class="badge b-blue"><span class="dot"></span>Mail à relire</span></div>
+            <div class="cell" style="width: 96px; display: flex; justify-content: flex-end"><button class="btn btn-s btn-p">Relire</button></div>
+          </div>
+
+          <!-- 3 — envoyé -->
+          <div class="row">
+            <span class="cell" style="width: 16px; height: 16px; border: 1px solid var(--border2); border-radius: 5px"></span>
+            <div style="flex: 1; min-width: 0">
+              <div style="display: flex; align-items: center; gap: 7px">
+                <span class="ell" style="font-size: 13px; font-weight: 500">Souleymane Dosso &mdash; DOS Services</span>
+                <span class="badge b-rose" style="height: 18px; font-size: 10px; flex: none">Site en panne</span>
+              </div>
+              <div class="ell" style="font-size: 11px; color: var(--muted)">Plombier &middot; Nantes nord &middot; score <span class="num">95</span></div>
+            </div>
+            <div class="cell" style="width: 152px"><div class="track"><span class="seg seg-ok"></span><span class="seg seg-ok"></span><span class="seg seg-ok"></span></div></div>
+            <div class="cell" style="width: 186px"><span class="badge b-mint"><span class="dot"></span>Envoyé à <span class="num">14 h 02</span></span></div>
+            <div class="cell" style="width: 96px; display: flex; justify-content: flex-end"><button class="btn btn-s">Voir</button></div>
+          </div>
+
+          <!-- 4 — échec : la cause est DANS la ligne, pas derrière un journal -->
+          <div class="row" style="background: rgba(255,122,133,0.05); border-color: rgba(255,122,133,0.22)">
+            <span class="cell" style="width: 16px; height: 16px; border: 1px solid var(--border2); border-radius: 5px"></span>
+            <div style="flex: 1; min-width: 0">
+              <div style="display: flex; align-items: center; gap: 7px">
+                <span class="ell" style="font-size: 13px; font-weight: 500">Chauffage Bellevue</span>
+                <span class="badge b-mute" style="height: 18px; font-size: 10px; flex: none">Réseaux seuls</span>
+              </div>
+              <div class="ell" style="font-size: 11px; color: var(--rose)">Dépôt : le nom &laquo; chauffage-bellevue &raquo; est déjà pris</div>
+            </div>
+            <div class="cell" style="width: 152px"><div class="track"><span class="seg seg-fail"></span><span class="seg"></span><span class="seg"></span></div></div>
+            <div class="cell" style="width: 186px"><span class="badge b-rose"><span class="dot"></span>Dépôt en échec</span></div>
+            <div class="cell" style="width: 96px; display: flex; justify-content: flex-end"><button class="btn btn-s">Rejouer</button></div>
+          </div>
+
+          <!-- 5 — prêt, mais espacé : le garde-fou de rythme se voit -->
+          <div class="row">
+            <span class="cell" style="width: 16px; height: 16px; border: 1px solid var(--border2); border-radius: 5px"></span>
+            <div style="flex: 1; min-width: 0">
+              <div style="display: flex; align-items: center; gap: 7px">
+                <span class="ell" style="font-size: 13px; font-weight: 500">Aquatio &mdash; Vincent Combe</span>
+                <span class="badge b-rose" style="height: 18px; font-size: 10px; flex: none">Site en panne</span>
+              </div>
+              <div class="ell" style="font-size: 11px; color: var(--muted)">Plombier &middot; Saint-Herblain &middot; score <span class="num">60</span></div>
+            </div>
+            <div class="cell" style="width: 152px"><div class="track"><span class="seg seg-ok"></span><span class="seg seg-ok"></span><span class="seg seg-run"></span></div></div>
+            <div class="cell" style="width: 186px">
+              <div class="tip">
+                <span class="badge b-blue"><span class="dot"></span>Envoi dans <span class="num">42 s</span></span>
+                <span class="tipBody"><span class="tipK">Pourquoi cette attente</span>Dix mails en rafale depuis une boîte neuve se lisent comme du spam et brûlent sa réputation. Les envois sont espacés de 90 s.</span>
+              </div>
+            </div>
+            <div class="cell" style="width: 96px; display: flex; justify-content: flex-end"><button class="btn btn-s">Envoyer</button></div>
+          </div>
+
+          <!-- 6 — en file : l'état que la file introduit, et qu'il faut nommer -->
+          <div class="row">
+            <span class="cell" style="width: 16px; height: 16px; border: 1px solid var(--border2); border-radius: 5px"></span>
+            <div style="flex: 1; min-width: 0">
+              <div style="display: flex; align-items: center; gap: 7px">
+                <span class="ell" style="font-size: 13px; font-weight: 500">Serrurier Express 44</span>
+                <span class="badge b-mute" style="height: 18px; font-size: 10px; flex: none">Annuaire seul</span>
+              </div>
+              <div class="ell" style="font-size: 11px; color: var(--muted)">Serrurier &middot; Saint-Herblain &middot; score <span class="num">79</span></div>
+            </div>
+            <div class="cell" style="width: 152px"><div class="track"><span class="seg"></span><span class="seg"></span><span class="seg"></span></div></div>
+            <div class="cell" style="width: 186px">
+              <div class="tip">
+                <span class="badge b-mute"><span class="dot"></span>En file d'attente &middot; <span class="num">3<sup>e</sup></span></span>
+                <span class="tipBody"><span class="tipK">Demande déposée</span>Le collector traite un prospect à la fois. Celui-ci démarrera dans ~3 min.</span>
+              </div>
+            </div>
+            <div class="cell" style="width: 96px; display: flex; justify-content: flex-end"><button class="btn btn-s">Retirer</button></div>
+          </div>
+
+          <!-- 7 — adresse manquante : une absence, pas un échec -->
+          <div class="row" style="background: rgba(240,180,92,0.05); border-color: rgba(240,180,92,0.22)">
+            <span class="cell" style="width: 16px; height: 16px; border: 1px solid var(--border2); border-radius: 5px"></span>
+            <div style="flex: 1; min-width: 0">
+              <div style="display: flex; align-items: center; gap: 7px">
+                <span class="ell" style="font-size: 13px; font-weight: 500">Plomberie Océane</span>
+                <span class="badge b-mute" style="height: 18px; font-size: 10px; flex: none">Aucune présence</span>
+              </div>
+              <div class="ell" style="font-size: 11px; color: var(--amber)">Le mail est écrit : la collecte n'a trouvé aucune adresse</div>
+            </div>
+            <div class="cell" style="width: 152px"><div class="track"><span class="seg seg-ok"></span><span class="seg seg-ok"></span><span class="seg seg-wait"></span></div></div>
+            <div class="cell" style="width: 186px"><span class="badge b-amber"><span class="dot"></span>Adresse manquante</span></div>
+            <div class="cell" style="width: 96px; display: flex; justify-content: flex-end"><button class="btn btn-s">Saisir</button></div>
+          </div>
+
+          <!-- 8 — jamais déployé, hors campagne, coché pour la sélection -->
+          <div class="row">
+            <span class="cell" style="width: 16px; height: 16px; border-radius: 5px; background: rgba(109,146,255,0.18); border: 1px solid var(--blue); display: flex; align-items: center; justify-content: center">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#a9c2ff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+            </span>
+            <div style="flex: 1; min-width: 0">
+              <div style="display: flex; align-items: center; gap: 7px">
+                <span class="ell" style="font-size: 13px; font-weight: 500">Sanitaire Loire</span>
+                <span class="badge b-mute" style="height: 18px; font-size: 10px; flex: none">Aucune présence</span>
+              </div>
+              <div class="ell" style="font-size: 11px; color: var(--muted)">Plombier &middot; Vertou &middot; score <span class="num">58</span></div>
+            </div>
+            <div class="cell" style="width: 152px"><div class="track"><span class="seg"></span><span class="seg"></span><span class="seg"></span></div></div>
+            <div class="cell" style="width: 186px"><span style="font-size: 11.5px; color: var(--faint)">Jamais déployé</span></div>
+            <div class="cell" style="width: 96px; display: flex; justify-content: flex-end"><button class="btn btn-s">Déployer</button></div>
+          </div>
+
+        </div>
+
+        <!-- L'exclusion se nomme : un prospect jamais scoré n'est pas un
+             prospect à zéro, et le taire le rangerait en bas du tri comme
+             s'il l'était. -->
+        <div style="margin-top: 12px; padding: 9px 13px; border: 1px dashed var(--border2); border-radius: 10px; display: flex; align-items: center; gap: 9px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--faint)" stroke-width="1.8" stroke-linecap="round" style="flex: none"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+          <span style="font-size: 11.5px; color: var(--muted)"><span class="num">3</span> prospects n'ont jamais été scorés : ils ne peuvent pas être classés, et n'apparaissent pas dans ce lot.</span>
+          <a href="#" style="font-size: 11.5px; margin-left: auto; flex: none">Les scorer</a>
+        </div>
+
+      </div>
+
+      <!-- ================= PANNEAU DE RELECTURE ================= -->
+      <aside style="width: 520px; flex: none; border-left: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; overflow: hidden">
+
+        <div style="flex: none; padding: 15px 20px 13px; border-bottom: 1px solid var(--border)">
+          <div style="display: flex; align-items: flex-start; gap: 12px">
+            <div style="flex: 1; min-width: 0">
+              <h2 class="ell" style="font-size: 16px">Nantes Chauffe-Eau</h2>
+              <div class="ell" style="font-size: 11.5px; color: var(--muted); margin-top: 2px">Franck Bernard &middot; Rezé &middot; score <span class="num">75</span></div>
+            </div>
+            <button style="width: 26px; height: 26px; border-radius: 7px; color: var(--faint); display: flex; align-items: center; justify-content: center; flex: none">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div style="flex: 1; min-height: 0; overflow: hidden; padding: 15px 20px 0">
+
+          <!-- Le site : c'est LUI l'argument. Le relire est le vrai contrôle. -->
+          <div style="border: 1px solid rgba(79,209,165,0.28); background: rgba(79,209,165,0.05); border-radius: 11px; padding: 11px 13px; display: flex; align-items: center; gap: 12px">
+            <div style="width: 32px; height: 32px; border-radius: 9px; background: rgba(79,209,165,0.14); color: var(--mint); display: flex; align-items: center; justify-content: center; flex: none">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+            </div>
+            <div style="flex: 1; min-width: 0">
+              <div style="font-size: 12px; font-weight: 600">Le site est en ligne depuis <span class="num">13 h 56</span></div>
+              <div class="ell num" style="font-size: 11.5px; color: var(--muted)">nantes-chauffe-eau.prospeo.app</div>
+            </div>
+            <a href="#" class="btn btn-s" style="flex: none; color: var(--text)">Ouvrir</a>
+          </div>
+
+          <!-- Le destinataire, et D'OÙ il vient : une adresse trouvée par un
+               robot et une adresse saisie par un humain ne sont pas le même
+               fait, et ce qu'on engage en l'utilisant n'est pas le même. -->
+          <div style="margin-top: 13px">
+            <div class="colhead" style="margin-bottom: 6px">Destinataire</div>
+            <div style="display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); background: var(--surface2); border-radius: 10px; padding: 8px 11px">
+              <span class="ell num" style="flex: 1; min-width: 0; font-size: 12px">contact@nantes-chauffe-eau.fr</span>
+              <div class="tip" style="flex: none">
+                <span class="badge b-violet" style="height: 19px; font-size: 10px">Collectée</span>
+                <span class="tipBody" style="left: auto; right: 0; transform: none"><span class="tipK">Origine de l'adresse</span>Relevée sur la page Facebook de l'entreprise le 3 septembre. Une adresse saisie à la main porterait &laquo; Saisie &raquo;, et l'absence des deux se dirait plutôt que de laisser un champ vide.</span>
+              </div>
+              <button class="btn btn-s" style="flex: none">Corriger</button>
+            </div>
+          </div>
+
+          <!-- L'objet et le corps -->
+          <div style="margin-top: 13px">
+            <div class="colhead" style="margin-bottom: 6px">Objet</div>
+            <div class="ell" style="border: 1px solid var(--border); background: var(--surface2); border-radius: 10px; padding: 8px 11px; font-size: 12.5px">
+              Votre site ne répond plus &mdash; en voici un qui fonctionne
+            </div>
+          </div>
+
+          <div style="margin-top: 13px">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px">
+              <span class="colhead">Corps du message</span>
+              <span style="flex: 1"></span>
+              <button class="btn btn-s" style="height: 22px; padding: 0 8px; font-size: 11px">Modifier</button>
+            </div>
+            <!-- Les sauts de ligne sont signifiants, et la ligne isolée qui
+                 porte l'URL est l'argument. Les replier ferait relire autre
+                 chose que ce qui partira. -->
+            <div style="border: 1px solid var(--border); background: var(--surface2); border-radius: 10px; padding: 11px 13px; font-size: 12.5px; line-height: 1.55; white-space: pre-wrap; font-family: var(--ui)">Bonjour,
+
+J'ai vu que le site de Nantes Chauffe-Eau ne répondait plus. J'en ai construit un, et il est déjà en ligne :
+
+<span class="num" style="color: var(--blue)">https://nantes-chauffe-eau.prospeo.app</span>
+
+Il reprend ce que vos clients cherchent en premier : votre téléphone, votre zone d'intervention à Rezé, et vos <span class="num">4,6</span>/5 sur <span class="num">38</span> avis Google.
+
+Regardez-le, et dites-moi s'il vous convient.
+
+Léo</div>
+            <!-- La traçabilité, comme sur la fiche prospect : un texte relu
+                 dans six mois doit dire sous quelles consignes il a été écrit. -->
+            <p style="margin: 7px 0 0; font-size: 11px; color: var(--faint)">Rédigé par <span class="num">claude-opus-5</span> &middot; consignes <span class="num">v3</span> &middot; 3 septembre, <span class="num">13 h 58</span></p>
+            <div class="tip" style="margin-top: 5px">
+              <span style="font-size: 11px; color: var(--muted); border-bottom: 1px dashed var(--border2)">Chaque chiffre de ce texte vient de la base</span>
+              <span class="tipBody"><span class="tipK">Aucun fait inventé</span>Note et nombre d'avis viennent de l'enrichissement Google, la ville de la fiche entreprise. Le modèle ne reçoit que des faits vérifiés, et il lui est interdit d'en ajouter.</span>
+            </div>
+          </div>
+
+          <!-- Le SMS existe : `pitch` en rédige un en même temps. Le taire
+               laisserait croire qu'il n'y en a pas ; l'afficher avec un
+               bouton « Envoyer » mentirait, faute de passerelle. -->
+          <div style="margin-top: 14px; padding: 10px 12px; border: 1px dashed var(--border2); border-radius: 10px; display: flex; align-items: center; gap: 10px">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--faint)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z"/></svg>
+            <span style="flex: 1; min-width: 0; font-size: 11.5px; color: var(--muted)">Un SMS a aussi été rédigé (<span class="num">2</span> segments). Il ne part pas d'ici : aucune passerelle n'est branchée.</span>
+            <button class="btn btn-s" style="flex: none">Copier</button>
+          </div>
+        </div>
+
+        <!-- Le pied : l'envoi, et ce qu'il engage, dit avant le clic -->
+        <div style="flex: none; border-top: 1px solid var(--border); padding: 11px 20px; background: var(--surface)">
+          <p style="margin: 0 0 4px; font-size: 11px; color: var(--faint)">Le mail partira de <span class="num">leo.bello@gmail.com</span>. Les réponses arriveront dans cette boîte.</p>
+          <p style="margin: 0 0 9px; font-size: 11px; color: var(--faint)">À l'envoi, le prospect passe en &laquo; contacté &raquo; et l'échange rejoint son historique.</p>
+          <div style="display: flex; align-items: center; gap: 8px">
+            <button class="btn btn-p" style="flex: 1">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l16-8-6 16-2-6-8-2z"/></svg>
+              Envoyer
+            </button>
+            <button class="btn" style="flex: none">Régénérer</button>
+            <div class="tip" style="flex: none">
+              <button class="btn" style="color: #ffa8b0; border-color: rgba(255,122,133,0.35)">Ne pas contacter</button>
+              <span class="tipBody" style="left: auto; right: 0; transform: none"><span class="tipK">Immédiat et définitif</span>Le prospect sort de toutes les listes, et son site est dépublié sans délai.</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+    </div>
+  </div>
+</div>
+
+</x-dc>
+</body>
+</html>
