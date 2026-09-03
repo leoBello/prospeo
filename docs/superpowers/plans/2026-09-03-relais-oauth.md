@@ -408,8 +408,8 @@ Remplacer tout le fichier par :
 
 ```typescript
 import { describe, expect, it, vi } from 'vitest';
-import { chiffrer, lireCleMaitresse, type CoffreDeps } from '@prospeo/coffre';
-import { jetonDe } from './coffre.js';
+import { chiffrer, lireCleMaitresse } from '@prospeo/coffre';
+import { jetonDe, type CoffreDeps } from './coffre.js';
 import { proprietaire } from './proprietaire.js';
 
 /** Trente-deux octets, la taille exacte d'une clé AES-256. */
