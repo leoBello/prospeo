@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { lireCleMaitresse, type CleMaitresse } from './coffre.js';
 
 const schema = z.object({
   SUPABASE_URL: z.string().url(),
@@ -140,4 +141,18 @@ export function loadDeployConfig(env: Record<string, string | undefined>): Deplo
     vercelToken: v['VERCEL_TOKEN'] as string,
     vercelTeamId: lire(env, 'PROSPEO_VERCEL_TEAM'),
   };
+}
+
+export interface CoffreConfig {
+  cle: CleMaitresse;
+}
+
+/**
+ * `lireCleMaitresse` valide déjà le format et se nomme déjà en échouant
+ * (voir `coffre.ts`) : `exiger` ferait double emploi, ce loader ne fait donc
+ * que la brancher sur l'environnement — même rôle que les autres, forme
+ * légèrement différente parce que la validation vit ailleurs.
+ */
+export function loadCoffreConfig(env: Record<string, string | undefined>): CoffreConfig {
+  return { cle: lireCleMaitresse(lire(env, 'PROSPEO_COFFRE_CLE')) };
 }

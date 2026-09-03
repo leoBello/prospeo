@@ -676,6 +676,79 @@ que déplacer le risque.
 l'application, pas après. **Après toute migration suivie de `db:types`, le
 typecheck se revérifie** avant d'annoncer quoi que ce soit.
 
+## Chantier n°8, étape 2 — le coffre à jetons : ce qu'il protège, et ce qu'il ne protège pas
+
+**Appliqué à l'instance le 3 septembre 2026.** Spec :
+[`2026-09-03-coffre-jetons-design.md`](../superpowers/specs/2026-09-03-coffre-jetons-design.md).
+Plan : [`2026-09-03-coffre-jetons.md`](../superpowers/plans/2026-09-03-coffre-jetons.md).
+Ne pas lire ce tableau comme clos.
+
+### Ce qui est protégé, et prouvé contre l'instance réelle
+
+`connexion_plateforme` (état, lisible par son propriétaire — lecture SEULE,
+jamais écrite depuis le dashboard) et `connexion_secret` (le triplet chiffré
+AES-256-GCM, RLS activée, **aucune politique**) existent
+(`supabase/migrations/20260905090000_coffre_jetons.sql`). Le chiffrement vit
+dans `apps/collector/src/coffre.ts` (`chiffrer`, `dechiffrer`, `jetonDe`,
+`lireCleMaitresse`) : module pur, sans base ni réseau, dont la clé maîtresse
+vient de l'environnement du collector (`PROSPEO_COFFRE_CLE`) et **jamais** de
+la base — une copie complète de la base ne vaut donc rien sans cette clé.
+
+**Prouvé de bout en bout, contre l'instance réelle, pas seulement en test
+unitaire :**
+
+- un secret réel, chiffré puis écrit avec `service_role`, se relit identique
+  via `jetonDe` avec la même clé ;
+- un octet altéré dans `chiffre` fait échouer le déchiffrement et **marque la
+  connexion `indechiffrable` en base**, avant que `jetonDe` ne rende son
+  échec — jamais un silence ;
+- en session témoin, clé publique : `connexion_plateforme` se lit (c'est un
+  fait qu'un écran doit pouvoir montrer), mais `connexion_secret` reste
+  **invisible même pour son propre propriétaire**, alors que la ligne existe
+  et lui appartient — c'est la preuve qui compte, une politique manquante ne
+  lève pas, elle rend zéro ligne, et seule une écriture préalable la rend
+  probante. Le contrôle vit dans `scripts/verifier-cloisonnement.mjs`.
+
+**Une politique corrigée en relecture, avant application, comme
+`site_template` à l'étape 1.** Le SQL transcrit initialement donnait à
+`connexion_plateforme` une politique `for all`, par imitation de
+`prospect`/`campaign`. Le spec (V5) est explicite : le dashboard n'écrit
+JAMAIS cette table, les connexions arrivent par les rappels OAuth traités
+côté collector. Une politique `for all` aurait laissé un utilisateur
+s'auto-déclarer connecté sans jamais passer par l'échange OAuth —
+l'affordance que la doctrine interdit. Corrigée en `for select` avant
+application, dans le SQL et dans le plan.
+
+### Ce qui n'est PAS encore construit, et c'est le point important
+
+**Rien n'écrit encore de vrai jeton.** Aucune GitHub App, aucune intégration
+Vercel, aucun rappel OAuth n'existe : la ligne du témoin dans
+`connexion_secret` est une fixture de contrôle (`chiffre`/`vecteur`/
+`etiquette` valant `\x00`), pas une vraie connexion. Recevoir un rappel OAuth
+suppose un serveur HTTP que le collector n'a pas — c'est le premier endroit
+du projet où « pas de backend applicatif » devient contraignant, à trancher à
+l'étape 3, pas avant.
+
+**`loadCoffreConfig` (`apps/collector/src/config.ts`) n'est appelé nulle
+part.** Décision délibérée de la Tâche 3 : aucune commande de `cli.ts` ne
+manipule encore de jeton, l'exiger partout casserait `discover`, `enrich`,
+`probe` et `score` pour un coffre dont ils n'ont pas besoin. `cli.ts` sera le
+premier endroit qui assemble un `CoffreDeps` réel à partir d'un client
+`service_role`, le jour où une commande en a besoin.
+
+**Aucun processus de péremption n'existe.** `jetonDe` peut lire le jeton
+d'un utilisateur absent depuis des mois (critère de succès n°5 du spec,
+prouvé par construction — `jetonDe` ne dépend d'aucune fraîcheur de
+connexion), mais rien ne l'appelle en continu : ni où ce processus doit
+tourner, ni sous quel ordonnanceur n'est tranché (§7 du spec).
+
+**Aucun écran ne montre les connexions.** Le critère de succès n°3 du spec
+(« l'utilisateur voit quels comptes sont connectés ») est **délibérément
+reporté à l'étape 3** — sans intégration réelle, un tel écran ne pourrait
+dire que « aucun compte », sans aucun moyen d'y changer quoi que ce soit. La
+doctrine du dépôt interdit de plus un composant important sans maquette
+approuvée ; aucune maquette n'existe encore pour cet écran.
+
 ## La question ouverte du lot 3
 
 `prospect_pipeline` ne porte que `status` et `updated_at`. Savoir qu'une
