@@ -14,6 +14,7 @@ import {
   loadPitchConfig,
   loadPublishConfig,
 } from './config.js';
+import type { Proprietaire } from './proprietaire.js';
 import { gabaritDefautPourPublication, lireGabaritActif } from './site-template.js';
 import { createClient, PAGE_SIZE } from './supabase.js';
 import { createPitchRedacteur, createRedacteur } from './sources/anthropic.js';
@@ -87,6 +88,9 @@ export function construireDepsPublication(
       } satisfies EtatSite;
     },
     async enregistrer(prospectId, etat) {
+      // `prospectId` vient de `opts.rows`, c'est-a-dire de `fetchSiteRows`,
+      // qui filtre sur le proprietaire. Un `upsert` ne se filtre pas sur une
+      // relation embarquee : c'est la provenance qui cloisonne.
       const { error } = await client.from('prospect_site').upsert({
         prospect_id: prospectId,
         repo_full_name: etat.repoFullName,
@@ -113,6 +117,8 @@ export function construireDepsDeploiement(
     vercel: opts.vercel,
     events: createEventSink(client),
     async enregistrerProjet(prospectId, vercelProjectId) {
+      // Meme provenance que `enregistrer` ci-dessus : l'identifiant sort
+      // d'une lecture filtree, jamais d'une entree libre.
       const { error } = await client
         .from('prospect_site')
         .update({ vercel_project_id: vercelProjectId, updated_at: new Date().toISOString() })
@@ -120,6 +126,7 @@ export function construireDepsDeploiement(
       if (error) throw new Error(error.message);
     },
     async enregistrerUrl(prospectId, url) {
+      // Meme provenance que `enregistrer` ci-dessus.
       const { error } = await client
         .from('prospect_site')
         .update({ deployment_url: url, updated_at: new Date().toISOString() })
@@ -300,6 +307,7 @@ export async function traiterProspect(
  */
 export async function fetchSiteCandidates(
   client: ReturnType<typeof createClient>,
+  proprietaire: Proprietaire,
   tradeSlug: string | undefined,
 ): Promise<{ id: string; faits: SiteFacts; total: number }[]> {
   const lignes: { id: string; faits: SiteFacts; total: number }[] = [];
@@ -310,6 +318,10 @@ export async function fetchSiteCandidates(
       .select(
         'id, siret, denomination, denomination_usuelle, trade_slug, address, postal_code, city, date_creation, latitude, longitude, is_closed, prospect_enrichment(status, matched_name, phone_e164, rating, maps_url), web_presence(category), prospect_score(total)',
       )
+      // LE cloisonnement du worker. `service_role` contourne RLS : sans
+      // cette ligne, la chaine redigerait et publierait au nom d'entreprises
+      // visees par un autre client.
+      .eq('owner_id', proprietaire)
       .order('id')
       .range(from, from + PAGE_SIZE - 1);
     if (tradeSlug !== undefined) query = query.eq('trade_slug', tradeSlug);
@@ -380,6 +392,7 @@ export async function fetchSiteCandidates(
  */
 export async function fetchPitchCandidates(
   client: ReturnType<typeof createClient>,
+  proprietaire: Proprietaire,
 ): Promise<{ id: string; faits: PitchFacts; total: number }[]> {
   const lignes: { id: string; faits: PitchFacts; total: number }[] = [];
 
@@ -389,6 +402,9 @@ export async function fetchPitchCandidates(
       .select(
         'id, siret, denomination, denomination_usuelle, trade_slug, address, postal_code, city, date_creation, is_closed, prospect_enrichment(status, matched_name, phone_e164, rating, maps_url), web_presence(category, domain_free_name), prospect_score(total), prospect_pipeline(status), prospect_site(deployment_url, unpublished_at)',
       )
+      // Meme raison que ci-dessus : le message de vente part au nom de
+      // l'editeur, vers une entreprise que SEUL son proprietaire a ciblee.
+      .eq('owner_id', proprietaire)
       .order('id')
       .range(from, from + PAGE_SIZE - 1);
     if (error) throw new Error(error.message);
@@ -452,7 +468,10 @@ export async function fetchPitchCandidates(
 }
 
 /** L'état de site déjà enregistré, par prospect. */
-export async function fetchSiteRows(client: ReturnType<typeof createClient>) {
+export async function fetchSiteRows(
+  client: ReturnType<typeof createClient>,
+  proprietaire: Proprietaire,
+) {
   const rows: Record<string, {
     content: unknown;
     repo_full_name: string | null;
@@ -468,8 +487,14 @@ export async function fetchSiteRows(client: ReturnType<typeof createClient>) {
     const { data, error } = await client
       .from('prospect_site')
       .select(
-        'prospect_id, content, repo_full_name, repo_url, content_hash, content_rejected_at, published_at, unpublished_at, vercel_project_id, deployment_url',
+        'prospect_id, content, repo_full_name, repo_url, content_hash, content_rejected_at, published_at, unpublished_at, vercel_project_id, deployment_url, prospect!inner()',
       )
+      // `!inner` N'EST PAS COSMETIQUE. Sans lui, PostgREST ne restreint pas
+      // les lignes de `prospect_site` : il vide seulement la relation
+      // embarquee et rend TOUTES les lignes, avec `prospect: null`. Verifie
+      // contre l'instance le 3 septembre 2026 — sans `!inner`, 2 lignes sur 2
+      // pour un proprietaire etranger ; avec, 0.
+      .eq('prospect.owner_id', proprietaire)
       .order('prospect_id')
       .range(from, from + PAGE_SIZE - 1);
     if (error) throw new Error(error.message);
@@ -519,11 +544,14 @@ export async function attendreUrl(
  * donc nul jusqu'à ce qu'une table de prix existe, et le total d'une
  * campagne s'annoncera partiel (lot 6).
  */
-export function chaineDeps(client: SupabaseClient<Database>): ChaineDeps {
+export function chaineDeps(
+  client: SupabaseClient<Database>,
+  proprietaire: Proprietaire,
+): ChaineDeps {
   return {
     async generer(prospectId) {
       const genConfig = loadGenerateConfig(process.env);
-      const candidats = await fetchSiteCandidates(client, undefined);
+      const candidats = await fetchSiteCandidates(client, proprietaire, undefined);
       const cible = candidats.find((c) => c.id === prospectId);
       if (cible === undefined) {
         // LÈVE, et ne se tait plus. Ce `return null` silencieux laissait la
@@ -545,7 +573,10 @@ export function chaineDeps(client: SupabaseClient<Database>): ChaineDeps {
         );
       }
 
-      const rows = await fetchSiteRows(client);
+      // Filtree par proprietaire, comme la lecture des candidats juste
+      // au-dessus : un prospect d'un autre client n'y figure pas, la ligne
+      // ressort `undefined` et l'ecriture plus bas n'a jamais lieu.
+      const rows = await fetchSiteRows(client, proprietaire);
       const decision = decideGeneration(rows[prospectId]);
       // `deja_fait` : un contenu est déjà écrit et n'a pas été rejeté à la
       // relecture. Un rejeu ne doit pas repayer un appel au modèle — c'est le
@@ -569,6 +600,11 @@ export function chaineDeps(client: SupabaseClient<Database>): ChaineDeps {
       }
 
       for (const { contenu } of resultat.contenus) {
+        // `prospect_id` vient de `fetchSiteCandidates`, filtree ci-dessus :
+        // un prospect etranger n'arrive jamais jusqu'ici. PostgREST ne sait
+        // pas filtrer un `upsert` sur une relation embarquee — c'est la
+        // provenance de l'identifiant qui porte le cloisonnement, et c'est
+        // pourquoi TOUTES les lectures qui en produisent sont filtrees.
         const { error } = await client.from('prospect_site').upsert({
           prospect_id: prospectId,
           content: contenu as unknown as Json,
@@ -587,7 +623,7 @@ export function chaineDeps(client: SupabaseClient<Database>): ChaineDeps {
 
     async publier(prospectId) {
       const pubConfig = loadPublishConfig(process.env);
-      const rows = await fetchSiteRows(client);
+      const rows = await fetchSiteRows(client, proprietaire);
       const ligne = rows[prospectId];
       if (ligne === undefined || ligne.content == null) {
         throw new Error('aucun contenu à publier — la rédaction n’a rien écrit');
@@ -638,7 +674,7 @@ export function chaineDeps(client: SupabaseClient<Database>): ChaineDeps {
         token: depConfig.vercelToken,
         teamId: depConfig.vercelTeamId,
       });
-      const rows = await fetchSiteRows(client);
+      const rows = await fetchSiteRows(client, proprietaire);
       const ligne = rows[prospectId];
       if (ligne === undefined || ligne.repo_full_name === null) {
         throw new Error('aucun dépôt à déployer');
@@ -679,7 +715,7 @@ export function chaineDeps(client: SupabaseClient<Database>): ChaineDeps {
 
     async rediger(prospectId) {
       const pitchConfig = loadPitchConfig(process.env);
-      const candidats = await fetchPitchCandidates(client);
+      const candidats = await fetchPitchCandidates(client, proprietaire);
       const cible = candidats.find((c) => c.id === prospectId);
       // Non joignable (ni téléphone ni site déployé) : rien à rédiger, et ce
       // n'est pas un échec de la chaîne. L'écran le dira par son troisième
@@ -691,7 +727,11 @@ export function chaineDeps(client: SupabaseClient<Database>): ChaineDeps {
       // dont on a besoin ici.
       const { data: messagesExistants, error: lectureError } = await client
         .from('generated_message')
-        .select('prospect_id')
+        .select('prospect_id, prospect!inner()')
+        // Redondant avec `fetchPitchCandidates` ci-dessus, et garde quand
+        // meme : c'est une lecture, elle porte donc son filtre. Un jour ou
+        // la garde du dessus bougerait, celle-ci tiendrait encore.
+        .eq('prospect.owner_id', proprietaire)
         .eq('prospect_id', prospectId)
         .limit(1);
       if (lectureError) throw new Error(lectureError.message);
@@ -725,6 +765,7 @@ export function chaineDeps(client: SupabaseClient<Database>): ChaineDeps {
       }
 
       for (const m of resultat.messages) {
+        // `m.prospectId` vient de `fetchPitchCandidates`, filtree plus haut.
         const { error } = await client.from('generated_message').insert({
           prospect_id: m.prospectId,
           channel: m.canal,

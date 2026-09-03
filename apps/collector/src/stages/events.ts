@@ -33,6 +33,11 @@ export function createEventSink(client: SupabaseClient<Database>): EventSink {
   return {
     async emit(e: DeploymentEvent): Promise<void> {
       try {
+        // Aucun filtre a poser : `e.prospectId` vient de l'etage qui
+        // journalise, dont le lot est issu d'une lecture filtree sur le
+        // proprietaire. Un `insert` ne se filtre pas sur une relation
+        // embarquee, et un parametre `Proprietaire` inutilise annoncerait
+        // ici un cloisonnement que cette ligne ne fait pas.
         const { error } = await client.from('deployment_event').insert({
           prospect_id: e.prospectId,
           step: e.step,

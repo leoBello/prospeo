@@ -4,7 +4,7 @@
 
 **Goal:** Qu'un utilisateur ne voie, ne lise et n'écrive que ses propres données — et qu'un second compte le prouve, table par table.
 
-**Architecture :** `prospect`, `campaign` et `campaign_job` portent le propriétaire ; les onze satellites le déduisent par une remontée indexée. Les politiques RLS protègent le dashboard. **Elles ne protègent pas le collector**, qui emploie `service_role` : ses 40 lectures reçoivent un propriétaire obligatoire.
+**Architecture :** `prospect`, `campaign` et `campaign_job` portent le propriétaire ; les onze satellites le déduisent par une remontée indexée. Les politiques RLS protègent le dashboard. **Elles ne protègent pas le collector**, qui emploie `service_role` : ses 42 lectures reçoivent un propriétaire obligatoire.
 
 **Tech Stack :** Postgres/Supabase (migrations SQL, RLS), Node + tsx (collector), React 18 + TypeScript (dashboard), Vitest.
 
@@ -408,7 +408,7 @@ export function proprietaire(brut: string | undefined): Proprietaire {
 
 Casser à tour de rôle : retirer la garde sur `undefined`, puis celle sur le format. Chaque cassure doit faire rougir son test. Coller les sorties.
 
-- [ ] **Étape 5 : Reprendre les 40 lectures**
+- [ ] **Étape 5 : Reprendre les 42 lectures**
 
 Le recensement, à refaire pour partir de la réalité et non de ce plan :
 
@@ -416,7 +416,7 @@ Le recensement, à refaire pour partir de la réalité et non de ce plan :
 grep -rn "\.from('" apps/collector/src --include=*.ts | grep -v test
 ```
 
-**42 appels, dont 40 à filtrer.** `site_template` et `worker_heartbeat` en sont exclus (C4) — ce sont des objets de l'application.
+**44 appels, dont 42 à filtrer.** `site_template` et `worker_heartbeat` en sont exclus (C4) — ce sont des objets de l'application.
 
 Le patron, partout le même : la fonction prend un `Proprietaire` en **premier paramètre après le client**, obligatoire, et le filtre s'applique là où le propriétaire est atteignable :
 

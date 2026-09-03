@@ -175,7 +175,7 @@ C'est la moitié du travail, et elle est invisible depuis la base.
 
 **Recensement fait, et il est plus lourd que prévu.**
 `grep -rn "\.from('" apps/collector/src --include=*.ts | grep -v test` rend
-**42 appels** sur dix tables :
+**44 appels** sur dix tables :
 
 | Table | Appels | À filtrer |
 |---|---|---|
@@ -190,7 +190,7 @@ C'est la moitié du travail, et elle est invisible depuis la base.
 | `site_template` | 1 | **non** — gabarit de l'application (C4) |
 | `worker_heartbeat` | 1 | **non** — décrit un processus (C4) |
 
-**Quarante appels à reprendre**, pas cinq fonctions. Le premier jet de ce
+**Quarante-deux appels à reprendre**, pas cinq fonctions. Le premier jet de ce
 document annonçait cinq lectures ; le recensement le corrige, et c'est la
 mesure qui gouverne.
 

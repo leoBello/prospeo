@@ -10,6 +10,16 @@ import {
   traiterProspect,
   type ChaineDeps,
 } from './chaine.js';
+import { proprietaire } from './proprietaire.js';
+
+/**
+ * Le proprietaire pour le compte duquel la chaine simulee travaille.
+ *
+ * Passe par la garde plutot qu'ecrit `as Proprietaire` : un transtypage
+ * laisserait un uuid invalide entrer dans les tests sans qu'aucun ne le dise,
+ * et le marquage de type existe precisement pour interdire ce raccourci.
+ */
+const PROPRIETAIRE = proprietaire('131ab48e-055a-4a15-af4b-79ed7a2e4465');
 
 function deps(surcharges: Partial<ChaineDeps> = {}): ChaineDeps {
   return {
@@ -258,7 +268,7 @@ describe('chaineDeps.generer', () => {
     // Motif lu dans `chaine.ts`, jamais reecrit de memoire : c est ce texte-la
     // que le worker ecrit dans `campaign_job.last_error` et que la ligne de
     // l ecran affiche.
-    await expect(chaineDeps(client).generer('p-1')).rejects.toThrow(
+    await expect(chaineDeps(client, PROPRIETAIRE).generer('p-1')).rejects.toThrow(
       /hors des critères de la chaîne/,
     );
   });
@@ -272,6 +282,6 @@ describe('chaineDeps.generer', () => {
       [{ prospect_id: 'p-1', content: { titre: 'x' }, content_rejected_at: null }],
     );
 
-    await expect(chaineDeps(client).generer('p-1')).resolves.toBeNull();
+    await expect(chaineDeps(client, PROPRIETAIRE).generer('p-1')).resolves.toBeNull();
   });
 });
