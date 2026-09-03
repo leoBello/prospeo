@@ -7,10 +7,12 @@ import { createDashboardClient } from './data/supabase.js';
 import { designerGabarit } from './data/mutations.js';
 import { useProspects } from './data/useProspects.js';
 import { useDeployments } from './data/useDeployments.js';
+import { useCampagne } from './data/useCampagne.js';
 import { useSiteTemplate } from './data/useSiteTemplate.js';
 import { makePanelActions } from './ui/actions.js';
 import { LoginScreen } from './screens/LoginScreen.js';
 import { TodayScreen } from './screens/TodayScreen.js';
+import { CampagneScreen } from './screens/CampagneScreen.js';
 import { DeploiementsScreen } from './screens/DeploiementsScreen.js';
 import { GabaritScreen } from './screens/GabaritScreen.js';
 import { AppShell } from './ui/AppShell.js';
@@ -51,6 +53,8 @@ function Authenticated({ client }: { client: SupabaseClient<Database> }) {
   // Appelé sans condition (règle des hooks) ; `enabled` évite la lecture
   // Supabase tant que l'écran « Déploiements » n'est pas affiché.
   const deploymentsState = useDeployments(client, vue === 'deploiements');
+  // Même garde pour « Campagne » (chantier n°7).
+  const campagneState = useCampagne(client, vue === 'campagne');
   // Même garde pour « Gabarit » (D10, chantier n°10).
   const gabaritState = useSiteTemplate(client, vue === 'gabarit');
   const gabaritReload = gabaritState.reload;
@@ -129,6 +133,56 @@ function Authenticated({ client }: { client: SupabaseClient<Database> }) {
     );
   }
 
+  // L'écran de campagne (chantier n°7, tâches 8-9), en lecture seule : même
+  // patron que « Déploiements » ci-dessous, monté avant lui pour l'ordre du
+  // rail (Aujourd'hui, Campagne, Déploiements, Gabarit — voir Nav.tsx).
+  if (vue === 'campagne') {
+    if (campagneState.status === 'loading') {
+      return (
+        <AppShell
+          nav={nav}
+          onSignOut={() => void signOut()}
+          panel={null}
+          list={
+            <p className={styles.status} aria-live="polite">
+              {t('app.loading')}
+            </p>
+          }
+        />
+      );
+    }
+
+    if (campagneState.status === 'error') {
+      return (
+        <AppShell
+          nav={nav}
+          onSignOut={() => void signOut()}
+          panel={null}
+          list={
+            <div className={styles.status} role="alert">
+              <h1>{t('app.error.title')}</h1>
+              <p>{campagneState.message}</p>
+              <button type="button" onClick={campagneState.reload}>
+                {t('app.error.retry')}
+              </button>
+            </div>
+          }
+        />
+      );
+    }
+
+    return (
+      <CampagneScreen
+        lot={campagneState.lot}
+        lignes={campagneState.lignes}
+        totalProspects={campagneState.totalProspects}
+        heartbeat={campagneState.heartbeat}
+        onSignOut={() => void signOut()}
+        nav={nav}
+      />
+    );
+  }
+
   if (vue === 'deploiements') {
     if (deploymentsState.status === 'loading') {
       return (
@@ -173,10 +227,10 @@ function Authenticated({ client }: { client: SupabaseClient<Database> }) {
     );
   }
 
-  // Les gardes de `useProspects` viennent APRÈS les deux branches ci-dessus,
-  // et non avant : ni « Gabarit » ni « Déploiements » ne consomment
-  // `prospects`. Placées plus haut, elles réduisaient l'application entière à
-  // une boîte d'erreur sans rail de navigation dès qu'une lecture de
+  // Les gardes de `useProspects` viennent APRÈS les trois branches ci-dessus,
+  // et non avant : ni « Gabarit », ni « Campagne », ni « Déploiements » ne
+  // consomment `prospects`. Placées plus haut, elles réduisaient l'application
+  // entière à une boîte d'erreur sans rail de navigation dès qu'une lecture de
   // prospects échouait — impossible d'atteindre l'écran de déploiement,
   // c'est-à-dire précisément celui qu'on ouvre quand quelque chose ne va pas.
   // Et chaque chargement à froid de `#/deploiements` clignotait sans rail le

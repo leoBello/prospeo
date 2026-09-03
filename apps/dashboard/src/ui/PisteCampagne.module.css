@@ -1,0 +1,40 @@
+.piste {
+  display: flex;
+  gap: 3px;
+}
+
+.segment {
+  width: 46px;
+  height: 5px;
+  border-radius: var(--radius-pill);
+  flex: none;
+}
+
+.vide {
+  background: var(--color-seg-empty);
+}
+
+.enCours {
+  background: var(--color-accent);
+}
+
+.ok {
+  background: var(--color-success);
+}
+
+.echec {
+  background: var(--color-danger);
+}
+
+/*
+ * Bloqué se distingue d'échoué par la FORME autant que par la teinte : des
+ * tirets, pas un plein. Une adresse manquante attend un humain, elle n'a rien
+ * raté — et un opérateur daltonien doit pouvoir le voir.
+ */
+.bloque {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--color-warning) 0 4px,
+    var(--color-seg-empty) 4px 8px
+  );
+}

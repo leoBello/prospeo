@@ -340,6 +340,47 @@ export const en: Record<keyof typeof fr, string> = {
   'deploiements.empty.filtre.titre': 'No deployments in this filter',
   'deploiements.empty.filtre.detail': 'Choose "All" to see every deployment again.',
 
+  'nav.campagne': 'Campaign',
+
+  'campagne.title': 'Prospecting campaign',
+  'campagne.subtitle':
+    'The 20 highest-scoring prospects nobody has touched yet. A site, an email, a send — in that order.',
+
+  'campagne.col.prospect': 'Prospect',
+  'campagne.col.piste': 'Site · Email · Send',
+  'campagne.col.etat': 'Status',
+
+  'campagne.etat.jamais': 'Never deployed',
+  'campagne.etat.enFile': 'Queued · #{rang}',
+  'campagne.etat.siteEnCours': 'Site in progress',
+  'campagne.etat.siteEchec': 'Deployment failed',
+  'campagne.etat.mailARelire': 'Email to review',
+  'campagne.etat.adresseManquante': 'Missing address',
+  'campagne.etat.envoiIncertain': 'Send uncertain',
+  'campagne.etat.envoiEchec': 'Send failed',
+  'campagne.etat.envoye': 'Sent',
+
+  'campagne.piste.site': 'Site',
+  'campagne.piste.mail': 'Email',
+  'campagne.piste.envoi': 'Send',
+  'campagne.piste.segment': '{segment}: {etat}',
+  'campagne.piste.etat.vide': 'not started',
+  'campagne.piste.etat.enCours': 'in progress',
+  'campagne.piste.etat.ok': 'done',
+  'campagne.piste.etat.echec': 'failed',
+  'campagne.piste.etat.bloque': 'waiting on information',
+
+  'campagne.sansScore':
+    '{count} prospects have never been scored: they cannot be ranked, and do not appear in this batch.',
+  'campagne.sansScore_one':
+    '{count} prospect has never been scored: it cannot be ranked, and does not appear in this batch.',
+
+  'campagne.vide.lotFini': 'The batch is done',
+  'campagne.vide.lotFini.detail': 'The highest-scoring prospects have all been reached.',
+  'campagne.vide.aucunProspect': 'No prospects',
+  'campagne.vide.aucunProspect.detail':
+    'The database holds no prospects. Nothing was filtered out: there is nothing.',
+
   'gabarit.title': 'Site template',
   'gabarit.subtitle':
     'Every published site is generated from a GitHub repository marked as a template. Designating one here replaces the template shipped with the application, without touching any code.',
