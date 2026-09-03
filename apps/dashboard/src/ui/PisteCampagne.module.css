@@ -14,8 +14,37 @@
   background: var(--color-seg-empty);
 }
 
+/*
+ * Le seul segment en mouvement de l'écran, et c'est voulu : c'est celui
+ * qu'on regarde quand on vient d'appuyer sur un bouton. Un segment plein et
+ * immobile ne se distingue pas d'un segment terminé sans lire le badge — or
+ * un déploiement dure une minute, et pendant cette minute l'écran doit
+ * montrer qu'il se passe quelque chose.
+ *
+ * Le dégradé fait deux fois la largeur du segment et défile : c'est le rendu
+ * de la maquette (`Campagne.dc.html`, `.seg-run`).
+ *
+ * Le mouvement reste facultatif : `theme.css` neutralise toute animation
+ * sous `prefers-reduced-motion`, parce qu'un mouvement non désiré peut
+ * déclencher un malaise vestibulaire.
+ */
 .enCours {
-  background: var(--color-accent);
+  background: linear-gradient(
+    90deg,
+    var(--color-accent) 50%,
+    var(--color-seg-empty) 50%
+  );
+  background-size: 200% 100%;
+  animation: defile 1.4s linear infinite;
+}
+
+@keyframes defile {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
 }
 
 .ok {

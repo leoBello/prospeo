@@ -60,15 +60,60 @@ function eligibleHorsScore(f: FaitsProspect): boolean {
   return f.statut === 'a_contacter' && !f.aInteraction && !f.aMessage && !f.sitePublie;
 }
 
-export function classerLot(faits: readonly FaitsProspect[], taille: number): Lot {
+/**
+ * Le tri du lot : score décroissant, et les sans-score en dernier.
+ *
+ * Un `null` glissé dans une soustraction rendrait `NaN`, et un comparateur
+ * qui rend `NaN` laisse l'ordre indéfini — pas trié, pas stable, pas
+ * reproductible. On le traite donc explicitement.
+ */
+function parScoreDecroissant(a: FaitsProspect, b: FaitsProspect): number {
+  if (a.score === null) return b.score === null ? 0 : 1;
+  if (b.score === null) return -1;
+  return b.score - a.score;
+}
+
+/**
+ * Qui s'affiche : le lot des éligibles, **plus ce qu'on suit déjà**.
+ *
+ * **Pourquoi `suivis` existe.** D3 dit qui a le droit d'ENTRER dans le lot :
+ * jamais contacté, aucun message écrit, aucun site publié. Or déployer un
+ * prospect lui écrit un message et lui publie un site — deux critères qui
+ * l'excluent aussitôt. S'en servir aussi comme filtre d'affichage faisait
+ * donc DISPARAÎTRE la ligne sur laquelle on venait de cliquer, ce qui annule
+ * la moitié « suivre » de « lancer et suivre une campagne ».
+ *
+ * Un prospect suivi reste donc visible quoi qu'en dise D3, et **il n'occupe
+ * pas une des `taille` places** : les vingt mieux notés restent vingt, sinon
+ * chaque lancement rétrécirait le vivier.
+ *
+ * `suivis` ne contient que les prospects portant un job non annulé : retirer
+ * une demande doit rendre la ligne à son état d'avant, pas la figer à
+ * l'écran.
+ */
+export function classerLot(
+  faits: readonly FaitsProspect[],
+  taille: number,
+  suivis: ReadonlySet<string> = new Set(),
+): Lot {
   const recevables = faits.filter(eligibleHorsScore);
 
+  const suivi = faits.filter((f) => suivis.has(f.prospectId));
+  const idsSuivis = new Set(suivi.map((f) => f.prospectId));
+
+  const eligibles = recevables
+    .filter((f): f is FaitsProspect & { score: number } => f.score !== null)
+    // Déjà compté parmi les suivis : l'ajouter une seconde fois casserait la
+    // clé de rendu de React et doublerait la ligne.
+    .filter((f) => !idsSuivis.has(f.prospectId))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, taille);
+
   return {
-    lignes: recevables
-      .filter((f): f is FaitsProspect & { score: number } => f.score !== null)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, taille),
-    sansScore: recevables.filter((f) => f.score === null).length,
+    lignes: [...suivi, ...eligibles].sort(parScoreDecroissant),
+    // Un suivi sans score n'est pas un « écarté faute de score » : il est
+    // déjà parti. L'y compter promettrait qu'un scoring le ferait entrer.
+    sansScore: recevables.filter((f) => f.score === null && !idsSuivis.has(f.prospectId)).length,
   };
 }
 

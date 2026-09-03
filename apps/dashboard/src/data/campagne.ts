@@ -188,7 +188,14 @@ function campaignJobRangeReader(client: Client): RangeReader<JobRow> {
     client
       .from('campaign_job')
       .select('prospect_id,state,last_error,requested_at')
-      .in('state', ['en_attente', 'en_cours', 'echoue'])
+      // `termine` en fait partie, et ce n'est pas un detail : un job termine a
+    // ecrit un message et publie un site, donc D3 exclut desormais son
+    // prospect. C'est cette ligne qui permet a l'ecran de continuer a le
+    // MONTRER — sans elle, la ligne sur laquelle on vient de cliquer
+    // disparait au moment ou elle reussit.
+    // `annule` reste dehors : retirer une demande rend la ligne a son etat
+    // d'avant.
+    .in('state', ['en_attente', 'en_cours', 'echoue', 'termine'])
       .order('requested_at', { ascending: true })
       .order('id', { ascending: true })
       .range(from, to) as unknown as ReturnType<RangeReader<JobRow>>;

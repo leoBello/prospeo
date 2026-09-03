@@ -424,7 +424,7 @@ export const fr = {
 
   'campagne.title': 'Campagne de prospection',
   'campagne.subtitle':
-    "Les 20 prospects les mieux notés que personne n'a encore touchés. Un site, un mail, un envoi — dans cet ordre.",
+    "Les 20 prospects les mieux notés que personne n'a encore touchés, plus ceux que vous avez déjà lancés. Un site, un mail, un envoi — dans cet ordre.",
 
   'campagne.col.prospect': 'Prospect',
   'campagne.col.piste': 'Site · Mail · Envoi',

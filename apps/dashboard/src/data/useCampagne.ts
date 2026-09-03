@@ -64,7 +64,15 @@ export function useCampagne(
         if (!vivant) return;
         setState({
           status: 'ready',
-          lot: classerLot(faits, TAILLE_LOT),
+          // Les prospects qu'on SUIT : ceux qui portent un job non annule.
+          // Ils restent affiches meme quand D3 ne les accepte plus — voir le
+          // docstring de `classerLot`. Sans cet ensemble, une ligne disparait
+          // au moment precis ou son deploiement reussit.
+          lot: classerLot(
+            faits,
+            TAILLE_LOT,
+            new Set([...lignes].filter(([, l]) => l.job !== null).map(([id]) => id)),
+          ),
           lignes,
           totalProspects,
           heartbeat,

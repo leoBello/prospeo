@@ -241,3 +241,74 @@ describe('etatLigne', () => {
     expect(r.etat).toEqual({ nom: 'jamais' });
   });
 });
+
+describe('classerLot — ce qu on suit ne disparait pas', () => {
+  it('garde un prospect suivi meme quand D3 l exclut desormais', () => {
+    // LE DEFAUT QUE CE TEST FERME. Deployer un prospect lui fait ecrire un
+    // `generated_message` et publier un site : deux criteres de D3 qui
+    // l excluent aussitot. La ligne sur laquelle on venait de cliquer
+    // disparaissait donc de l ecran — ce qui annule la moitie « suivre » de
+    // « lancer et suivre une campagne ».
+    const lot = classerLot(
+      [
+        fait({ prospectId: 'lance', score: 70, aMessage: true, sitePublie: true }),
+        fait({ prospectId: 'neuf', score: 60 }),
+      ],
+      10,
+      new Set(['lance']),
+    );
+
+    expect(lot.lignes.map((l) => l.prospectId)).toEqual(['lance', 'neuf']);
+  });
+
+  it('ne garde PAS un prospect suivi qu on a explicitement retire', () => {
+    // Un job annule ne fait pas partie des suivis : retirer une demande doit
+    // rendre la ligne a son etat d avant, pas la figer a l ecran.
+    const lot = classerLot(
+      [fait({ prospectId: 'retire', score: 70, aMessage: true, sitePublie: true })],
+      10,
+      new Set(),
+    );
+
+    expect(lot.lignes).toHaveLength(0);
+  });
+
+  it('ne compte pas un suivi dans les vingt places du lot', () => {
+    // Les « vingt mieux notes que personne n a touches » restent vingt : un
+    // prospect qu on suit deja n en occupe pas une place, sinon lancer une
+    // campagne retrecirait le vivier a chaque clic.
+    const lot = classerLot(
+      [
+        fait({ prospectId: 'suivi', score: 99, aMessage: true }),
+        fait({ prospectId: 'a', score: 80 }),
+        fait({ prospectId: 'b', score: 70 }),
+      ],
+      2,
+      new Set(['suivi']),
+    );
+
+    expect(lot.lignes.map((l) => l.prospectId)).toEqual(['suivi', 'a', 'b']);
+  });
+
+  it('n ajoute pas deux fois un prospect a la fois suivi et eligible', () => {
+    // Un job depose sur un prospect encore intact : il est dans les deux
+    // ensembles. Une ligne en double casserait la cle de rendu de React.
+    const lot = classerLot([fait({ prospectId: 'x', score: 70 })], 10, new Set(['x']));
+    expect(lot.lignes.map((l) => l.prospectId)).toEqual(['x']);
+  });
+
+  it('garde un suivi sans score, en fin de liste, sans le compter comme ecarte', () => {
+    // Un prospect lance par « Deployer la selection » peut n avoir aucun
+    // score. Le cacher perdrait le suivi d un site en cours de publication ;
+    // le compter parmi les ecartes promettrait qu un scoring le ferait
+    // entrer, alors qu il est deja parti.
+    const lot = classerLot(
+      [fait({ prospectId: 'sans', score: null, aMessage: true }), fait({ prospectId: 'a', score: 50 })],
+      10,
+      new Set(['sans']),
+    );
+
+    expect(lot.lignes.map((l) => l.prospectId)).toEqual(['a', 'sans']);
+    expect(lot.sansScore).toBe(0);
+  });
+});

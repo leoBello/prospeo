@@ -344,7 +344,7 @@ export const en: Record<keyof typeof fr, string> = {
 
   'campagne.title': 'Prospecting campaign',
   'campagne.subtitle':
-    'The 20 highest-scoring prospects nobody has touched yet. A site, an email, a send — in that order.',
+    'The 20 highest-scoring prospects nobody has touched yet, plus the ones you have already started. A site, an email, a send — in that order.',
 
   'campagne.col.prospect': 'Prospect',
   'campagne.col.piste': 'Site · Email · Send',
