@@ -55,16 +55,21 @@ describe('prendreProchain', () => {
   it('rend null quand toute la liste a ete prise par ailleurs', async () => {
     // Distinct du cas « file vide » : ici il y avait du travail, et il est
     // parti. Rendre autre chose que null ferait traiter un job qu'on ne
-    // possede pas.
+    // possede pas. Sans l'assertion sur `prendre`, ce test rougirait
+    // pareillement si la boucle n'etait jamais parcourue : elle prouve donc
+    // qu'une prise a bien ete tentee sur l'unique candidat, et pas seulement
+    // que le resultat final est null.
+    const prendre = vi.fn(async () => false);
     const job = await prendreProchain(
       deps({
         listerEnAttente: async () => [
           { id: 7, prospect_id: 'p-7', campaign_id: null, attempts: 0 },
         ],
-        prendre: async () => false,
+        prendre,
       }),
     );
 
     expect(job).toBeNull();
+    expect(prendre).toHaveBeenCalledTimes(1);
   });
 });
