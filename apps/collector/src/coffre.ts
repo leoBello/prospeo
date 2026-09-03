@@ -36,6 +36,13 @@ export interface Scelle {
  * La perte de la clé maîtresse est un cas prévu : chaque connexion passe à
  * « indéchiffrable » et se reconnecte. L'appelant doit pouvoir le MARQUER en
  * base, ce qu'une exception nue lui interdirait sans un `try` à chaque appel.
+ *
+ * **Un seul motif, `'altere'`** : `dechiffrer` reçoit toujours une
+ * `CleMaitresse` déjà validée par `lireCleMaitresse`, qui lève avant d'en
+ * rendre une — une clé absente ne peut donc structurellement pas atteindre
+ * cette fonction. (Revue de branche du 3 septembre 2026 : le plan portait
+ * encore `'cle_absente' | 'altere'` dans sa ligne « Interfaces », restée en
+ * décalage avec le code qu'il donnait lui-même plus bas.)
  */
 export type Ouverture =
   | { ouvert: true; clair: string }

@@ -209,7 +209,7 @@ Ne rien appliquer, ne rien commiter. Rapporter les cinq contrôles avec leur sor
 **Interfaces:**
 - Produces :
   - `export interface Scelle { chiffre: Buffer; vecteur: Buffer; etiquette: Buffer; cleId: string }`
-  - `export type Ouverture = { ouvert: true; clair: string } | { ouvert: false; motif: 'cle_absente' | 'altere' }`
+  - `export type Ouverture = { ouvert: true; clair: string } | { ouvert: false; motif: 'altere' }` — un seul motif : `dechiffrer` reçoit toujours une `CleMaitresse` déjà validée par `lireCleMaitresse` (voir plus bas), qui lève avant d'en rendre une mal formée ou absente. Cette ligne portait encore `'cle_absente' | 'altere'` avant la revue de branche du 3 septembre 2026 — corrigée pour rester fidèle au code donné à l'Étape 3.
   - `export function chiffrer(clair: string, cle: CleMaitresse): Scelle`
   - `export function dechiffrer(scelle: Scelle, cle: CleMaitresse): Ouverture`
   - `export type CleMaitresse = { id: string; octets: Buffer }`
