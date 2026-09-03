@@ -1,5 +1,13 @@
 .page {
   padding: var(--space-4) var(--space-5) var(--space-5);
+
+  /* Une mesure de lecture, pas toute la fenetre. Sans ce plafond, la colonne
+     « Prospect » absorbe tout l'espace restant et repousse les boutons a plus
+     de mille pixels de l'etat qu'ils commentent — l'oeil ne fait plus le lien.
+     La maquette montre l'ecran AVEC le panneau de relecture, qui occupe la
+     droite ; tant qu'il n'existe pas, c'est ce plafond qui tient la densite,
+     et il cessera de mordre le jour ou le panneau prendra sa place. */
+  max-width: 1080px;
 }
 
 .entete {

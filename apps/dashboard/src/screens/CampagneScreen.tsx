@@ -172,6 +172,12 @@ export function CampagneScreen({
                   <th scope="col" className={styles.colEtat}>
                     {t('campagne.col.etat')}
                   </th>
+                  {/* Sans intitulé : la colonne ne porte que des boutons, qui
+                      se nomment eux-mêmes. Mais la cellule doit EXISTER — en
+                      `table-layout: fixed`, ce sont les cellules de la
+                      première rangée qui fixent les largeurs, et une colonne
+                      absente de l'en-tête absorbe tout l'espace restant. */}
+                  <th scope="col" className={styles.colAction} />
                 </tr>
               </thead>
               <tbody>
