@@ -648,9 +648,36 @@ rencontre, et se consignent dans `HANDOFF.md`.
    `supabase-js` du dépôt : conservé en session ou perdu au premier
    rafraîchissement. À mesurer, pas à supposer. Le rendu de l'état « jeton
    expiré » en dépend.
-2. **Les sources de l'étage `contacts`**, et son taux de réussite réel sur les
-   prospects `none`. S'il est très bas, la saisie manuelle devient le chemin
-   principal et l'étage un bonus — ce que l'écran doit alors refléter.
+2. ~~**Les sources de l'étage `contacts`**, et son taux de réussite réel sur les
+   prospects `none`.~~ **MESURÉ le 3 septembre 2026, à l'entrée du lot 2 — et
+   la réponse renverse D6.**
+
+   Relevé sur les 139 prospects de l'instance :
+
+   | Source que D6 prévoyait | Ce que la base contient |
+   |---|---|
+   | page Facebook (`prospect_enrichment.social_urls`) | **0 prospect sur 139** |
+   | site déclaré (`declared_url`) | 20, dont 17 sont `has_site` — donc **exclus du lot** |
+   | fiche Google Maps (`maps_url`) | 39, mais Maps n'expose pas d'email |
+
+   Répartition de la présence web : `none` = 109, `has_site` = 17, non sondé = 10,
+   `dead_site` = 3.
+
+   **L'étage automatique n'aurait presque rien à visiter** : 109 prospects sur
+   139 n'ont ni site, ni réseau social, ni rien à ouvrir, et ce sont eux qui
+   peuplent le lot. Le scénario que la maquette dessine — « relevée sur la page
+   Facebook de l'entreprise » — n'a aucune donnée derrière lui.
+
+   **Conséquence, à porter dans le plan du lot 2 :** la saisie manuelle n'est
+   pas le repli, c'est **le chemin principal**. D6 posait l'inverse
+   (« l'étage cherche, l'opérateur complète ce qui manque ») ; la mesure le
+   renverse. L'étage `contacts` n'est pas à construire tant qu'une source
+   réellement peuplée n'a pas été identifiée — le bâtir maintenant livrerait
+   un chercheur qui ne trouve rien, c'est-à-dire l'affordance que ce dépôt
+   interdit, à l'échelle d'un chantier.
+
+   Ce qui reste vrai de D6 : **l'origine de l'adresse doit être affichée.**
+   Elle le sera d'autant plus que toutes les adresses seront saisies au début.
 3. **Le délai de garde** avant de reprendre un job `en_cours` orphelin : trop
    court, on double un déploiement ; trop long, une campagne se fige.
 4. **La détection des rebonds.** Hors périmètre ici, mais un mail qui rebondit

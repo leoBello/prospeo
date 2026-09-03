@@ -262,11 +262,24 @@ const VIOLATION_UNICITE = '23505';
  * prospect ; c'est la garantie qui joue son rôle, et l'écran affiche déjà
  * « en file d'attente ». Remonter une erreur ferait recliquer sur une
  * demande déjà déposée, ou pire, croire à une panne.
+ *
+ * **`utilisateurId` est fourni par l'appelant, pas relu ici.** La politique
+ * `proprietaire_seul` de `campaign_job` (chantier n°8) filtre sur
+ * `requested_by = auth.uid()` : sans cette colonne, l'insertion est refusée
+ * par la RLS — c'est ce qui a cassé le bouton « Déployer ». Un
+ * `client.auth.getUser()` à chaque appel aurait évité de toucher les
+ * appelants, mais aurait payé un aller-retour réseau par clic et rendu cette
+ * fonction impossible à tester sans simuler l'authentification ; `App.tsx`
+ * tient déjà la session (`useAuth`), et n'a qu'à la transmettre.
  */
-export async function deposerJob(client: Client, prospectId: string): Promise<string | null> {
+export async function deposerJob(
+  client: Client,
+  prospectId: string,
+  utilisateurId: string,
+): Promise<string | null> {
   const { error } = await client
     .from('campaign_job')
-    .insert({ prospect_id: prospectId, kind: 'chaine', state: 'en_attente' });
+    .insert({ prospect_id: prospectId, kind: 'chaine', state: 'en_attente', requested_by: utilisateurId });
 
   if (error === null) return null;
   if (error.code === VIOLATION_UNICITE) return null;
@@ -284,6 +297,12 @@ export async function deposerJob(client: Client, prospectId: string): Promise<st
  * `annule` et non une suppression : ce qu'on a demandé, puis retiré, fait
  * partie de ce qu'on doit pouvoir relire. C'est aussi un état terminal, donc
  * invisible des lectures de l'écran.
+ *
+ * **N'écrit pas `requested_by`, et n'en a pas besoin.** `proprietaire_seul`
+ * s'applique aussi à cet `update` (`using` ET `with check`), mais la colonne
+ * n'est pas modifiée par cette écriture : une fois `deposerJob` corrigé, la
+ * ligne visée porte déjà le bon `requested_by`, et `using` la laisse passer
+ * pour son propriétaire sans qu'il faille la réécrire ici.
  */
 export async function retirerJob(client: Client, prospectId: string): Promise<string | null> {
   const { error } = await client

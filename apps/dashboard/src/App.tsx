@@ -40,7 +40,13 @@ function ConfigError({ message }: { message: string }) {
   );
 }
 
-function Authenticated({ client }: { client: SupabaseClient<Database> }) {
+function Authenticated({
+  client,
+  utilisateurId,
+}: {
+  client: SupabaseClient<Database>;
+  utilisateurId: string;
+}) {
   const t = useT();
   const { signOut } = useAuth();
   const state = useProspects(client);
@@ -92,14 +98,18 @@ function Authenticated({ client }: { client: SupabaseClient<Database> }) {
    * de `useCampagne` : le même parti que le worker, qui écoute ET balaye. Une
    * socket muette ne doit pas laisser l'écran figé sur un clic qui, lui, est
    * bien parti.
+   *
+   * `utilisateurId` vient de `Gate`, qui le tient déjà de la session — pas un
+   * second `client.auth.getUser()` ici, qui paierait un aller-retour réseau
+   * par clic pour une donnée déjà en main.
    */
   const deposer = useCallback(
     (prospectId: string): Promise<string | null> =>
-      deposerJob(client, prospectId).then((erreur) => {
+      deposerJob(client, prospectId, utilisateurId).then((erreur) => {
         if (erreur === null) campagneReload();
         return erreur;
       }),
-    [client, campagneReload],
+    [client, campagneReload, utilisateurId],
   );
 
   const retirer = useCallback(
@@ -331,7 +341,11 @@ function Gate({ client }: { client: SupabaseClient<Database> }) {
 
   if (session === null) return <LoginScreen onSignIn={signIn} />;
 
-  return <Authenticated client={client} />;
+  // `session` est ici garantie non nulle par les deux gardes ci-dessus :
+  // c'est de là, et non d'un second appel à `auth.getUser()`, que
+  // `deposerJob` (tâche 5 du chantier n°8) tient l'identifiant qu'exige
+  // désormais `campaign_job.requested_by`.
+  return <Authenticated client={client} utilisateurId={session.user.id} />;
 }
 
 export function App() {

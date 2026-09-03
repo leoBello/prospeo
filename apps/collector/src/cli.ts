@@ -11,6 +11,7 @@ import {
   loadPublishConfig,
 } from './config.js';
 import type { Json } from '@prospeo/db';
+import { proprietaire as lireProprietaire, type Proprietaire } from './proprietaire.js';
 import { createClient, PAGE_SIZE } from './supabase.js';
 import { createGoogleMapsSource } from './sources/google-maps.js';
 import { fetchStatusBySiret } from './sources/recherche-entreprises.js';
@@ -69,25 +70,35 @@ const ENV_FILE = fileURLToPath(new URL('../../../.env', import.meta.url));
 if (existsSync(ENV_FILE)) process.loadEnvFile(ENV_FILE);
 
 const USAGE = `
-prospeo <commande> [options]
+prospeo <commande> --owner <uuid> [options]
+
+  --owner <uuid> est OBLIGATOIRE sur toutes les commandes ci-dessous. Le
+  collector se connecte en service_role, qui contourne RLS : ce drapeau est
+  la seule chose qui borne une commande aux données d'un utilisateur. Il est
+  répété sur chaque ligne parce qu'une option obligatoire absente de l'aide
+  est une option qu'on découvre par une erreur.
 
 Commandes
-  discover --trade <slug> --postal-code <cp>   Ingère les établissements Sirene
-  enrich --trade <slug>                        Apparie les fiches Google Maps
-  review                                       Tranche les appariements douteux
-  calibrate [--trade <slug>] [--apply]         Rejoue l'appariement hors ligne
-  probe                                        Sonde les URL déclarées
-  score                                        Classe et note les prospects
-  reconcile                                    Revérifie l'état Sirene des prospects
-  domains                                      Cherche un nom de domaine libre
-  generate [--trade <slug>]                    Rédige le contenu des sites (LLM)
-  publish                                      Crée les dépôts et y écrit le contenu
-  deploy                                       Déploie et enregistre les URL
-  unpublish [--dry-run]                        Dépublie les refus et les périmés
-  pitch [--force]                              Rédige email, SMS et script d'appel
-  worker                                       Draine la file du dashboard, en continu
+  discover --owner <uuid> --trade <slug> --postal-code <cp>
+                                               Ingère les établissements Sirene
+  enrich --owner <uuid> --trade <slug>         Apparie les fiches Google Maps
+  review --owner <uuid>                        Tranche les appariements douteux
+  calibrate --owner <uuid> [--trade <slug>] [--apply]
+                                               Rejoue l'appariement hors ligne
+  probe --owner <uuid>                         Sonde les URL déclarées
+  score --owner <uuid>                         Classe et note les prospects
+  reconcile --owner <uuid>                     Revérifie l'état Sirene des prospects
+  domains --owner <uuid>                       Cherche un nom de domaine libre
+  generate --owner <uuid> [--trade <slug>]     Rédige le contenu des sites (LLM)
+  publish --owner <uuid>                       Crée les dépôts et y écrit le contenu
+  deploy --owner <uuid>                        Déploie et enregistre les URL
+  unpublish --owner <uuid> [--dry-run]         Dépublie les refus et les périmés
+  pitch --owner <uuid> [--force]               Rédige email, SMS et script d'appel
+  worker --owner <uuid>                        Draine la file du dashboard, en continu
 
 Options
+  --owner <uuid>       OBLIGATOIRE. Le propriétaire des données traitées. Un
+                       worker sert UN utilisateur et ne draine que sa file.
   --limit <n>          Plafond d'enregistrements traités
   --force              (probe) Resonde même les URL encore fraîches
   --retry-not-found    Rejoue les prospects déjà classés introuvables
@@ -186,12 +197,17 @@ const DAILY_CAP = 300;
  * la ligne à partir de ce littéral, et toute concaténation l'élargirait en
  * `string`, faisant retomber l'inférence sur `GenericStringError`.
  */
-function fetchScorePage(client: ReturnType<typeof createClient>, from: number) {
+function fetchScorePage(
+  client: ReturnType<typeof createClient>,
+  proprietaire: Proprietaire,
+  from: number,
+) {
   return client
     .from('prospect')
     .select(
       'id, denomination, date_creation, effectif_code, is_closed, prospect_enrichment(status, declared_url, social_urls, phone_e164, rating, review_count), web_presence(category, probed_url, http_status, is_https, final_url, is_parked, has_viewport_meta, last_social_post_at)',
     )
+    .eq('owner_id', proprietaire)
     .order('id')
     .range(from, from + PAGE_SIZE - 1);
 }
@@ -250,12 +266,16 @@ function parseLimit(argv: string[]): number | undefined | 'invalide' {
  * entreprises fermées — jusqu'à 270 navigations et quarante minutes par run
  * pour quinze cessations, au détriment des vivantes.
  */
-async function fetchClosedIds(client: ReturnType<typeof createClient>): Promise<Set<string>> {
+async function fetchClosedIds(
+  client: ReturnType<typeof createClient>,
+  proprietaire: Proprietaire,
+): Promise<Set<string>> {
   const closed = new Set<string>();
   for (let from = 0; ; from += PAGE_SIZE) {
     const { data, error } = await client
       .from('prospect')
       .select('id')
+      .eq('owner_id', proprietaire)
       .eq('is_closed', true)
       .order('id')
       .range(from, from + PAGE_SIZE - 1);
@@ -269,12 +289,16 @@ async function fetchClosedIds(client: ReturnType<typeof createClient>): Promise<
 /** Les prospects qui ont déjà au moins un message archivé. */
 async function fetchProspectsDejaRediges(
   client: ReturnType<typeof createClient>,
+  proprietaire: Proprietaire,
 ): Promise<Set<string>> {
   const vus = new Set<string>();
   for (let from = 0; ; from += PAGE_SIZE) {
     const { data, error } = await client
       .from('generated_message')
-      .select('prospect_id')
+      .select('prospect_id, prospect!inner()')
+      // `!inner` obligatoire : sans lui, PostgREST vide la relation et rend
+      // TOUTES les lignes. Voir le commentaire de `fetchSiteRows`.
+      .eq('prospect.owner_id', proprietaire)
       .order('prospect_id')
       .range(from, from + PAGE_SIZE - 1);
     if (error) throw new Error(error.message);
@@ -298,6 +322,21 @@ async function main(argv: string[]): Promise<number> {
     process.stderr.write(`Commande inconnue : ${command}\n${USAGE}`);
     return 1;
   }
+
+  // LU UNE SEULE FOIS, AVANT LE `switch`, et jamais dans chaque `case`.
+  //
+  // Le collector se connecte en `service_role`, qui contourne RLS par
+  // construction : aucune politique ne le retiendra jamais, et une lecture
+  // sans filtre ne leve rien — elle rend simplement les lignes de tout le
+  // monde. Le filtre explicite est la SEULE barriere.
+  //
+  // Repartir la lecture dans les quatorze `case` reviendrait a parier
+  // qu'aucune commande future ne l'oubliera. Ici, une commande neuve herite
+  // de la garde sans rien faire, et `proprietaire` leve avant le moindre
+  // acces reseau : une valeur absente ferait lire la base entiere, une
+  // valeur mal formee rendrait zero ligne qu'on prendrait pour « rien a
+  // faire ». Les deux echecs sont silencieux, celui-ci est bruyant.
+  const proprietaire = lireProprietaire(flag(argv, 'owner'));
 
   switch (command) {
     case 'discover': {
@@ -325,7 +364,7 @@ async function main(argv: string[]): Promise<number> {
         trade,
         postalCode,
         limit,
-        upsertProspect: makeUpsertProspect(client),
+        upsertProspect: makeUpsertProspect(client, proprietaire),
       });
       process.stdout.write(
         `discover ${trade.slug} ${postalCode} : ${report.upserted}/${report.seen} enregistrés\n`,
@@ -362,7 +401,10 @@ async function main(argv: string[]): Promise<number> {
       for (let from = 0; ; from += PAGE_SIZE) {
         const { data, error } = await client
           .from('prospect_enrichment')
-          .select('prospect_id, status')
+          .select('prospect_id, status, prospect!inner()')
+          // `!inner` obligatoire : sans lui PostgREST vide la relation et
+          // rend toutes les lignes. Voir `fetchSiteRows` dans chaine.ts.
+          .eq('prospect.owner_id', proprietaire)
           .order('prospect_id')
           .range(from, from + PAGE_SIZE - 1);
         if (error) throw new Error(error.message);
@@ -375,6 +417,7 @@ async function main(argv: string[]): Promise<number> {
         const { data, error } = await client
           .from('prospect')
           .select('id, denomination, denomination_usuelle, city, address, latitude, longitude')
+          .eq('owner_id', proprietaire)
           .eq('trade_slug', trade.slug)
           // Une entreprise cessee n'est plus un prospect : la scraper
           // consommerait du quota Google au detriment des vivantes.
@@ -407,7 +450,11 @@ async function main(argv: string[]): Promise<number> {
       since.setHours(0, 0, 0, 0);
       const { count, error: countError } = await client
         .from('prospect_enrichment')
-        .select('prospect_id', { count: 'exact', head: true })
+        // Le plafond est CELUI DU PROPRIETAIRE. Non filtre, le quota d'un
+        // client serait consomme par le scraping d'un autre — un run rendu
+        // vide sans qu'aucune erreur ne le dise.
+        .select('prospect_id, prospect!inner()', { count: 'exact', head: true })
+        .eq('prospect.owner_id', proprietaire)
         .gte('enriched_at', since.toISOString());
       if (countError) throw new Error(countError.message);
       const capRemaining = Math.max(0, DAILY_CAP - (count ?? 0));
@@ -428,6 +475,10 @@ async function main(argv: string[]): Promise<number> {
           source,
           dailyRemaining,
           upsert: async (row) => {
+            // `row.prospect_id` sort de la liste `prospects` batie ci-dessus,
+            // filtree sur le proprietaire : PostgREST ne filtre pas un
+            // `upsert` sur une relation embarquee, c'est la provenance qui
+            // cloisonne.
             const { error } = await client
               .from('prospect_enrichment')
               .upsert(row, { onConflict: 'prospect_id' });
@@ -498,8 +549,13 @@ async function main(argv: string[]): Promise<number> {
         const { data, error } = await client
           .from('prospect_enrichment')
           .select(
-            'prospect_id, candidates, enriched_at, prospect(denomination, denomination_usuelle, address, naf_code, trade_slug)',
+            'prospect_id, candidates, enriched_at, prospect!inner(denomination, denomination_usuelle, address, naf_code, trade_slug)',
           )
+          // `prospect!inner(...)` et non `prospect(...)` : c'est le `!inner`
+          // qui restreint les lignes de `prospect_enrichment`. Sans lui, la
+          // file presenterait a l'operateur les appariements douteux de tous
+          // les clients, et sa decision s'ecrirait chez eux.
+          .eq('prospect.owner_id', proprietaire)
           .eq('status', 'ambiguous')
           .order('prospect_id')
           .range(from, from + PAGE_SIZE - 1);
@@ -611,6 +667,7 @@ async function main(argv: string[]): Promise<number> {
               // scraping du lendemain par une session purement humaine.
               row.enriched_at as string,
             );
+            // `row.prospect_id` vient de la file lue ci-dessus, filtree.
             const { error: writeError } = await client
               .from('prospect_enrichment')
               .upsert(updated, { onConflict: 'prospect_id' });
@@ -655,8 +712,11 @@ async function main(argv: string[]): Promise<number> {
         const { data, error } = await client
           .from('prospect_enrichment')
           .select(
-            'prospect_id, status, matched_name, candidates, decided_by, enriched_at, prospect(denomination, denomination_usuelle, latitude, longitude, trade_slug)',
+            'prospect_id, status, matched_name, candidates, decided_by, enriched_at, prospect!inner(denomination, denomination_usuelle, latitude, longitude, trade_slug)',
           )
+          // `!inner`, sans quoi `--apply` reecrirait les verdicts d'un autre
+          // client sous les seuils qu'un tiers vient de regler.
+          .eq('prospect.owner_id', proprietaire)
           .order('prospect_id')
           .range(from, from + PAGE_SIZE - 1);
         if (error) throw new Error(error.message);
@@ -757,6 +817,7 @@ async function main(argv: string[]): Promise<number> {
           // inutile ferait remonter la ligne dans tout suivi de modification
           // et coûterait un aller-retour par prospect.
           if (!replay.changed) continue;
+          // `subject.prospectId` vient de la lecture filtree ci-dessus.
           const { error } = await client
             .from('prospect_enrichment')
             .upsert(rewritten, { onConflict: 'prospect_id' });
@@ -813,7 +874,7 @@ async function main(argv: string[]): Promise<number> {
       // Les cessations viennent de `reconcile` et vivent sur `prospect` :
       // les deux lectures ci-dessous portent sur d'autres tables, on ecarte
       // donc en memoire plutot que par une jointure fragile.
-      const closed = await fetchClosedIds(client);
+      const closed = await fetchClosedIds(client, proprietaire);
 
       // PostgREST plafonne les reponses (max_rows = 1000). Sans pagination, un
       // run au-dela de ce seuil traiterait une tranche arbitraire et afficherait
@@ -823,7 +884,9 @@ async function main(argv: string[]): Promise<number> {
       for (let from = 0; ; from += PAGE_SIZE) {
         const { data, error } = await client
           .from('prospect_enrichment')
-          .select('prospect_id, declared_url')
+          .select('prospect_id, declared_url, prospect!inner()')
+          // `!inner` obligatoire : voir `fetchSiteRows` dans chaine.ts.
+          .eq('prospect.owner_id', proprietaire)
           .not('declared_url', 'is', null)
           .order('prospect_id')
           .range(from, from + PAGE_SIZE - 1);
@@ -840,7 +903,8 @@ async function main(argv: string[]): Promise<number> {
       for (let from = 0; ; from += PAGE_SIZE) {
         const { data, error } = await client
           .from('web_presence')
-          .select('prospect_id, probed_at')
+          .select('prospect_id, probed_at, prospect!inner()')
+          .eq('prospect.owner_id', proprietaire)
           .order('prospect_id')
           .range(from, from + PAGE_SIZE - 1);
         if (error) throw new Error(error.message);
@@ -864,6 +928,8 @@ async function main(argv: string[]): Promise<number> {
         // `discover`, l'écriture est unitaire et l'erreur est journalisée.
         try {
           const result = await probeUrl(row.declared_url as string);
+          // `row.prospect_id` vient de la lecture filtree de
+          // `prospect_enrichment` ci-dessus.
           const { error: writeError } = await client.from('web_presence').upsert(
             {
               prospect_id: row.prospect_id,
@@ -906,7 +972,7 @@ async function main(argv: string[]): Promise<number> {
       const data: Awaited<ReturnType<typeof fetchScorePage>>['data'] = [];
       let error: { message: string } | null = null;
       for (let from = 0; ; from += PAGE_SIZE) {
-        const page = await fetchScorePage(client, from);
+        const page = await fetchScorePage(client, proprietaire, from);
         if (page.error) {
           error = page.error;
           break;
@@ -972,6 +1038,12 @@ async function main(argv: string[]): Promise<number> {
         if (write.kind === 'erase') {
           // Effacer plutôt que laisser en place : le score précédent a été
           // calculé sans connaître l'URL qu'on vient de découvrir.
+          //
+          // Les deux ecritures portent sur `write.prospectId`, issu de
+          // `fetchScorePage`, filtree sur le proprietaire. PostgREST ne
+          // filtre pas un `delete` ni un `update` sur une relation
+          // embarquee : c'est la provenance de l'identifiant qui cloisonne,
+          // et c'est pourquoi la lecture qui le produit porte son filtre.
           const { error: eraseScoreError } = await client
             .from('prospect_score')
             .delete()
@@ -1041,6 +1113,7 @@ async function main(argv: string[]): Promise<number> {
           presenceWrite.domain_checked_at = null;
         }
 
+        // `row.prospectId` vient de `fetchScorePage`, filtree.
         const { error: presenceError } = await client
           .from('web_presence')
           .upsert(presenceWrite, { onConflict: 'prospect_id' });
@@ -1052,6 +1125,7 @@ async function main(argv: string[]): Promise<number> {
           continue;
         }
 
+        // Meme provenance que l'ecriture de la categorie juste au-dessus.
         const { error: scoreError } = await client.from('prospect_score').upsert(
           {
             prospect_id: row.prospectId,
@@ -1130,6 +1204,7 @@ async function main(argv: string[]): Promise<number> {
         const { data, error } = await client
           .from('prospect')
           .select('id, siret')
+          .eq('owner_id', proprietaire)
           .order('id')
           .range(from, from + PAGE_SIZE - 1);
         if (error) throw new Error(error.message);
@@ -1149,7 +1224,15 @@ async function main(argv: string[]): Promise<number> {
         remove: async (id) => {
           // Les dépendances partent en cascade : c'est la définition même de
           // « ne pas conserver ».
-          const { error } = await client.from('prospect').delete().eq('id', id);
+          // `owner_id` EN PLUS de `id`, sur la seule operation irreversible
+          // de cette base. Le proprietaire est sur la ligne : le filtre est
+          // donc direct, et il ne coute rien de l'exiger. Un identifiant
+          // errant ne peut alors supprimer que le travail de son proprietaire.
+          const { error } = await client
+            .from('prospect')
+            .delete()
+            .eq('id', id)
+            .eq('owner_id', proprietaire);
           if (error) throw new Error(error.message);
         },
         // Drapeau de cessation et horodatage dans un seul `update` : une
@@ -1158,10 +1241,13 @@ async function main(argv: string[]): Promise<number> {
         // erreur restait vraie pour toujours, même après correction de la fiche
         // Sirene, et le barème rendait 0 sans recours.
         setClosed: async (id, closed) => {
+          // Meme raison que pour la suppression : le proprietaire est sur la
+          // ligne, le filtre est direct et gratuit.
           const { error } = await client
             .from('prospect')
             .update({ is_closed: closed, reconciled_at: new Date().toISOString() })
-            .eq('id', id);
+            .eq('id', id)
+            .eq('owner_id', proprietaire);
           if (error) throw new Error(error.message);
         },
       });
@@ -1211,7 +1297,7 @@ async function main(argv: string[]): Promise<number> {
       // Les cessations viennent de `reconcile` et vivent sur `prospect` :
       // les deux lectures ci-dessous portent sur d'autres tables, on ecarte
       // donc en memoire plutot que par une jointure fragile.
-      const closed = await fetchClosedIds(client);
+      const closed = await fetchClosedIds(client, proprietaire);
 
 
       // Seuls les prospects sans domaine propre : proposer un nom à qui en a
@@ -1232,7 +1318,12 @@ async function main(argv: string[]): Promise<number> {
       for (let from = 0; ; from += PAGE_SIZE) {
         const { data, error } = await client
           .from('web_presence')
-          .select('prospect_id, prospect(denomination, denomination_usuelle, trade_slug)')
+          .select('prospect_id, prospect!inner(denomination, denomination_usuelle, trade_slug)')
+          // `prospect!inner(...)` et non `prospect(...)` : sans `!inner`, les
+          // lignes de tous les clients remontent avec `prospect: null`, la
+          // boucle les ecarte en silence, et le run annonce « 0 verifies »
+          // comme s'il n'y avait rien a faire.
+          .eq('prospect.owner_id', proprietaire)
           .in('category', [...DOMAIN_PROPOSAL_CATEGORIES])
           .or(`domain_checked_at.is.null,domain_checked_at.lt.${staleCutoff}`)
           .order('prospect_id')
@@ -1314,6 +1405,7 @@ async function main(argv: string[]): Promise<number> {
           write.domain_checked_at = new Date().toISOString();
         }
 
+        // `row.prospect_id` vient de la lecture filtree ci-dessus.
         const { error } = await client
           .from('web_presence')
           .upsert(write, { onConflict: 'prospect_id' });
@@ -1344,8 +1436,8 @@ async function main(argv: string[]): Promise<number> {
       const genConfig = loadGenerateConfig(process.env);
       const client = createClient(loadConfig(process.env));
 
-      const candidats = await fetchSiteCandidates(client, tradeSlug);
-      const dejaFait = await fetchSiteRows(client);
+      const candidats = await fetchSiteCandidates(client, proprietaire, tradeSlug);
+      const dejaFait = await fetchSiteRows(client, proprietaire);
 
       // Un contenu déjà écrit n'est pas régénéré : c'est le seul étage qui
       // dépense de l'argent, et un rejeu distrait coûterait vingt-deux appels.
@@ -1400,6 +1492,7 @@ async function main(argv: string[]): Promise<number> {
         usage.output += resultat.report.usage.output;
 
         for (const { prospectId, contenu } of resultat.contenus) {
+          // `prospectId` vient de `fetchSiteCandidates`, filtree.
           const { error } = await client.from('prospect_site').upsert({
             prospect_id: prospectId,
             // La colonne est `jsonb`. Le contenu a déjà été validé contre son
@@ -1444,8 +1537,8 @@ async function main(argv: string[]): Promise<number> {
       const pitchConfig = loadPitchConfig(process.env);
       const client = createClient(loadConfig(process.env));
 
-      const candidats = await fetchPitchCandidates(client);
-      const dejaRediges = await fetchProspectsDejaRediges(client);
+      const candidats = await fetchPitchCandidates(client, proprietaire);
+      const dejaRediges = await fetchProspectsDejaRediges(client, proprietaire);
 
       // Un prospect déjà rédigé n'est pas repris : c'est un étage payant, et un
       // rejeu distrait coûterait autant que le premier passage.
@@ -1474,6 +1567,7 @@ async function main(argv: string[]): Promise<number> {
       let ecrits = 0;
       let echoue = resultat.report.failed;
       for (const m of resultat.messages) {
+        // `m.prospectId` vient de `fetchPitchCandidates`, filtree.
         const { error } = await client.from('generated_message').insert({
           prospect_id: m.prospectId,
           channel: m.canal,
@@ -1528,7 +1622,7 @@ async function main(argv: string[]): Promise<number> {
 
       const pubConfig = loadPublishConfig(process.env);
       const client = createClient(loadConfig(process.env));
-      const rows = await fetchSiteRows(client);
+      const rows = await fetchSiteRows(client, proprietaire);
       // Le gabarit actif en base prime sur PROSPEO_GITHUB_TEMPLATE_REPO — le
       // métier, lui, continue de primer sur les deux (templateRepoFor,
       // inchangé, tranche entre ce repli et trade.templateRepo plus bas dans
@@ -1582,7 +1676,7 @@ async function main(argv: string[]): Promise<number> {
         teamId: depConfig.vercelTeamId,
       });
 
-      const rows = await fetchSiteRows(client);
+      const rows = await fetchSiteRows(client, proprietaire);
       const aDeployer = Object.entries(rows).filter(
         ([, r]) => r.repo_full_name !== null && r.unpublished_at === null && r.deployment_url === null,
       );
@@ -1628,8 +1722,13 @@ async function main(argv: string[]): Promise<number> {
             const { data, error } = await client
               .from('prospect_site')
               .select(
-                'prospect_id, vercel_project_id, repo_full_name, published_at, unpublished_at, prospect(prospect_pipeline(status))',
+                'prospect_id, vercel_project_id, repo_full_name, published_at, unpublished_at, prospect!inner(prospect_pipeline(status))',
               )
+              // `!inner` : `unpublish` SUPPRIME des projets Vercel. Sans lui,
+              // les sites de tous les clients remonteraient, et le retrait
+              // d'un site publie au nom d'une entreprise reelle se
+              // declencherait sur la decision d'un tiers.
+              .eq('prospect.owner_id', proprietaire)
               .not('repo_full_name', 'is', null)
               .order('prospect_id')
               .range(from, from + PAGE_SIZE - 1);
@@ -1661,7 +1760,14 @@ async function main(argv: string[]): Promise<number> {
           for (let from = 0; ; from += PAGE_SIZE) {
             const { data, error } = await client
               .from('prospect_site')
-              .select('vercel_project_id')
+              .select('vercel_project_id, prospect!inner()')
+              // Filtre aussi, et c'est SANS DANGER ici : cet ensemble est une
+              // liste d'AUTORISATION — `projetSupprimable` n'accepte que ce
+              // qui y figure. Le restreindre ne peut donc que refuser une
+              // suppression, jamais en permettre une de plus. Comme
+              // `lireSitesEnLigne` porte le meme filtre, tout projet a retirer
+              // y figure encore.
+              .eq('prospect.owner_id', proprietaire)
               .not('vercel_project_id', 'is', null)
               .order('prospect_id')
               .range(from, from + PAGE_SIZE - 1);
@@ -1677,6 +1783,7 @@ async function main(argv: string[]): Promise<number> {
           await vercel.supprimerProjet(id);
         },
         async marquerDepublie(prospectId) {
+          // `prospectId` vient de `lireSitesEnLigne`, filtree ci-dessus.
           const { error } = await client
             .from('prospect_site')
             .update({ unpublished_at: new Date().toISOString(), updated_at: new Date().toISOString() })
@@ -1735,6 +1842,13 @@ async function main(argv: string[]): Promise<number> {
           const { data, error } = await client
             .from('campaign_job')
             .select('id,prospect_id,campaign_id,attempts')
+            // LA porte d'entree du worker, et la seule de tout le collector
+            // ou un `prospect_id` arrive d'ailleurs que d'une lecture deja
+            // filtree : c'est le dashboard qui remplit cette file. Sur
+            // `campaign_job` le proprietaire s'appelle `requested_by`, et il
+            // est sur la ligne. Un worker par utilisateur (D8) : il ne draine
+            // que la file de celui qu'il sert.
+            .eq('requested_by', proprietaire)
             .eq('state', 'en_attente')
             .order('requested_at', { ascending: true })
             .limit(20);
@@ -1749,6 +1863,7 @@ async function main(argv: string[]): Promise<number> {
             .from('campaign_job')
             .update({ state: 'en_cours', started_at: new Date().toISOString() })
             .eq('id', id)
+            .eq('requested_by', proprietaire)
             .eq('state', 'en_attente')
             .select('id');
           if (error) throw new Error(error.message);
@@ -1771,14 +1886,15 @@ async function main(argv: string[]): Promise<number> {
             cost_eur: cout,
             finished_at: new Date().toISOString(),
           })
-          .eq('id', id);
+          .eq('id', id)
+          .eq('requested_by', proprietaire);
         // Journalisé et non relancé : une exception ici sortirait de
         // `traiterUn` par le `finally`, et la boucle s'arrêterait sur un
         // problème d'écriture alors que le déploiement, lui, a réussi.
         if (error) process.stderr.write(`worker : clôture échouée — ${error.message}\n`);
       };
 
-      const deps = chaineDeps(client);
+      const deps = chaineDeps(client, proprietaire);
 
       const traiterUn = async (): Promise<boolean> => {
         // `prendreProchain` lit puis écrit sur Supabase, et `fileDeps` fait un
@@ -1893,6 +2009,12 @@ async function main(argv: string[]): Promise<number> {
         .channel('campagne-file')
         .on(
           'postgres_changes',
+          // Volontairement NON filtre sur `requested_by`. Un reveil de trop
+          // ne coute qu'une lecture, elle-meme filtree — `listerEnAttente` ne
+          // rend que les jobs de ce proprietaire, et un job etranger ne sera
+          // donc jamais pris. Un filtre Realtime mal ecrit, lui, echoue sans
+          // bruit : le worker ne serait plus reveille que par le balayage des
+          // 30 s, et personne ne le verrait.
           { event: 'INSERT', schema: 'public', table: 'campaign_job' },
           () => lancerDrainage(),
         )

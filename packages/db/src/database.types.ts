@@ -22,6 +22,7 @@ export type Database = {
           created_by: string | null
           id: string
           label: string
+          owner_id: string | null
           size: number
           state: Database["public"]["Enums"]["campaign_state"]
         }
@@ -32,6 +33,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           label: string
+          owner_id?: string | null
           size: number
           state?: Database["public"]["Enums"]["campaign_state"]
         }
@@ -42,6 +44,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           label?: string
+          owner_id?: string | null
           size?: number
           state?: Database["public"]["Enums"]["campaign_state"]
         }
@@ -329,6 +332,7 @@ export type Database = {
           latitude: number | null
           longitude: number | null
           naf_code: string | null
+          owner_id: string
           postal_code: string
           reconciled_at: string | null
           siren: string
@@ -351,6 +355,7 @@ export type Database = {
           latitude?: number | null
           longitude?: number | null
           naf_code?: string | null
+          owner_id: string
           postal_code: string
           reconciled_at?: string | null
           siren: string
@@ -373,6 +378,7 @@ export type Database = {
           latitude?: number | null
           longitude?: number | null
           naf_code?: string | null
+          owner_id?: string
           postal_code?: string
           reconciled_at?: string | null
           siren?: string

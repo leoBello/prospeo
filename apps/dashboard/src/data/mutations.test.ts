@@ -311,23 +311,35 @@ describe('deposerJob', () => {
     // Vercel, il écrit une ligne. Se tromper de table ou d'état laisserait
     // une demande qu'aucun worker ne draine, sans la moindre erreur.
     const { client, appels } = fakeClient();
-    void deposerJob(client, 'p1');
+    void deposerJob(client, 'p1', 'u1');
 
     expect(appels[0]?.table).toBe('campaign_job');
     expect(appels[0]?.verbe).toBe('insert');
     expect(appels[0]?.valeurs).toMatchObject({ prospect_id: 'p1', state: 'en_attente' });
   });
 
+  it('renseigne requested_by avec l’identifiant de l’utilisateur connecté, faute de quoi la RLS refuse l’insertion', () => {
+    // Le cœur de la tâche 5 : `campaign_job` porte désormais
+    // `proprietaire_seul`, qui filtre sur `requested_by = auth.uid()`. Une
+    // ligne déposée sans cette colonne est un `insert` que la politique
+    // refuse — c'est le bouton « Déployer » qui ne marche plus, en
+    // production, depuis que la migration est appliquée.
+    const { client, appels } = fakeClient();
+    void deposerJob(client, 'p1', 'u1');
+
+    expect((appels[0]?.valeurs as Record<string, unknown>)['requested_by']).toBe('u1');
+  });
+
   it('rend null quand l insertion reussit', async () => {
     const { client } = fakeClient();
-    expect(await deposerJob(client, 'p1')).toBeNull();
+    expect(await deposerJob(client, 'p1', 'u1')).toBeNull();
   });
 
   it('rend le message quand la RLS refuse, au lieu de le taire', async () => {
     // Une écriture refusée qui ne remonte pas laisse l'opérateur croire que
     // le déclenchement est parti. C'est le défaut relevé sur `designerGabarit`.
     const { client } = fakeClient({ message: 'RLS' });
-    expect(await deposerJob(client, 'p1')).toBe('RLS');
+    expect(await deposerJob(client, 'p1', 'u1')).toBe('RLS');
   });
 
   it('traite une violation d unicite comme un succes, pas comme une erreur', async () => {
@@ -336,7 +348,7 @@ describe('deposerJob', () => {
     // joue son rôle, et l'écran affiche déjà « en file d'attente ». Remonter
     // une erreur ferait recliquer sur une demande déjà déposée.
     const { client } = fakeClient({ code: '23505', message: 'duplicate key' });
-    expect(await deposerJob(client, 'p1')).toBeNull();
+    expect(await deposerJob(client, 'p1', 'u1')).toBeNull();
   });
 });
 
