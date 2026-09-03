@@ -110,6 +110,74 @@ export type Database = {
           },
         ]
       }
+      connexion_plateforme: {
+        Row: {
+          compte_libelle: string | null
+          connectee_at: string
+          etat: Database["public"]["Enums"]["etat_connexion"]
+          etat_constate_at: string | null
+          id: string
+          owner_id: string
+          plateforme: Database["public"]["Enums"]["plateforme_connectee"]
+          reference: string | null
+        }
+        Insert: {
+          compte_libelle?: string | null
+          connectee_at?: string
+          etat?: Database["public"]["Enums"]["etat_connexion"]
+          etat_constate_at?: string | null
+          id?: string
+          owner_id: string
+          plateforme: Database["public"]["Enums"]["plateforme_connectee"]
+          reference?: string | null
+        }
+        Update: {
+          compte_libelle?: string | null
+          connectee_at?: string
+          etat?: Database["public"]["Enums"]["etat_connexion"]
+          etat_constate_at?: string | null
+          id?: string
+          owner_id?: string
+          plateforme?: Database["public"]["Enums"]["plateforme_connectee"]
+          reference?: string | null
+        }
+        Relationships: []
+      }
+      connexion_secret: {
+        Row: {
+          chiffre: string
+          cle_id: string
+          connexion_id: string
+          ecrit_at: string
+          etiquette: string
+          vecteur: string
+        }
+        Insert: {
+          chiffre: string
+          cle_id: string
+          connexion_id: string
+          ecrit_at?: string
+          etiquette: string
+          vecteur: string
+        }
+        Update: {
+          chiffre?: string
+          cle_id?: string
+          connexion_id?: string
+          ecrit_at?: string
+          etiquette?: string
+          vecteur?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "connexion_secret_connexion_id_fkey"
+            columns: ["connexion_id"]
+            isOneToOne: true
+            referencedRelation: "connexion_plateforme"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deployment_event: {
         Row: {
           detail: string | null
@@ -750,6 +818,7 @@ export type Database = {
         | "en_ligne"
         | "retrait"
       enrichment_status: "ok" | "not_found" | "ambiguous" | "blocked"
+      etat_connexion: "active" | "revoquee" | "indechiffrable"
       interaction_kind: "appel" | "whatsapp" | "email" | "sms" | "note"
       pipeline_event_origin: "observe" | "amorcage"
       pipeline_status:
@@ -760,6 +829,7 @@ export type Database = {
         | "gagne"
         | "perdu"
         | "ne_pas_contacter"
+      plateforme_connectee: "github" | "vercel" | "google"
       send_state: "en_cours" | "envoye" | "echoue"
       web_presence_category:
         | "none"
@@ -914,6 +984,7 @@ export const Constants = {
         "retrait",
       ],
       enrichment_status: ["ok", "not_found", "ambiguous", "blocked"],
+      etat_connexion: ["active", "revoquee", "indechiffrable"],
       interaction_kind: ["appel", "whatsapp", "email", "sms", "note"],
       pipeline_event_origin: ["observe", "amorcage"],
       pipeline_status: [
@@ -925,6 +996,7 @@ export const Constants = {
         "perdu",
         "ne_pas_contacter",
       ],
+      plateforme_connectee: ["github", "vercel", "google"],
       send_state: ["en_cours", "envoye", "echoue"],
       web_presence_category: [
         "none",

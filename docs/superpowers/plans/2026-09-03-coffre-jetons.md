@@ -160,11 +160,16 @@ create table connexion_secret (
 alter table connexion_plateforme enable row level security;
 alter table connexion_secret     enable row level security;
 
--- L'état se lit par son propriétaire, comme le reste des données de client.
-create policy proprietaire_seul on connexion_plateforme
-  for all to authenticated
-  using (owner_id = (select auth.uid()))
-  with check (owner_id = (select auth.uid()));
+-- LECTURE SEULE, et non `for all` comme sur `prospect`/`campaign`. Cette
+-- table n'est JAMAIS écrite par le dashboard (V5 du spec) : les jetons
+-- arrivent par les rappels OAuth, traités côté collector en `service_role`,
+-- qui contourne RLS. Donner l'écriture ici ouvrirait exactement
+-- l'affordance que la doctrine interdit — un utilisateur pourrait
+-- s'INSÉRER lui-même une ligne « vercel, active » sans jamais être passé
+-- par l'échange OAuth, et rien n'aurait constaté ce que cette ligne prétend.
+create policy proprietaire_lit on connexion_plateforme
+  for select to authenticated
+  using (owner_id = (select auth.uid()));
 
 -- `connexion_secret` N'A AUCUNE POLITIQUE, ET CE N'EST PAS UN OUBLI.
 --
