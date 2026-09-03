@@ -2229,7 +2229,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `export const CAMPAGNE_SELECT: string`
   - `export function toFaitsProspect(raw: unknown): FaitsProspect | null`
   - `export function campagneRangeReader(client: SupabaseClient<Database>): RangeReader<unknown>`
-  - `export interface LectureCampagne { faits: FaitsProspect[]; lignes: Map<string, FaitsLigne>; totalQualifies: number }`
+  - `export interface LectureCampagne { faits: FaitsProspect[]; lignes: Map<string, FaitsLigne>; totalProspects: number }`
   - `export async function fetchCampagne(client: SupabaseClient<Database>): Promise<LectureCampagne>`
   - `export async function fetchHeartbeat(client: SupabaseClient<Database>): Promise<{ beatAt: string; inFlight: number } | null>`
 
@@ -2537,13 +2537,16 @@ export interface LectureCampagne {
   faits: FaitsProspect[];
   lignes: Map<string, FaitsLigne>;
   /**
-   * Combien de prospects sont qualifiés dans la base, tous statuts confondus.
+   * Combien de prospects ont été lus en tout, sans aucun filtre.
    *
-   * C'est ce qui permet à l'écran de distinguer « le lot est fini » de « la
-   * base est vide » — deux absences de natures différentes, que le seul
-   * `faits.length === 0` confondrait.
+   * Ne mesure ni l'éligibilité ni le score — c'est `classerLot` qui filtre.
+   * Combiné à lui, ce compte permet à l'écran de distinguer « le lot est
+   * fini » de « la base est vide » — deux absences de natures différentes,
+   * que le seul `faits.length === 0` confondrait. Mais c'est cette
+   * combinaison qui tranche, pas ce champ seul : lui seul ne vaut jamais que
+   * `faits.length`, dont il est la copie littérale.
    */
-  totalQualifies: number;
+  totalProspects: number;
 }
 
 export async function fetchCampagne(
@@ -2580,7 +2583,7 @@ export async function fetchCampagne(
     });
   }
 
-  return { faits, lignes, totalQualifies: faits.length };
+  return { faits, lignes, totalProspects: faits.length };
 }
 ```
 
@@ -2688,9 +2691,9 @@ Dans `apps/dashboard/src/i18n/fr.ts`, à la suite du bloc `deploiements.*`, ajou
 
   'campagne.vide.lotFini': 'Le lot est fini',
   'campagne.vide.lotFini.detail': 'Les prospects les mieux notés ont tous été touchés.',
-  'campagne.vide.aucunQualifie': 'Aucun prospect qualifié',
-  'campagne.vide.aucunQualifie.detail':
-    "La base n'en contient aucun pour ce métier. Rien n'a été filtré : il n'y a rien.",
+  'campagne.vide.aucunProspect': 'Aucun prospect',
+  'campagne.vide.aucunProspect.detail':
+    "La base ne contient aucun prospect. Rien n'a été filtré : il n'y a rien.",
 ```
 
 > **Le pluriel de `campagne.sansScore` :** la forme `_one` est obligatoire dès qu'une clé porte `{count}` — `i18n.test.ts` vérifie que toute forme `_one` a sa forme plurielle, et `translate` choisit selon la règle de la langue (le français met au singulier tout ce qui est strictement inférieur à deux).
@@ -2728,11 +2731,11 @@ Cette tâche laisse la suite rouge par construction. Elle se commite **avec la t
 - Consumes: `SegmentEtat`, `EtatLigne`, `classerLot`, `etatLigne` (tâche 6) ; `fetchCampagne`, `fetchHeartbeat` (tâche 7) ; les clés de la tâche 8.
 - Produces:
   - `export function PisteCampagne(props: { site: SegmentEtat; mail: SegmentEtat; envoi: SegmentEtat }): ReactElement`
-  - `export interface CampagneScreenProps { lot: Lot; lignes: Map<string, FaitsLigne>; totalQualifies: number; heartbeat: { beatAt: string; inFlight: number } | null; onSignOut: () => void; nav: ReactNode }`
+  - `export interface CampagneScreenProps { lot: Lot; lignes: Map<string, FaitsLigne>; totalProspects: number; heartbeat: { beatAt: string; inFlight: number } | null; onSignOut: () => void; nav: ReactNode }`
   - `export function CampagneScreen(props: CampagneScreenProps): ReactElement`
   - `export type Vue = 'today' | 'campagne' | 'deploiements' | 'gabarit'`
 
-> **`totalQualifies` est une propriété à part entière, et non une dérivation de `lot.lignes.length`.** C'est ce qui sépare « les vingt mieux notés ont tous été touchés » de « la base ne contient personne ». Les confondre est exactement l'erreur que la doctrine des absences interdit, et un tableau vide ne porte pas cette information.
+> **`totalProspects` est une propriété à part entière, et non une dérivation de `lot.lignes.length`.** C'est ce qui sépare « les vingt mieux notés ont tous été touchés » de « la base ne contient personne ». Les confondre est exactement l'erreur que la doctrine des absences interdit, et un tableau vide ne porte pas cette information.
 
 > **Aucun bouton n'agit dans cette tâche.** L'écran lit. Le déclenchement est la tâche 11 — livrer une action qui n'a pas encore de file derrière elle serait une affordance qui annonce un fait qu'aucun code ne rend vrai.
 
@@ -2935,7 +2938,7 @@ Dans `apps/dashboard/src/ui/Nav.test.tsx`, étendre le test existant qui compte 
 
 - [ ] **Étape 6 : Écrire le test de `CampagneScreen`**
 
-Créer `apps/dashboard/src/screens/CampagneScreen.test.tsx`. **Avant d'écrire les assertions, ouvrir `fr.ts` et lire les valeurs de `campagne.sansScore`, `campagne.vide.lotFini` et `campagne.vide.aucunQualifie`.**
+Créer `apps/dashboard/src/screens/CampagneScreen.test.tsx`. **Avant d'écrire les assertions, ouvrir `fr.ts` et lire les valeurs de `campagne.sansScore`, `campagne.vide.lotFini` et `campagne.vide.aucunProspect`.**
 
 ```tsx
 import { describe, expect, it } from 'vitest';
@@ -2968,7 +2971,7 @@ describe('CampagneScreen', () => {
       <CampagneScreen
         lot={{ lignes: [fait()], sansScore: 0 }}
         lignes={new Map<string, FaitsLigne>()}
-        totalQualifies={12}
+        totalProspects={12}
         heartbeat={VIVANT}
         onSignOut={() => {}}
         nav={null}
@@ -2988,7 +2991,7 @@ describe('CampagneScreen', () => {
       <CampagneScreen
         lot={{ lignes: [fait()], sansScore: 3 }}
         lignes={new Map<string, FaitsLigne>()}
-        totalQualifies={12}
+        totalProspects={12}
         heartbeat={VIVANT}
         onSignOut={() => {}}
         nav={null}
@@ -3008,7 +3011,7 @@ describe('CampagneScreen', () => {
       <CampagneScreen
         lot={{ lignes: [fait()], sansScore: 0 }}
         lignes={new Map<string, FaitsLigne>()}
-        totalQualifies={12}
+        totalProspects={12}
         heartbeat={VIVANT}
         onSignOut={() => {}}
         nav={null}
@@ -3027,7 +3030,7 @@ describe('CampagneScreen', () => {
       <CampagneScreen
         lot={{ lignes: [], sansScore: 0 }}
         lignes={new Map<string, FaitsLigne>()}
-        totalQualifies={12}
+        totalProspects={12}
         heartbeat={VIVANT}
         onSignOut={() => {}}
         nav={null}
@@ -3041,28 +3044,28 @@ describe('CampagneScreen', () => {
 
 - [ ] **Étape 6 bis : Ajouter le cinquième test, celui qui sépare les deux vides**
 
-Le quatrième test ci-dessus montre « le lot est fini » avec `totalQualifies={12}`. Il lui faut son jumeau, sans quoi rien ne prouve que la distinction existe : un composant qui afficherait toujours « le lot est fini » les passerait tous les deux.
+Le quatrième test ci-dessus montre « le lot est fini » avec `totalProspects={12}`. Il lui faut son jumeau, sans quoi rien ne prouve que la distinction existe : un composant qui afficherait toujours « le lot est fini » les passerait tous les deux.
 
 ```tsx
   it('dit « aucun prospect qualifie » quand la base est vide, et non « lot fini »', () => {
     // Deux absences de natures differentes. Un tableau vide ne dit pas
-    // laquelle : c est `totalQualifies` qui le porte, et le deriver de
+    // laquelle : c est `totalProspects` qui le porte, et le deriver de
     // `lot.lignes.length` recreerait exactement la confusion.
-    const aucunQualifie = 'REMPLACER PAR LA VALEUR LUE DANS fr.ts';
+    const aucunProspect = 'REMPLACER PAR LA VALEUR LUE DANS fr.ts';
     const lotFini = 'REMPLACER PAR LA VALEUR LUE DANS fr.ts';
 
     renderWithPreferences(
       <CampagneScreen
         lot={{ lignes: [], sansScore: 0 }}
         lignes={new Map<string, FaitsLigne>()}
-        totalQualifies={0}
+        totalProspects={0}
         heartbeat={VIVANT}
         onSignOut={() => {}}
         nav={null}
       />,
     );
 
-    expect(screen.getByText(aucunQualifie)).toBeTruthy();
+    expect(screen.getByText(aucunProspect)).toBeTruthy();
     expect(screen.queryByText(lotFini)).toBeNull();
   });
 ```
@@ -3118,7 +3121,7 @@ function cleEtat(etat: EtatLigne): TranslationKey {
 export interface CampagneScreenProps {
   lot: Lot;
   lignes: Map<string, FaitsLigne>;
-  totalQualifies: number;
+  totalProspects: number;
   heartbeat: { beatAt: string; inFlight: number } | null;
   onSignOut: () => void;
   nav: ReactNode;
@@ -3137,7 +3140,7 @@ const LIGNE_VIERGE: FaitsLigne = {
 export function CampagneScreen({
   lot,
   lignes,
-  totalQualifies,
+  totalProspects,
   heartbeat,
   onSignOut,
   nav,
@@ -3161,16 +3164,16 @@ export function CampagneScreen({
 
           {lot.lignes.length === 0 ? (
             // Deux vides de natures différentes, deux écrans. Le second ne se
-            // dérive PAS d'un tableau vide : `totalQualifies` le porte.
+            // dérive PAS d'un tableau vide : `totalProspects` le porte.
             <div className={styles.vide} role="status">
               <p className={styles.videTitre}>
-                {totalQualifies === 0
-                  ? t('campagne.vide.aucunQualifie')
+                {totalProspects === 0
+                  ? t('campagne.vide.aucunProspect')
                   : t('campagne.vide.lotFini')}
               </p>
               <p className={styles.videDetail}>
-                {totalQualifies === 0
-                  ? t('campagne.vide.aucunQualifie.detail')
+                {totalProspects === 0
+                  ? t('campagne.vide.aucunProspect.detail')
                   : t('campagne.vide.lotFini.detail')}
               </p>
             </div>
@@ -3247,7 +3250,7 @@ export type CampagneState =
       status: 'ready';
       lot: Lot;
       lignes: Map<string, FaitsLigne>;
-      totalQualifies: number;
+      totalProspects: number;
       heartbeat: { beatAt: string; inFlight: number } | null;
     }
   | { status: 'error'; message: string };

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { toFaitsProspect } from './campagne.js';
+import { toFaitsLigne, toFaitsProspect } from './campagne.js';
 
 describe('toFaitsProspect', () => {
   it('lit un score absent comme null et jamais comme zero', () => {
@@ -78,5 +78,77 @@ describe('toFaitsProspect', () => {
     // Meme doctrine que `typeDeTelephone` dans queries.ts : une ligne que la
     // base ne nomme pas ne peut pas peser sur un classement.
     expect(toFaitsProspect({ denomination: 'Sans id' })).toBeNull();
+  });
+});
+
+describe('toFaitsLigne', () => {
+  it('retient l evenement de deploiement le plus recent quand plusieurs sont embarques, meme hors ordre', () => {
+    // Le tableau n EST PAS trie dans ce fixture : l evenement le plus recent
+    // (en_ligne, 02) est place AVANT le plus ancien (build, 01) dans le
+    // tableau. Si la fonction se contentait de prendre le premier element,
+    // elle retiendrait le mauvais des deux ici comme la-bas.
+    const f = toFaitsLigne(
+      {
+        id: 'p-1',
+        prospect_site: null,
+        prospect_contact: null,
+        generated_message: [],
+        deployment_event: [
+          { step: 'build', outcome: 'reussi', detail: null, occurred_at: '2026-09-01T10:00:00Z' },
+          { step: 'en_ligne', outcome: 'reussi', detail: null, occurred_at: '2026-09-02T08:00:00Z' },
+        ],
+        message_send: [],
+      },
+      null,
+    );
+
+    expect(f.derniereEtape).toMatchObject({ step: 'en_ligne', outcome: 'reussi' });
+  });
+
+  it('rend une absence reelle quand aucun evenement n est embarque, jamais une troncature', () => {
+    // Un tableau VIDE, pas un tableau tronque a une limite globale : c est ce
+    // que corrige l embarquement de `deployment_event` dans `CAMPAGNE_SELECT`
+    // (D3, doctrine des absences).
+    const f = toFaitsLigne(
+      {
+        id: 'p-1',
+        prospect_site: null,
+        prospect_contact: null,
+        generated_message: [],
+        deployment_event: [],
+        message_send: [],
+      },
+      null,
+    );
+
+    expect(f.derniereEtape).toBeNull();
+  });
+
+  it('distingue un prospect avec un envoi d un prospect sans aucun envoi', () => {
+    const avecEnvoi = toFaitsLigne(
+      {
+        id: 'p-1',
+        prospect_site: null,
+        prospect_contact: null,
+        generated_message: [],
+        deployment_event: [],
+        message_send: [{ state: 'envoye', sent_at: '2026-09-02T09:00:00Z', started_at: '2026-09-02T08:59:00Z' }],
+      },
+      null,
+    );
+    const sansEnvoi = toFaitsLigne(
+      {
+        id: 'p-2',
+        prospect_site: null,
+        prospect_contact: null,
+        generated_message: [],
+        deployment_event: [],
+        message_send: [],
+      },
+      null,
+    );
+
+    expect(avecEnvoi.envoi).toMatchObject({ state: 'envoye', sentAt: '2026-09-02T09:00:00Z' });
+    expect(sansEnvoi.envoi).toBeNull();
   });
 });
