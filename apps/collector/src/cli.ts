@@ -45,15 +45,9 @@ import { createPitchRedacteur, createRedacteur } from './sources/anthropic.js';
 import { createGithubClient } from './sources/github.js';
 import { createVercelClient } from './sources/vercel.js';
 import { createEventSink } from './stages/events.js';
-import { deployExitCode, runDeploy, type DeployDeps, type DeploySite } from './stages/deploy.js';
+import { deployExitCode, runDeploy, type DeploySite } from './stages/deploy.js';
 import { runGenerate, type GenerateInput } from './stages/generate.js';
-import {
-  publishExitCode,
-  runPublish,
-  type EtatSite,
-  type PublishDeps,
-  type PublishInput,
-} from './stages/publish.js';
+import { publishExitCode, runPublish, type PublishInput } from './stages/publish.js';
 import { runPitch, PITCH_TRACE, type PitchInput } from './stages/pitch.js';
 import {
   runUnpublish,
@@ -62,6 +56,7 @@ import {
   type UnpublishDeps,
 } from './stages/unpublish.js';
 import { gabaritDefautPourPublication, lireGabaritActif } from './site-template.js';
+import { construireDepsDeploiement, construireDepsPublication } from './chaine.js';
 
 // `.env` vit a la racine du depot. Ni tsx ni Node ne le chargent tout seuls :
 // sans cette ligne, la procedure documentee (« copier .env.example en .env »)
@@ -1773,35 +1768,14 @@ async function main(argv: string[]): Promise<number> {
       }
       const lot = limit === undefined ? entrees : entrees.slice(0, limit);
 
-      const deps: PublishDeps = {
+      const deps = construireDepsPublication(client, {
         github: createGithubClient({ token: pubConfig.githubToken, org: pubConfig.githubOrg }),
-        templateRepoDefaut: gabaritDefautPourPublication(gabaritActif, pubConfig.githubTemplateRepo),
-        async lireEtat(prospectId) {
-          const row = rows[prospectId];
-          if (row === undefined || row.repo_full_name === null) return null;
-          return {
-            repoFullName: row.repo_full_name,
-            empreinte: row.content_hash,
-            publishedAt: row.published_at === null ? null : new Date(row.published_at),
-          } satisfies EtatSite;
-        },
-        async enregistrer(prospectId, etat) {
-          const { error } = await client.from('prospect_site').upsert({
-            prospect_id: prospectId,
-            repo_full_name: etat.repoFullName,
-            repo_url: etat.repoUrl,
-            content_hash: etat.empreinte,
-            prompt_version: etat.promptVersion,
-            model: etat.model,
-            generated_at: etat.generatedAt.toISOString(),
-            published_at: etat.publishedAt.toISOString(),
-            updated_at: new Date().toISOString(),
-          });
-          if (error) throw new Error(error.message);
-        },
-        maintenant: () => new Date(),
-        events: createEventSink(client),
-      };
+        templateRepoDefaut: gabaritDefautPourPublication(
+          gabaritActif,
+          pubConfig.githubTemplateRepo,
+        ),
+        rows,
+      });
 
       const report = await runPublish(lot, deps);
       process.stdout.write(
@@ -1839,28 +1813,10 @@ async function main(argv: string[]): Promise<number> {
         vercelProjectId: row.vercel_project_id,
       }));
 
-      const deps: DeployDeps = {
+      const deps = construireDepsDeploiement(client, {
         vercel,
-        events: createEventSink(client),
-        async enregistrerProjet(prospectId, vercelProjectId) {
-          const { error } = await client
-            .from('prospect_site')
-            .update({ vercel_project_id: vercelProjectId, updated_at: new Date().toISOString() })
-            .eq('prospect_id', prospectId);
-          if (error) throw new Error(error.message);
-        },
-        async enregistrerUrl(prospectId, url) {
-          const { error } = await client
-            .from('prospect_site')
-            .update({ deployment_url: url, updated_at: new Date().toISOString() })
-            .eq('prospect_id', prospectId);
-          if (error) throw new Error(error.message);
-        },
-        // Le déclenchement double est sans conséquence : l'API Vercel
-        // dédoublonne les déploiements identiques faute de `forceNew`.
         attendreUrl: (projectId) => attendreUrl(vercel, projectId),
-        maintenant: () => new Date(),
-      };
+      });
 
       const report = await runDeploy(sites, deps);
       process.stdout.write(
