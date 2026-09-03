@@ -22,9 +22,11 @@ import type { VercelClient } from './sources/vercel.js';
 /**
  * Une ligne de `prospect_site` telle que `fetchSiteRows` la rend.
  *
- * Les dix champs sont ceux du `select` de `fetchSiteRows` (`cli.ts`), dans
- * le même ordre. En omettre un ferait échouer la construction du type au
- * premier appelant qui le lit, et non ici.
+ * Les neuf champs sont ceux du `select` de `fetchSiteRows` (`cli.ts`), dans
+ * le même ordre — `prospect_id`, dixième colonne du `select`, est la clé du
+ * `Record<string, LigneSite>` et non un champ de la valeur. En omettre un
+ * ferait échouer la construction du type au premier appelant qui le lit, et
+ * non ici.
  */
 export interface LigneSite {
   content: unknown;
@@ -98,7 +100,72 @@ export function construireDepsDeploiement(
         .eq('prospect_id', prospectId);
       if (error) throw new Error(error.message);
     },
+    // Le déclenchement double est sans conséquence : l'API Vercel
+    // dédoublonne les déploiements identiques faute de `forceNew`.
     attendreUrl: opts.attendreUrl,
     maintenant: () => new Date(),
   };
+}
+
+export type EtapeChaine = 'generate' | 'publish' | 'deploy' | 'pitch';
+
+export interface ResultatChaine {
+  termine: EtapeChaine[];
+  echec: { etape: EtapeChaine; message: string } | null;
+  /** `null` : aucune étape n'a su dire ce qu'elle coûtait. Ce n'est pas zéro. */
+  coutEur: number | null;
+}
+
+export interface ChaineDeps {
+  generer(prospectId: string): Promise<number | null>;
+  publier(prospectId: string): Promise<void>;
+  deployer(prospectId: string): Promise<void>;
+  rediger(prospectId: string): Promise<number | null>;
+}
+
+/**
+ * La chaîne complète sur UN prospect.
+ *
+ * **L'ordre est une dépendance de données, pas une convention** : publier
+ * avant d'avoir généré pousserait un dépôt vide, et rédiger avant d'avoir
+ * déployé produirait un mail citant une URL qui n'existe pas. La chaîne
+ * s'arrête donc au premier échec au lieu de sauter l'étape fautive.
+ *
+ * Le rapport nomme l'étape qui a échoué : c'est ce que la ligne de l'écran
+ * affichera, et « échoué » tout court n'aiderait personne.
+ */
+export async function traiterProspect(
+  prospectId: string,
+  deps: ChaineDeps,
+): Promise<ResultatChaine> {
+  const termine: EtapeChaine[] = [];
+  // `null` tant qu'aucune étape n'a rendu de coût — voir `ResultatChaine`.
+  let cout: number | null = null;
+
+  const ajouterCout = (montant: number | null): void => {
+    if (montant === null) return;
+    cout = cout === null ? montant : cout + montant;
+  };
+
+  const etapes: readonly [EtapeChaine, () => Promise<number | null>][] = [
+    ['generate', () => deps.generer(prospectId)],
+    ['publish', () => deps.publier(prospectId).then(() => null)],
+    ['deploy', () => deps.deployer(prospectId).then(() => null)],
+    ['pitch', () => deps.rediger(prospectId)],
+  ];
+
+  for (const [etape, executer] of etapes) {
+    try {
+      ajouterCout(await executer());
+      termine.push(etape);
+    } catch (cause) {
+      return {
+        termine,
+        echec: { etape, message: cause instanceof Error ? cause.message : String(cause) },
+        coutEur: cout,
+      };
+    }
+  }
+
+  return { termine, echec: null, coutEur: cout };
 }
