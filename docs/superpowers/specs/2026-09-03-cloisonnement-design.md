@@ -1,7 +1,7 @@
 # Cloisonnement — chaque utilisateur ne voit que ses prospects
 
 **Date :** 2026-09-03
-**Statut :** design, prêt pour plan d'implémentation — **une exception doctrinale demande une autorisation explicite (§7)**
+**Statut :** design validé, exception du §7 **autorisée le 3 septembre 2026** — prêt pour plan d'implémentation
 **Portée :** chantier n°8, étape 1 sur 6. Voir [`2026-09-03-multi-utilisateur-design.md`](2026-09-03-multi-utilisateur-design.md) pour les dix décisions qui l'encadrent.
 
 ---
@@ -252,7 +252,17 @@ pourrait insérer un doublon. Les deux instructions doivent être **dans la mêm
 transaction**, et la migration ne doit pas tourner pendant qu'un collector
 tourne.
 
-**Cette autorisation se demande au propriétaire, elle ne se déduit pas.**
+**AUTORISATION ACCORDÉE** par le propriétaire le 3 septembre 2026, sur ce
+point précis : retirer `prospect_siret_key` et la remplacer par un index
+unique sur `(owner_id, siret)`.
+
+Ce qu'elle ne couvre pas, et qui reste interdit sans une nouvelle demande :
+tout autre `drop`, tout `alter column`, toute suppression de donnée. Une
+autorisation donnée pour une contrainte ne s'étend pas à la suivante.
+
+Les deux précautions restent exigibles : **une seule transaction** pour le
+`drop` et le `create unique index`, et **aucun collector en marche** pendant
+la migration.
 
 ---
 
