@@ -1,7 +1,7 @@
 # Prospeo devient multi-utilisateur — décisions, mesures, et ce que ça casse
 
 **Date :** 2026-09-03
-**Statut :** décisions prises, mesures faites, **spec pas encore écrit** — questions ouvertes en §6
+**Statut :** dix décisions prises, mesures faites, **spec d'implémentation pas encore écrit**
 **Portée :** chantier n°8. Il n'amende pas le chantier n°7 : il en renverse une hypothèse.
 
 ---
@@ -45,9 +45,10 @@ L'utilisateur installe l'application sur son compte et l'autorise. Aucun
 secret à copier, portée révocable et limitée, jetons renouvelables.
 
 *Conséquence :* deux intégrations à construire et à faire valider côté GitHub
-et Vercel, plus un **stockage chiffré des jetons par utilisateur**, et leur
-résolution **par job** dans le worker — là où `loadPublishConfig(process.env)`
-lit aujourd'hui un jeton unique.
+et Vercel, plus un **coffre chiffré des jetons par utilisateur** — là où
+`loadPublishConfig(process.env)` lit aujourd'hui un jeton unique. D8 fait que
+le worker de campagne tient ceux de SON utilisateur en mémoire ; mais le
+§6 bis montre pourquoi le coffre reste indispensable malgré cela.
 
 ### D3 — L'application paie le modèle de langage
 
@@ -143,7 +144,7 @@ Davantage qu'il n'y paraît, et une chose s'en trouve **renforcée** :
 | **Les jetons du `.env`** | un `GITHUB_TOKEN`, un `VERCEL_TOKEN` pour tout le monde |
 | **D4 du chantier n°4** | « organisation et compte **dédiés** » dit l'inverse de la cible |
 | **L'accès au gabarit** | `runPublish` dérive un dépôt d'un modèle ; celui-ci vit chez l'application et le dépôt naît chez l'utilisateur — l'accès croisé est à résoudre |
-| **`worker_heartbeat`** | ligne unique, donc un seul worker pour tous : tenable, mais à décider explicitement |
+| **`worker_heartbeat`** | table à ligne unique (`check (id)`), alors que D8 demande un battement par utilisateur — et le dépôt interdit de modifier un objet existant. Table sœur obligatoire |
 | **Le plafond Google** | `gmail.send` est un scope **sensible**. En « External + Testing » on plafonne à **100 utilisateurs** ; au-delà, la **vérification Google** est exigée — semaines de délai, vidéo de démonstration, politique de confidentialité. C'est un prérequis produit, pas une case à cocher. |
 
 ## 6. Les six questions, tranchées le 3 septembre 2026
@@ -247,13 +248,26 @@ C'est un coût réel, à connaître avant d'écrire le spec plutôt qu'au milieu
 
 ## 7. Ordre suggéré
 
-Rien ne s'écrit avant que le §6 soit tranché. Ensuite, dans cet ordre, parce
-que chaque étape rend la suivante vérifiable :
+Chaque étape rend la suivante vérifiable, et la première n'est pas
+négociable :
 
-1. **Le cloisonnement** — colonne propriétaire, RLS réécrite, rattachement de
-   l'existant. C'est le seul poste qui, non fait, est une fuite de données.
-2. **Le stockage des jetons par utilisateur** et leur résolution par job.
-3. **La GitHub App et l'intégration Vercel**, avec le parcours d'installation.
-4. **L'enrichissement par tranches**, et ce que l'écran en dit.
-5. **Google et l'envoi**, une fois le projet Google Cloud de l'application
+1. **Le cloisonnement** — colonne propriétaire, RLS réécrite table par table,
+   rattachement de l'existant (D5). C'est le seul poste qui, non fait, n'est
+   pas une gêne mais un **incident** : au deuxième inscrit, chacun voit les
+   prospects de l'autre.
+2. **Le coffre à jetons chiffré**, et la GitHub App + l'intégration Vercel qui
+   le remplissent (D2, D6). Le coffre avant les intégrations : c'est lui que
+   les deux exécutants du §6 bis liront.
+3. **Le worker par utilisateur** (D8) et son superviseur, avec la table sœur
+   de battement. Le worker existant devient le modèle, pas le produit fini.
+4. **La seconde file et l'enrichissement par tranches** (D7, D4), et ce que
+   l'écran en dit sans jamais promettre une durée non mesurée (D9).
+5. **Le processus de péremption de l'application** (D10, §6 bis) — distinct
+   des workers, et la seule chose qui fasse tenir D5 du chantier n°4.
+6. **Google et l'envoi**, une fois le projet Google Cloud de l'application
    créé et la question de la vérification tranchée.
+
+**Ce qui n'est pas dans cet ordre, et qui devrait l'être avant l'ouverture à
+de vrais clients :** les conditions d'utilisation qu'exige D10, et le dossier
+de vérification Google qu'exige `gmail.send` au-delà de cent utilisateurs.
+Ni l'un ni l'autre n'est du code, et les deux prennent des semaines.
