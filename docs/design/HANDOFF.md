@@ -825,7 +825,10 @@ du coffre (`jetonDe`, en service depuis cette étape après deux étapes sans
 appelant). Un bug latent trouvé au passage : `jetonDe` aurait marqué à tort
 une connexion GitHub saine comme `indechiffrable`, faute de secret à
 déchiffrer côté GitHub App — corrigé en donnant à GitHub sa propre fonction
-de résolution plutôt que de réutiliser celle de Vercel.
+de résolution plutôt que de réutiliser celle de Vercel. Les messages d'erreur
+adressés à l'utilisateur (GitHub et Vercel) traduisent désormais les états
+`revoquee`/`indechiffrable` en français correct via `libelleEtatConnexion`,
+plutôt que d'interpoler le slug technique brut.
 
 `worker_heartbeat_utilisateur` remplace le singleton pour le worker de
 campagne ; `worker_heartbeat` ne se supprime pas (le dépôt l'interdit) et
@@ -854,6 +857,15 @@ choisi** — décision reportée, avec de vrais tarifs clients en main.
 - La ligne de témoin de l'étape 1 (`b81c0bf1-…`, `vercel` seul, fixture de
   `verifier-cloisonnement.mjs`) reste en base, inerte pour ce chantier
   puisqu'elle n'a pas les deux plateformes actives — signalée, pas nettoyée.
+- Deux fenêtres de course théoriques, trouvées en revue (Tâche 7) : (1) deux
+  balayages `balayer()` se chevauchent si l'un est anormalement lent ;
+  (2) un process fraîchement redémarré peut être tué à tort si son battement
+  est lu avant sa première écriture. De faible probabilité (le délai de backoff
+  minimal, 5 secondes, très supérieur à la durée d'un aller-retour base de
+  données) et non corrigées à ce stade. Une piste existe : comparer
+  l'identité du process — par exemple son `pid` — plutôt que de raisonner
+  uniquement sur l'`ownerId`, pour éviter qu'une décision fondée sur un cycle
+  de balayage antérieur ne s'applique à un process relancé entre-temps.
 
 ## La question ouverte du lot 3
 
