@@ -792,6 +792,24 @@ export type Database = {
         }
         Relationships: []
       }
+      worker_heartbeat_utilisateur: {
+        Row: {
+          beat_at: string
+          in_flight: number
+          owner_id: string
+        }
+        Insert: {
+          beat_at: string
+          in_flight?: number
+          owner_id: string
+        }
+        Update: {
+          beat_at?: string
+          in_flight?: number
+          owner_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
