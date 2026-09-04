@@ -749,6 +749,73 @@ dire que « aucun compte », sans aucun moyen d'y changer quoi que ce soit. La
 doctrine du dépôt interdit de plus un composant important sans maquette
 approuvée ; aucune maquette n'existe encore pour cet écran.
 
+## Chantier n°8, étape 3 — le relais OAuth : ce qui connecte, et ce qui ne rebranche rien
+
+**Déployé le 4 septembre 2026.** Spec :
+[`2026-09-03-relais-oauth-design.md`](../superpowers/specs/2026-09-03-relais-oauth-design.md).
+Plan : [`2026-09-03-relais-oauth.md`](../superpowers/plans/2026-09-03-relais-oauth.md).
+Ne pas lire ce tableau comme clos.
+
+### Ce qui est prouvé, contre GitHub et Vercel réels
+
+Un utilisateur clique un lien (`/api/connecter?plateforme=…&owner=…`),
+installe la GitHub App ou autorise l'intégration Vercel sur SON propre
+compte, et `connexion_plateforme` porte une vraie connexion — `reference`
+pour GitHub (l'`installation_id`, non secret), `connexion_secret` chiffré
+pour Vercel. Prouvé le 4 septembre 2026 par le propriétaire, contre les deux
+plateformes réelles : `connexion_plateforme` porte deux lignes (`vercel`
+avec `connexion_secret` associé, 60 octets qui ne se déchiffrent pas en
+texte lisible ; `github` avec `reference = 159129996`, sans
+`connexion_secret` — rien à chiffrer). Le `state` signé (HMAC-SHA256, dix
+minutes de validité) protège les deux flux contre la falsification d'un
+`owner_id`.
+
+### Une limite Vercel découverte au premier déploiement, pas anticipée par le plan
+
+**Un projet Vercel dont le Root Directory est `apps/relais-oauth` ne peut
+accéder à AUCUN fichier en dehors de ce dossier** — documenté par Vercel,
+y compris contre `..`. `packages/coffre` (le chiffrement, chantier n°8
+étape 3) est un paquet frère, donc hors de portée. Le premier déploiement a
+échoué net : `FUNCTION_INVOCATION_FAILED`, `ERR_MODULE_NOT_FOUND` sur
+`@prospeo/coffre/src/index.ts`.
+
+Le dashboard n'avait jamais heurté cette limite : il importe `@prospeo/db`
+uniquement pour des **types**, effacés à la compilation — jamais de code
+exécuté. Le relais, lui, appelle `chiffrer`/`lireCleMaitresse` pour de vrai,
+à l'exécution. **`apps/relais-oauth/src/coffre.ts` est désormais une copie
+délibérée** de `packages/coffre/src/coffre.ts`, commentée comme telle, avec
+le devoir de synchroniser les deux si l'algorithme change. Le collector n'est
+pas concerné : il tourne en local, jamais sur Vercel.
+
+**Pour tout paquet Vercel-déployé futur de ce dépôt** (Root Directory dans ce
+monorepo) : un paquet partagé (`packages/*`) ne peut y être consommé que pour
+ses **types**. Du code exécuté à l'exécution doit être vendoré, ou le paquet
+partagé doit gagner un vrai build compilé avec une stratégie d'inclusion —
+non résolu ici, juste contourné.
+
+### Ce qui n'est PAS encore construit, et c'est le point important
+
+**`publish.ts`/`deploy.ts` n'ont pas changé.** La chaîne de déploiement
+continue d'utiliser `GITHUB_TOKEN`/`VERCEL_TOKEN`, les secrets partagés —
+une vraie connexion existe désormais dans `connexion_plateforme` sans que
+rien dans le collector ne la lise encore. Rebrancher la chaîne attend D8 (un
+worker par utilisateur).
+
+**Aucun écran dashboard.** Toujours reporté, comme à l'étape 2 — même
+raison (pas de maquette approuvée pour un composant important).
+
+**Un risque résiduel assumé par le spec, pas par l'implémentation.** La
+GitHub App est volontairement sans OAuth utilisateur à l'installation (§2 du
+spec de l'étape 3) : rien ne lie cryptographiquement l'`installation_id` reçu
+à l'utilisateur qui vient de l'installer — seul le `state` garantit que
+*quelqu'un* de légitime a initié la demande, pas que l'installation
+désignée est la sienne. Trouvé en revue finale de branche. **Impact nul
+aujourd'hui** (rien ne lit encore `reference` pour agir) ; **deviendra réel**
+le jour où la chaîne de déploiement lira les connexions GitHub — à fermer à
+ce moment-là, pas avant.
+
+**Aucun processus de péremption n'existe.** Inchangé depuis l'étape 2.
+
 ## La question ouverte du lot 3
 
 `prospect_pipeline` ne porte que `status` et `updated_at`. Savoir qu'une
