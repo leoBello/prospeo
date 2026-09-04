@@ -103,9 +103,6 @@ importers:
 
   apps/relais-oauth:
     dependencies:
-      '@prospeo/coffre':
-        specifier: workspace:*
-        version: link:../../packages/coffre
       '@prospeo/db':
         specifier: workspace:*
         version: link:../../packages/db

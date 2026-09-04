@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { lireCleMaitresse, type Scelle } from '@prospeo/coffre';
+import { lireCleMaitresse, type Scelle } from './coffre.js';
 import { traiterRappelVercel, type VercelCallbackDeps } from './vercel-callback.js';
 import type { ResultatState } from './state.js';
 

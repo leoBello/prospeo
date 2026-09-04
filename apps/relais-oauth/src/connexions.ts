@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@prospeo/db';
-import type { Scelle } from '@prospeo/coffre';
+import type { Scelle } from './coffre.js';
 
 type Client = SupabaseClient<Database>;
 

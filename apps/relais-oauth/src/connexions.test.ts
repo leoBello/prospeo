@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@prospeo/db';
-import { chiffrer, lireCleMaitresse } from '@prospeo/coffre';
+import { chiffrer, lireCleMaitresse } from './coffre.js';
 import { ecrireConnexionGithub, ecrireConnexionVercel } from './connexions.js';
 
 const CLE = lireCleMaitresse('v1:' + Buffer.alloc(32, 7).toString('base64'));
