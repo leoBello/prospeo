@@ -172,10 +172,12 @@ export function campagneRangeReader(client: Client): RangeReader<unknown> {
 export async function fetchHeartbeat(
   client: Client,
 ): Promise<{ beatAt: string; inFlight: number } | null> {
+  // Pas de filtre explicite : comme partout ailleurs dans ce fichier, c'est
+  // la RLS (`proprietaire_seul`) qui borne le résultat au propriétaire
+  // courant — voir la note de tête de cette tâche.
   const { data, error } = await client
-    .from('worker_heartbeat')
+    .from('worker_heartbeat_utilisateur')
     .select('beat_at,in_flight')
-    .eq('id', true)
     .maybeSingle();
   if (error !== null) throw new Error(error.message);
   if (data === null) return null;

@@ -156,3 +156,38 @@ export interface CoffreConfig {
 export function loadCoffreConfig(env: Record<string, string | undefined>): CoffreConfig {
   return { cle: lireCleMaitresse(lire(env, 'PROSPEO_COFFRE_CLE')) };
 }
+
+export interface GithubAppConfig {
+  appId: string;
+  clePrivee: string;
+}
+
+/**
+ * Les secrets de l'App GitHub, dupliqués depuis l'environnement du relais
+ * (`apps/relais-oauth`) : le worker en a besoin pour fabriquer ses propres
+ * jetons d'installation (chantier n°8, étape suivant le relais OAuth).
+ */
+export function loadGithubAppConfig(env: Record<string, string | undefined>): GithubAppConfig {
+  const v = exiger(env, ['PROSPEO_GITHUB_APP_ID', 'PROSPEO_GITHUB_APP_PRIVATE_KEY'], 'worker');
+  return {
+    appId: v['PROSPEO_GITHUB_APP_ID'] as string,
+    // Même restauration que `loadRelaisConfig` (`apps/relais-oauth/src/
+    // config.ts`) : un PEM porte de vrais sauts de ligne, une variable
+    // d'environnement les perd souvent en route.
+    clePrivee: (v['PROSPEO_GITHUB_APP_PRIVATE_KEY'] as string).replace(/\\n/g, '\n'),
+  };
+}
+
+export interface GithubTemplateConfig {
+  githubTemplateRepo: string | undefined;
+}
+
+/**
+ * Le seul réglage que `chaineDeps` partage encore avec `loadPublishConfig` :
+ * le dépôt modèle de repli. Un loader à part, et non `loadPublishConfig`
+ * lui-même, parce que celui-ci EXIGE `GITHUB_TOKEN`/`PROSPEO_GITHUB_ORG` —
+ * des secrets globaux que `chaineDeps` ne lit plus (Tâche 6).
+ */
+export function loadGithubTemplateConfig(env: Record<string, string | undefined>): GithubTemplateConfig {
+  return { githubTemplateRepo: lire(env, 'PROSPEO_GITHUB_TEMPLATE_REPO') };
+}

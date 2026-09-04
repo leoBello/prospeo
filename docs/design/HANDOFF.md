@@ -816,6 +816,57 @@ ce moment-là, pas avant.
 
 **Aucun processus de péremption n'existe.** Inchangé depuis l'étape 2.
 
+## Chantier n°8, étape suivante — le worker par utilisateur : ce qui résout, et ce qui reste manuel
+
+`chaineDeps.publier()`/`.deployer()` résolvent maintenant le jeton et le
+compte de LEUR utilisateur — un jeton d'installation GitHub fabriqué à la
+demande (`jetonInstallationGithub`, jamais stocké), le jeton Vercel déchiffré
+du coffre (`jetonDe`, en service depuis cette étape après deux étapes sans
+appelant). Un bug latent trouvé au passage : `jetonDe` aurait marqué à tort
+une connexion GitHub saine comme `indechiffrable`, faute de secret à
+déchiffrer côté GitHub App — corrigé en donnant à GitHub sa propre fonction
+de résolution plutôt que de réutiliser celle de Vercel. Les messages d'erreur
+adressés à l'utilisateur (GitHub et Vercel) traduisent désormais les états
+`revoquee`/`indechiffrable` en français correct via `libelleEtatConnexion`,
+plutôt que d'interpoler le slug technique brut.
+
+`worker_heartbeat_utilisateur` remplace le singleton pour le worker de
+campagne ; `worker_heartbeat` ne se supprime pas (le dépôt l'interdit) et
+reste disponible pour un usage futur (D10, ou un diagnostic global).
+
+**Le superviseur existe, l'hébergement non.** `superviseur` (nouvelle
+commande du collector) démarre/surveille/arrête un `worker --owner <uuid>`
+par utilisateur éligible (GitHub et Vercel actifs), à base de
+`child_process` — portable tel quel vers n'importe quel hôte. Deux chiffrages
+faits pendant le brainstorming, à réutiliser plutôt qu'à refaire : Fly.io
+Machines coûte environ 2 à 3 \$/mois par utilisateur pour un process léger
+toujours allumé (donc linéaire avec le nombre de clients) ; un VPS à coût
+fixe (~6-12 \$/mois) héberge plusieurs dizaines de ces process via
+`pm2`/`systemd`, au prix d'un isolement plus faible. **Aucun des deux n'est
+choisi** — décision reportée, avec de vrais tarifs clients en main.
+
+**Ce que cette étape laisse délibérément de côté :**
+- Les commandes batch `publish`/`deploy` de `cli.ts` (lignes 1619 et 1668)
+  gardent leurs jetons globaux (`GITHUB_TOKEN`/`VERCEL_TOKEN`) — hors
+  périmètre, sans lien avec la file de campagne.
+- La péremption (D10) — un processus distinct, à l'application, qui lit le
+  coffre pour un utilisateur disparu. Le superviseur ne le remplace pas
+  (§6 bis du spec multi-utilisateur : les deux exécutants sont nécessaires).
+- Aucun nouvel écran : seul `fetchHeartbeat` est rebranché, l'écran de
+  campagne affiche la même chose, pour le bon utilisateur.
+- La ligne de témoin de l'étape 1 (`b81c0bf1-…`, `vercel` seul, fixture de
+  `verifier-cloisonnement.mjs`) reste en base, inerte pour ce chantier
+  puisqu'elle n'a pas les deux plateformes actives — signalée, pas nettoyée.
+- Deux fenêtres de course théoriques, trouvées en revue (Tâche 7) : (1) deux
+  balayages `balayer()` se chevauchent si l'un est anormalement lent ;
+  (2) un process fraîchement redémarré peut être tué à tort si son battement
+  est lu avant sa première écriture. De faible probabilité (le délai de backoff
+  minimal, 5 secondes, très supérieur à la durée d'un aller-retour base de
+  données) et non corrigées à ce stade. Une piste existe : comparer
+  l'identité du process — par exemple son `pid` — plutôt que de raisonner
+  uniquement sur l'`ownerId`, pour éviter qu'une décision fondée sur un cycle
+  de balayage antérieur ne s'applique à un process relancé entre-temps.
+
 ## La question ouverte du lot 3
 
 `prospect_pipeline` ne porte que `status` et `updated_at`. Savoir qu'une

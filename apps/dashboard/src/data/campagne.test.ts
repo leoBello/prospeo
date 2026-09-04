@@ -1,5 +1,7 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@prospeo/db';
 import { describe, expect, it } from 'vitest';
-import { toFaitsLigne, toFaitsProspect } from './campagne.js';
+import { fetchHeartbeat, toFaitsLigne, toFaitsProspect } from './campagne.js';
 
 describe('toFaitsProspect', () => {
   it('lit un score absent comme null et jamais comme zero', () => {
@@ -214,5 +216,38 @@ describe('toFaitsLigne', () => {
 
     expect(avecEnvoi.envoi).toMatchObject({ state: 'envoye', sentAt: '2026-09-02T09:00:00Z' });
     expect(sansEnvoi.envoi).toBeNull();
+  });
+});
+
+describe('fetchHeartbeat', () => {
+  it('lit worker_heartbeat_utilisateur, jamais l ancien singleton', async () => {
+    // LE DEFAUT QUE CE TEST FERME. Sans cette preuve, un renommage de table
+    // resterait invisible : le dashboard continuerait de lire l'ancien
+    // singleton, désormais mort, et afficherait « à l'arrêt » pour toujours
+    // — indiscernable d'un vrai worker jamais démarré.
+    const tables: string[] = [];
+    const b = {
+      select: () => b,
+      maybeSingle: () => Promise.resolve({ data: { beat_at: '2026-09-05T10:00:00.000Z', in_flight: 2 }, error: null }),
+    };
+    const client = {
+      from: (nom: string) => {
+        tables.push(nom);
+        return b;
+      },
+    } as unknown as SupabaseClient<Database>;
+
+    const r = await fetchHeartbeat(client);
+
+    expect(tables).toEqual(['worker_heartbeat_utilisateur']);
+    expect(r).toEqual({ beatAt: '2026-09-05T10:00:00.000Z', inFlight: 2 });
+  });
+
+  it('rend null quand aucune ligne n existe — jamais demarre, pas en echec', async () => {
+    const client = {
+      from: () => ({ select: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }) }),
+    } as unknown as SupabaseClient<Database>;
+
+    expect(await fetchHeartbeat(client)).toBeNull();
   });
 });

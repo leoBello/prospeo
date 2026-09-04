@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { chiffrer, lireCleMaitresse } from '@prospeo/coffre';
-import { jetonDe, type CoffreDeps } from './coffre.js';
+import { jetonDe, jetonInstallationGithub, type CoffreDeps, type CoffreGithubDeps } from './coffre.js';
 import { proprietaire } from './proprietaire.js';
 
 /** Trente-deux octets, la taille exacte d'une clé AES-256. */
@@ -113,5 +113,92 @@ describe('jetonDe', () => {
     expect((echecCapture as Error).message).not.toContain(
       'jeton-vercel-secret-a-ne-jamais-relire',
     );
+  });
+});
+
+describe('jetonInstallationGithub', () => {
+  const PROPRIETAIRE = proprietaire('131ab48e-055a-4a15-af4b-79ed7a2e4465');
+
+  function deps(surcharges: Partial<CoffreGithubDeps> = {}): CoffreGithubDeps {
+    return {
+      lireInstallation: async () => null,
+      marquerEtat: async () => {},
+      creerJetonInstallation: async () => ({ ok: true, token: 'jeton-installation' }),
+      ...surcharges,
+    };
+  }
+
+  it('rend absente quand aucune connexion n existe', async () => {
+    const creerJetonInstallation = vi.fn();
+    const r = await jetonInstallationGithub(deps({ creerJetonInstallation }), PROPRIETAIRE);
+
+    expect(r).toEqual({ jeton: null, etat: 'absente' });
+    expect(creerJetonInstallation).not.toHaveBeenCalled();
+  });
+
+  it('ne fabrique pas de jeton pour une connexion deja revoquee, et rend son etat tel quel', async () => {
+    const creerJetonInstallation = vi.fn();
+    const r = await jetonInstallationGithub(
+      deps({
+        lireInstallation: async () => ({ connexionId: 'cx-1', etat: 'revoquee', installationId: '999' }),
+        creerJetonInstallation,
+      }),
+      PROPRIETAIRE,
+    );
+
+    expect(r).toEqual({ jeton: null, etat: 'revoquee' });
+    expect(creerJetonInstallation).not.toHaveBeenCalled();
+  });
+
+  it('leve sur une connexion active sans identifiant d installation — etat incoherent', async () => {
+    await expect(
+      jetonInstallationGithub(
+        deps({ lireInstallation: async () => ({ connexionId: 'cx-1', etat: 'active', installationId: null }) }),
+        PROPRIETAIRE,
+      ),
+    ).rejects.toThrow(/incohérent/);
+  });
+
+  it('marque revoquee en base quand GitHub refuse de fabriquer un jeton, et rend l etat', async () => {
+    const marquerEtat = vi.fn(async () => {});
+    const r = await jetonInstallationGithub(
+      deps({
+        lireInstallation: async () => ({ connexionId: 'cx-1', etat: 'active', installationId: '999' }),
+        creerJetonInstallation: async () => ({ ok: false, motif: 'revoquee', message: 'GitHub : 404' }),
+        marquerEtat,
+      }),
+      PROPRIETAIRE,
+    );
+
+    expect(r).toEqual({ jeton: null, etat: 'revoquee' });
+    expect(marquerEtat).toHaveBeenCalledWith('cx-1', 'revoquee');
+    expect(marquerEtat).toHaveBeenCalledTimes(1);
+  });
+
+  it('leve sans marquer l etat sur un echec transitoire (reseau, 5xx)', async () => {
+    const marquerEtat = vi.fn(async () => {});
+    await expect(
+      jetonInstallationGithub(
+        deps({
+          lireInstallation: async () => ({ connexionId: 'cx-1', etat: 'active', installationId: '999' }),
+          creerJetonInstallation: async () => ({ ok: false, motif: 'echec', message: 'GitHub : 503' }),
+          marquerEtat,
+        }),
+        PROPRIETAIRE,
+      ),
+    ).rejects.toThrow(/503/);
+    expect(marquerEtat).not.toHaveBeenCalled();
+  });
+
+  it('rend le jeton d une connexion active dont GitHub accepte la fabrication', async () => {
+    const r = await jetonInstallationGithub(
+      deps({
+        lireInstallation: async () => ({ connexionId: 'cx-1', etat: 'active', installationId: '999' }),
+        creerJetonInstallation: async () => ({ ok: true, token: 'jeton-installation-frais' }),
+      }),
+      PROPRIETAIRE,
+    );
+
+    expect(r).toEqual({ jeton: 'jeton-installation-frais' });
   });
 });

@@ -229,6 +229,7 @@ interface AppelRequete {
 function clientSimule(
   prospects: unknown[],
   sites: unknown[] = [],
+  connexions: Record<string, unknown> | null = null,
 ): { client: SupabaseClient<Database>; appels: AppelRequete[] } {
   const appels: AppelRequete[] = [];
   const table = (nom: string, lignes: unknown[]): Record<string, unknown> => {
@@ -247,10 +248,18 @@ function clientSimule(
       limit: () => Promise.resolve({ data: lignes, error: null }),
       range: () => Promise.resolve({ data: lignes, error: null }),
       upsert: () => Promise.resolve({ error: null }),
+      // `connexion_plateforme` se lit par `.maybeSingle()`, jamais par
+      // `.limit()`/`.range()` — les autres tables de ce fake n'en ont pas
+      // l'usage.
+      maybeSingle: () => Promise.resolve({ data: connexions, error: null }),
     };
     return b;
   };
   const client = {
+    // `connexion_plateforme` ne lit jamais par `.limit()`/`.range()` (voir
+    // `maybeSingle` ci-dessus, qui ferme sur `connexions` directement) : la
+    // route vers `sites` ici est sans conséquence pour elle, seulement
+    // utilisée par les tables qui appellent réellement l'un des deux.
     from: (nom: string) => table(nom, nom === 'prospect' ? prospects : sites),
   } as unknown as SupabaseClient<Database>;
   return { client, appels };
@@ -365,5 +374,79 @@ describe('cloisonnement des lectures', () => {
     const appel = appels.find((a) => a.table === 'prospect_site');
     expect(appel?.filtres).toContainEqual(['prospect.owner_id', PROPRIETAIRE]);
     expect(appel?.select).toContain('prospect!inner()');
+  });
+});
+
+describe('chaineDeps.publier — résolution du jeton GitHub', () => {
+  const cleCoffre = process.env['PROSPEO_COFFRE_CLE'];
+  const appId = process.env['PROSPEO_GITHUB_APP_ID'];
+  const clePrivee = process.env['PROSPEO_GITHUB_APP_PRIVATE_KEY'];
+  beforeEach(() => {
+    process.env['PROSPEO_COFFRE_CLE'] = 'v1:' + Buffer.alloc(32, 7).toString('base64');
+    process.env['PROSPEO_GITHUB_APP_ID'] = '123456';
+    process.env['PROSPEO_GITHUB_APP_PRIVATE_KEY'] = 'cle-de-test-non-pem';
+  });
+  afterEach(() => {
+    if (cleCoffre === undefined) delete process.env['PROSPEO_COFFRE_CLE'];
+    else process.env['PROSPEO_COFFRE_CLE'] = cleCoffre;
+    if (appId === undefined) delete process.env['PROSPEO_GITHUB_APP_ID'];
+    else process.env['PROSPEO_GITHUB_APP_ID'] = appId;
+    if (clePrivee === undefined) delete process.env['PROSPEO_GITHUB_APP_PRIVATE_KEY'];
+    else process.env['PROSPEO_GITHUB_APP_PRIVATE_KEY'] = clePrivee;
+  });
+
+  it('leve un message clair quand la connexion GitHub est absente', async () => {
+    // `connexions: null` : aucune ligne — `lireInstallation` rend `null`
+    // avant tout appel réseau, la fausse clé PEM ci-dessus n'est donc jamais
+    // exercée.
+    const { client } = clientSimule([], [{ prospect_id: 'p-1', content: { titre: 'x' }, content_rejected_at: null }], null);
+    await expect(chaineDeps(client, PROPRIETAIRE).publier('p-1')).rejects.toThrow(/GitHub/);
+  });
+
+  it('leve un message clair quand la connexion GitHub est revoquee', async () => {
+    const { client } = clientSimule(
+      [],
+      [{ prospect_id: 'p-1', content: { titre: 'x' }, content_rejected_at: null }],
+      { id: 'cx-1', etat: 'revoquee', reference: '999' },
+    );
+    await expect(chaineDeps(client, PROPRIETAIRE).publier('p-1')).rejects.toThrow(/révoqu/);
+  });
+
+  it('traduit indechiffrable en français dans le message, jamais le slug brut', async () => {
+    const { client } = clientSimule([], [{ prospect_id: 'p-1', content: { titre: 'x' }, content_rejected_at: null }], {
+      id: 'cx-1',
+      etat: 'indechiffrable',
+      reference: '999',
+    });
+    await expect(chaineDeps(client, PROPRIETAIRE).publier('p-1')).rejects.toThrow(/indéchiffrable/);
+  });
+});
+
+describe('chaineDeps.deployer — résolution du jeton Vercel', () => {
+  const cleCoffre = process.env['PROSPEO_COFFRE_CLE'];
+  beforeEach(() => {
+    process.env['PROSPEO_COFFRE_CLE'] = 'v1:' + Buffer.alloc(32, 7).toString('base64');
+  });
+  afterEach(() => {
+    if (cleCoffre === undefined) delete process.env['PROSPEO_COFFRE_CLE'];
+    else process.env['PROSPEO_COFFRE_CLE'] = cleCoffre;
+  });
+
+  it('leve un message clair quand la connexion Vercel est absente', async () => {
+    const { client } = clientSimule(
+      [],
+      [{ prospect_id: 'p-1', repo_full_name: 'org/depot-p1', vercel_project_id: null, deployment_url: null, unpublished_at: null }],
+      null,
+    );
+    await expect(chaineDeps(client, PROPRIETAIRE).deployer('p-1')).rejects.toThrow(/Vercel/);
+  });
+
+  it('traduit indechiffrable en français dans le message, jamais le slug brut', async () => {
+    const { client } = clientSimule(
+      [],
+      [{ prospect_id: 'p-1', repo_full_name: 'org/depot-p1', vercel_project_id: null, deployment_url: null, unpublished_at: null }],
+      { id: 'cx-1', etat: 'indechiffrable', reference: null },
+    );
+    await expect(chaineDeps(client, PROPRIETAIRE).deployer('p-1')).rejects.toThrow(/indéchiffrable/);
   });
 });

@@ -132,9 +132,14 @@ simplement **pas de ligne** — la lecture honnête : « jamais démarré »
 diffère de « démarré puis silencieux », deux absences de nature différente
 (doctrine du dépôt). Le dashboard (`fetchHeartbeat`,
 `apps/dashboard/src/data/campagne.ts`) traite déjà `null` comme « à
-l'arrêt » — aucun changement de ce comportement, seulement du filtre :
-`.from('worker_heartbeat_utilisateur').eq('owner_id', <utilisateur
-courant>)` au lieu de `.from('worker_heartbeat').eq('id', true)`.
+l'arrêt » — aucun changement de ce comportement. Le nom de table change
+(`.from('worker_heartbeat_utilisateur')` au lieu de
+`.from('worker_heartbeat').eq('id', true)`) et le filtre `id = true` du
+singleton disparaît **sans être remplacé par un `eq('owner_id', …)`** :
+comme partout ailleurs dans `apps/dashboard/src/data/*.ts`, c'est la RLS qui
+borne le résultat au propriétaire courant — aucune lecture de ce fichier ne
+filtre explicitement par `owner_id`, et en ajouter un ici romprait cette
+convention sans rien protéger de plus.
 
 ### V5 — Le superviseur : découverte, démarrage, arrêt, surveillance
 
@@ -148,9 +153,11 @@ connexions (`github` et `vercel`) sont `active` dans
 de la liste au balayage suivant.
 
 **Démarrage** : pour chaque `owner_id` éligible sans process en cours,
-`child_process.spawn('npx', ['tsx', 'src/cli.ts', 'worker', '--owner', id])`
-— la même invocation que le script `start` du collector (il n'y a pas de
-build : `tsx` exécute le TypeScript directement) —, stdout/stderr redirigés
+`child_process.spawn(process.execPath, [require.resolve('tsx/cli'), 'src/cli.ts', 'worker', '--owner', id])`
+— le point d'entrée de `tsx` résolu en JS pur, jamais `npx tsx` (un script
+`.cmd` sous Windows, invocable seulement via `shell: true`, ce qui expose à
+un enfant dont `kill()` ne relaie pas forcément le signal à son propre
+enfant) —, stdout/stderr redirigés
 vers un fichier de log nommé par utilisateur.
 
 **Arrêt** : pour chaque process en cours dont l'`owner_id` n'est plus
