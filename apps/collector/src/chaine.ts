@@ -17,7 +17,7 @@ import {
 } from './config.js';
 import { createGithubAppClient } from './sources/github-app.js';
 import { creerCoffreDeps, creerCoffreGithubDeps, lireCompteLibelle } from './coffre-supabase.js';
-import { jetonDe, jetonInstallationGithub } from './coffre.js';
+import { jetonDe, jetonInstallationGithub, type EtatConnexion } from './coffre.js';
 import type { Proprietaire } from './proprietaire.js';
 import { gabaritDefautPourPublication, lireGabaritActif } from './site-template.js';
 import { createClient, PAGE_SIZE } from './supabase.js';
@@ -142,6 +142,23 @@ export function construireDepsDeploiement(
     attendreUrl: opts.attendreUrl,
     maintenant: () => new Date(),
   };
+}
+
+/**
+ * Le libellé français d'un état de connexion — `EtatConnexion` porte des
+ * slugs ASCII (`revoquee`, `indechiffrable`) qui ne sont pas eux-mêmes du
+ * français correct : cette fonction traduit les deux, pour tout message
+ * adressé à un humain. `absente` s'écrit déjà normalement.
+ */
+function libelleEtatConnexion(etat: EtatConnexion | 'absente'): string {
+  switch (etat) {
+    case 'revoquee':
+      return 'révoquée';
+    case 'indechiffrable':
+      return 'indéchiffrable';
+    default:
+      return etat;
+  }
 }
 
 /**
@@ -654,13 +671,9 @@ export function chaineDeps(
       );
       const jetonGithub = await jetonInstallationGithub(coffreGithub, proprietaire);
       if (jetonGithub.jeton === null) {
-        // `EtatConnexion` est un slug ASCII de base (`revoquee`, jamais
-        // `révoquée`) : l'interpoler tel quel dans un message adressé à un
-        // humain violerait « tout est en français ». Seul cet état a une
-        // forme distincte du slug — les deux autres (`absente`, `indechiffrable`)
-        // s'écrivent déjà normalement.
-        const etat = jetonGithub.etat === 'revoquee' ? 'révoquée' : jetonGithub.etat;
-        throw new Error(`connexion GitHub ${etat} — reconnecte ton compte GitHub`);
+        throw new Error(
+          `connexion GitHub ${libelleEtatConnexion(jetonGithub.etat)} — reconnecte ton compte GitHub`,
+        );
       }
       const githubOrg = await lireCompteLibelle(client, proprietaire, 'github');
       if (githubOrg === null) {
@@ -718,7 +731,9 @@ export function chaineDeps(
       const coffreDeps = creerCoffreDeps(client, coffreConfig.cle);
       const jetonVercel = await jetonDe(coffreDeps, proprietaire, 'vercel');
       if (jetonVercel.jeton === null) {
-        throw new Error(`connexion Vercel ${jetonVercel.etat} — reconnecte ton compte Vercel`);
+        throw new Error(
+          `connexion Vercel ${libelleEtatConnexion(jetonVercel.etat)} — reconnecte ton compte Vercel`,
+        );
       }
       const compteVercel = await lireCompteLibelle(client, proprietaire, 'vercel');
       if (compteVercel === null) {

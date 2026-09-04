@@ -411,6 +411,15 @@ describe('chaineDeps.publier — résolution du jeton GitHub', () => {
     );
     await expect(chaineDeps(client, PROPRIETAIRE).publier('p-1')).rejects.toThrow(/révoqu/);
   });
+
+  it('traduit indechiffrable en français dans le message, jamais le slug brut', async () => {
+    const { client } = clientSimule([], [{ prospect_id: 'p-1', content: { titre: 'x' }, content_rejected_at: null }], {
+      id: 'cx-1',
+      etat: 'indechiffrable',
+      reference: '999',
+    });
+    await expect(chaineDeps(client, PROPRIETAIRE).publier('p-1')).rejects.toThrow(/indéchiffrable/);
+  });
 });
 
 describe('chaineDeps.deployer — résolution du jeton Vercel', () => {
@@ -430,5 +439,14 @@ describe('chaineDeps.deployer — résolution du jeton Vercel', () => {
       null,
     );
     await expect(chaineDeps(client, PROPRIETAIRE).deployer('p-1')).rejects.toThrow(/Vercel/);
+  });
+
+  it('traduit indechiffrable en français dans le message, jamais le slug brut', async () => {
+    const { client } = clientSimule(
+      [],
+      [{ prospect_id: 'p-1', repo_full_name: 'org/depot-p1', vercel_project_id: null, deployment_url: null, unpublished_at: null }],
+      { id: 'cx-1', etat: 'indechiffrable', reference: null },
+    );
+    await expect(chaineDeps(client, PROPRIETAIRE).deployer('p-1')).rejects.toThrow(/indéchiffrable/);
   });
 });
