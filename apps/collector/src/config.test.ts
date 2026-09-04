@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   loadCoffreConfig,
   loadDeployConfig,
+  loadGithubAppConfig,
+  loadGithubTemplateConfig,
   loadPitchConfig,
   loadGenerateConfig,
   loadPublishConfig,
@@ -100,6 +102,33 @@ describe('loadCoffreConfig', () => {
     const config = loadCoffreConfig({ PROSPEO_COFFRE_CLE: cleValide });
     expect(config.cle.id).toBe('v1');
     expect(config.cle.octets).toHaveLength(32);
+  });
+});
+
+describe('loadGithubAppConfig', () => {
+  it('exige PROSPEO_GITHUB_APP_ID et PROSPEO_GITHUB_APP_PRIVATE_KEY', () => {
+    expect(() => loadGithubAppConfig({})).toThrow(/PROSPEO_GITHUB_APP_ID/);
+  });
+
+  it('restaure les sauts de ligne littéraux \\n du PEM', () => {
+    const config = loadGithubAppConfig({
+      PROSPEO_GITHUB_APP_ID: '123456',
+      PROSPEO_GITHUB_APP_PRIVATE_KEY: '-----BEGIN RSA PRIVATE KEY-----\\nABC\\n-----END RSA PRIVATE KEY-----',
+    });
+    expect(config.appId).toBe('123456');
+    expect(config.clePrivee).toBe('-----BEGIN RSA PRIVATE KEY-----\nABC\n-----END RSA PRIVATE KEY-----');
+  });
+});
+
+describe('loadGithubTemplateConfig', () => {
+  it('rend undefined quand PROSPEO_GITHUB_TEMPLATE_REPO est absent', () => {
+    expect(loadGithubTemplateConfig({}).githubTemplateRepo).toBeUndefined();
+  });
+
+  it('rend la valeur quand elle est presente', () => {
+    expect(loadGithubTemplateConfig({ PROSPEO_GITHUB_TEMPLATE_REPO: 'mon-modele' }).githubTemplateRepo).toBe(
+      'mon-modele',
+    );
   });
 });
 

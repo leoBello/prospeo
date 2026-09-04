@@ -9,11 +9,15 @@ import {
 } from '@prospeo/core';
 import type { Database, Json } from '@prospeo/db';
 import {
-  loadDeployConfig,
+  loadCoffreConfig,
   loadGenerateConfig,
+  loadGithubAppConfig,
+  loadGithubTemplateConfig,
   loadPitchConfig,
-  loadPublishConfig,
 } from './config.js';
+import { createGithubAppClient } from './sources/github-app.js';
+import { creerCoffreDeps, creerCoffreGithubDeps, lireCompteLibelle } from './coffre-supabase.js';
+import { jetonDe, jetonInstallationGithub } from './coffre.js';
 import type { Proprietaire } from './proprietaire.js';
 import { gabaritDefautPourPublication, lireGabaritActif } from './site-template.js';
 import { createClient, PAGE_SIZE } from './supabase.js';
@@ -622,7 +626,6 @@ export function chaineDeps(
     },
 
     async publier(prospectId) {
-      const pubConfig = loadPublishConfig(process.env);
       const rows = await fetchSiteRows(client, proprietaire);
       const ligne = rows[prospectId];
       if (ligne === undefined || ligne.content == null) {
@@ -641,13 +644,34 @@ export function chaineDeps(
         throw new Error('publication refusée : le site a été retiré (unpublished_at renseigné)');
       }
 
+      // Résolu PAR UTILISATEUR (chantier n°8, étape suivant le relais OAuth) :
+      // plus de GITHUB_TOKEN/PROSPEO_GITHUB_ORG globaux. `installationId` est
+      // fabriqué à la demande, jamais stocké — voir `jetonInstallationGithub`.
+      const githubAppConfig = loadGithubAppConfig(process.env);
+      const coffreGithub = creerCoffreGithubDeps(
+        client,
+        createGithubAppClient({ appId: githubAppConfig.appId, clePrivee: githubAppConfig.clePrivee }),
+      );
+      const jetonGithub = await jetonInstallationGithub(coffreGithub, proprietaire);
+      if (jetonGithub.jeton === null) {
+        // `EtatConnexion` est un slug ASCII de base (`revoquee`, jamais
+        // `révoquée`) : l'interpoler tel quel dans un message adressé à un
+        // humain violerait « tout est en français ». Seul cet état a une
+        // forme distincte du slug — les deux autres (`absente`, `indechiffrable`)
+        // s'écrivent déjà normalement.
+        const etat = jetonGithub.etat === 'revoquee' ? 'révoquée' : jetonGithub.etat;
+        throw new Error(`connexion GitHub ${etat} — reconnecte ton compte GitHub`);
+      }
+      const githubOrg = await lireCompteLibelle(client, proprietaire, 'github');
+      if (githubOrg === null) {
+        throw new Error('connexion GitHub active sans compte associé — état incohérent');
+      }
+
+      const templateConfig = loadGithubTemplateConfig(process.env);
       const gabaritActif = await lireGabaritActif(client);
       const deps = construireDepsPublication(client, {
-        github: createGithubClient({ token: pubConfig.githubToken, org: pubConfig.githubOrg }),
-        templateRepoDefaut: gabaritDefautPourPublication(
-          gabaritActif,
-          pubConfig.githubTemplateRepo,
-        ),
+        github: createGithubClient({ token: jetonGithub.jeton, org: githubOrg }),
+        templateRepoDefaut: gabaritDefautPourPublication(gabaritActif, templateConfig.githubTemplateRepo),
         rows,
       });
 
@@ -669,11 +693,6 @@ export function chaineDeps(
     },
 
     async deployer(prospectId) {
-      const depConfig = loadDeployConfig(process.env);
-      const vercel = createVercelClient({
-        token: depConfig.vercelToken,
-        teamId: depConfig.vercelTeamId,
-      });
       const rows = await fetchSiteRows(client, proprietaire);
       const ligne = rows[prospectId];
       if (ligne === undefined || ligne.repo_full_name === null) {
@@ -692,6 +711,27 @@ export function chaineDeps(
         // ligne — rien à gagner à relancer un déploiement identique.
         return;
       }
+
+      // Résolu PAR UTILISATEUR, comme `publier` ci-dessus : plus de
+      // VERCEL_TOKEN/PROSPEO_VERCEL_TEAM globaux.
+      const coffreConfig = loadCoffreConfig(process.env);
+      const coffreDeps = creerCoffreDeps(client, coffreConfig.cle);
+      const jetonVercel = await jetonDe(coffreDeps, proprietaire, 'vercel');
+      if (jetonVercel.jeton === null) {
+        throw new Error(`connexion Vercel ${jetonVercel.etat} — reconnecte ton compte Vercel`);
+      }
+      const compteVercel = await lireCompteLibelle(client, proprietaire, 'vercel');
+      if (compteVercel === null) {
+        throw new Error('connexion Vercel active sans compte associé — état incohérent');
+      }
+
+      const vercel = createVercelClient({
+        token: jetonVercel.jeton,
+        // Écrit par `ecrireConnexionVercel` (relais-oauth) comme `'compte
+        // personnel'` littéral quand il n'y a pas d'équipe : ce n'est pas un
+        // identifiant d'équipe Vercel valide, donc jamais transmis tel quel.
+        teamId: compteVercel === 'compte personnel' ? undefined : compteVercel,
+      });
 
       const report = await runDeploy(
         [
