@@ -1,5 +1,7 @@
+import { spawn, type ChildProcess } from 'node:child_process';
 import { resolveNs } from 'node:dns/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync, createWriteStream } from 'node:fs';
+import { createRequire } from 'node:module';
 import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 import { domainCandidates, getTrade, MATCHING_CONFIG, nafMatchesTrade } from '@prospeo/core';
@@ -61,6 +63,7 @@ import {
   traiterProspect,
 } from './chaine.js';
 import { prendreProchain, unSeulALaFois, type FileDeps } from './stages/file.js';
+import { balayer, creerSuiviBackoff, decouvrirEligiblesReel, type SuperviseurDeps } from './superviseur.js';
 
 // `.env` vit a la racine du depot. Ni tsx ni Node ne le chargent tout seuls :
 // sans cette ligne, la procedure documentee (« copier .env.example en .env »)
@@ -95,6 +98,8 @@ Commandes
   unpublish --owner <uuid> [--dry-run]         Dépublie les refus et les périmés
   pitch --owner <uuid> [--force]               Rédige email, SMS et script d'appel
   worker --owner <uuid>                        Draine la file du dashboard, en continu
+  superviseur                                  Démarre/surveille/arrête un worker
+                                               par utilisateur éligible — SANS --owner
 
 Options
   --owner <uuid>       OBLIGATOIRE. Le propriétaire des données traitées. Un
@@ -228,6 +233,7 @@ const COMMANDS = [
   'unpublish',
   'pitch',
   'worker',
+  'superviseur',
 ] as const;
 
 function flag(argv: string[], name: string): string | undefined {
@@ -308,6 +314,104 @@ async function fetchProspectsDejaRediges(
   return vus;
 }
 
+// Le point d'entrée réel de `tsx`, résolu en JS pur — jamais `npx tsx` : sous
+// Windows, `npx` est un script `.cmd`, que `spawn` ne peut invoquer sans
+// `shell: true` ; or un enfant lancé via un shell POSIX n'est pas garanti de
+// relayer un signal à son propre enfant (`kill()` sur le shell peut laisser
+// le vrai process orphelin). `tsx/cli` est un fichier `.mjs` que `node`
+// exécute directement, sur les deux plateformes, sans intermédiaire.
+const require = createRequire(import.meta.url);
+const TSX_CLI = require.resolve('tsx/cli');
+
+async function runSuperviseur(): Promise<number> {
+  const config = loadConfig(process.env);
+  const client = createClient(config);
+
+  const PERIODE_BALAYAGE_MS = 60_000;
+  const processus = new Map<string, ChildProcess>();
+  const backoff = creerSuiviBackoff();
+  let arret = false;
+
+  mkdirSync('logs', { recursive: true });
+
+  const demarrerProcessus = (ownerId: string): void => {
+    const enfant = spawn(process.execPath, [TSX_CLI, 'src/cli.ts', 'worker', '--owner', ownerId]);
+    processus.set(ownerId, enfant);
+    backoff.enregistrerDemarrage(ownerId, new Date());
+
+    const journal = createWriteStream(`logs/worker-${ownerId}.log`, { flags: 'a' });
+    enfant.stdout?.pipe(journal);
+    enfant.stderr?.pipe(journal);
+
+    enfant.on('exit', () => {
+      processus.delete(ownerId);
+      backoff.enregistrerSortie(ownerId, new Date());
+      if (arret) return;
+      // Signal PRINCIPAL de redémarrage (voir `superviseur.ts`) : `balayer`
+      // ne redémarre que ce qu'il ne voit pas encore comme suivi, `exit` est
+      // ce qui le lui apprend sans attendre le prochain balayage de 60s.
+      const delai = backoff.delaiRedemarrageMs(ownerId);
+      setTimeout(() => {
+        if (!arret) demarrerProcessus(ownerId);
+      }, delai);
+    });
+  };
+
+  const deps: SuperviseurDeps = {
+    decouvrirEligibles: () => decouvrirEligiblesReel(client),
+    suivis: () => new Set(processus.keys()),
+    demarrer: demarrerProcessus,
+    arreterProprement: (ownerId) => {
+      processus.get(ownerId)?.kill('SIGTERM');
+    },
+    tuerSansGrace: (ownerId) => {
+      processus.get(ownerId)?.kill('SIGKILL');
+    },
+    async dernierBattement(ownerId) {
+      const { data, error } = await client
+        .from('worker_heartbeat_utilisateur')
+        .select('beat_at')
+        .eq('owner_id', ownerId)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return data === null ? null : new Date(data.beat_at);
+    },
+    maintenant: () => new Date(),
+  };
+
+  const cycle = (): void => {
+    void balayer(deps).catch((cause: unknown) => {
+      process.stderr.write(
+        `superviseur : balayage interrompu — ${cause instanceof Error ? cause.message : String(cause)}\n`,
+      );
+    });
+  };
+
+  const balayage = setInterval(cycle, PERIODE_BALAYAGE_MS);
+  cycle();
+
+  const fermer = (): void => {
+    arret = true;
+    clearInterval(balayage);
+    for (const enfant of processus.values()) enfant.kill('SIGTERM');
+    process.stdout.write('superviseur : arrêt demandé, plus aucun démarrage\n');
+  };
+  process.on('SIGINT', fermer);
+  process.on('SIGTERM', fermer);
+
+  process.stdout.write('superviseur : à l’écoute\n');
+
+  await new Promise<void>((resoudre) => {
+    const attendre = setInterval(() => {
+      if (arret && processus.size === 0) {
+        clearInterval(attendre);
+        resoudre();
+      }
+    }, 500);
+  });
+  return 0;
+}
+
 async function main(argv: string[]): Promise<number> {
   const command = argv[0];
   if (command === undefined || command === '--help' || command === '-h') {
@@ -336,6 +440,14 @@ async function main(argv: string[]): Promise<number> {
   // acces reseau : une valeur absente ferait lire la base entiere, une
   // valeur mal formee rendrait zero ligne qu'on prendrait pour « rien a
   // faire ». Les deux echecs sont silencieux, celui-ci est bruyant.
+  // `superviseur` sert TOUS les utilisateurs éligibles : c'est la seule
+  // commande sans --owner, et elle doit contourner la lecture universelle
+  // ci-dessous — sans quoi `lireProprietaire` lèverait avant même
+  // d'atteindre son traitement.
+  if (command === 'superviseur') {
+    return runSuperviseur();
+  }
+
   const proprietaire = lireProprietaire(flag(argv, 'owner'));
 
   switch (command) {
