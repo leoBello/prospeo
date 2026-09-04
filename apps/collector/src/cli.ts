@@ -1827,10 +1827,13 @@ async function main(argv: string[]): Promise<number> {
       let arret = false;
 
       const battre = async (): Promise<void> => {
+        // `upsert`, et non `update` : contrairement à l'ancien singleton, cette
+        // table n'a PAS de ligne d'amorçage (Tâche 1) — le tout premier battement
+        // d'un utilisateur doit INSÉRER sa ligne, les suivants la mettent à jour.
+        // `owner_id` est la clé primaire : la cible de conflit est implicite.
         const { error } = await client
-          .from('worker_heartbeat')
-          .update({ beat_at: new Date().toISOString(), in_flight: enCours })
-          .eq('id', true);
+          .from('worker_heartbeat_utilisateur')
+          .upsert({ owner_id: proprietaire, beat_at: new Date().toISOString(), in_flight: enCours });
         // Journalisé, jamais fatal : perdre un battement est un désagrément,
         // interrompre un déploiement en cours en est un autre. Même doctrine
         // que `createEventSink`.
