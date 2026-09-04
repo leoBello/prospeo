@@ -1,4 +1,4 @@
-import { lireCleMaitresse, type CleMaitresse } from '@prospeo/coffre';
+import { lireCleMaitresse, type CleMaitresse } from './coffre.js';
 
 /**
  * Les onze variables du relais, exigées d'un coup — comme `exiger` dans

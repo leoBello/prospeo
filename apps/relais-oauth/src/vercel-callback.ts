@@ -1,4 +1,4 @@
-import { chiffrer, type CleMaitresse, type Scelle } from '@prospeo/coffre';
+import { chiffrer, type CleMaitresse, type Scelle } from './coffre.js';
 import type { ResultatState } from './state.js';
 
 export interface VercelCallbackDeps {
