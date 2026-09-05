@@ -937,6 +937,95 @@ IP**. Le spec du chantier n°1 assumait le risque de blocage pour un opérateur 
 ici un blocage arrêterait tous les clients à la fois. Les proxys résidentiels
 sont la réponse retenue, non encore implémentée.
 
+## L'appariement, mesuré le 5 septembre 2026 — le vrai goulot du produit
+
+**Ce qui a déclenché la mesure.** Le propriétaire demandait une API qui
+fournirait les emails des prospects, la saisie à la main lui paraissant
+irréaliste. La réponse est non, et la recherche a trouvé bien plus grave.
+
+### Aucune source ne porte les emails de cette population
+
+| Source | Emails ? |
+|---|---|
+| API publique Recherche d'entreprises (Etalab) | **aucun champ** — vérifié sur un SIRET réel |
+| Pappers (INSEE, INPI, BODACC, greffes) | **aucune donnée de contact**, ils le disent |
+| Hunter / Dropcontact / Snov | travaillent **à partir d'un domaine** — 109 prospects sur 139 n'en ont aucun |
+| Google Maps | n'expose jamais d'email |
+
+Ces adresses n'existent dans aucune source interrogeable. Inutile de
+rouvrir la question sans élément neuf.
+
+### Le vrai goulot : 90 prospects sur 139 rejetés par l'appariement
+
+| Statut d'enrichissement | Prospects |
+|---|---|
+| `not_found` | **90** |
+| `ok` | 39 (dont 37 avec téléphone) |
+| `ambiguous` — **en attente de `review`** | 10 |
+
+**Et sur ces 90 « introuvables », ZÉRO n'est réellement absent de Google
+Maps.** Tous ont reçu entre 5 et 12 candidats ; l'appariement les a tous
+rejetés. `calibrate` chiffre les éliminations : **676 par le rayon, 147 sous
+le seuil bas**.
+
+Deux causes distinctes, toutes deux dans `packages/core/src/matching.ts` :
+
+1. **Le rayon de 1 km (`maxDistanceM: 1000`) est trop serré.** Des plombiers
+   nantais, catégorie confirmée, sont écartés à 1 858 m, 2 320 m, 2 764 m. Le
+   siège social d'un artisan est souvent son domicile, sa fiche Maps son
+   atelier.
+2. **Le nom pèse 0,65 et vaut ~0 pour cette population.** Le motif récurrent
+   est « nom : aucune variante exploitable ». Le SIRET dit `SARL ALLARD`,
+   `EPB`, `HYDROVOLT` ; Maps affiche `AB Plomberie`, `Ze Plombier - Nantes`.
+   Le nom légal et le nom commercial n'ont souvent rien à voir.
+
+### L'appariement par adresse : un gain réel, partiel, et sous-estimé
+
+Mesuré hors ligne sur les candidats déjà en base (`prospect_enrichment.candidates`
+porte l'adresse Maps, le téléphone, la note et le `placeId` — aucun scraping
+n'est nécessaire pour rejouer) :
+
+- **17 prospects** ont un candidat à l'adresse exacte (numéro + voie + code
+  postal) ; **5** survivent en plus au contrôle de catégorie.
+- Les récupérations sont de bonne qualité : `ZE SERVICES (ZE PLOMBIER)` →
+  `Ze Plombier - Nantes`, `LES ATELIERS DE SAULE` → `SAULE PLOMBERIE`,
+  `BELKACEM ABDOUS (SERF DEPANNAGE PLOMBERIE)` → `Service Dépannage
+  Plomberie Chauffage`.
+- **Le contrôle de catégorie rejette de vraies correspondances** : `BELENOS`,
+  enregistré « BELENOS SERRURERIE, BELENOS PLOMBERIE », est écarté parce que
+  Maps le classe « Serrurier ». Idem `REYDEL ENERGIE` → `Reydel ECS.
+  Électricité-Plomberie`. Un artisan multi-métiers est la norme.
+- **83 sur 100 n'ont aucun candidat à leur adresse** : pour eux l'adresse du
+  SIRET est le domicile du gérant ou le cabinet comptable. L'appariement par
+  adresse ne les débloque pas.
+
+**Le chiffre de 17 est SOUS-ESTIMÉ, et le piège est instructif.** L'adresse
+SIRET porte souvent un préfixe avant le numéro de voie — `BUREAU 3 2 PLACE
+JEAN V`, `PORTE 64 11 RUE FELIBIEN`, `ETAGE 1 APPT 59 5 RUE ANITA CONTI`,
+`ZONE NANT'EST ENTREPRISES 1 RUE DU BENELUX`. Prendre « le premier nombre »
+donne le bureau, l'étage ou l'appartement, jamais la rue. Une implémentation
+sérieuse doit ignorer ces préfixes, et gérer `71b` / `30 bis`.
+
+### Les 39 appariements existants sont JUSTES — vérifiés un par un
+
+31 concordent sur l'adresse **et** le nom. Les 8 restants ont été inspectés à
+l'œil : **tous corrects**, les signalements venant du bug de préfixe
+ci-dessus. **Aucun faux positif trouvé.**
+
+C'est le constat le plus utile de cette mesure : le matcher se trompe en
+**refusant**, jamais en acceptant. C'est le bon sens de l'erreur vu l'enjeu
+(un site publié au nom de la mauvaise entreprise, D5 du chantier n°4) — et
+cela autorise à desserrer les seuils avec bien moins de risque qu'il n'y
+paraissait.
+
+### Ce qui reste à faire, et n'est pas fait
+
+Un chantier « appariement » : une seconde voie fondée sur l'adresse exacte,
+un contrôle de catégorie qui accepte les métiers connexes, et un rayon
+desserré — chaque changement mesuré par `calibrate` **avant** d'être
+appliqué. Et, gratuitement, les **10 `ambiguous` qui attendent déjà**
+`prospeo review`.
+
 ## La question ouverte du lot 3
 
 `prospect_pipeline` ne porte que `status` et `updated_at`. Savoir qu'une
