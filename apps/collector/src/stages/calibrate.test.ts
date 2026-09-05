@@ -272,10 +272,14 @@ describe('replayEnrichment — la voie adresse', () => {
 
     const ecrite = rewriteFromReplay(ligne, replayEnrichment(ligne, MATCHING_CONFIG));
 
+    // `ecrite` d'abord : sur un `null`, chaque `ecrite?.champ` vaudrait
+    // `undefined`, et un `not.toBeNull()` passerait sans rien vérifier.
+    expect(ecrite).not.toBeNull();
     expect(ecrite?.status).toBe('ok');
     expect(ecrite?.matched_name).toBe('Sanitherm Nantes');
     // Le téléphone de la fiche retenue doit suivre : c'est tout l'objet de la
-    // fusion, et c'est le numéro qui sera composé.
-    expect(ecrite?.phone_e164).not.toBeNull();
+    // fusion, et c'est le numéro qui sera composé. `stored()` porte
+    // « 02 40 00 00 00 ».
+    expect(ecrite?.phone_e164).toBe('+33240000000');
   });
 });

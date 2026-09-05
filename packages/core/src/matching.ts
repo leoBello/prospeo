@@ -296,11 +296,18 @@ export function scoreCandidate(
   // elle n'ajoute que des fusions, elle n'envoie rien en revue.
   if (sameAddress) {
     const fiche = candidate.address ?? '';
+    // Trois libellés et non deux : « catégorie connue, hors bâtiment » et
+    // « catégorie que Google n'a pas rendue » sont deux absences de natures
+    // différentes, et la seconde ne permet d'affirmer aucun refus.
+    const verdict =
+      addressMatch
+        ? 'métier du bâtiment ✓'
+        : candidate.category === null
+          ? 'catégorie inconnue ?'
+          : `catégorie « ${candidate.category} » hors bâtiment ✗`;
     lines.push({
       code: 'adresse',
-      label: addressMatch
-        ? `adresse identique « ${fiche} » — métier du bâtiment ✓`
-        : `adresse identique « ${fiche} » — catégorie « ${candidate.category ?? 'absente'} » hors bâtiment ✗`,
+      label: `adresse identique « ${fiche} » — ${verdict}`,
       points: 0,
     });
   }
@@ -365,14 +372,24 @@ export function selectMatch(
   // coordonnées dit qu'un des deux géocodages est faux, pas que ce sont deux
   // entreprises. Le rayon, lui, ne bouge pas — le score reste ce qu'il est.
   if (retained.length === 0) {
-    const aLAdresse = scored.filter((s) => s.score.addressMatch);
     // Deux artisans du bâtiment partageant un local produiraient deux
     // candidats également crédibles : choisir le premier serait choisir au
     // hasard. Le doute se constate tout seul et se retire (A4) — le
     // propriétaire ne veut pas arbitrer, et une file de revue transformerait
     // un gain en corvée.
-    const seul = aLAdresse.length === 1 ? aLAdresse[0] : undefined;
-    if (seul !== undefined) {
+    //
+    // Un rival est un candidat à la même adresse **qu'on ne peut pas
+    // exclure** : soit il est du bâtiment, soit Google n'a pas rendu sa
+    // catégorie. Ne compter que les premiers ferait d'une absence un « non »,
+    // et effacerait le doute au lieu de le constater — la fiche sans
+    // catégorie est justement celle dont on ignore si c'est la bonne.
+    const rivaux = scored.filter(
+      (s) => s.score.sameAddress && (s.score.addressMatch || s.candidate.category === null),
+    );
+    const seul = rivaux.length === 1 ? rivaux[0] : undefined;
+    // …et le seul rival restant doit être prouvé du bâtiment pour emporter la
+    // fusion : « je ne peux pas t'exclure » n'a jamais valu « c'est toi ».
+    if (seul !== undefined && seul.score.addressMatch) {
       return { kind: 'ok', candidate: seul.candidate, score: seul.score, scored, via: 'adresse' };
     }
     return { kind: 'not_found', scored };

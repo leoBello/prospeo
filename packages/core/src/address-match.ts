@@ -14,6 +14,14 @@ import { CATEGORIES_BATIMENT } from './trades.js';
 export interface AdressePostale {
   /** Numéro de voie, suffixe retiré : « 71 » pour « 71b ». */
   numero: string | null;
+  /**
+   * Classe du type de voie — `rue`, `quai`, `cours`… — et non son écriture.
+   *
+   * Portée et non jetée : `Quai de la Fosse` et `Rue de la Fosse` existent
+   * toutes deux à Nantes 44000, à quelques centaines de mètres. Sans elle,
+   * elles seraient la même adresse.
+   */
+  typeVoie: string | null;
   /** Mots de la voie, normalisés, type de voie et mots-outils retirés. */
   motsVoie: string[];
   /** Code postal à cinq chiffres. */
@@ -21,24 +29,46 @@ export interface AdressePostale {
 }
 
 /**
- * Types de voie, abréviations comprises.
+ * Types de voie : chaque écriture, vers sa classe d'équivalence.
  *
- * Ils jouent deux rôles à la fois, et c'est voulu : ils **ancrent** la lecture
- * — le numéro de voie est celui qui les précède, ce qui écarte les numéros de
- * bureau, d'étage et d'appartement — puis ils **s'effacent**, parce qu'un type
- * de voie ne porte aucune identité. `AVENUE` et `Av.` désignent la même chose,
- * et il ne faut pas que l'écriture décide.
+ * Ils jouent deux rôles, et c'est voulu. Ils **ancrent** la lecture — le
+ * numéro de voie est celui qui les précède, ce qui écarte les numéros de
+ * bureau, d'étage et d'appartement. Et ils **distinguent** : `Quai de la
+ * Fosse` et `Rue de la Fosse`, `Rue Cambronne` et `Cours Cambronne`, `Place
+ * Graslin` et `Rue Graslin` existent toutes les six à Nantes 44000, aux mêmes
+ * petits numéros et à quelques centaines de mètres — la zone où les prospects
+ * sont les plus denses.
  *
- * Conséquence assumée : `3 rue Victor Hugo` et `3 avenue Victor Hugo` dans le
- * même code postal se confondent. Le cas est rare, et le test de catégorie
- * puis la règle du doute (A3, A4) doivent encore tenir derrière.
+ * C'est pourquoi ils ne s'effacent pas, contrairement à ce que la première
+ * version faisait : ils se **réduisent à une classe**. `AVENUE` et `Av.`
+ * donnent tous deux `avenue`, donc l'orthographe ne décide de rien ; mais
+ * `quai` et `rue` restent deux classes, donc deux adresses. Effacer le type
+ * revenait à confier ce cas à la catégorie et à la règle du doute, qui ne
+ * l'attrapent ni l'un ni l'autre : les deux occupants sont du bâtiment, et le
+ * concurrent de l'autre voie n'est pas dans la liste des candidats.
+ *
+ * `ROND POINT` est absent délibérément : Maps l'abrège `Rd-Pt`, et son second
+ * mot tomberait dans le nom de la voie d'un seul côté. Une reconnaissance à
+ * moitié vaut moins qu'une absence franche, qui ferme la voie sans rien
+ * affirmer.
  */
-const TYPES_DE_VOIE = new Set([
-  'rue', 'avenue', 'av', 'ave', 'boulevard', 'bd', 'bld', 'blvd',
-  'place', 'pl', 'route', 'rte', 'chemin', 'chem',
-  'impasse', 'imp', 'allee', 'allees', 'quai', 'cours',
-  'square', 'passage', 'villa', 'venelle', 'esplanade', 'promenade',
-  'parvis', 'faubourg', 'fbg', 'mail', 'sentier', 'voie', 'rond',
+const TYPES_DE_VOIE = new Map<string, string>([
+  ['rue', 'rue'],
+  ['avenue', 'avenue'], ['av', 'avenue'], ['ave', 'avenue'],
+  ['boulevard', 'boulevard'], ['bd', 'boulevard'], ['bld', 'boulevard'], ['blvd', 'boulevard'],
+  ['place', 'place'], ['pl', 'place'],
+  ['route', 'route'], ['rte', 'route'],
+  ['chemin', 'chemin'], ['chem', 'chemin'],
+  ['impasse', 'impasse'], ['imp', 'impasse'],
+  ['allee', 'allee'], ['allees', 'allee'], ['all', 'allee'],
+  ['quai', 'quai'],
+  ['cours', 'cours'], ['crs', 'cours'],
+  ['square', 'square'], ['sq', 'square'],
+  ['passage', 'passage'], ['pass', 'passage'],
+  ['villa', 'villa'], ['venelle', 'venelle'], ['esplanade', 'esplanade'],
+  ['promenade', 'promenade'], ['parvis', 'parvis'],
+  ['faubourg', 'faubourg'], ['fbg', 'faubourg'],
+  ['mail', 'mail'], ['sentier', 'sentier'], ['voie', 'voie'],
 ]);
 
 /**
@@ -60,6 +90,20 @@ const MOTS_OUTILS = new Set([
  * ici reviendrait à écrire l'alphabet.
  */
 const SUFFIXES_DE_NUMERO = new Set(['bis', 'ter', 'quater', 'quinquies']);
+
+/**
+ * Mentions de distribution : tout ce qui les suit n'est plus le nom de la voie.
+ *
+ * Les préfixes se traitent par l'ancre ; ceux-là arrivent APRÈS. Chaîne Maps
+ * réelle : `41 Bd Michelet CS 22201, 44322 Nantes CEDEX 3` — sans coupure,
+ * `cs` et `22201` deviennent des mots de rue, et l'adresse Sirene
+ * correspondante, qui ne les porte pas, ne s'y retrouve plus. On coupe plutôt
+ * qu'on ne filtre : ce qui suit une boîte postale n'est jamais de la voie.
+ */
+const MENTIONS_DE_DISTRIBUTION = new Set([
+  'cs', 'bp', 'cedex', 'bat', 'batiment', 'etage', 'appt', 'appartement',
+  'porte', 'bureau', 'lot', 'residence',
+]);
 
 /**
  * Réduction d'un texte à des jetons comparables.
@@ -86,6 +130,10 @@ function reduire(valeur: string): string[] {
  * On ne remonte que de deux jetons : au-delà, ce n'est plus le numéro de la
  * voie mais le numéro de quelque chose d'autre — précisément ce que cette
  * fonction existe pour ne pas ramasser.
+ *
+ * Coût connu, sans occurrence en base : sur une plage `12 14 RUE DU MAINE`,
+ * c'est `14` qui sort, quand Maps affichera `12`. L'API Sirene ne rend qu'un
+ * numéro de voie, et la comparaison échoue alors du côté sûr.
  */
 function numeroAvant(jetons: readonly string[], ancre: number): string | null {
   for (let index = ancre - 1; index >= 0 && ancre - index <= 2; index -= 1) {
@@ -105,7 +153,7 @@ function numeroAvant(jetons: readonly string[], ancre: number): string | null {
  * `211 Rte de Sainte-Luce, 44300 Nantes` doivent rendre la même chose.
  */
 export function normaliserAdresse(brut: string | null): AdressePostale {
-  const vide: AdressePostale = { numero: null, motsVoie: [], codePostal: null };
+  const vide: AdressePostale = { numero: null, typeVoie: null, motsVoie: [], codePostal: null };
   if (brut === null) return vide;
 
   const jetons = reduire(brut);
@@ -129,18 +177,26 @@ export function normaliserAdresse(brut: string | null): AdressePostale {
   // deux types de voie, et seul le second ouvre la vraie adresse.
   let ancre = -1;
   let numero: string | null = null;
+  let typeVoie: string | null = null;
   for (let index = 0; index < fin; index += 1) {
-    if (!TYPES_DE_VOIE.has(jetons[index] ?? '')) continue;
+    const classe = TYPES_DE_VOIE.get(jetons[index] ?? '');
+    if (classe === undefined) continue;
     const trouve = numeroAvant(jetons, index);
     if (trouve === null) continue;
     ancre = index;
     numero = trouve;
+    typeVoie = classe;
     break;
   }
-  if (ancre === -1) return { numero: null, motsVoie: [], codePostal };
+  if (ancre === -1) return { numero: null, typeVoie: null, motsVoie: [], codePostal };
 
-  const motsVoie = jetons.slice(ancre + 1, fin).filter((jeton) => !MOTS_OUTILS.has(jeton));
-  return { numero, motsVoie, codePostal };
+  const motsVoie: string[] = [];
+  for (const jeton of jetons.slice(ancre + 1, fin)) {
+    if (MENTIONS_DE_DISTRIBUTION.has(jeton)) break;
+    if (MOTS_OUTILS.has(jeton)) continue;
+    motsVoie.push(jeton);
+  }
+  return { numero, typeVoie, motsVoie, codePostal };
 }
 
 /**
@@ -159,14 +215,30 @@ export function normaliserAdresse(brut: string | null): AdressePostale {
  *
  * Une voie Maps sans aucun mot fait échouer aussi : l'inclusion d'un ensemble
  * vide est toujours vraie, et le numéro seul suffirait alors à apparier.
+ *
+ * Le **type de voie**, lui, doit coïncider à la classe près. Il est toujours
+ * défini dès qu'un numéro l'est — c'est lui qui a servi à le trouver — donc
+ * cette exigence n'écarte aucune adresse lisible, et elle sépare le quai de
+ * la rue du même nom.
  */
 export function memeAdresse(siret: AdressePostale, maps: AdressePostale): boolean {
   if (siret.numero === null || siret.numero !== maps.numero) return false;
+  if (siret.typeVoie === null || siret.typeVoie !== maps.typeVoie) return false;
   if (siret.codePostal === null || siret.codePostal !== maps.codePostal) return false;
   if (maps.motsVoie.length === 0) return false;
   const connus = new Set(siret.motsVoie);
   return maps.motsVoie.every((mot) => connus.has(mot));
 }
+
+/**
+ * Ce qui vend le métier sans l'exercer.
+ *
+ * Vit ici et non dans `trades.ts` : ce n'est pas une donnée de métier mais la
+ * borne d'une lecture, et elle n'a de sens que pour cette fonction.
+ */
+const MOTS_DE_NEGOCE = [
+  'magasin', 'fournisseur', 'grossiste', 'negoce', 'location', 'materiel', 'fabricant',
+];
 
 /**
  * Le libellé de catégorie Google désigne-t-il **un** métier du bâtiment ?
@@ -178,17 +250,27 @@ export function memeAdresse(siret: AdressePostale, maps: AdressePostale): boolea
  * immeuble, qui est un faux positif, du serrurier-plombier classé sous
  * l'étiquette voisine, qui est un faux négatif.
  *
+ * Un libellé de **négoce** est refusé d'emblée, avant même qu'on y cherche un
+ * métier : « Fournisseur de matériel de plomberie » et « Grossiste en
+ * matériel de chauffage » sont des catégories Google réelles, et un grossiste
+ * sanitaire dans l'immeuble de l'artisan cherché est le cas de la boulangerie
+ * en pire — son libellé porte le mot du métier.
+ *
  * La comparaison est **mot à mot**, et non par inclusion de chaîne comme le
  * fait `matchesCategory` : un métier de la liste ne confirme rien s'il n'est
  * qu'un fragment d'un mot plus long. Aucune catégorie Google observée ne
  * distingue aujourd'hui les deux règles — la garantie est structurelle, pas
  * mesurée — mais elle est gratuite, et c'est le sens de l'échange : la liste
  * s'élargira, et le jour où elle accueillera un mot court, l'inclusion de
- * chaîne l'aurait fait confirmer n'importe quoi.
+ * chaîne l'aurait fait confirmer n'importe quoi. Son coût, à nommer : un mot
+ * de la liste ne reconnaît aucune de ses flexions — « Plombiers » au pluriel
+ * n'est pas « plombier ». Aucune catégorie Google observée n'emploie le
+ * pluriel ; le jour où l'une le fera, c'est ici qu'il faudra le traiter.
  */
 export function estCategorieBatiment(categorie: string | null): boolean {
   if (categorie === null) return false;
   const mots = new Set(reduire(categorie));
   if (mots.size === 0) return false;
+  if (MOTS_DE_NEGOCE.some((mot) => mots.has(mot))) return false;
   return CATEGORIES_BATIMENT.some((metier) => mots.has(metier));
 }

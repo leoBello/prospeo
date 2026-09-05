@@ -1057,6 +1057,25 @@ cas** — c'est exactement la panne que ce chantier visait.
 `LES ATELIERS DE SAULE` est figée en test de régression dans
 `matching.test.ts`, avec ses vraies chaînes et ses vraies coordonnées.
 
+**Resserrée après la revue de branche, sans rien perdre.** Une revue de code a
+trouvé un faux positif que la mesure n'avait pas rencontré : le type de voie
+était effacé après avoir servi d'ancre, si bien que `2 QUAI DE LA FOSSE` et
+`2 Rue de la Fosse` — deux voies réelles de Nantes 44000, à quelques centaines
+de mètres — étaient la même adresse. Ni la catégorie ni la règle du doute ne
+rattrapaient le cas : les deux occupants sont du bâtiment, et le concurrent de
+l'autre voie n'est pas dans la liste des candidats. Le type de voie est donc
+désormais **réduit à une classe** plutôt qu'effacé : `AVENUE` et `Av.` restent
+la même chose, `quai` et `rue` non. Quatre autres corrections ont suivi : une
+catégorie **absente** compte maintenant comme un doute et non comme un refus
+(sans quoi une fiche dont Google n'a pas rendu la catégorie effaçait le rival
+au lieu de le constater) ; les mentions de distribution (`CS`, `BP`, `Bât.`)
+sont coupées du nom de voie ; les abréviations `All.`, `Sq.`, `Pass.`, `Crs`
+sont reconnues ; et un libellé de négoce (`Fournisseur de matériel de
+plomberie`) n'est plus pris pour un artisan.
+
+`calibrate` rejoué après ces resserrements : **0 verdict changé**, les cinq
+fusions intactes, aucune nouvelle. La base est cohérente avec le code corrigé.
+
 Ce que cette voie **ne** résout **pas**, et qu'il ne faut pas croire réglé :
 
 - **`BELENOS` reste `ambiguous`.** Son unique candidat note 0,736, au-dessus
@@ -1079,6 +1098,12 @@ Ce que cette voie **ne** résout **pas**, et qu'il ne faut pas croire réglé :
   bâtiment à la même adresse dont un seul figure parmi les candidats (A4 ne le
   voit pas, il n'y a qu'un candidat) ; et une adresse de comptable partagée
   par plusieurs entreprises clientes.
+- **Le code postal du SIRET est redeviné plutôt que lu.** `prospect.postal_code`
+  existe et fait autorité, mais `normaliserAdresse` le retrouve par heuristique
+  — « le dernier groupe de cinq chiffres » — pour que les deux côtés passent
+  par la même lecture, Maps n'ayant pas de champ structuré. Le partage est
+  justifié ; ignorer la donnée sûre du côté où elle existe ne l'est qu'à
+  moitié.
 - **La confiance écrite sur une fusion par l'adresse est celle du score, et
   elle est basse** — 0,34 à 0,51 pour les cinq. C'est voulu : la voie adresse
   décide à côté du score, pas dedans, et lui donner des points la ferait

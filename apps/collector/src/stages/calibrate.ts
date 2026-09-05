@@ -239,11 +239,12 @@ export function rewriteFromReplay(
       denomination: row.denomination,
       denominationUsuelle: row.denominationUsuelle,
       // `city` ne sert qu'à composer les requêtes Google, et il n'en part
-      // aucune ici. `address`, en revanche, décide désormais : la propager est
-      // la condition pour que la réécriture produise EXACTEMENT le verdict qui
-      // vient d'être mesuré.
+      // aucune ici. `address`, en revanche, décide désormais : la propager
+      // TELLE QUELLE est la condition pour que la réécriture produise
+      // EXACTEMENT le verdict qui vient d'être mesuré — une absence vidée en
+      // chaîne vide serait déjà une autre donnée.
       city: '',
-      address: row.address ?? '',
+      address: row.address,
       latitude: row.latitude,
       longitude: row.longitude,
     },

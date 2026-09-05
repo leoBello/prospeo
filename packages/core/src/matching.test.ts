@@ -414,6 +414,82 @@ describe('la voie adresse', () => {
     expect(outcome.kind).toBe('not_found');
   });
 
+  it('ne fusionne pas quand un second candidat à la même adresse a une catégorie inconnue', () => {
+    // A4 doit se déclencher sur « je ne peux pas exclure ce rival », pas sur
+    // « ce rival est prouvé du bâtiment ». Google rend `category: null` dès
+    // que le détail n'a pas été extrait : compter cette absence comme un
+    // « non » effacerait le doute au lieu de le constater.
+    const outcome = selectMatch(
+      chhun,
+      [
+        candidate({
+          name: 'Sanitherm Nantes',
+          address: '211 Rte de Sainte-Luce, 44300 Nantes',
+          category: 'Chauffagiste',
+          latitude: 47.2434,
+          longitude: -1.5124,
+        }),
+        candidate({
+          // Nom Maps réel, sans rien de commun avec le sujet : le score ne
+          // retient donc personne, et c'est bien la voie adresse qu'on éprouve.
+          name: 'Les Gars des Eaux',
+          address: '211 Rte de Sainte-Luce, 44300 Nantes',
+          category: null,
+          latitude: 47.2434,
+          longitude: -1.5124,
+        }),
+      ],
+      plombier,
+      MATCHING_CONFIG,
+    );
+    expect(outcome.kind).toBe('not_found');
+  });
+
+  it('ne prétend pas qu’une catégorie absente est hors du bâtiment', () => {
+    const score = scoreCandidate(
+      chhun,
+      candidate({
+        name: 'Les Gars des Eaux',
+        address: '211 Rte de Sainte-Luce, 44300 Nantes',
+        category: null,
+        latitude: 47.2434,
+        longitude: -1.5124,
+      }),
+      plombier,
+      MATCHING_CONFIG,
+    );
+    const ligne = score.lines.find((l) => l.code === 'adresse');
+    expect(ligne?.label).toContain('catégorie inconnue');
+    expect(ligne?.label).not.toContain('hors bâtiment');
+  });
+
+  it('fusionne encore quand le second candidat est exclu par sa catégorie', () => {
+    // La boulangerie du même immeuble est un rival CONNU et écarté : elle ne
+    // doit pas, elle, empêcher la fusion.
+    const outcome = selectMatch(
+      chhun,
+      [
+        candidate({
+          name: 'Sanitherm Nantes',
+          address: '211 Rte de Sainte-Luce, 44300 Nantes',
+          category: 'Chauffagiste',
+          latitude: 47.2434,
+          longitude: -1.5124,
+        }),
+        candidate({
+          name: 'Sésame Boulangerie-Pâtisserie',
+          address: '211 Rte de Sainte-Luce, 44300 Nantes',
+          category: 'Boulangerie',
+          latitude: 47.2434,
+          longitude: -1.5124,
+        }),
+      ],
+      plombier,
+      MATCHING_CONFIG,
+    );
+    expect(outcome.kind).toBe('ok');
+  });
+
   it('ne dégrade pas une fusion obtenue par le score', () => {
     const outcome = selectMatch(subject, [candidate()], plombier, MATCHING_CONFIG);
     expect(outcome.kind).toBe('ok');

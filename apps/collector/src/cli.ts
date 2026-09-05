@@ -917,6 +917,28 @@ async function main(argv: string[]): Promise<number> {
         }
       }
 
+      // A5 : ces fusions-là se relisent une par une avant d'être propagées.
+      // La liste s'imprime donc AVANT la boucle d'écriture, et pas seulement
+      // dans le compte rendu final : en `--apply`, un récapitulatif publié
+      // après l'`upsert` arriverait trop tard pour servir à quoi que ce soit.
+      // Le code ne verrouille rien — c'est une procédure, pas un invariant —
+      // mais au moins il ne prétend pas le contraire.
+      const gagnees = replays.flatMap((replay, index) => {
+        const subject = subjects[index];
+        if (replay.replayed?.via !== 'adresse') return [];
+        if (subject === undefined || subject.address === null) return [];
+        return [{ replay, adresse: subject.address }];
+      });
+      if (gagnees.length > 0) {
+        process.stdout.write('\n  Fusions gagnées par la voie adresse, à relire une par une :\n');
+        for (const { replay, adresse } of gagnees) {
+          process.stdout.write(
+            `    ${replay.denomination}  —  ${adresse}\n` +
+              `      → ${replay.replayed?.matchedName ?? 'aucune'}\n`,
+          );
+        }
+      }
+
       let applied = 0;
       let protege = 0;
       let applyFailed = 0;
@@ -963,22 +985,6 @@ async function main(argv: string[]): Promise<number> {
       if (sansMetier > 0) {
         process.stdout.write(`  ${sansMetier} lignes ignorées : métier inconnu de la configuration\n`);
       }
-      // A5 : rien ne s'applique sans que ces fusions-là aient été relues une
-      // par une. Les lister à part est ce qui rend la relecture possible —
-      // noyées dans les blocs de tous les prospects, elles ne seraient pas relues.
-      const gagnees = replays
-        .map((replay, index) => ({ replay, subject: subjects[index] }))
-        .filter(({ replay }) => replay.replayed?.via === 'adresse');
-      if (gagnees.length > 0) {
-        process.stdout.write('\n  Fusions gagnées par la voie adresse, à relire une par une :\n');
-        for (const { replay, subject } of gagnees) {
-          process.stdout.write(
-            `    ${replay.denomination}  —  ${subject?.address ?? 'adresse inconnue'}\n` +
-              `      → ${replay.replayed?.matchedName ?? 'aucune'}\n`,
-          );
-        }
-      }
-
       if (argv.includes('--apply')) {
         process.stdout.write(
           `  appliqué : ${applied} verdicts réécrits` +
