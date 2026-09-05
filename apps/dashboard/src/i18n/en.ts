@@ -382,6 +382,20 @@ export const en: Record<keyof typeof fr, string> = {
   'campagne.action.retirer': 'Remove',
   'campagne.action.impossible':
     'The collector is stopped: a request filed now would not go anywhere.',
+  'campagne.envoi.titre': 'Sending ready',
+  'campagne.envoi.pret': 'The email will be sent from {expediteur}.',
+  'campagne.envoi.sansJeton': 'No sending account',
+  'campagne.envoi.sansJetonRaison':
+    'Session opened with a password. Deployment and drafting work; sending does not.',
+  'campagne.envoi.sansJetonRemede':
+    'Sending requires a Google token, which is only granted at sign-in. Deploying and drafting stay available until then.',
+  'campagne.envoi.sansJetonAction': 'Sign in again with Google',
+  'campagne.envoi.expire': 'Token expired',
+  'campagne.envoi.expireRaison':
+    'Sending is paused. Nothing is lost: the drafts live in the database.',
+  'campagne.envoi.expireRemede':
+    'The sending token lasts one hour and does not renew itself. Signing in again resumes where sending stopped.',
+  'campagne.envoi.expireAction': 'Sign in again and resume',
   'campagne.worker.ecoute': 'Collector listening',
   'campagne.worker.arret': 'Collector stopped',
   'campagne.worker.arret.raison':

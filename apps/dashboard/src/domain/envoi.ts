@@ -32,7 +32,13 @@ export function etatCompteEnvoi(session: Session | null | undefined): EtatCompte
   // `app_metadata.provider` garde la trace du fournisseur qui a ouvert la
   // session, même une fois le jeton perdu : c'est LUI qui distingue les deux
   // absences.
-  const fournisseur = (session.user.app_metadata as { provider?: string }).provider;
+  //
+  // `?? {}` bien que le type le déclare obligatoire : une session incomplète
+  // — reconstituée, tronquée, forgée par un test — ne doit pas faire tomber
+  // l'écran entier. Elle retombe alors sur `sans_jeton`, qui est l'état
+  // conservateur : il n'autorise aucun envoi.
+  const metadonnees = (session.user.app_metadata ?? {}) as { provider?: string };
+  const fournisseur = metadonnees.provider;
   return fournisseur === 'google' ? { etat: 'jeton_expire', expediteur } : { etat: 'sans_jeton' };
 }
 

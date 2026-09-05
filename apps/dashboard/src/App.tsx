@@ -11,6 +11,7 @@ import { useCampagne } from './data/useCampagne.js';
 import { useSiteTemplate } from './data/useSiteTemplate.js';
 import { makePanelActions } from './ui/actions.js';
 import { LoginScreen } from './screens/LoginScreen.js';
+import { etatCompteEnvoi } from './domain/envoi.js';
 import { TodayScreen } from './screens/TodayScreen.js';
 import { CampagneScreen } from './screens/CampagneScreen.js';
 import { DeploiementsScreen } from './screens/DeploiementsScreen.js';
@@ -48,7 +49,11 @@ function Authenticated({
   utilisateurId: string;
 }) {
   const t = useT();
-  const { signOut } = useAuth();
+  const { session, signInWithGoogle, signOut } = useAuth();
+  // L'état du compte d'envoi se dérive de la session, ici et pas plus bas :
+  // `CampagneScreen` ne connaît pas Supabase, et c'est ce qui le garde
+  // testable sans base.
+  const compteEnvoi = etatCompteEnvoi(session);
   const state = useProspects(client);
   const reload = state.reload;
   // La vue vit dans le fragment d'URL (voir Nav.tsx) : elle survit à un
@@ -218,6 +223,8 @@ function Authenticated({
         heartbeat={campagneState.heartbeat}
         onSignOut={() => void signOut()}
         nav={nav}
+        compteEnvoi={compteEnvoi}
+        onReconnecter={() => void signInWithGoogle()}
       />
     );
   }

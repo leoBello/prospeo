@@ -42,6 +42,13 @@ describe('etatCompteEnvoi', () => {
     });
   });
 
+  it('retombe sur sans_jeton quand la session ne porte pas de métadonnées', () => {
+    // Une session incomplète ne doit pas faire tomber l'écran entier. Elle
+    // retombe sur l'état conservateur : celui qui n'autorise aucun envoi.
+    const tronquee = { provider_token: null, user: { email: 'leo@example.com' } };
+    expect(etatCompteEnvoi(tronquee as unknown as Session)).toEqual({ etat: 'sans_jeton' });
+  });
+
   it('rend jeton_expire pour une session Google dont le jeton a disparu', () => {
     const r = etatCompteEnvoi(
       session({ providerToken: null, provider: 'google', email: 'leo@gmail.com' }),

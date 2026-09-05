@@ -44,6 +44,8 @@ describe('CampagneScreen', () => {
         onRetirer={RIEN}
         onSignOut={() => {}}
         nav={null}
+        compteEnvoi={null}
+        onReconnecter={() => {}}
       />,
     );
 
@@ -64,6 +66,8 @@ describe('CampagneScreen', () => {
         onRetirer={RIEN}
         onSignOut={() => {}}
         nav={null}
+        compteEnvoi={null}
+        onReconnecter={() => {}}
       />,
     );
 
@@ -83,6 +87,8 @@ describe('CampagneScreen', () => {
         onRetirer={RIEN}
         onSignOut={() => {}}
         nav={null}
+        compteEnvoi={null}
+        onReconnecter={() => {}}
       />,
     );
 
@@ -107,6 +113,8 @@ describe('CampagneScreen', () => {
         onRetirer={RIEN}
         onSignOut={() => {}}
         nav={null}
+        compteEnvoi={null}
+        onReconnecter={() => {}}
       />,
     );
 
@@ -126,6 +134,8 @@ describe('CampagneScreen', () => {
         onRetirer={RIEN}
         onSignOut={() => {}}
         nav={null}
+        compteEnvoi={null}
+        onReconnecter={() => {}}
       />,
     );
 
@@ -149,6 +159,8 @@ describe('CampagneScreen', () => {
         onRetirer={RIEN}
         onSignOut={() => {}}
         nav={null}
+        compteEnvoi={null}
+        onReconnecter={() => {}}
       />,
     );
 
@@ -171,6 +183,8 @@ describe('CampagneScreen', () => {
         onRetirer={RIEN}
         onSignOut={() => {}}
         nav={null}
+        compteEnvoi={null}
+        onReconnecter={() => {}}
       />,
     );
 
@@ -192,6 +206,8 @@ describe('CampagneScreen', () => {
         onRetirer={RIEN}
         onSignOut={() => {}}
         nav={null}
+        compteEnvoi={null}
+        onReconnecter={() => {}}
       />,
     );
 
@@ -216,6 +232,8 @@ describe('CampagneScreen', () => {
         onRetirer={RIEN}
         onSignOut={() => {}}
         nav={null}
+        compteEnvoi={null}
+        onReconnecter={() => {}}
       />,
     );
 
@@ -242,6 +260,8 @@ describe('CampagneScreen — le declenchement', () => {
         onRetirer={RIEN}
         onSignOut={() => {}}
         nav={null}
+        compteEnvoi={null}
+        onReconnecter={() => {}}
       />,
     );
 
@@ -264,6 +284,8 @@ describe('CampagneScreen — le declenchement', () => {
         onRetirer={RIEN}
         onSignOut={() => {}}
         nav={null}
+        compteEnvoi={null}
+        onReconnecter={() => {}}
       />,
     );
 
@@ -288,6 +310,8 @@ describe('CampagneScreen — le declenchement', () => {
         onRetirer={RIEN}
         onSignOut={() => {}}
         nav={null}
+        compteEnvoi={null}
+        onReconnecter={() => {}}
       />,
     );
 

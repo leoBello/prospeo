@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 import type { EtatLigne, FaitsLigne, Lot } from '../domain/campagne.js';
+import type { EtatCompteEnvoi } from '../domain/envoi.js';
 import { getTrade } from '@prospeo/core';
 import { etatLigne } from '../domain/campagne.js';
 import type { TranslationKey } from '../i18n/translate.js';
@@ -85,6 +86,16 @@ export interface CampagneScreenProps {
    */
   heartbeat: { beatAt: string; inFlight: number } | null;
   /**
+   * L'état du compte d'envoi Gmail, ou `null` quand on ne sait pas encore.
+   *
+   * Traversé plutôt que lu ici : l'écran ne connaît pas la session, et c'est
+   * `App` qui la tient. Le distinguer de « pas de compte » est la raison
+   * d'être des trois états — voir `domain/envoi.ts`.
+   */
+  compteEnvoi: EtatCompteEnvoi | null;
+  /** Rouvre le flux Google. Appelée par la remédiation de la bande. */
+  onReconnecter: () => void;
+  /**
    * Déposer une demande, et la retirer. Rendent `null` en cas de succès et le
    * message d'erreur sinon — la convention de `designerGabarit` et de
    * `PanelActions`, adoptée après qu'une écriture refusée par la RLS n'ait été
@@ -117,6 +128,8 @@ export function CampagneScreen({
   onRetirer,
   onSignOut,
   nav,
+  compteEnvoi,
+  onReconnecter,
 }: CampagneScreenProps): ReactElement {
   const t = useT();
   const maintenant = new Date();
@@ -145,7 +158,12 @@ export function CampagneScreen({
             <p className={styles.sousTitre}>{t('campagne.subtitle')}</p>
           </header>
 
-          <BandeConditions heartbeat={heartbeat} maintenant={maintenant} />
+          <BandeConditions
+            heartbeat={heartbeat}
+            maintenant={maintenant}
+            compteEnvoi={compteEnvoi}
+            onReconnecter={onReconnecter}
+          />
 
           {lot.lignes.length === 0 ? (
             // Deux vides de natures différentes, deux écrans. Le second ne se

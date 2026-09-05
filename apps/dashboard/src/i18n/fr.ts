@@ -465,6 +465,20 @@ export const fr = {
   'campagne.action.retirer': 'Retirer',
   'campagne.action.impossible':
     'Le collector est à l’arrêt : une demande déposée maintenant ne partirait pas.',
+  'campagne.envoi.titre': 'Envoi prêt',
+  'campagne.envoi.pret': 'Le mail partira de {expediteur}.',
+  'campagne.envoi.sansJeton': 'Aucun compte d’envoi',
+  'campagne.envoi.sansJetonRaison':
+    'Session ouverte par mot de passe. Le déploiement et la rédaction fonctionnent ; l’envoi, non.',
+  'campagne.envoi.sansJetonRemede':
+    'Envoyer demande un jeton Google, qui ne s’obtient qu’à la connexion. Déployer et rédiger restent disponibles d’ici là.',
+  'campagne.envoi.sansJetonAction': 'Se reconnecter avec Google',
+  'campagne.envoi.expire': 'Jeton expiré',
+  'campagne.envoi.expireRaison':
+    'L’envoi est en pause. Rien n’est perdu : les brouillons vivent en base.',
+  'campagne.envoi.expireRemede':
+    'Le jeton d’envoi vit une heure et ne se renouvelle pas seul. Se reconnecter reprend là où l’envoi s’est arrêté.',
+  'campagne.envoi.expireAction': 'Se reconnecter et reprendre',
   'campagne.worker.ecoute': "Collector à l'écoute",
   'campagne.worker.arret': "Collector à l'arrêt",
   'campagne.worker.arret.raison':
