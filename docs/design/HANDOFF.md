@@ -867,6 +867,76 @@ choisi** — décision reportée, avec de vrais tarifs clients en main.
   uniquement sur l'`ownerId`, pour éviter qu'une décision fondée sur un cycle
   de balayage antérieur ne s'applique à un process relancé entre-temps.
 
+## Chantier n°8 mis en pause le 5 septembre 2026 — où il s'arrête, et ce qu'il laisse ouvert
+
+**Décision du propriétaire, et sa raison :** il est encore le seul utilisateur.
+Avant d'engager une dépense d'infrastructure (hébergement des workers, proxys
+résidentiels), il veut prouver que l'application marche de bout en bout et
+rapporte. Le chantier n°7 (campagne de prospection) reprend donc à son lot 4,
+et le n°8 attend.
+
+**Rien n'est à annuler.** Les quatre étapes livrées — cloisonnement RLS, coffre
+à jetons, relais OAuth, worker par utilisateur — sont correctes pour un seul
+utilisateur : un utilisateur unique reste un utilisateur. Aucune infrastructure
+n'a été engagée, aucune des décisions d'hébergement n'a été prise. Le
+superviseur existe mais reste facultatif : `worker --owner <uuid>` lancé à la
+main fait le même travail pour un compte.
+
+**LE PIÈGE, PAYÉ UNE FOIS — à vérifier avant de croire à une panne.** La
+dernière étape a fait lire les jetons dans le coffre plutôt que dans le `.env`.
+Trois variables sont donc devenues obligatoires dans l'environnement du
+collector, et ne l'étaient pas avant : `PROSPEO_COFFRE_CLE`,
+`PROSPEO_GITHUB_APP_ID`, `PROSPEO_GITHUB_APP_PRIVATE_KEY`. Sans elles, le
+worker échoue à l'étape `publish` avec « Configuration incomplète pour l'étage
+« worker » » — alors que les commandes batch `publish`/`deploy`, restées sur
+les anciens `GITHUB_TOKEN`/`VERCEL_TOKEN`, continuent de marcher. Le contraste
+entre les deux est exactement ce qui rend la panne déroutante. Les valeurs sont
+celles du projet Vercel `prospeo-relais-oauth` ; `PROSPEO_COFFRE_CLE` doit être
+**identique**, sinon le jeton Vercel chiffré ne se déchiffre plus.
+
+### Ce qui reste ouvert, dans l'ordre où il faudra le reprendre
+
+1. **La seconde file et l'enrichissement par tranches** (D7, D4, D9) — le
+   brainstorming était commencé quand la pause a été décidée. Deux points y
+   avaient déjà été tranchés : l'enrichissement hébergé passera **derrière des
+   proxys résidentiels** (une IP de sortie par utilisateur), et le worker
+   vérifiera la file de campagne **entre chaque prospect enrichi** plutôt qu'en
+   fin de tranche — le grain d'interruption devient ~17 s au lieu de 14 min.
+2. **La péremption** (D10) — le seul mécanisme qui fasse tenir D5 du chantier
+   n°4 (un site publié au nom d'un tiers ne doit pas vivre sans surveillance).
+3. **L'hébergement** des workers, et **Google** au-delà de 100 utilisateurs.
+
+### Trois mesures faites le 5 septembre 2026, à ne pas refaire de mémoire
+
+Le scraping Google Maps, mesuré avec Playwright sur six navigations réelles :
+
+| Mesure | Valeur |
+|---|---|
+| Première navigation (amorçage, cache froid) | **1,13 Mo** |
+| Navigations suivantes (régime marginal) | **0,48 Mo** en moyenne |
+| Par prospect (2 à 4 navigations) | **~1,4 Mo** |
+
+Ce que ça coûte derrière un proxy résidentiel, aux prix du marché
+(1,50 à 8 $/Go, relevés le 5 septembre) : **moins de 0,60 $** pour les 50
+prospects d'un premier lot, **1 à 4 $** pour un arrondissement (354), et
+**8 à 33 $** pour Marseille entier (2 934). L'enrichissement proxifié est donc
+abordable — c'était l'inconnue qui pouvait renverser le choix.
+
+**Et une optimisation écartée par la mesure, pour qu'on ne la réécrive pas :**
+bloquer images, fontes et médias dans Playwright ne fait gagner que **4 %**.
+En `waitUntil: 'domcontentloaded'`, Maps ne charge jamais ses tuiles ; le poids
+est dans les scripts et le document. Le cache du profil persistant, lui, vaut
+cher : il divise par deux le coût d'une navigation. Un profil par utilisateur,
+gardé entre les tranches, n'est donc pas seulement une nécessité technique
+(`launchPersistentContext` verrouille son répertoire) — c'est aussi ce qui
+tient la facture.
+
+**Le risque qui reste entier, et qui devra être tranché avant d'ouvrir :** avec
+N workers sur une seule machine, N clients scrapent Google depuis **une seule
+IP**. Le spec du chantier n°1 assumait le risque de blocage pour un opérateur ;
+ici un blocage arrêterait tous les clients à la fois. Les proxys résidentiels
+sont la réponse retenue, non encore implémentée.
+
 ## La question ouverte du lot 3
 
 `prospect_pipeline` ne porte que `status` et `updated_at`. Savoir qu'une
