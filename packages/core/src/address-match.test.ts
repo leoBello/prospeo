@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normaliserAdresse } from './address-match.js';
+import { estCategorieBatiment, memeAdresse, normaliserAdresse } from './address-match.js';
 
 describe('normaliserAdresse — les préfixes avant le numéro de voie', () => {
   // Toutes ces chaînes sont des `prospect.address` réels, relevés le
@@ -139,5 +139,113 @@ describe('normaliserAdresse — ce qu’elle refuse de deviner', () => {
     const lue = normaliserAdresse('RUE DU BENELUX 44300 NANTES');
     expect(lue.numero).toBeNull();
     expect(lue.motsVoie).toEqual([]);
+  });
+});
+
+/** Raccourci de lecture : les deux côtés passent par la même normalisation. */
+function meme(siret: string | null, maps: string | null): boolean {
+  return memeAdresse(normaliserAdresse(siret), normaliserAdresse(maps));
+}
+
+describe('memeAdresse', () => {
+  it('refuse « 9 avenue Général Marchand » face à « 9 rue Kléber »', () => {
+    // Le faux positif que la première mesure de ce chantier a réellement
+    // produit : même numéro, même code postal, deux rues sans rapport.
+    expect(meme('9 AVENUE GENERAL MARCHAND 44000 NANTES', '9 Rue Kléber, 44000 Nantes')).toBe(
+      false,
+    );
+  });
+
+  it('accepte une adresse SIRET qui porte des mots en plus', () => {
+    expect(
+      meme(
+        "ZONE NANT'EST ENTREPRISES 1 RUE DU BENELUX 44300 NANTES",
+        '1 Rue du Benelux, 44300 Nantes',
+      ),
+    ).toBe(true);
+  });
+
+  it('refuse l’inclusion dans l’autre sens', () => {
+    // La relation n'est pas symétrique, et c'est le cœur de la règle : des
+    // mots en plus côté Maps sont des mots que le SIRET ne confirme pas.
+    expect(
+      meme(
+        '1 RUE DU BENELUX 44300 NANTES',
+        "1 Rue du Benelux Parc Nant'Est, 44300 Nantes",
+      ),
+    ).toBe(false);
+  });
+
+  it('accepte l’adresse identique malgré l’abréviation du type de voie', () => {
+    expect(
+      meme('211 ROUTE DE SAINTE LUCE 44300 NANTES', '211 Rte de Sainte-Luce, 44300 Nantes'),
+    ).toBe(true);
+  });
+
+  it('refuse un code postal différent', () => {
+    expect(meme('1 RUE DU BENELUX 44300 NANTES', '1 Rue du Benelux, 44000 Nantes')).toBe(false);
+  });
+
+  it('refuse un numéro différent', () => {
+    expect(meme('1 RUE DU BENELUX 44300 NANTES', '3 Rue du Benelux, 44300 Nantes')).toBe(false);
+  });
+
+  it('refuse quand un numéro manque d’un côté', () => {
+    expect(meme('RUE DU BENELUX 44300 NANTES', '1 Rue du Benelux, 44300 Nantes')).toBe(false);
+    expect(meme('1 RUE DU BENELUX 44300 NANTES', 'Rue du Benelux, 44300 Nantes')).toBe(false);
+  });
+
+  it('refuse quand l’adresse Maps est absente', () => {
+    expect(meme('1 RUE DU BENELUX 44300 NANTES', null)).toBe(false);
+  });
+
+  it('refuse quand la voie Maps ne porte aucun mot', () => {
+    // Sans ce garde-fou, l'inclusion d'un ensemble vide serait toujours vraie
+    // et n'importe quel numéro suffirait à apparier.
+    expect(meme('1 RUE DU BENELUX 44300 NANTES', '1 Rue, 44300 Nantes')).toBe(false);
+  });
+});
+
+describe('estCategorieBatiment', () => {
+  it('accepte « Serrurier » quand on cherchait un plombier', () => {
+    // Le cas BELENOS : enregistré « BELENOS SERRURERIE, BELENOS PLOMBERIE »,
+    // classé « Serrurier » par Maps. L'artisan multi-métiers est la norme.
+    expect(estCategorieBatiment('Serrurier')).toBe(true);
+  });
+
+  it('refuse « Boulangerie »', () => {
+    // Le cas Sésame, à l'adresse exacte d'un installateur thermique : un autre
+    // commerce dans le même immeuble.
+    expect(estCategorieBatiment('Boulangerie')).toBe(false);
+  });
+
+  it('accepte les cinq métiers que le spec exige', () => {
+    for (const libelle of ['Électricien', 'Couvreur', 'Maçon', 'Menuisier', 'Chauffagiste']) {
+      expect(estCategorieBatiment(libelle)).toBe(true);
+    }
+  });
+
+  it('accepte un libellé composé dont un mot seulement est un métier', () => {
+    expect(estCategorieBatiment('Entreprise de rénovation')).toBe(true);
+  });
+
+  it('refuse les catégories réelles qui ne sont pas des métiers du bâtiment', () => {
+    // Toutes relevées dans `prospect_enrichment.candidates`.
+    for (const libelle of [
+      'Santé',
+      'Centre de formation',
+      "Établissement d'enseignement professionnel",
+      'Centre d’apprentissage',
+    ]) {
+      expect(estCategorieBatiment(libelle)).toBe(false);
+    }
+  });
+
+  it('refuse « Dépannage », mauvais discriminant', () => {
+    expect(estCategorieBatiment('Dépannage')).toBe(false);
+  });
+
+  it('refuse une catégorie absente', () => {
+    expect(estCategorieBatiment(null)).toBe(false);
   });
 });

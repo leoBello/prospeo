@@ -9,6 +9,8 @@
  * nature que « 300 mètres », surtout indépendante du nom.
  */
 
+import { CATEGORIES_BATIMENT } from './trades.js';
+
 export interface AdressePostale {
   /** Numéro de voie, suffixe retiré : « 71 » pour « 71b ». */
   numero: string | null;
@@ -139,4 +141,54 @@ export function normaliserAdresse(brut: string | null): AdressePostale {
 
   const motsVoie = jetons.slice(ancre + 1, fin).filter((jeton) => !MOTS_OUTILS.has(jeton));
   return { numero, motsVoie, codePostal };
+}
+
+/**
+ * Les deux adresses désignent-elles le même point ?
+ *
+ * **L'ordre des arguments compte.** La relation testée est l'*inclusion* des
+ * mots de voie du côté Maps dans ceux du côté SIRET, et non l'égalité : le
+ * SIRET porte souvent des mots que Maps n'a pas — une zone d'activité, un
+ * bâtiment — alors que l'inverse ne se produit pas. Un mot en plus du côté
+ * Maps est donc un mot que le SIRET ne confirme pas, et il fait échouer la
+ * comparaison.
+ *
+ * « Un mot en commun » aurait été bien plus permissif, et c'est exactement ce
+ * qui a apparié `9 avenue Général Marchand` à `9 rue Kléber` pendant
+ * l'investigation.
+ *
+ * Une voie Maps sans aucun mot fait échouer aussi : l'inclusion d'un ensemble
+ * vide est toujours vraie, et le numéro seul suffirait alors à apparier.
+ */
+export function memeAdresse(siret: AdressePostale, maps: AdressePostale): boolean {
+  if (siret.numero === null || siret.numero !== maps.numero) return false;
+  if (siret.codePostal === null || siret.codePostal !== maps.codePostal) return false;
+  if (maps.motsVoie.length === 0) return false;
+  const connus = new Set(siret.motsVoie);
+  return maps.motsVoie.every((mot) => connus.has(mot));
+}
+
+/**
+ * Le libellé de catégorie Google désigne-t-il **un** métier du bâtiment ?
+ *
+ * Distinct de `matchesCategory`, qui demande « est-ce le métier cherché ? » et
+ * garde ce sens partout ailleurs. Cette lecture élargie ne vaut que dans la
+ * voie adresse, où elle est adossée à une preuve forte — le même numéro, la
+ * même rue, le même code postal. C'est ce qui sépare la boulangerie du même
+ * immeuble, qui est un faux positif, du serrurier-plombier classé sous
+ * l'étiquette voisine, qui est un faux négatif.
+ *
+ * La comparaison est **mot à mot**, et non par inclusion de chaîne comme le
+ * fait `matchesCategory` : un métier de la liste ne confirme rien s'il n'est
+ * qu'un fragment d'un mot plus long. Aucune catégorie Google observée ne
+ * distingue aujourd'hui les deux règles — la garantie est structurelle, pas
+ * mesurée — mais elle est gratuite, et c'est le sens de l'échange : la liste
+ * s'élargira, et le jour où elle accueillera un mot court, l'inclusion de
+ * chaîne l'aurait fait confirmer n'importe quoi.
+ */
+export function estCategorieBatiment(categorie: string | null): boolean {
+  if (categorie === null) return false;
+  const mots = new Set(reduire(categorie));
+  if (mots.size === 0) return false;
+  return CATEGORIES_BATIMENT.some((metier) => mots.has(metier));
 }
