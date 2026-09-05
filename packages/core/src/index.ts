@@ -2,6 +2,7 @@ export * from './types.js';
 export * from './trades.js';
 export * from './normalize.js';
 export * from './name-match.js';
+export * from './address-match.js';
 export * from './phone.js';
 export * from './effectif.js';
 export * from './web-presence.js';

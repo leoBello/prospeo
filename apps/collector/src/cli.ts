@@ -132,6 +132,10 @@ Calibrer les seuils d'appariement
   lignes déjà en base, toujours sans requête Google : les candidats y sont,
   il n'y a qu'à les renoter. Sans --apply, calibrate n'écrit rien.
 
+  La voie adresse est comptée à part, et les fusions qu'elle gagne sont
+  listées nommément : elles se relisent une par une AVANT --apply, comme
+  l'ont été les quatre fusions du passage de 300 m à 1 000 m.
+
   --apply ne touche JAMAIS une ligne tranchée en revue par un humain. C'est
   la seule donnée de cette base que rien ne permet de reconstituer, et un
   recalcul qui la contredirait ne ferait aucun bruit. Le décompte des lignes
@@ -824,7 +828,7 @@ async function main(argv: string[]): Promise<number> {
         const { data, error } = await client
           .from('prospect_enrichment')
           .select(
-            'prospect_id, status, matched_name, candidates, decided_by, enriched_at, prospect!inner(denomination, denomination_usuelle, latitude, longitude, trade_slug)',
+            'prospect_id, status, matched_name, candidates, decided_by, enriched_at, prospect!inner(denomination, denomination_usuelle, address, latitude, longitude, trade_slug)',
           )
           // `!inner`, sans quoi `--apply` reecrirait les verdicts d'un autre
           // client sous les seuils qu'un tiers vient de regler.
@@ -857,6 +861,7 @@ async function main(argv: string[]): Promise<number> {
           prospectId: row.prospect_id as string,
           denomination: (p.denomination as string | null) ?? '(sans dénomination)',
           denominationUsuelle: p.denomination_usuelle as string | null,
+          address: p.address as string | null,
           latitude: p.latitude as number | null,
           longitude: p.longitude as number | null,
           trade,
@@ -889,7 +894,8 @@ async function main(argv: string[]): Promise<number> {
             ? replay.stored.status
             : `${replay.stored.status} → ${replay.replayed.status}`;
         process.stdout.write(
-          `${replay.denomination}  [${verdict}]${replay.changed ? '  ⚠ verdict changé' : ''}\n`,
+          `${replay.denomination}  [${verdict}]${replay.changed ? '  ⚠ verdict changé' : ''}` +
+            `${replay.replayed.via === 'adresse' ? '  ← voie adresse' : ''}\n`,
         );
         if (replay.changed && replay.stored.matchedName !== replay.replayed.matchedName) {
           process.stdout.write(
@@ -908,6 +914,28 @@ async function main(argv: string[]): Promise<number> {
             `\n  ${mark}  ${scored.candidate.name}  ${scored.score.confidence.toFixed(3)}\n`,
           );
           for (const line of scored.score.lines) process.stdout.write(`      ${line.label}\n`);
+        }
+      }
+
+      // A5 : ces fusions-là se relisent une par une avant d'être propagées.
+      // La liste s'imprime donc AVANT la boucle d'écriture, et pas seulement
+      // dans le compte rendu final : en `--apply`, un récapitulatif publié
+      // après l'`upsert` arriverait trop tard pour servir à quoi que ce soit.
+      // Le code ne verrouille rien — c'est une procédure, pas un invariant —
+      // mais au moins il ne prétend pas le contraire.
+      const gagnees = replays.flatMap((replay, index) => {
+        const subject = subjects[index];
+        if (replay.replayed?.via !== 'adresse') return [];
+        if (subject === undefined || subject.address === null) return [];
+        return [{ replay, adresse: subject.address }];
+      });
+      if (gagnees.length > 0) {
+        process.stdout.write('\n  Fusions gagnées par la voie adresse, à relire une par une :\n');
+        for (const { replay, adresse } of gagnees) {
+          process.stdout.write(
+            `    ${replay.denomination}  —  ${adresse}\n` +
+              `      → ${replay.replayed?.matchedName ?? 'aucune'}\n`,
+          );
         }
       }
 
@@ -950,6 +978,7 @@ async function main(argv: string[]): Promise<number> {
           `${summary.unreplayable} non rejouables\n` +
           `  verdicts : ${summary.byStatus.ok} fusionnés, ${summary.byStatus.ambiguous} à trancher, ` +
           `${summary.byStatus.not_found} introuvables\n` +
+          `  dont ${summary.fusionsParAdresse} fusions gagnées par la voie adresse\n` +
           `  éliminations : ${summary.eliminated.distance} par le rayon, ` +
           `${summary.eliminated.confiance} sous le seuil bas\n`,
       );

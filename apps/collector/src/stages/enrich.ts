@@ -69,7 +69,14 @@ export interface EnrichProspect {
   denomination: string;
   denominationUsuelle: string | null;
   city: string;
-  address: string;
+  /**
+   * L'adresse Sirene, code postal compris.
+   *
+   * Nullable depuis que la calibration rejoue des lignes : elle n'a rien à
+   * fabriquer quand la colonne est vide, et une chaîne vide passerait pour
+   * une adresse lue.
+   */
+  address: string | null;
   latitude: number | null;
   longitude: number | null;
 }
@@ -167,6 +174,9 @@ export function buildEnrichmentRow(
   const subject: MatchSubject = {
     denomination: prospect.denomination,
     denominationUsuelle: prospect.denominationUsuelle,
+    // L'adresse Sirene, code postal compris : la matière de la voie adresse.
+    // Elle était jusqu'ici lue pour composer les requêtes Google, puis jetée.
+    address: prospect.address,
     latitude: prospect.latitude,
     longitude: prospect.longitude,
   };
@@ -293,7 +303,8 @@ function queriesFor(prospect: EnrichProspect, trade: Trade): string[] {
   }
   queries.push(`"${prospect.denomination}" ${prospect.city}`);
   const fallback = trade.mapsQueries[0] ?? trade.slug;
-  queries.push(`${fallback} ${prospect.address}`);
+  // Sans adresse, pas de requête par adresse : elle porterait le mot « null ».
+  if (prospect.address !== null) queries.push(`${fallback} ${prospect.address}`);
   return queries;
 }
 
