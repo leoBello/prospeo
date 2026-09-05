@@ -465,6 +465,35 @@ export const fr = {
   'campagne.action.retirer': 'Retirer',
   'campagne.action.impossible':
     'Le collector est à l’arrêt : une demande déposée maintenant ne partirait pas.',
+  'relecture.destinataire': 'Destinataire',
+  'relecture.origine.saisie': 'Saisie',
+  'relecture.origine.collecte': 'Collectée',
+  'relecture.origine.aucune': 'Aucune adresse',
+  'relecture.origineAide.saisie': 'Adresse saisie à la main dans cet écran.',
+  'relecture.origineAide.collecte': 'Adresse relevée automatiquement à l’enrichissement.',
+  'relecture.origineAide.aucune':
+    'Aucune adresse n’a été trouvée ni saisie. La saisir permet d’envoyer.',
+  'relecture.corriger': 'Corriger',
+  'relecture.saisir': 'Saisir l’adresse',
+  'relecture.enregistrer': 'Enregistrer',
+  'relecture.annuler': 'Annuler',
+  'relecture.objet': 'Objet',
+  'relecture.corps': 'Corps du message',
+  'relecture.tracabilite': 'Rédigé par {modele} · consignes {consignes} · {date}',
+  'relecture.pasDeMail': 'Aucun mail n’a encore été rédigé pour ce prospect.',
+  'relecture.partiraDe':
+    'Le mail partira de {expediteur}. Les réponses arriveront dans cette boîte.',
+  'relecture.consequence':
+    'À l’envoi, le prospect passe en « contacté » et l’échange rejoint son historique.',
+  'relecture.envoyer': 'Envoyer',
+  'relecture.envoiEnCours': 'Envoi…',
+  'relecture.dejaEnvoye': 'Déjà envoyé',
+  'relecture.echecPrise': 'Un envoi est déjà en cours ou parti pour ce prospect.',
+  'relecture.echecGmail': 'Gmail a refusé l’envoi : {message}',
+  'relecture.echecSuite':
+    'Le mail est parti, mais la suite a échoué : {message}. Le prospect peut être en retard d’un statut.',
+  'relecture.adresseEchec': 'L’adresse n’a pas pu être enregistrée : {message}',
+
   'campagne.envoi.titre': 'Envoi prêt',
   'campagne.envoi.pret': 'Le mail partira de {expediteur}.',
   'campagne.envoi.sansJeton': 'Aucun compte d’envoi',
