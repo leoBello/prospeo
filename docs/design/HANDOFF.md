@@ -1026,6 +1026,70 @@ desserré — chaque changement mesuré par `calibrate` **avant** d'être
 appliqué. Et, gratuitement, les **10 `ambiguous` qui attendent déjà**
 `prospeo review`.
 
+### Résolu — la voie adresse, livrée et mesurée le 5 septembre 2026
+
+`packages/core/src/address-match.ts` ajoute une seconde voie de décision : à
+l'adresse postale exacte (même numéro, même voie, même code postal) et pour
+une catégorie Google qui est **un** métier du bâtiment, un candidat unique
+emporte la fusion. Elle ne transforme qu'un `not_found` en `ok` — elle ne
+dégrade aucun verdict et n'alimente pas la file de revue.
+
+**Mesuré par `calibrate` sur les 139 prospects, sans une requête Google : 5
+fusions gagnées**, relues une par une. La répartition passe de 39 / 10 / 90 à
+**44 fusionnés / 10 à trancher / 85 introuvables** — les dix `ambiguous` sont
+exactement les mêmes, comme promis.
+
+Les cinq, avec ce qui les a décidées :
+
+| Prospect (SIRET) | Fiche retenue | Distance | Catégorie |
+|---|---|---|---|
+| LES ATELIERS DE SAULE — 43 rue du Maine | SAULE PLOMBERIE, 43 Rue du Maine | 10 m | Plombier |
+| SARL AUBINEAU PLOMBIER CHAUFFAGISTE — 18 rue de la Conardière | Plombier Nantes - BON PLOMBIER, **18b** Rue de la Conardière | 13 m | Plombier |
+| EMERS — 20 avenue Petit Breton | Roussel Marc Winbrase, 20 **Av.** Petit Breton | 12 m | Plombier |
+| BELKACEM ABDOUS (SERF DEPANNAGE PLOMBERIE) — 19 rue Claude et Simone Millot | Service Dépannage Plomberie Chauffage | 21 m | Chauffagiste |
+| GROUPE AMH (RABIER JEAN-MARIE) — 22 **mail** Pablo Picasso | Les Gars des Eaux | 22 m | Plombier |
+
+Trois des quatre pièges de normalisation ont réellement servi : le suffixe de
+numéro (`18` contre `18b`), l'abréviation de type de voie (`Av.`), et un type
+de voie peu courant (`mail`). Sur les cinq, **le nom ne vaut rien dans trois
+cas** — c'est exactement la panne que ce chantier visait.
+
+`LES ATELIERS DE SAULE` est figée en test de régression dans
+`matching.test.ts`, avec ses vraies chaînes et ses vraies coordonnées.
+
+Ce que cette voie **ne** résout **pas**, et qu'il ne faut pas croire réglé :
+
+- **`BELENOS` reste `ambiguous`.** Son unique candidat note 0,736, au-dessus
+  du seuil bas : le verdict n'est pas `not_found`, et la voie adresse n'y
+  touche pas par construction. Il se tranche par `prospeo review`, comme les
+  neuf autres. Le spec citait ce cas comme justification de la lecture
+  élargie de la catégorie ; la lecture élargie le retient bien — un test le
+  prouve — mais c'est le statut de départ qui n'était pas celui qu'on croyait.
+  **Étendre la voie aux `ambiguous` fusionnerait BELENOS** : la mutation l'a
+  vérifié. C'est une décision, pas un oubli, et elle appartient au
+  propriétaire.
+- **80 prospects sur 139 restent introuvables.** Pour eux, aucun candidat n'est
+  à l'adresse Sirene : c'est le domicile du gérant ou le cabinet comptable.
+- **La latitude prise sur le rayon n'a rien rapporté.** La voie adresse
+  regarde tous les candidats, y compris ceux que les 1 000 m écartent ; les
+  cinq fusions sont pourtant toutes à moins de 25 mètres. La règle reste
+  juste — une adresse identique à 2 km dit qu'un géocodage est faux — mais
+  elle n'a pas été exercée ici.
+- **Deux risques restent ouverts et non couverts** : un second artisan du
+  bâtiment à la même adresse dont un seul figure parmi les candidats (A4 ne le
+  voit pas, il n'y a qu'un candidat) ; et une adresse de comptable partagée
+  par plusieurs entreprises clientes.
+- **La confiance écrite sur une fusion par l'adresse est celle du score, et
+  elle est basse** — 0,34 à 0,51 pour les cinq. C'est voulu : la voie adresse
+  décide à côté du score, pas dedans, et lui donner des points la ferait
+  produire des `ambiguous`, ce que sa décision fondatrice lui interdit. La
+  fiche du dashboard affichera donc un badge « alerte » sur ces appariements —
+  c'est une invitation à la relecture, pas un défaut.
+
+**État d'application au moment où ces lignes sont écrites : mesuré, non
+appliqué.** `calibrate --apply` réécrit cinq lignes de `prospect_enrichment`
+en base de production, et attend l'accord du propriétaire.
+
 ## La question ouverte du lot 3
 
 `prospect_pipeline` ne porte que `status` et `updated_at`. Savoir qu'une

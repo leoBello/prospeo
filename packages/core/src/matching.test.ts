@@ -430,6 +430,39 @@ describe('la voie adresse', () => {
     expect(outcome.kind).toBe('ambiguous');
   });
 
+  it('fusionne « LES ATELIERS DE SAULE » avec « SAULE PLOMBERIE », cas réel', () => {
+    // Une des cinq fusions réellement gagnées par `calibrate` le 5 septembre
+    // 2026, figée ici avec ses vraies chaînes et ses vraies coordonnées. Le
+    // nom ne vaut que 0,25 et la confiance 0,51 — sous le seuil bas : sans la
+    // voie adresse, ce prospect resterait introuvable alors que sa fiche est
+    // à dix mètres, au même numéro de la même rue.
+    const saule: MatchSubject = {
+      denomination: 'LES ATELIERS DE SAULE',
+      denominationUsuelle: null,
+      address: '43 RUE DU MAINE 44000 NANTES',
+      latitude: 47.225640057,
+      longitude: -1.566198832,
+    };
+    const outcome = selectMatch(
+      saule,
+      [
+        candidate({
+          name: 'SAULE PLOMBERIE',
+          address: '43 Rue du Maine, 44000 Nantes',
+          category: 'Plombier',
+          latitude: 47.2256947,
+          longitude: -1.5662961,
+        }),
+      ],
+      plombier,
+      MATCHING_CONFIG,
+    );
+    expect(outcome.kind).toBe('ok');
+    if (outcome.kind !== 'ok') return;
+    expect(outcome.via).toBe('adresse');
+    expect(outcome.score.confidence).toBeLessThan(MATCHING_CONFIG.lowThreshold);
+  });
+
   it('ne pose aucune ligne d’adresse quand les adresses diffèrent', () => {
     const score = scoreCandidate(subject, candidate(), plombier, MATCHING_CONFIG);
     expect(score.sameAddress).toBe(false);
