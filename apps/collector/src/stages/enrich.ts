@@ -167,6 +167,9 @@ export function buildEnrichmentRow(
   const subject: MatchSubject = {
     denomination: prospect.denomination,
     denominationUsuelle: prospect.denominationUsuelle,
+    // L'adresse Sirene, code postal compris : la matière de la voie adresse.
+    // Elle était jusqu'ici lue pour composer les requêtes Google, puis jetée.
+    address: prospect.address,
     latitude: prospect.latitude,
     longitude: prospect.longitude,
   };

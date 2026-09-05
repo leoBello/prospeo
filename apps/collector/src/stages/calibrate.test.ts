@@ -43,6 +43,9 @@ function row(over: Partial<StoredEnrichment> = {}): StoredEnrichment {
     decidedBy: 'matcher',
     denomination: 'SARL ALLARD',
     denominationUsuelle: null,
+    // Les cas antérieurs à la voie adresse n'en ont pas besoin : une absence
+    // qui se nomme referme simplement cette voie.
+    address: null,
     latitude: 47.2213,
     longitude: -1.5601,
     trade,
@@ -214,5 +217,65 @@ describe('rewriteFromReplay — propager un reglage sans effacer un humain', () 
     const rewritten = rewriteFromReplay(row(), replay);
     expect(rewritten?.candidates).toHaveLength(1);
     expect(rewritten?.candidates[0]?.latitude).toBe(47.2214);
+  });
+});
+
+describe('replayEnrichment — la voie adresse', () => {
+  /** Le prospect réel dont la fiche à l'adresse exacte est une boulangerie. */
+  function ligneChhun(over: Partial<StoredEnrichment> = {}): StoredEnrichment {
+    return row({
+      denomination: 'LEAT CHHUN',
+      denominationUsuelle: 'LC INSTALLATEUR THERMIQUE',
+      address: '211 ROUTE DE SAINTE LUCE 44300 NANTES',
+      latitude: 47.2434,
+      longitude: -1.5124,
+      status: 'not_found',
+      matchedName: null,
+      candidates: [
+        stored({
+          name: 'Sanitherm Nantes',
+          address: '211 Rte de Sainte-Luce, 44300 Nantes',
+          category: 'Chauffagiste',
+          latitude: 47.2434,
+          longitude: -1.5124,
+          confidence: 0.1,
+          rejectedFor: 'confiance',
+        }),
+      ],
+      ...over,
+    });
+  }
+
+  it('rejoue un introuvable en fusion quand une fiche du bâtiment est à l’adresse', () => {
+    const replay = replayEnrichment(ligneChhun(), MATCHING_CONFIG);
+
+    expect(replay.replayed?.status).toBe('ok');
+    expect(replay.replayed?.via).toBe('adresse');
+    expect(replay.replayed?.matchedName).toBe('Sanitherm Nantes');
+    expect(replay.changed).toBe(true);
+  });
+
+  it('compte à part les fusions gagnées par la voie adresse', () => {
+    const summary = summarizeReplays([
+      replayEnrichment(ligneChhun(), MATCHING_CONFIG),
+      replayEnrichment(row(), MATCHING_CONFIG),
+    ]);
+
+    expect(summary.byStatus.ok).toBe(2);
+    // La ligne SARL ALLARD fusionne par le score : elle ne doit pas être
+    // comptée ici, sans quoi le décompte ne dirait plus ce qu'il annonce.
+    expect(summary.fusionsParAdresse).toBe(1);
+  });
+
+  it('propage la fusion par l’adresse à la ligne réécrite', () => {
+    const ligne = ligneChhun();
+
+    const ecrite = rewriteFromReplay(ligne, replayEnrichment(ligne, MATCHING_CONFIG));
+
+    expect(ecrite?.status).toBe('ok');
+    expect(ecrite?.matched_name).toBe('Sanitherm Nantes');
+    // Le téléphone de la fiche retenue doit suivre : c'est tout l'objet de la
+    // fusion, et c'est le numéro qui sera composé.
+    expect(ecrite?.phone_e164).not.toBeNull();
   });
 });

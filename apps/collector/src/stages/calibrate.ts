@@ -28,6 +28,8 @@ export interface StoredEnrichment {
   prospectId: string;
   denomination: string;
   denominationUsuelle: string | null;
+  /** L'adresse Sirene, code postal compris : la matière de la voie adresse. */
+  address: string | null;
   latitude: number | null;
   longitude: number | null;
   trade: Trade;
@@ -43,6 +45,14 @@ export interface StoredEnrichment {
 export interface ReplayedOutcome {
   status: 'ok' | 'ambiguous' | 'not_found';
   matchedName: string | null;
+  /**
+   * Ce qui a emporté la fusion, `null` quand il n'y en a pas.
+   *
+   * A5 exige que la mesure distingue les fusions gagnées par la voie adresse
+   * de celles du score : sans cette distinction, on ne saurait pas quoi
+   * relire avant `--apply`.
+   */
+  via: 'score' | 'adresse' | null;
   /** Tous les candidats renotés, éliminés compris et motif à l'appui. */
   scored: ScoredCandidate[];
 }
@@ -131,6 +141,7 @@ export function replayEnrichment(row: StoredEnrichment, config: MatchingConfig):
   const subject: MatchSubject = {
     denomination: row.denomination,
     denominationUsuelle: row.denominationUsuelle,
+    address: row.address,
     latitude: row.latitude,
     longitude: row.longitude,
   };
@@ -138,6 +149,7 @@ export function replayEnrichment(row: StoredEnrichment, config: MatchingConfig):
   const replayed: ReplayedOutcome = {
     status: outcome.kind,
     matchedName: outcome.kind === 'ok' ? outcome.candidate.name : null,
+    via: outcome.kind === 'ok' ? outcome.via : null,
     scored: outcome.scored,
   };
 
@@ -156,6 +168,8 @@ export interface ReplaySummary {
   unreplayable: number;
   changed: number;
   byStatus: { ok: number; ambiguous: number; not_found: number };
+  /** Fusions que le score seul aurait refusées, et que l'adresse a emportées. */
+  fusionsParAdresse: number;
   /** Candidats écartés, par motif, sur les seules lignes rejouées. */
   eliminated: { distance: number; confiance: number };
 }
@@ -166,6 +180,7 @@ export function summarizeReplays(replays: readonly Replay[]): ReplaySummary {
     unreplayable: 0,
     changed: 0,
     byStatus: { ok: 0, ambiguous: 0, not_found: 0 },
+    fusionsParAdresse: 0,
     eliminated: { distance: 0, confiance: 0 },
   };
 
@@ -177,6 +192,7 @@ export function summarizeReplays(replays: readonly Replay[]): ReplaySummary {
     summary.replayed += 1;
     if (replay.changed) summary.changed += 1;
     summary.byStatus[replay.replayed.status] += 1;
+    if (replay.replayed.via === 'adresse') summary.fusionsParAdresse += 1;
     // Comptés sur le rejeu et non sur le champ stocké : c'est la
     // configuration qu'on est en train d'éprouver qui décide des
     // éliminations, pas celle qui a produit la ligne.
@@ -222,10 +238,12 @@ export function rewriteFromReplay(
       id: row.prospectId,
       denomination: row.denomination,
       denominationUsuelle: row.denominationUsuelle,
-      // `city` et `address` ne servent qu'à composer les requêtes Google, et
-      // il n'en part aucune ici.
+      // `city` ne sert qu'à composer les requêtes Google, et il n'en part
+      // aucune ici. `address`, en revanche, décide désormais : la propager est
+      // la condition pour que la réécriture produise EXACTEMENT le verdict qui
+      // vient d'être mesuré.
       city: '',
-      address: '',
+      address: row.address ?? '',
       latitude: row.latitude,
       longitude: row.longitude,
     },

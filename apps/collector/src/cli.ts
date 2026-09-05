@@ -132,6 +132,10 @@ Calibrer les seuils d'appariement
   lignes déjà en base, toujours sans requête Google : les candidats y sont,
   il n'y a qu'à les renoter. Sans --apply, calibrate n'écrit rien.
 
+  La voie adresse est comptée à part, et les fusions qu'elle gagne sont
+  listées nommément : elles se relisent une par une AVANT --apply, comme
+  l'ont été les quatre fusions du passage de 300 m à 1 000 m.
+
   --apply ne touche JAMAIS une ligne tranchée en revue par un humain. C'est
   la seule donnée de cette base que rien ne permet de reconstituer, et un
   recalcul qui la contredirait ne ferait aucun bruit. Le décompte des lignes
@@ -824,7 +828,7 @@ async function main(argv: string[]): Promise<number> {
         const { data, error } = await client
           .from('prospect_enrichment')
           .select(
-            'prospect_id, status, matched_name, candidates, decided_by, enriched_at, prospect!inner(denomination, denomination_usuelle, latitude, longitude, trade_slug)',
+            'prospect_id, status, matched_name, candidates, decided_by, enriched_at, prospect!inner(denomination, denomination_usuelle, address, latitude, longitude, trade_slug)',
           )
           // `!inner`, sans quoi `--apply` reecrirait les verdicts d'un autre
           // client sous les seuils qu'un tiers vient de regler.
@@ -857,6 +861,7 @@ async function main(argv: string[]): Promise<number> {
           prospectId: row.prospect_id as string,
           denomination: (p.denomination as string | null) ?? '(sans dénomination)',
           denominationUsuelle: p.denomination_usuelle as string | null,
+          address: p.address as string | null,
           latitude: p.latitude as number | null,
           longitude: p.longitude as number | null,
           trade,
@@ -889,7 +894,8 @@ async function main(argv: string[]): Promise<number> {
             ? replay.stored.status
             : `${replay.stored.status} → ${replay.replayed.status}`;
         process.stdout.write(
-          `${replay.denomination}  [${verdict}]${replay.changed ? '  ⚠ verdict changé' : ''}\n`,
+          `${replay.denomination}  [${verdict}]${replay.changed ? '  ⚠ verdict changé' : ''}` +
+            `${replay.replayed.via === 'adresse' ? '  ← voie adresse' : ''}\n`,
         );
         if (replay.changed && replay.stored.matchedName !== replay.replayed.matchedName) {
           process.stdout.write(
@@ -950,12 +956,29 @@ async function main(argv: string[]): Promise<number> {
           `${summary.unreplayable} non rejouables\n` +
           `  verdicts : ${summary.byStatus.ok} fusionnés, ${summary.byStatus.ambiguous} à trancher, ` +
           `${summary.byStatus.not_found} introuvables\n` +
+          `  dont ${summary.fusionsParAdresse} fusions gagnées par la voie adresse\n` +
           `  éliminations : ${summary.eliminated.distance} par le rayon, ` +
           `${summary.eliminated.confiance} sous le seuil bas\n`,
       );
       if (sansMetier > 0) {
         process.stdout.write(`  ${sansMetier} lignes ignorées : métier inconnu de la configuration\n`);
       }
+      // A5 : rien ne s'applique sans que ces fusions-là aient été relues une
+      // par une. Les lister à part est ce qui rend la relecture possible —
+      // noyées dans les blocs de tous les prospects, elles ne seraient pas relues.
+      const gagnees = replays
+        .map((replay, index) => ({ replay, subject: subjects[index] }))
+        .filter(({ replay }) => replay.replayed?.via === 'adresse');
+      if (gagnees.length > 0) {
+        process.stdout.write('\n  Fusions gagnées par la voie adresse, à relire une par une :\n');
+        for (const { replay, subject } of gagnees) {
+          process.stdout.write(
+            `    ${replay.denomination}  —  ${subject?.address ?? 'adresse inconnue'}\n` +
+              `      → ${replay.replayed?.matchedName ?? 'aucune'}\n`,
+          );
+        }
+      }
+
       if (argv.includes('--apply')) {
         process.stdout.write(
           `  appliqué : ${applied} verdicts réécrits` +
