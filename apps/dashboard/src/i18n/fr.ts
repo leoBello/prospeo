@@ -41,6 +41,8 @@ export const fr = {
   'auth.password': 'Mot de passe',
   'auth.submit': 'Se connecter',
   'auth.pending': 'Connexion…',
+  'auth.google': 'Continuer avec Google',
+  'auth.googleAide': 'Nécessaire pour envoyer les mails depuis votre compte.',
   'auth.error.credentials': 'Adresse e-mail ou mot de passe incorrect.',
   'auth.error.generic': 'Connexion impossible : {message}',
   'auth.noSignup':

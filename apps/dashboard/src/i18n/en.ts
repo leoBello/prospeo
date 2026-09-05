@@ -34,6 +34,8 @@ export const en: Record<keyof typeof fr, string> = {
   'auth.password': 'Password',
   'auth.submit': 'Sign in',
   'auth.pending': 'Signing in…',
+  'auth.google': 'Continue with Google',
+  'auth.googleAide': 'Required to send emails from your account.',
   'auth.error.credentials': 'Incorrect email address or password.',
   'auth.error.generic': 'Sign-in failed: {message}',
   'auth.noSignup': 'Single account, created in Supabase. There is no sign-up on this screen.',

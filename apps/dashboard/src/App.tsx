@@ -326,7 +326,7 @@ function Authenticated({
 
 function Gate({ client }: { client: SupabaseClient<Database> }) {
   const t = useT();
-  const { session, signIn } = useAuth();
+  const { session, signIn, signInWithGoogle } = useAuth();
 
   // `undefined` : la session stockée n'a pas encore été relue. Confondre cet
   // état avec « pas connecté » ferait clignoter l'écran de connexion à chaque
@@ -339,7 +339,9 @@ function Gate({ client }: { client: SupabaseClient<Database> }) {
     );
   }
 
-  if (session === null) return <LoginScreen onSignIn={signIn} />;
+  if (session === null) {
+    return <LoginScreen onSignIn={signIn} onSignInWithGoogle={signInWithGoogle} />;
+  }
 
   // `session` est ici garantie non nulle par les deux gardes ci-dessus :
   // c'est de là, et non d'un second appel à `auth.getUser()`, que
