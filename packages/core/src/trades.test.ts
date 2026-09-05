@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TRADES, getTrade, templateRepoFor } from './trades.js';
+import { CATEGORIES_BATIMENT, TRADES, getTrade, templateRepoFor } from './trades.js';
 
 describe('trades', () => {
   it('expose plombier et serrurier', () => {
@@ -50,5 +50,40 @@ describe('templateRepoFor', () => {
     const sansModele = { ...getTrade('plombier')!, templateRepo: undefined };
     expect(() => templateRepoFor(sansModele, undefined)).toThrow(/plombier/);
     expect(() => templateRepoFor(sansModele, '  ')).toThrow();
+  });
+});
+
+describe('CATEGORIES_BATIMENT', () => {
+  it('contient les cinq métiers que le spec exige au minimum', () => {
+    for (const metier of ['electricien', 'couvreur', 'macon', 'menuisier', 'chauffagiste']) {
+      expect(CATEGORIES_BATIMENT).toContain(metier);
+    }
+  });
+
+  it('couvre tous les libellés de catégorie des métiers configurés', () => {
+    // La voie adresse ne doit jamais refuser ce que le score, lui, accepte
+    // déjà comme confirmation du métier.
+    for (const trade of TRADES) {
+      for (const label of trade.categoryLabels) {
+        expect(CATEGORIES_BATIMENT).toContain(label);
+      }
+    }
+  });
+
+  it('exclut « depannage », mauvais discriminant déjà identifié', () => {
+    // Il qualifie autant l'électroménager que l'automobile : voir le
+    // commentaire de `matchesCategory` dans matching.ts.
+    expect(CATEGORIES_BATIMENT).not.toContain('depannage');
+  });
+
+  it('ne contient que des mots déjà normalisés, comparables tels quels', () => {
+    // La comparaison se fait mot à mot contre un libellé Google normalisé :
+    // une entrée accentuée ou composée n'y serait jamais retrouvée, et le
+    // manque serait silencieux.
+    for (const mot of CATEGORIES_BATIMENT) {
+      expect(mot).toBe(mot.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase());
+      expect(mot).not.toContain(' ');
+      expect(mot).not.toBe('');
+    }
   });
 });

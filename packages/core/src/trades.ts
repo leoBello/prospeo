@@ -145,6 +145,45 @@ const HEROS_SERRURIER: readonly HeroImage[] = [
 ] as const;
 
 /**
+ * Les métiers du bâtiment, au sens de la voie adresse.
+ *
+ * **Une donnée, pas une constante cachée** (A3 du spec de l'appariement par
+ * adresse). Elle vit ici, avec les `Trade`, parce qu'elle se relit et se
+ * complète au même moment qu'eux.
+ *
+ * Elle est délibérément **plus large que l'union des `categoryLabels`** : à
+ * l'adresse exacte, la question n'est plus « est-ce le métier cherché ? »
+ * mais « est-ce *un* métier du bâtiment ? ». C'est ce qui sépare les deux cas
+ * mesurés du 5 septembre 2026 : une boulangerie à l'adresse d'un plombier est
+ * un autre commerce dans le même immeuble ; un artisan classé « Serrurier »
+ * quand on cherchait un plombier est le bon artisan sous une étiquette
+ * voisine — et l'artisan multi-métiers est la norme.
+ *
+ * Trois mots sont écartés exprès, parce qu'ils ne discriminent rien :
+ * « depannage », qui qualifie aussi bien l'électroménager que l'automobile
+ * (voir `matchesCategory`) ; « peinture », qui vaut pour un magasin ou une
+ * carrosserie, quand « peintre » désigne bien un artisan ; « travaux », qui
+ * n'est un métier de personne.
+ *
+ * Les entrées sont **déjà normalisées** — minuscules, sans accents, un seul
+ * mot — parce qu'elles sont comparées mot à mot à un libellé Google lui aussi
+ * réduit. Une entrée accentuée ne serait jamais retrouvée, et le manque
+ * serait silencieux.
+ */
+export const CATEGORIES_BATIMENT: readonly string[] = [
+  'plombier', 'plomberie', 'chauffagiste', 'chauffage', 'climatisation', 'sanitaire',
+  'serrurier', 'serrurerie', 'metallier', 'metallerie',
+  'electricien', 'electricite',
+  'couvreur', 'couverture', 'zingueur', 'zinguerie',
+  'macon', 'maconnerie',
+  'menuisier', 'menuiserie', 'charpentier', 'charpente',
+  'carreleur', 'carrelage', 'platrier', 'platrerie', 'plaquiste',
+  'peintre', 'vitrier', 'vitrerie',
+  'isolation', 'etancheite', 'ravalement', 'terrassement',
+  'renovation', 'batiment',
+];
+
+/**
  * Ajouter un métier consiste à ajouter un objet ici.
  *
  * `nafCodes` est volontairement un tableau : la nomenclature NAF est en cours
