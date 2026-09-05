@@ -1086,9 +1086,11 @@ Ce que cette voie **ne** résout **pas**, et qu'il ne faut pas croire réglé :
   fiche du dashboard affichera donc un badge « alerte » sur ces appariements —
   c'est une invitation à la relecture, pas un défaut.
 
-**État d'application au moment où ces lignes sont écrites : mesuré, non
-appliqué.** `calibrate --apply` réécrit cinq lignes de `prospect_enrichment`
-en base de production, et attend l'accord du propriétaire.
+**Appliqué en base le 5 septembre 2026** : `calibrate --apply` a réécrit les
+cinq lignes, sans une requête Google. **Quatre des cinq apportent un numéro de
+téléphone** que la base n'avait pas ; la cinquième, `Service Dépannage
+Plomberie Chauffage`, n'en publie aucun sur sa fiche — `phone_e164` y reste
+`null`, et c'est la bonne valeur, pas un zéro.
 
 ## La question ouverte du lot 3
 
