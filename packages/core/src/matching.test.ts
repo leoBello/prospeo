@@ -18,6 +18,10 @@ if (serrurier === undefined) throw new Error('métier serrurier absent de la con
 const subject: MatchSubject = {
   denomination: 'SARL ALLARD',
   denominationUsuelle: null,
+  // L'adresse réelle de cet établissement. Elle ne coïncide avec aucune
+  // adresse de candidat de ce fichier : la voie adresse reste donc muette
+  // sur tous les cas antérieurs à son arrivée.
+  address: '5 RUE LE NOTRE 44000 NANTES',
   latitude: 47.2213,
   longitude: -1.5601,
 };
@@ -86,6 +90,7 @@ describe('scoreCandidate', () => {
       {
         denomination: 'SARL MARTIN SERRURERIE',
         denominationUsuelle: null,
+        address: null,
         latitude: 47.2213,
         longitude: -1.5601,
       },
@@ -195,6 +200,7 @@ describe('selectMatch', () => {
     const martinSubject: MatchSubject = {
       denomination: 'SARL MARTIN SERRURERIE',
       denominationUsuelle: null,
+      address: null,
       latitude: 47.2213,
       longitude: -1.5601,
     };
@@ -276,5 +282,157 @@ describe('selectMatch — trace de ce qui a été examiné', () => {
   it('ne marque aucun motif sur un candidat retenu', () => {
     const outcome = selectMatch(subject, [candidate()], plombier, MATCHING_CONFIG);
     expect(outcome.scored[0]?.rejectedFor).toBeNull();
+  });
+});
+
+describe('la voie adresse', () => {
+  // Sujets et candidats relevés en base le 5 septembre 2026. Les adresses des
+  // candidats forgés reprennent à la lettre la forme des adresses Maps
+  // réelles : « 9 Rue Kléber, 44000 Nantes ».
+
+  const theret: MatchSubject = {
+    denomination: 'SARL THERET',
+    denominationUsuelle: null,
+    address: '9 AVENUE GENERAL MARCHAND 44000 NANTES',
+    latitude: 47.2213,
+    longitude: -1.5601,
+  };
+
+  const chhun: MatchSubject = {
+    denomination: 'LEAT CHHUN',
+    denominationUsuelle: 'LC INSTALLATEUR THERMIQUE',
+    address: '211 ROUTE DE SAINTE LUCE 44300 NANTES',
+    latitude: 47.2434,
+    longitude: -1.5124,
+  };
+
+  /** BELENOS, tel qu'il est réellement en base : plombier, fiche « Serrurier ». */
+  const belenos: MatchSubject = {
+    denomination: 'BELENOS',
+    denominationUsuelle: 'BELENOS SERRURERIE, BELENOS PLOMBERIE',
+    address: "ZONE NANT'EST ENTREPRISES 1 RUE DU BENELUX 44300 NANTES",
+    latitude: 47.2539,
+    longitude: -1.5003,
+  };
+
+  function ficheBelenos(): MapsCandidate {
+    return candidate({
+      name: 'Serrurier Nantes Bélénos',
+      address: '1 Rue du Benelux, 44300 Nantes',
+      category: 'Serrurier',
+      latitude: 47.2539344,
+      longitude: -1.5002896,
+    });
+  }
+
+  it('ne fusionne pas deux rues différentes au même numéro', () => {
+    // Le faux positif réel de l'investigation.
+    const outcome = selectMatch(
+      theret,
+      [
+        candidate({
+          name: "C'est le Plombier",
+          address: '9 Rue Kléber, 44000 Nantes',
+          category: 'Plombier',
+          latitude: 47.2136,
+          longitude: -1.5471,
+        }),
+      ],
+      plombier,
+      MATCHING_CONFIG,
+    );
+    expect(outcome.kind).toBe('not_found');
+  });
+
+  it('rejette la boulangerie à l’adresse exacte, et le dit', () => {
+    const boulangerie = candidate({
+      name: 'Sésame Boulangerie-Pâtisserie',
+      address: '211 Rte de Sainte-Luce, 44300 Nantes',
+      category: 'Boulangerie',
+      latitude: 47.2434,
+      longitude: -1.5124,
+    });
+    const score = scoreCandidate(chhun, boulangerie, plombier, MATCHING_CONFIG);
+    expect(score.sameAddress).toBe(true);
+    expect(score.addressMatch).toBe(false);
+    expect(score.lines.find((l) => l.code === 'adresse')?.label).toContain('hors bâtiment');
+    expect(selectMatch(chhun, [boulangerie], plombier, MATCHING_CONFIG).kind).toBe('not_found');
+  });
+
+  it('retient un métier du bâtiment à l’adresse exacte, catégorie voisine comprise', () => {
+    // Le cas BELENOS : SIRET « BELENOS SERRURERIE, BELENOS PLOMBERIE »,
+    // fiche « Serrurier » à la même adresse, cherché comme plombier.
+    const score = scoreCandidate(belenos, ficheBelenos(), plombier, MATCHING_CONFIG);
+    expect(score.addressMatch).toBe(true);
+    expect(score.lines.map((l) => l.code)).toContain('adresse');
+  });
+
+  it('transforme un introuvable en fusion, et le justifie', () => {
+    const fiche = candidate({
+      name: 'Sanitherm Nantes',
+      address: '211 Rte de Sainte-Luce, 44300 Nantes',
+      category: 'Chauffagiste',
+      latitude: 47.2434,
+      longitude: -1.5124,
+    });
+    const outcome = selectMatch(chhun, [fiche], plombier, MATCHING_CONFIG);
+    expect(outcome.kind).toBe('ok');
+    if (outcome.kind !== 'ok') return;
+    expect(outcome.via).toBe('adresse');
+    expect(outcome.candidate.name).toBe('Sanitherm Nantes');
+    const ligne = outcome.score.lines.find((l) => l.code === 'adresse');
+    expect(ligne?.label).toContain('211 Rte de Sainte-Luce');
+    // La voie adresse décide HORS du score : elle n'y ajoute aucun point.
+    expect(ligne?.points).toBe(0);
+    expect(outcome.score.confidence).toBeLessThan(MATCHING_CONFIG.lowThreshold);
+  });
+
+  it('ne tranche pas entre deux candidats du bâtiment à la même adresse', () => {
+    // A4 : le doute se constate tout seul et se retire, plutôt que d'aller
+    // demander un arbitrage humain.
+    const outcome = selectMatch(
+      chhun,
+      [
+        candidate({
+          name: 'Sanitherm Nantes',
+          address: '211 Rte de Sainte-Luce, 44300 Nantes',
+          category: 'Chauffagiste',
+          latitude: 47.2434,
+          longitude: -1.5124,
+        }),
+        candidate({
+          name: 'Élec 44',
+          address: '211 Rte de Sainte-Luce, 44300 Nantes',
+          category: 'Électricien',
+          latitude: 47.2434,
+          longitude: -1.5124,
+        }),
+      ],
+      plombier,
+      MATCHING_CONFIG,
+    );
+    expect(outcome.kind).toBe('not_found');
+  });
+
+  it('ne dégrade pas une fusion obtenue par le score', () => {
+    const outcome = selectMatch(subject, [candidate()], plombier, MATCHING_CONFIG);
+    expect(outcome.kind).toBe('ok');
+    if (outcome.kind !== 'ok') return;
+    expect(outcome.via).toBe('score');
+  });
+
+  it('laisse un verdict à trancher tel quel, même à l’adresse exacte', () => {
+    // BELENOS, réellement : sa confiance de 0,736 dépasse le seuil bas, son
+    // unique candidat est donc retenu et le verdict est `ambiguous`. A1
+    // interdit à la voie adresse d'y toucher — elle n'ajoute que des fusions
+    // là où il n'y en avait aucune.
+    const outcome = selectMatch(belenos, [ficheBelenos()], plombier, MATCHING_CONFIG);
+    expect(outcome.kind).toBe('ambiguous');
+  });
+
+  it('ne pose aucune ligne d’adresse quand les adresses diffèrent', () => {
+    const score = scoreCandidate(subject, candidate(), plombier, MATCHING_CONFIG);
+    expect(score.sameAddress).toBe(false);
+    expect(score.lines.map((l) => l.code)).toEqual(['nom', 'distance', 'categorie']);
   });
 });

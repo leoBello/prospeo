@@ -1,3 +1,4 @@
+import { estCategorieBatiment, memeAdresse, normaliserAdresse } from './address-match.js';
 import { bestNameMatch, nameVariants } from './name-match.js';
 import { normalizeCompanyName } from './normalize.js';
 import type { Trade } from './types.js';
@@ -9,6 +10,14 @@ const EARTH_RADIUS_M = 6_371_000;
 export interface MatchSubject {
   denomination: string;
   denominationUsuelle: string | null;
+  /**
+   * L'adresse déclarée à Sirene, code postal compris.
+   *
+   * Requise et non facultative : un champ optionnel se serait oublié chez un
+   * appelant, et la voie adresse aurait été inerte sans que rien ne le dise.
+   * `null` est une absence qui se nomme, et qui referme simplement la voie.
+   */
+  address: string | null;
   latitude: number | null;
   longitude: number | null;
 }
@@ -30,7 +39,7 @@ export interface MapsCandidate {
 
 /** Une ligne de justification, affichable telle quelle. */
 export interface MatchLine {
-  code: 'nom' | 'distance' | 'categorie';
+  code: 'nom' | 'distance' | 'categorie' | 'adresse';
   label: string;
   /** Contribution effective à la confiance, déjà pondérée. */
   points: number;
@@ -45,6 +54,13 @@ export interface MatchScore {
   /** `null` quand une des deux positions manque. */
   distanceM: number | null;
   categoryMatch: boolean;
+  /** Le numéro, la voie et le code postal coïncident des deux côtés. */
+  sameAddress: boolean;
+  /**
+   * …et la catégorie Google est un métier du bâtiment : la voie adresse peut
+   * trancher sur ce candidat. Implique toujours `sameAddress`.
+   */
+  addressMatch: boolean;
   lines: MatchLine[];
 }
 
@@ -74,7 +90,23 @@ export interface ScoredCandidate {
  * aurait été jetée avant d'être écrite.
  */
 export type MatchOutcome =
-  | { kind: 'ok'; candidate: MapsCandidate; score: MatchScore; scored: ScoredCandidate[] }
+  | {
+      kind: 'ok';
+      candidate: MapsCandidate;
+      score: MatchScore;
+      scored: ScoredCandidate[];
+      /**
+       * Ce qui a emporté la décision.
+       *
+       * Deux voies mènent à une fusion et elles ne se valent pas à la
+       * relecture : `'score'` dit que le nom, la distance et la catégorie ont
+       * franchi le seuil ; `'adresse'` dit que la confiance est restée basse
+       * et que c'est l'adresse postale exacte, plus un métier du bâtiment,
+       * qui a tranché. Un opérateur qui relit six mois plus tard doit pouvoir
+       * les distinguer sans relire le code.
+       */
+      via: 'score' | 'adresse';
+    }
   | { kind: 'ambiguous'; scored: ScoredCandidate[] }
   | { kind: 'not_found'; scored: ScoredCandidate[] };
 
@@ -222,6 +254,12 @@ export function scoreCandidate(
 
   const categoryMatch = matchesCategory(candidate.category, trade);
 
+  const sameAddress = memeAdresse(
+    normaliserAdresse(subject.address),
+    normaliserAdresse(candidate.address),
+  );
+  const addressMatch = sameAddress && estCategorieBatiment(candidate.category);
+
   const namePoints = config.nameWeight * name.score;
   const distancePoints = config.distanceWeight * proximity;
   const categoryPoints = config.categoryWeight * (categoryMatch ? 1 : 0);
@@ -250,12 +288,31 @@ export function scoreCandidate(
     },
   ];
 
+  // La ligne n'apparaît que quand l'adresse coïncide : sur les candidats où
+  // elle ne dit rien, elle n'encombrerait que la trace. Elle porte **zéro
+  // point**, et ce n'est pas un oubli — la voie adresse décide à côté du
+  // score, jamais dedans. Lui donner un poids la ferait franchir des seuils,
+  // donc produire des `ambiguous`, ce que A1 lui interdit formellement :
+  // elle n'ajoute que des fusions, elle n'envoie rien en revue.
+  if (sameAddress) {
+    const fiche = candidate.address ?? '';
+    lines.push({
+      code: 'adresse',
+      label: addressMatch
+        ? `adresse identique « ${fiche} » — métier du bâtiment ✓`
+        : `adresse identique « ${fiche} » — catégorie « ${candidate.category ?? 'absente'} » hors bâtiment ✗`,
+      points: 0,
+    });
+  }
+
   return {
     confidence: namePoints + distancePoints + categoryPoints,
     nameSimilarity: name.score,
     matchedVariant: name.variant,
     distanceM,
     categoryMatch,
+    sameAddress,
+    addressMatch,
     lines,
   };
 }
@@ -296,14 +353,37 @@ export function selectMatch(
   scored.sort((a, b) => b.score.confidence - a.score.confidence);
   const retained = scored.filter((s) => s.rejectedFor === null);
 
-  if (retained.length === 0) return { kind: 'not_found', scored };
+  // La voie adresse — et **seulement ici**, dans la branche où le score n'a
+  // rien retenu. Elle ne peut donc que transformer un `not_found` en `ok` :
+  // elle ne retire aucune fusion, ne dégrade aucun verdict, et n'envoie rien
+  // de neuf en revue (A1). Le nom vaut ~0 sur cette population, l'adresse
+  // exacte est une preuve d'une autre nature — et indépendante du nom, qui
+  // est précisément le signal défaillant.
+  //
+  // Elle regarde TOUS les candidats, y compris ceux que le rayon a écartés :
+  // quand le numéro, la rue et le code postal coïncident, un désaccord de
+  // coordonnées dit qu'un des deux géocodages est faux, pas que ce sont deux
+  // entreprises. Le rayon, lui, ne bouge pas — le score reste ce qu'il est.
+  if (retained.length === 0) {
+    const aLAdresse = scored.filter((s) => s.score.addressMatch);
+    // Deux artisans du bâtiment partageant un local produiraient deux
+    // candidats également crédibles : choisir le premier serait choisir au
+    // hasard. Le doute se constate tout seul et se retire (A4) — le
+    // propriétaire ne veut pas arbitrer, et une file de revue transformerait
+    // un gain en corvée.
+    const seul = aLAdresse.length === 1 ? aLAdresse[0] : undefined;
+    if (seul !== undefined) {
+      return { kind: 'ok', candidate: seul.candidate, score: seul.score, scored, via: 'adresse' };
+    }
+    return { kind: 'not_found', scored };
+  }
 
   const confident = retained.filter((s) => s.score.confidence >= config.highThreshold);
 
   if (confident.length === 1) {
     const only = confident[0];
     if (only === undefined) return { kind: 'not_found', scored };
-    return { kind: 'ok', candidate: only.candidate, score: only.score, scored };
+    return { kind: 'ok', candidate: only.candidate, score: only.score, scored, via: 'score' };
   }
 
   return { kind: 'ambiguous', scored };
