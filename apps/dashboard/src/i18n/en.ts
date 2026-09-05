@@ -379,6 +379,7 @@ export const en: Record<keyof typeof fr, string> = {
 
   'campagne.action.deployer': 'Deploy',
   'campagne.action.rejouer': 'Replay',
+  'campagne.action.relire': 'Review',
   'campagne.action.retirer': 'Remove',
   'campagne.action.impossible':
     'The collector is stopped: a request filed now would not go anywhere.',

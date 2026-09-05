@@ -462,6 +462,7 @@ export const fr = {
 
   'campagne.action.deployer': 'Déployer',
   'campagne.action.rejouer': 'Rejouer',
+  'campagne.action.relire': 'Relire',
   'campagne.action.retirer': 'Retirer',
   'campagne.action.impossible':
     'Le collector est à l’arrêt : une demande déposée maintenant ne partirait pas.',

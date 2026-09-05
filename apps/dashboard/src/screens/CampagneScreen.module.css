@@ -173,3 +173,17 @@
   font-size: var(--text-md);
   color: var(--color-danger);
 }
+
+/*
+ * Le panneau de relecture, à droite de la liste — la place que lui donne
+ * `Campagne.dc.html` (392). Largeur fixe : la liste se comprime, pas le texte
+ * qu'on relit avant de l'envoyer.
+ */
+.panneau {
+  width: 520px;
+  flex: none;
+  padding: var(--space-4);
+  overflow-y: auto;
+  background: var(--color-surface);
+  border-left: 1px solid var(--color-border);
+}

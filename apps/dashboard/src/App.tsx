@@ -4,7 +4,17 @@ import type { Database } from '@prospeo/db';
 import { SCORING_RULESET, TRADES } from '@prospeo/core';
 import { AuthProvider, useAuth } from './auth/AuthProvider.js';
 import { createDashboardClient } from './data/supabase.js';
-import { deposerJob, designerGabarit, retirerJob } from './data/mutations.js';
+import {
+  definirStatut,
+  deposerJob,
+  designerGabarit,
+  journaliserInteraction,
+  retirerJob,
+} from './data/mutations.js';
+import { enregistrerAdresse, envoyerMail, fetchBrouillon } from './data/envoi.js';
+import type { EnvoiDeps } from './data/envoi.js';
+import { createGmailClient } from './data/gmail.js';
+import type { MailAEnvoyer } from './data/gmail.js';
 import { useProspects } from './data/useProspects.js';
 import { useDeployments } from './data/useDeployments.js';
 import { useCampagne } from './data/useCampagne.js';
@@ -126,6 +136,88 @@ function Authenticated({
     [client, campagneReload],
   );
 
+  const lireBrouillon = useCallback(
+    (prospectId: string) => fetchBrouillon(client, prospectId),
+    [client],
+  );
+
+  const ecrireAdresse = useCallback(
+    (prospectId: string, email: string): Promise<string | null> =>
+      enregistrerAdresse(client, prospectId, email).then((erreur) => {
+        // La ligne de la liste porte l'adresse : sans ce rechargement, elle
+        // continuerait d'afficher « adresse manquante » après la saisie.
+        if (erreur === null) campagneReload();
+        return erreur;
+      }),
+    [client, campagneReload],
+  );
+
+  /**
+   * L'assemblage réel de la séquence du §7.2.
+   *
+   * L'étape 4 passe par `journaliserInteraction` et `definirStatut`, les
+   * fonctions qui existent déjà : les réécrire ici referait, moins bien, la
+   * distinction que `definirStatut` porte entre l'état et l'historique.
+   */
+  const envoyer = useCallback(
+    (prospectId: string, mail: MailAEnvoyer) => {
+      const deps: EnvoiDeps = {
+        async prendre(id, destinataire) {
+          const { data, error } = await client
+            .from('message_send')
+            .insert({
+              prospect_id: id,
+              channel: 'email',
+              provider: 'gmail',
+              recipient: destinataire,
+              state: 'en_cours',
+              sent_by: utilisateurId,
+            })
+            .select('id')
+            .single();
+          // Un refus ici n'est pas une panne : c'est l'index unique partiel
+          // qui joue son rôle et empêche un second mail au même artisan.
+          if (error !== null) return { ok: false, message: error.message };
+          return { ok: true, id: data.id };
+        },
+        // Le jeton de la session, jamais un identifiant stocké : il vit une
+        // heure et rien ne le renouvelle (D5).
+        envoyer: (aEnvoyer) =>
+          createGmailClient({ jeton: session?.provider_token ?? '' }).envoyer(aEnvoyer),
+        async clore(envoiId, providerMessageId) {
+          const { error } = await client
+            .from('message_send')
+            .update({
+              state: 'envoye',
+              provider_message_id: providerMessageId,
+              sent_at: new Date().toISOString(),
+            })
+            .eq('id', envoiId);
+          return error === null ? null : error.message;
+        },
+        async echouer(envoiId, message) {
+          const { error } = await client
+            .from('message_send')
+            .update({ state: 'echoue', error: message })
+            .eq('id', envoiId);
+          return error === null ? null : error.message;
+        },
+        journaliser: (id, corps) => journaliserInteraction(client, id, 'email', corps),
+        async avancerFiche(id) {
+          const echec = await definirStatut(client, id, 'contacte', null);
+          return echec === null ? null : echec.message;
+        },
+      };
+      return envoyerMail(deps, { prospectId, mail }).then((resultat) => {
+        // Rechargé dans tous les cas : `message_send` a bougé même en échec,
+        // et la ligne doit cesser de proposer un envoi que la base refuserait.
+        campagneReload();
+        return resultat;
+      });
+    },
+    [client, campagneReload, session, utilisateurId],
+  );
+
   // L'écran « Gabarit » (D10, chantier n°10) : branché sur l'écran réel,
   // comme « Déploiements » ci-dessous. `TRADES` vient de `@prospeo/core` —
   // jamais une liste recopiée dans l'écran.
@@ -225,6 +317,9 @@ function Authenticated({
         nav={nav}
         compteEnvoi={compteEnvoi}
         onReconnecter={() => void signInWithGoogle()}
+        onLireBrouillon={lireBrouillon}
+        onEnregistrerAdresse={ecrireAdresse}
+        onEnvoyer={envoyer}
       />
     );
   }

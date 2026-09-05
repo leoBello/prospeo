@@ -3,7 +3,9 @@ import userEvent from '@testing-library/user-event';
 import { screen } from '@testing-library/react';
 import { renderWithPreferences } from '../test-utils.js';
 import { CampagneScreen } from './CampagneScreen.js';
+import type { CampagneScreenProps } from './CampagneScreen.js';
 import type { FaitsLigne, FaitsProspect } from '../domain/campagne.js';
+import type { Brouillon } from '../data/envoi.js';
 
 function fait(surcharges: Partial<FaitsProspect> = {}): FaitsProspect {
   return {
@@ -29,6 +31,31 @@ const VIVANT = { beatAt: new Date().toISOString(), inFlight: 0 };
 /** Aucun de ces tests n'exerce le déclenchement : il a sa propre suite. */
 const RIEN = async (): Promise<string | null> => null;
 
+/** Un brouillon complet : le panneau s'ouvre sur quelque chose à relire. */
+const BROUILLON: Brouillon = {
+  objet: 'Votre site ne répond plus',
+  corps: 'Bonjour,',
+  modele: 'claude-opus-5',
+  consignes: 'v3',
+  redigeLe: '2026-09-05T11:58:00.000Z',
+  adresse: 'contact@artisan.fr',
+  origine: 'saisie',
+  envoi: null,
+};
+const LIRE_BROUILLON = async (): Promise<Brouillon> => BROUILLON;
+const RIEN_ADRESSE = async (): Promise<string | null> => null;
+const ENVOYER_OK = async () => ({ ok: true }) as const;
+
+/** Site en ligne + mail rédigé + adresse connue : l'état `mail_a_relire`. */
+const A_RELIRE: FaitsLigne = {
+  job: null,
+  derniereEtape: null,
+  siteEnLigne: true,
+  mailRedige: true,
+  adresse: 'contact@artisan.fr',
+  envoi: null,
+};
+
 describe('CampagneScreen', () => {
   it('porte la presence web, qui est l argument de vente de la ligne', () => {
     // Valeur lue dans src/i18n/fr.ts, cle `presence.dead_site`. « Votre site
@@ -46,6 +73,9 @@ describe('CampagneScreen', () => {
         nav={null}
         compteEnvoi={null}
         onReconnecter={() => {}}
+        onLireBrouillon={LIRE_BROUILLON}
+        onEnregistrerAdresse={RIEN_ADRESSE}
+        onEnvoyer={ENVOYER_OK}
       />,
     );
 
@@ -68,6 +98,9 @@ describe('CampagneScreen', () => {
         nav={null}
         compteEnvoi={null}
         onReconnecter={() => {}}
+        onLireBrouillon={LIRE_BROUILLON}
+        onEnregistrerAdresse={RIEN_ADRESSE}
+        onEnvoyer={ENVOYER_OK}
       />,
     );
 
@@ -89,6 +122,9 @@ describe('CampagneScreen', () => {
         nav={null}
         compteEnvoi={null}
         onReconnecter={() => {}}
+        onLireBrouillon={LIRE_BROUILLON}
+        onEnregistrerAdresse={RIEN_ADRESSE}
+        onEnvoyer={ENVOYER_OK}
       />,
     );
 
@@ -115,6 +151,9 @@ describe('CampagneScreen', () => {
         nav={null}
         compteEnvoi={null}
         onReconnecter={() => {}}
+        onLireBrouillon={LIRE_BROUILLON}
+        onEnregistrerAdresse={RIEN_ADRESSE}
+        onEnvoyer={ENVOYER_OK}
       />,
     );
 
@@ -136,6 +175,9 @@ describe('CampagneScreen', () => {
         nav={null}
         compteEnvoi={null}
         onReconnecter={() => {}}
+        onLireBrouillon={LIRE_BROUILLON}
+        onEnregistrerAdresse={RIEN_ADRESSE}
+        onEnvoyer={ENVOYER_OK}
       />,
     );
 
@@ -161,6 +203,9 @@ describe('CampagneScreen', () => {
         nav={null}
         compteEnvoi={null}
         onReconnecter={() => {}}
+        onLireBrouillon={LIRE_BROUILLON}
+        onEnregistrerAdresse={RIEN_ADRESSE}
+        onEnvoyer={ENVOYER_OK}
       />,
     );
 
@@ -185,6 +230,9 @@ describe('CampagneScreen', () => {
         nav={null}
         compteEnvoi={null}
         onReconnecter={() => {}}
+        onLireBrouillon={LIRE_BROUILLON}
+        onEnregistrerAdresse={RIEN_ADRESSE}
+        onEnvoyer={ENVOYER_OK}
       />,
     );
 
@@ -208,6 +256,9 @@ describe('CampagneScreen', () => {
         nav={null}
         compteEnvoi={null}
         onReconnecter={() => {}}
+        onLireBrouillon={LIRE_BROUILLON}
+        onEnregistrerAdresse={RIEN_ADRESSE}
+        onEnvoyer={ENVOYER_OK}
       />,
     );
 
@@ -234,6 +285,9 @@ describe('CampagneScreen', () => {
         nav={null}
         compteEnvoi={null}
         onReconnecter={() => {}}
+        onLireBrouillon={LIRE_BROUILLON}
+        onEnregistrerAdresse={RIEN_ADRESSE}
+        onEnvoyer={ENVOYER_OK}
       />,
     );
 
@@ -262,6 +316,9 @@ describe('CampagneScreen — le declenchement', () => {
         nav={null}
         compteEnvoi={null}
         onReconnecter={() => {}}
+        onLireBrouillon={LIRE_BROUILLON}
+        onEnregistrerAdresse={RIEN_ADRESSE}
+        onEnvoyer={ENVOYER_OK}
       />,
     );
 
@@ -286,6 +343,9 @@ describe('CampagneScreen — le declenchement', () => {
         nav={null}
         compteEnvoi={null}
         onReconnecter={() => {}}
+        onLireBrouillon={LIRE_BROUILLON}
+        onEnregistrerAdresse={RIEN_ADRESSE}
+        onEnvoyer={ENVOYER_OK}
       />,
     );
 
@@ -312,10 +372,76 @@ describe('CampagneScreen — le declenchement', () => {
         nav={null}
         compteEnvoi={null}
         onReconnecter={() => {}}
+        onLireBrouillon={LIRE_BROUILLON}
+        onEnregistrerAdresse={RIEN_ADRESSE}
+        onEnvoyer={ENVOYER_OK}
       />,
     );
 
     await userEvent.click(screen.getByRole('button', { name: 'Déployer' }));
     expect(await screen.findByRole('alert')).toBeTruthy();
+  });
+});
+
+describe('CampagneScreen — le panneau de relecture', () => {
+  function rendreEcran(ligne: FaitsLigne, surcharges: Partial<CampagneScreenProps> = {}) {
+    const props: CampagneScreenProps = {
+      lot: { lignes: [fait()], sansScore: 0 },
+      lignes: new Map<string, FaitsLigne>([['p-1', ligne]]),
+      totalProspects: 12,
+      heartbeat: VIVANT,
+      onDeposer: RIEN,
+      onRetirer: RIEN,
+      onSignOut: () => {},
+      nav: null,
+      compteEnvoi: { etat: 'pret' as const, expediteur: 'leo@gmail.com' },
+      onReconnecter: () => {},
+      onLireBrouillon: LIRE_BROUILLON,
+      onEnregistrerAdresse: RIEN_ADRESSE,
+      onEnvoyer: ENVOYER_OK,
+      ...surcharges,
+    };
+    renderWithPreferences(<CampagneScreen {...props} />);
+    return props;
+  }
+
+  it('ouvre le panneau de relecture depuis une ligne dont le mail attend d’être relu', async () => {
+    // Le commentaire de la colonne d'actions disait « l'envoi n'existe pas
+    // encore » : ce test est ce qui le rend faux.
+    const user = userEvent.setup();
+    rendreEcran(A_RELIRE);
+
+    await user.click(screen.getByRole('button', { name: 'Relire' }));
+
+    expect(await screen.findByText('Destinataire')).toBeTruthy();
+    expect(screen.getByText('Votre site ne répond plus')).toBeTruthy();
+  });
+
+  it('ouvre le même panneau quand l’adresse manque — c’est lui qui sait quoi proposer', async () => {
+    const user = userEvent.setup();
+    rendreEcran({ ...A_RELIRE, adresse: null });
+
+    await user.click(screen.getByRole('button', { name: 'Relire' }));
+
+    expect(await screen.findByText('Destinataire')).toBeTruthy();
+  });
+
+  it('n’offre aucun geste sur une ligne déjà envoyée', () => {
+    rendreEcran({
+      ...A_RELIRE,
+      envoi: { state: 'envoye', sentAt: '2026-09-05T12:00:00.000Z' },
+    });
+    expect(screen.queryByRole('button', { name: 'Relire' })).toBeNull();
+  });
+
+  it('n’offre aucun geste pendant qu’un envoi est en cours', () => {
+    // « Incertain » attend : recliquer ne ferait que buter sur l'index unique.
+    rendreEcran({ ...A_RELIRE, envoi: { state: 'en_cours', sentAt: null } });
+    expect(screen.queryByRole('button', { name: 'Relire' })).toBeNull();
+  });
+
+  it('laisse relire un envoi qui a échoué', () => {
+    rendreEcran({ ...A_RELIRE, envoi: { state: 'echoue', sentAt: null } });
+    expect(screen.getByRole('button', { name: 'Relire' })).toBeTruthy();
   });
 });

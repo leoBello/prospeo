@@ -2,6 +2,9 @@ import { useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 import type { EtatLigne, FaitsLigne, Lot } from '../domain/campagne.js';
 import type { EtatCompteEnvoi } from '../domain/envoi.js';
+import type { Brouillon, ResultatEnvoi } from '../data/envoi.js';
+import type { MailAEnvoyer } from '../data/gmail.js';
+import { RelectureTab } from '../ui/panel/RelectureTab.js';
 import { getTrade } from '@prospeo/core';
 import { etatLigne } from '../domain/campagne.js';
 import type { TranslationKey } from '../i18n/translate.js';
@@ -96,6 +99,18 @@ export interface CampagneScreenProps {
   /** Rouvre le flux Google. Appelée par la remédiation de la bande. */
   onReconnecter: () => void;
   /**
+   * Les trois gestes du panneau de relecture, **injectés** comme le sont déjà
+   * `onDeposer` et `onRetirer`.
+   *
+   * Cet écran ne connaît ni le client Supabase ni la session : c'est `App` qui
+   * les tient, et c'est ce qui permet aux dix-sept tests de ce fichier de le
+   * rendre sans base. Y faire entrer un client casserait ce partage pour ce
+   * seul lot.
+   */
+  onLireBrouillon: (prospectId: string) => Promise<Brouillon>;
+  onEnregistrerAdresse: (prospectId: string, email: string) => Promise<string | null>;
+  onEnvoyer: (prospectId: string, mail: MailAEnvoyer) => Promise<ResultatEnvoi>;
+  /**
    * Déposer une demande, et la retirer. Rendent `null` en cas de succès et le
    * message d'erreur sinon — la convention de `designerGabarit` et de
    * `PanelActions`, adoptée après qu'une écriture refusée par la RLS n'ait été
@@ -130,6 +145,9 @@ export function CampagneScreen({
   nav,
   compteEnvoi,
   onReconnecter,
+  onLireBrouillon,
+  onEnregistrerAdresse,
+  onEnvoyer,
 }: CampagneScreenProps): ReactElement {
   const t = useT();
   const maintenant = new Date();
@@ -146,11 +164,57 @@ export function CampagneScreen({
     void action.then(setErreur);
   };
 
+  // Le prospect dont le panneau est ouvert, et son brouillon. Deux états et
+  // non un : `ouvert` sans `brouillon` est le temps de la lecture, et le
+  // replier ferait clignoter un panneau vide — la même distinction que
+  // partout ailleurs entre « on ne sait pas encore » et « il n'y a rien ».
+  const [ouvert, setOuvert] = useState<string | null>(null);
+  const [brouillon, setBrouillon] = useState<Brouillon | null>(null);
+
+  const ouvrirRelecture = (prospectId: string): void => {
+    setOuvert(prospectId);
+    setBrouillon(null);
+    void onLireBrouillon(prospectId).then(setBrouillon);
+  };
+
+  const relire = (prospectId: string): void => {
+    void onLireBrouillon(prospectId).then(setBrouillon);
+  };
+
   return (
     <AppShell
       nav={nav}
       onSignOut={onSignOut}
-      panel={null}
+      panel={
+        ouvert === null || brouillon === null ? null : (
+          <aside className={styles.panneau}>
+            <RelectureTab
+              brouillon={brouillon}
+              compte={compteEnvoi}
+              onEnregistrerAdresse={async (email) => {
+                const echec = await onEnregistrerAdresse(ouvert, email);
+                // Relu après l'écriture : le panneau doit montrer l'adresse
+                // telle qu'elle est en base, pas telle qu'elle a été tapée.
+                if (echec === null) relire(ouvert);
+                return echec;
+              }}
+              onEnvoyer={async () => {
+                const resultat = await onEnvoyer(ouvert, {
+                  de: compteEnvoi !== null && compteEnvoi.etat === 'pret' ? compteEnvoi.expediteur : '',
+                  a: brouillon.adresse ?? '',
+                  objet: brouillon.objet ?? '',
+                  corps: brouillon.corps ?? '',
+                });
+                // Relu même en échec : `message_send` a bougé dans tous les
+                // cas, et le panneau doit cesser de proposer un envoi que la
+                // base refuserait désormais.
+                relire(ouvert);
+                return resultat;
+              }}
+            />
+          </aside>
+        )
+      }
       list={
         <div className={styles.page}>
           <header className={styles.entete}>
@@ -256,12 +320,14 @@ export function CampagneScreen({
                         ) : null}
                       </td>
                       <td className={styles.colAction}>
-                        {/* Trois etats seulement portent un geste. « Site en
-                            cours » n'en porte AUCUN : il n'y a rien a faire
-                            pendant qu'il tourne, et un bouton « Detail »
-                            promettrait un ecran que ce lot ne construit pas.
-                            Les autres etats attendent l'envoi, qui n'existe
-                            pas encore. */}
+                        {/* « Site en cours » ne porte AUCUN geste : il n'y a
+                            rien a faire pendant qu'il tourne, et un bouton
+                            « Detail » promettrait un ecran que ce lot ne
+                            construit pas. « Envoi incertain » non plus — il
+                            attend, et recliquer ne ferait que buter sur
+                            l'index unique. « Envoye » est fini. Les trois
+                            etats que l'envoi debloque ouvrent le MEME panneau :
+                            c'est lui qui sait quoi proposer. */}
                         {r.etat.nom === 'jamais' || r.etat.nom === 'site_echec' ? (
                           <button
                             type="button"
@@ -283,6 +349,16 @@ export function CampagneScreen({
                             onClick={() => agir(onRetirer(p.prospectId))}
                           >
                             {t('campagne.action.retirer')}
+                          </button>
+                        ) : r.etat.nom === 'mail_a_relire' ||
+                          r.etat.nom === 'adresse_manquante' ||
+                          r.etat.nom === 'envoi_echec' ? (
+                          <button
+                            type="button"
+                            className={styles.action}
+                            onClick={() => ouvrirRelecture(p.prospectId)}
+                          >
+                            {t('campagne.action.relire')}
                           </button>
                         ) : null}
                       </td>
