@@ -1,24 +1,164 @@
 {
   "pages": [
-    { "id": "page-1", "name": "Application" },
-    { "id": "page-2", "name": "Déploiement" },
-    { "id": "page-3", "name": "Directions" },
-    { "id": "page-4", "name": "Campagne" }
+    {
+      "id": "page-1",
+      "name": "Application"
+    },
+    {
+      "id": "page-2",
+      "name": "Déploiement"
+    },
+    {
+      "id": "page-3",
+      "name": "Directions"
+    },
+    {
+      "id": "page-4",
+      "name": "Campagne"
+    },
+    {
+      "id": "page-5",
+      "name": "Veille"
+    }
   ],
   "artboards": [
-    { "file": "Main.dc.html", "page": "page-1", "x": 0, "y": 0, "w": 1440, "h": 900, "title": "Aujourd'hui — refonte", "is_interactive": true },
-    { "file": "Composants.dc.html", "page": "page-1", "x": 1560, "y": 0, "w": 1200, "h": 1000, "title": "Vocabulaire d'interface" },
-
-    { "file": "Deploiements.dc.html", "page": "page-2", "x": 0, "y": 0, "w": 1440, "h": 900, "title": "Suivi des déploiements" },
-    { "file": "DeploiementDetail.dc.html", "page": "page-2", "x": 1560, "y": 0, "w": 760, "h": 900, "title": "Un déploiement en cours" },
-    { "file": "Gabarit.dc.html", "page": "page-2", "x": 2400, "y": 0, "w": 760, "h": 900, "title": "Gabarit GitHub" },
-
-    { "file": "DirectionA.dc.html", "page": "page-3", "x": 0, "y": 0, "w": 560, "h": 880, "title": "A — Console calme" },
-    { "file": "DirectionB.dc.html", "page": "page-3", "x": 680, "y": 0, "w": 560, "h": 880, "title": "B — Cockpit gamifié" },
-    { "file": "DirectionC.dc.html", "page": "page-3", "x": 1360, "y": 0, "w": 560, "h": 880, "title": "C — Dossier éditorial" },
-
-    { "file": "Campagne.dc.html", "page": "page-4", "x": 0, "y": 0, "w": 1440, "h": 900, "title": "Campagne de prospection" },
-    { "file": "CampagneEtats.dc.html", "page": "page-4", "x": 1560, "y": 0, "w": 1440, "h": 1300, "title": "Campagne — les états qui décident" }
+    {
+      "file": "Main.dc.html",
+      "page": "page-1",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "title": "Aujourd'hui — refonte",
+      "is_interactive": true
+    },
+    {
+      "file": "Composants.dc.html",
+      "page": "page-1",
+      "x": 1560,
+      "y": 0,
+      "w": 1200,
+      "h": 1000,
+      "title": "Vocabulaire d'interface"
+    },
+    {
+      "file": "Deploiements.dc.html",
+      "page": "page-2",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "title": "Suivi des déploiements"
+    },
+    {
+      "file": "DeploiementDetail.dc.html",
+      "page": "page-2",
+      "x": 1560,
+      "y": 0,
+      "w": 760,
+      "h": 900,
+      "title": "Un déploiement en cours"
+    },
+    {
+      "file": "Gabarit.dc.html",
+      "page": "page-2",
+      "x": 2400,
+      "y": 0,
+      "w": 760,
+      "h": 900,
+      "title": "Gabarit GitHub"
+    },
+    {
+      "file": "DirectionA.dc.html",
+      "page": "page-3",
+      "x": 0,
+      "y": 0,
+      "w": 560,
+      "h": 880,
+      "title": "A — Console calme"
+    },
+    {
+      "file": "DirectionB.dc.html",
+      "page": "page-3",
+      "x": 680,
+      "y": 0,
+      "w": 560,
+      "h": 880,
+      "title": "B — Cockpit gamifié"
+    },
+    {
+      "file": "DirectionC.dc.html",
+      "page": "page-3",
+      "x": 1360,
+      "y": 0,
+      "w": 560,
+      "h": 880,
+      "title": "C — Dossier éditorial"
+    },
+    {
+      "file": "Campagne.dc.html",
+      "page": "page-4",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "title": "Campagne de prospection"
+    },
+    {
+      "file": "CampagneEtats.dc.html",
+      "page": "page-4",
+      "x": 1560,
+      "y": 0,
+      "w": 1440,
+      "h": 1300,
+      "title": "Campagne — les états qui décident"
+    },
+    {
+      "file": "Veille.dc.html",
+      "page": "page-5",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "title": "La veille par onglets",
+      "is_interactive": true
+    },
+    {
+      "file": "VeilleDetail.dc.html",
+      "page": "page-5",
+      "x": 1560,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "title": "La fiche en surimpression"
+    },
+    {
+      "file": "VeilleCompacte.dc.html",
+      "page": "page-5",
+      "x": 3120,
+      "y": 0,
+      "w": 1440,
+      "h": 720,
+      "title": "Fenêtre de portable — 720 px"
+    },
+    {
+      "file": "VeilleEtats.dc.html",
+      "page": "page-5",
+      "x": 0,
+      "y": 1120,
+      "w": 1440,
+      "h": 1300,
+      "title": "Les états qui décident"
+    },
+    {
+      "file": "VeilleArbitrages.dc.html",
+      "page": "page-5",
+      "x": 1560,
+      "y": 1120,
+      "w": 1440,
+      "h": 1120,
+      "title": "Les trois arbitrages, tranchés"
+    }
   ],
   "annotations": [
     {
@@ -84,7 +224,50 @@
       "y": -230,
       "w": 900,
       "text": "L'artboard qui existe parce que les guidelines en font un critère d'« important » : un composant qui rend une absence, une erreur ou un chargement est précisément là où ce dépôt s'est trompé le plus souvent.\n\nQuatre listes vides de causes différentes, trois états de destinataire, quatre conditions manquantes, et le réglage d'envoi automatique — qui rouvre D6 (« le système rédige, l'humain envoie ») et doit donc se demander explicitement, dire ce qu'il fait perdre, et rester visible tant qu'il dure.\n\nBloqué n'est pas échoué : une adresse manquante porte des tirets ambre, pas un segment rouge. Une campagne où un prospect manque d'adresse n'est pas une campagne en panne."
+    },
+    {
+      "id": "note-veille",
+      "page": "page-5",
+      "x": 0,
+      "y": -250,
+      "w": 900,
+      "text": "Le défaut corrigé ici : « Nouveaux prospects à fort score » plafonne à 12 lignes et annonce le reste par « N de plus, non affichés ici ». On ne suit pas une prospection dans une liste dont on ne voit pas la fin.\n\nÀ la place, une table à onglets — un onglet par valeur de pipeline_status, jamais un statut masqué —, dix lignes par page, et une pagination. Six colonnes, dont la dernière SEULE change de sens selon l'onglet ouvert : sans cela, cinq onglets sur huit afficheraient une colonne vide.\n\nLes onglets de cet artboard sont cliquables.\n\nCe que la table ne porte pas : l'échéance. Une relance due n'est pas un statut, et aucun des sept onglets ne la porte — d'où la bande « Relances dues » qui reste au-dessus, dans le brief repliable. C'est l'arbitrage 2."
+    },
+    {
+      "id": "note-veille-detail",
+      "page": "page-5",
+      "x": 1560,
+      "y": -250,
+      "w": 900,
+      "text": "Le panneau ne rétrécit plus la liste : il passe AU-DESSUS d'elle. Posé sur le cadre position: relative de la coquille, z-index au-dessus, avec une ombre portée à gauche.\n\nCe qu'on y gagne : la table garde ses 1 344 px, et ses six colonnes ne se recalculent pas quand une fiche s'ouvre ou se ferme. Aujourd'hui, le panneau à 720 px (plafonné à 45 vw) rejoue la mise en page de toute la liste à chaque ouverture.\n\nCe qu'on y perd, et qu'il faut voir avant de valider : le panneau RECOUVRE les trois colonnes de droite. Restent lisibles le score, le nom et la présence web — assez pour continuer à naviguer aux flèches, pas assez pour comparer.\n\nLe contenu de la fiche est inchangé : c'est celle de l'artboard « Aujourd'hui ».\n\nDeux détails corrigés au passage, parce que le prospect ouvert n'a pas de site déployé : « Voir le site » devient « Déployer le site », et « Redéployer » devient « Marquer contacté » — un bouton ne doit jamais annoncer un fait qu'aucun code ne peut rendre vrai."
+    },
+    {
+      "id": "note-veille-compacte",
+      "page": "page-5",
+      "x": 3120,
+      "y": -250,
+      "w": 800,
+      "text": "L'exigence « la table tient sur une page, sans défilement », mise à l'épreuve de la fenêtre la plus courte qu'on rencontre : 720 px de haut.\n\nMesuré au navigateur : la page fait exactement 720 px, brief replié. Les dix lignes ne bougent pas — la taille de page reste fixe, c'est le brief qui se replie, et son état est mémorisé d'une visite à l'autre.\n\nLa mesure de la hauteur disponible pour en déduire la taille de page a été essayée dans le projet voisin et abandonnée le 2026-09-10, sur écran réel : la hauteur mesurée tombait à zéro sur un portable, et la liste n'affichait plus aucune ligne."
+    },
+    {
+      "id": "note-veille-etats",
+      "page": "page-5",
+      "x": 0,
+      "y": 2470,
+      "w": 900,
+      "text": "L'artboard qui existe parce que les guidelines en font un critère d'« important » : un composant qui rend une absence, une erreur ou un chargement est là où ce dépôt s'est trompé le plus souvent.\n\nSix situations, dont deux sont neuves et n'ont aujourd'hui aucun équivalent à l'écran :\n\nD — la dernière colonne change de sens selon l'onglet. Dans « À contacter » elle porte le suivi, et distingue « Jamais contacté » (aucune ligne en base) de « À contacter » (une ligne posée). Ce sont deux absences de natures différentes, et 137 prospects sur 139 sont dans la première.\n\nF — changer le statut depuis la fiche fait SORTIR la ligne de l'onglet courant. C'est le seul risque d'usage vraiment nouveau qu'apportent les onglets. La ligne laisse à sa place, le temps d'un geste, ce qu'elle est devenue et où elle est allée."
+    },
+    {
+      "id": "note-veille-arbitrages",
+      "page": "page-5",
+      "x": 1560,
+      "y": 2190,
+      "w": 900,
+      "text": "Trois décisions, tranchées le 2026-09-10 par le propriétaire : A, A, 1. Elles sont ici avec les options écartées et leur coût, parce qu'une décision sans son motif se redéfait au chantier suivant.\n\n1A — les 137 prospects sans ligne de suivi (98 % de la base) vont dans « À contacter », et la colonne « Suivi » distingue « Jamais contacté » de « À contacter ». Aucune migration.\n2A — la bande « Relances dues » reste, dans le brief repliable. Une échéance n'est pas un statut.\n3-1 — dix lignes par page, taille constante ; c'est le brief qui se replie, pas la table qui se mesure.\n\nLa quatrième décision, le panneau en surimpression, était demandée. Sa contrepartie est énoncée : le panneau recouvre trois colonnes."
     }
   ],
-  "launch": { "view": "canvas", "page": "page-1" }
+  "launch": {
+    "view": "canvas",
+    "page": "page-5"
+  }
 }

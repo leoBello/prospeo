@@ -1,0 +1,667 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+  <style>
+    :root {
+      --bg: #0b0d12; --surface: #14171f; --surface2: #1a1e28; --surface3: #232936;
+      --border: #252b38; --border2: #333c4e;
+      --text: #e4e8f0; --muted: #98a1b4; --faint: #6b7488;
+      --blue: #6d92ff; --mint: #4fd1a5; --amber: #f0b45c; --rose: #ff7a85; --violet: #a78bfa;
+      --seg1: #6d92ff; --seg2: #5a7de0; --seg3: #3f568f; --segvide: #232936;
+      --display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+      --ui: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
+      --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--ui); font-size: 13px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+    a { color: var(--blue); text-decoration: none; }
+    a:hover { color: #8fabff; }
+    h1, h2, h3, h4 { margin: 0; font-family: var(--display); font-weight: 600; letter-spacing: -0.015em; }
+    button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+    .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+    .sectT { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--faint); font-weight: 600; }
+
+    .tip { position: relative; display: inline-flex; }
+    .tip > .tipBody {
+      position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%) translateY(3px);
+      background: #030509; border: 1px solid var(--border2); color: var(--text);
+      padding: 7px 10px; border-radius: 8px; font-size: 11.5px; line-height: 1.4; width: max-content; max-width: 240px;
+      opacity: 0; pointer-events: none; transition: opacity 140ms ease, transform 140ms ease; z-index: 40;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.55);
+    }
+    .tip:hover > .tipBody { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .tipK { color: var(--faint); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 2px; }
+
+    .badge { display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; border: 1px solid transparent; white-space: nowrap; }
+    .badge .dot { width: 5px; height: 5px; border-radius: 999px; background: currentColor; flex: none; }
+    .b-mute { color: var(--muted); background: rgba(152,161,180,0.10); border-color: var(--border2); }
+    .b-blue { color: #a9c2ff; background: rgba(109,146,255,0.13); border-color: rgba(109,146,255,0.28); }
+    .b-mint { color: #86e3c1; background: rgba(79,209,165,0.13); border-color: rgba(79,209,165,0.28); }
+    .b-amber { color: #f5cd92; background: rgba(240,180,92,0.13); border-color: rgba(240,180,92,0.28); }
+    .b-violet { color: #c4b5fd; background: rgba(167,139,250,0.13); border-color: rgba(167,139,250,0.30); }
+    .b-rose { color: #ffa8b0; background: rgba(255,122,133,0.13); border-color: rgba(255,122,133,0.28); }
+    .b-dash { background: transparent; border-style: dashed; }
+
+    .trunc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .absent { color: var(--faint); font-size: 11px; font-style: italic; }
+
+    /* --- La barre d'onglets : un onglet par statut de `pipeline_status`. --- */
+    .tabs { display: flex; align-items: stretch; gap: 2px; height: 34px; border-bottom: 1px solid var(--border); flex: none; }
+    .tab { display: inline-flex; align-items: center; gap: 7px; padding: 0 11px; border-radius: 8px 8px 0 0; border-bottom: 2px solid transparent; margin-bottom: -1px; font-size: 12.5px; font-weight: 500; color: var(--muted); white-space: nowrap; }
+    .tab .pt { width: 5px; height: 5px; border-radius: 999px; flex: none; }
+    .tab .ring { width: 5px; height: 5px; border-radius: 999px; border: 1px dashed currentColor; flex: none; }
+    .tab .n { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 11px; color: var(--faint); }
+    .tab-on { color: var(--text); font-weight: 600; background: var(--surface2); border-bottom-color: var(--blue); }
+    .tab-on .n { color: var(--text); }
+
+    /* --- La rangée : six colonnes, la dernière change de sens selon l'onglet. --- */
+    .rowT { display: grid; grid-template-columns: 58px minmax(0, 1fr) 186px 136px 126px 140px; align-items: center; gap: 14px; height: 42px; padding: 0 12px; border: 1px solid transparent; border-radius: 9px; }
+    .rowSep { height: 1px; background: var(--border); flex: none; }
+    .rowT-on { background: rgba(109,146,255,0.10); border-color: rgba(109,146,255,0.35); }
+
+    .pgBtn { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 26px; padding: 0 7px; border-radius: 7px; border: 1px solid transparent; font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+    .pgBtn-on { color: var(--text); background: var(--surface3); border-color: var(--border2); font-weight: 700; }
+    .pgBtn-nav { border-color: var(--border2); padding: 0 9px; font-family: var(--ui); font-size: 12px; gap: 5px; }
+    .pgBtn-off { color: var(--faint); border-color: var(--border); }
+
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 28px; padding: 0 11px; border-radius: 8px; border: 1px solid var(--border2); font-size: 12px; font-weight: 500; color: var(--muted); }
+    .btn:hover { color: var(--text); border-color: var(--faint); }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
+  </style>
+</helmet>
+
+<!-- LE PANNEAU DE DÉTAIL EN SURIMPRESSION.
+     Inchangé quant à son contenu : c'est la fiche de `Main.dc.html`, ses
+     quatre onglets et sa jauge. Ce qui change est où il se pose. Il n'est
+     plus un frère de la liste dans une rangée flex — il est un CALQUE, posé
+     sur le cadre `position: relative` de la coquille, `z-index` au-dessus.
+     Conséquence recherchée : la table garde ses 1 344 px, ses six colonnes
+     ne se recalculent pas, et rien ne bouge sous le panneau à l'ouverture ni
+     à la fermeture. Conséquence à assumer : le panneau MASQUE les trois
+     colonnes de droite (Téléphone, Site, colonne contextuelle) — le score,
+     le nom et la présence restent lisibles à gauche, et ce sont eux qui
+     servent à naviguer aux flèches pendant que la fiche est ouverte. -->
+<div style="width: 1440px; height: 900px; display: flex; background: var(--bg); overflow: hidden">
+  <div style="width: 56px; flex: none; border-right: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; align-items: center; padding: 12px 0; gap: 6px">
+    <div style="width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(150deg, var(--blue), var(--violet)); display: flex; align-items: center; justify-content: center; font-family: var(--display); font-weight: 700; font-size: 15px; color: #0b0d12; margin-bottom: 10px">P</div>
+    <div class="tip">
+      <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(109,146,255,0.14); color: var(--blue); display: flex; align-items: center; justify-content: center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>
+      </div>
+      <span class="tipBody"><span class="tipK">Aujourd'hui</span>Le brief du jour, puis toute la veille par statut.</span>
+    </div>
+    <div class="tip">
+      <div style="width: 36px; height: 36px; border-radius: 10px; color: var(--faint); display: flex; align-items: center; justify-content: center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v16"/></svg>
+      </div>
+      <span class="tipBody"><span class="tipK">Campagne</span>Site, mail, envoi — les prospects jamais touchés.</span>
+    </div>
+    <div class="tip">
+      <div style="width: 36px; height: 36px; border-radius: 10px; color: var(--faint); display: flex; align-items: center; justify-content: center; position: relative">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+      </div>
+      <span class="tipBody"><span class="tipK">Déploiements</span>Les cinq étapes de publication d'un site.</span>
+    </div>
+    <div class="tip">
+      <div style="width: 36px; height: 36px; border-radius: 10px; color: var(--faint); display: flex; align-items: center; justify-content: center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
+      </div>
+      <span class="tipBody"><span class="tipK">Gabarit</span>Le dépôt GitHub qui sert de modèle aux sites.</span>
+    </div>
+  </div>
+
+  <div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+    <header style="height: 52px; flex: none; border-bottom: 1px solid var(--border); background: var(--surface); display: flex; align-items: center; gap: 16px; padding: 0 16px">
+      <span style="font-family: var(--display); font-weight: 700; font-size: 15px; letter-spacing: -0.02em">Prospeo</span>
+      <span style="color: var(--faint); font-size: 12px">Nantes &middot; plomberie &amp; serrurerie</span>
+      <div style="flex: 1"></div>
+      <div style="display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px 0 9px; border: 1px solid var(--border2); border-radius: 8px; color: var(--faint); font-size: 12px; min-width: 230px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+        <span style="flex: 1">Chercher un prospect, une action&hellip;</span>
+        <span class="num" style="font-size: 10.5px; border: 1px solid var(--border2); border-radius: 5px; padding: 1px 5px">Ctrl+K</span>
+      </div>
+      <div class="tip">
+        <span class="badge b-mute b-dash">Série&nbsp;: pas encore connue</span>
+        <span class="tipBody"><span class="tipK">Série de jours</span>Aucun fait observé en base&nbsp;: `pipeline_event` ne contient que deux lignes d'amorçage. Un zéro affiché se lirait comme un échec.</span>
+      </div>
+      <div style="width: 30px; height: 30px; border-radius: 999px; background: var(--surface3); border: 1px solid var(--border2); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: var(--muted)">LB</div>
+    </header>
+
+    <!-- `position: relative` : c'est CE bloc qui sert de cadre au panneau de
+         détail, posé en surimpression au-dessus de la liste (VeilleDetail).
+         La liste garde donc sa largeur, et ses colonnes ne bougent pas quand
+         un prospect s'ouvre. -->
+    <div style="flex: 1; min-height: 0; display: flex; position: relative">
+      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 14px 20px 0; overflow: hidden">
+      <div style="display: flex; align-items: baseline; gap: 10px; flex: none">
+        <h1 style="font-size: 19px">Aujourd'hui</h1>
+        <span style="color: var(--faint); font-size: 12px">jeudi 10 septembre</span>
+        <div style="flex: 1"></div>
+        <button class="btn" style="height: 26px; align-self: center">
+          Replier le brief
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+        </button>
+      </div>
+      <!-- LE BRIEF DU JOUR : bande de progression + relances dues. Repliable,
+           et l'état du repli est mémorisé d'une visite à l'autre — c'est lui
+           qui rend la table tenable sur un écran de portable (voir
+           VeilleCompacte). -->
+      <div style="display: flex; align-items: center; gap: 18px; margin-top: 12px; padding: 10px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; flex: none">
+        <div class="tip" style="flex: none">
+          <div style="position: relative; width: 46px; height: 46px">
+            <svg width="46" height="46" viewBox="0 0 46 46">
+              <circle cx="23" cy="23" r="19" fill="none" stroke="#232936" stroke-width="5"/>
+              <circle cx="23" cy="23" r="19" fill="none" stroke="var(--border2)" stroke-width="5" stroke-linecap="round" stroke-dasharray="4 6" transform="rotate(-90 23 23)"/>
+            </svg>
+            <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center">
+              <span style="font-size: 15px; color: var(--faint)">&mdash;</span>
+            </div>
+          </div>
+          <span class="tipBody"><span class="tipK">Objectif du jour</span>Pas encore connue&nbsp;: l'objectif est la médiane de vos 14 derniers jours, et aucun fait observé n'est encore en base.</span>
+        </div>
+
+        <div style="flex: 1; min-width: 0">
+          <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 5px">
+            <span style="font-size: 12px; color: var(--muted)">Objectif du jour <b style="color: var(--text)">pas encore connu</b></span>
+            <span class="absent">14 jours de faits observés sont nécessaires</span>
+          </div>
+          <div style="height: 6px; border-radius: 999px; background: #232936; border: 1px dashed var(--border2)"></div>
+        </div>
+
+        <div style="display: flex; gap: 6px; flex: none; padding-left: 16px; border-left: 1px solid var(--border)">
+          <div class="tip">
+            <div style="width: 32px; height: 32px; border-radius: 10px; background: var(--surface2); border: 1px dashed var(--border2); color: var(--faint); display: flex; align-items: center; justify-content: center">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+            </div>
+            <span class="tipBody"><span class="tipK">Verrouillé &mdash; Premier site en ligne</span>`deployment_event` est vide&nbsp;: le collector n'a pas encore tourné.</span>
+          </div>
+          <div class="tip">
+            <div style="width: 32px; height: 32px; border-radius: 10px; background: var(--surface2); border: 1px dashed var(--border2); color: var(--faint); display: flex; align-items: center; justify-content: center">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+            </div>
+            <span class="tipBody"><span class="tipK">Verrouillé &mdash; Dix relances tenues</span>Aucune relance observée&nbsp;: les deux seules lignes de `pipeline_event` sont des amorçages.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- RELANCES DUES : une échéance n'est pas un statut, et aucun onglet ne
+           la porte. La bande reste donc, au-dessus de la veille. -->
+      <div style="display: flex; align-items: center; gap: 8px; margin-top: 12px; flex: none">
+        <span class="sectT">Relances dues</span>
+        <span class="badge b-mute"><span class="num">2</span>&nbsp;prospects</span>
+        <div style="flex: 1; height: 1px; background: var(--border)"></div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 2px; margin-top: 4px; flex: none">
+        <div style="display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 12px; border-radius: 8px">
+          <span class="num" style="font-size: 13px; font-weight: 700; width: 26px; text-align: right; color: var(--blue)">81</span>
+          <span class="trunc" style="font-weight: 500; min-width: 0">Serrurerie du Bouffay</span>
+          <span class="badge b-amber"><span class="dot"></span>Relancé</span>
+          <span style="font-size: 11.5px; color: var(--amber)">relance en retard de 3 j</span>
+          <div style="flex: 1"></div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 12px; border-radius: 8px">
+          <span class="num" style="font-size: 13px; font-weight: 700; width: 26px; text-align: right; color: var(--blue)">74</span>
+          <span class="trunc" style="font-weight: 500; min-width: 0">Plomberie Guérin &amp; Fils</span>
+          <span class="badge b-blue"><span class="dot"></span>Contacté</span>
+          <span style="font-size: 11.5px; color: var(--muted)">relance prévue aujourd'hui</span>
+          <div style="flex: 1"></div>
+        </div>
+      </div>
+      <!-- LA VEILLE : un onglet par statut de `pipeline_status`, jamais un
+           statut masqué. La pastille est celle de `StatusBadge`, au ton près. -->
+      <div class="tabs" role="tablist" aria-label="Statut de suivi" style="margin-top: 14px">
+        
+          <button role="tab" aria-selected="true" style="display: inline-flex; align-items: center; gap: 7px; padding: 0 11px; border-radius: 8px 8px 0 0; margin-bottom: -1px; font-size: 12.5px; white-space: nowrap; border-bottom: 2px solid #6d92ff; font-weight: 600; color: #e4e8f0; background: #1a1e28;">
+            <span style="width: 5px; height: 5px; border-radius: 999px; background: #98a1b4; flex: none;"></span>
+            À contacter <span class="num" style="font-size: 11px; color: #e4e8f0;">127</span>
+          </button>
+        
+          <button role="tab" aria-selected="false" style="display: inline-flex; align-items: center; gap: 7px; padding: 0 11px; border-radius: 8px 8px 0 0; margin-bottom: -1px; font-size: 12.5px; white-space: nowrap; border-bottom: 2px solid transparent; font-weight: 500; color: #98a1b4;">
+            <span style="width: 5px; height: 5px; border-radius: 999px; background: #6d92ff; flex: none;"></span>
+            Contacté <span class="num" style="font-size: 11px; color: #6b7488;">1</span>
+          </button>
+        
+          <button role="tab" aria-selected="false" style="display: inline-flex; align-items: center; gap: 7px; padding: 0 11px; border-radius: 8px 8px 0 0; margin-bottom: -1px; font-size: 12.5px; white-space: nowrap; border-bottom: 2px solid transparent; font-weight: 500; color: #98a1b4;">
+            <span style="width: 5px; height: 5px; border-radius: 999px; background: #f0b45c; flex: none;"></span>
+            Relancé <span class="num" style="font-size: 11px; color: #6b7488;">1</span>
+          </button>
+        
+          <button role="tab" aria-selected="false" style="display: inline-flex; align-items: center; gap: 7px; padding: 0 11px; border-radius: 8px 8px 0 0; margin-bottom: -1px; font-size: 12.5px; white-space: nowrap; border-bottom: 2px solid transparent; font-weight: 500; color: #98a1b4;">
+            <span style="width: 5px; height: 5px; border-radius: 999px; background: #a78bfa; flex: none;"></span>
+            Intéressé <span class="num" style="font-size: 11px; color: #6b7488;">0</span>
+          </button>
+        
+          <button role="tab" aria-selected="false" style="display: inline-flex; align-items: center; gap: 7px; padding: 0 11px; border-radius: 8px 8px 0 0; margin-bottom: -1px; font-size: 12.5px; white-space: nowrap; border-bottom: 2px solid transparent; font-weight: 500; color: #98a1b4;">
+            <span style="width: 5px; height: 5px; border-radius: 999px; background: #4fd1a5; flex: none;"></span>
+            Gagné <span class="num" style="font-size: 11px; color: #6b7488;">0</span>
+          </button>
+        
+          <button role="tab" aria-selected="false" style="display: inline-flex; align-items: center; gap: 7px; padding: 0 11px; border-radius: 8px 8px 0 0; margin-bottom: -1px; font-size: 12.5px; white-space: nowrap; border-bottom: 2px solid transparent; font-weight: 500; color: #98a1b4;">
+            <span style="width: 5px; height: 5px; border-radius: 999px; background: #ff7a85; flex: none;"></span>
+            Perdu <span class="num" style="font-size: 11px; color: #6b7488;">0</span>
+          </button>
+        
+          <button role="tab" aria-selected="false" style="display: inline-flex; align-items: center; gap: 7px; padding: 0 11px; border-radius: 8px 8px 0 0; margin-bottom: -1px; font-size: 12.5px; white-space: nowrap; border-bottom: 2px solid transparent; font-weight: 500; color: #98a1b4;">
+            <span style="width: 5px; height: 5px; border-radius: 999px; border: 1px dashed #ff7a85; flex: none;"></span>
+            Ne pas contacter <span class="num" style="font-size: 11px; color: #6b7488;">0</span>
+          </button>
+        
+        <span style="width: 1px; height: 18px; background: var(--border2); align-self: center; margin: 0 6px"></span>
+        <button role="tab" aria-selected="false" style="display: inline-flex; align-items: center; gap: 7px; padding: 0 11px; border-radius: 8px 8px 0 0; margin-bottom: -1px; font-size: 12.5px; white-space: nowrap; border-bottom: 2px solid transparent; font-weight: 500; color: #98a1b4;">
+          Toutes <span class="num" style="font-size: 11px; color: #6b7488;">129</span>
+        </button>
+
+        <div style="flex: 1"></div>
+        <div style="display: flex; align-items: center; gap: 7px; align-self: center; padding-bottom: 4px">
+          <button class="btn" style="height: 26px">
+            Tri&nbsp;: score
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- La ligne de compte dit ce que l'onglet montre ET ce qu'il ne montre pas. -->
+      <div style="display: flex; align-items: center; gap: 12px; height: 22px; margin: 9px 0; flex: none">
+        <span class="sectT">À contacter</span>
+        <span style="font-size: 11.5px; color: var(--muted)">127 classables, sur 137 sans aucune ligne de suivi en base</span>
+        <span class="badge b-amber b-dash" style="">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
+          10 jamais scorés, non classables
+        </span>
+      </div>
+
+      <div class="rowT" style="display: grid; grid-template-columns: 58px minmax(0, 1fr) 186px 136px 126px 140px; align-items: center; gap: 14px; height: 22px; padding: 0 12px; flex: none;">
+        <span class="sectT" style="text-align: right">Score</span>
+        <span class="sectT">Prospect</span>
+        <span class="sectT">Présence web</span>
+        <span class="sectT">Téléphone</span>
+        <span class="sectT">Site</span>
+        <span class="sectT">Suivi</span>
+      </div>
+      <div class="rowSep" style="height: 1px; background: #252b38; flex: none;"></div>
+
+      <div style="flex: none">
+        
+          <div style="display: grid; grid-template-columns: 58px minmax(0, 1fr) 186px 136px 126px 140px; align-items: center; gap: 14px; height: 44px; padding: 0 12px; border: 1px solid; border-radius: 9px; background: transparent; border-color: transparent;">
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 3px">
+              <span class="num" style="font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 700; line-height: 1; color: #6d92ff;">79</span>
+              <span style="display: flex; gap: 2px"><span style="display: block; width: 10px; height: 3px; border-radius: 2px; background: #6d92ff;"></span><span style="display: block; width: 8px; height: 3px; border-radius: 2px; background: #5a7de0;"></span><span style="display: block; width: 6px; height: 3px; border-radius: 2px; background: #3f568f;"></span></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+              <span class="trunc" style="font-weight: 500">Serrurier Express 44</span>
+              <span class="badge b-mute" style="flex: none">Serrurier</span>
+            </div>
+            <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; color: #98a1b4; background: rgba(152,161,180,0.10); border-color: #333c4e;">Site en panne ou obsolète</span></span>
+            <div style="display: flex; flex-direction: column; gap: 0; min-width: 0">
+              <span class="num trunc" style="font-size: 12px; color: #98a1b4; line-height: 1.25;">06 78 21 90 14</span>
+              <span style="font-size: 9.5px; color: #6b7488; line-height: 1.25;">mobile</span>
+            </div>
+            <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; color: #86e3c1; background: rgba(79,209,165,0.13); border-color: rgba(79,209,165,0.28);">En ligne</span></span>
+            <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; color: #98a1b4; background: rgba(152,161,180,0.10); border-color: #333c4e; background: transparent; border-style: dashed;">Jamais contacté</span></span>
+          </div>
+        
+          <div style="display: grid; grid-template-columns: 58px minmax(0, 1fr) 186px 136px 126px 140px; align-items: center; gap: 14px; height: 44px; padding: 0 12px; border: 1px solid; border-radius: 9px; background: rgba(109,146,255,0.10); border-color: rgba(109,146,255,0.35);">
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 3px">
+              <span class="num" style="font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 700; line-height: 1; color: #6d92ff;">74</span>
+              <span style="display: flex; gap: 2px"><span style="display: block; width: 11px; height: 3px; border-radius: 2px; background: #6d92ff;"></span><span style="display: block; width: 9px; height: 3px; border-radius: 2px; background: #5a7de0;"></span><span style="display: block; width: 6px; height: 3px; border-radius: 2px; background: #3f568f;"></span></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+              <span class="trunc" style="font-weight: 500">Aquatech Nantes</span>
+              <span class="badge b-mute" style="flex: none">Plombier</span>
+            </div>
+            <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; color: #98a1b4; background: rgba(152,161,180,0.10); border-color: #333c4e;">Aucune présence web</span></span>
+            <div style="display: flex; flex-direction: column; gap: 0; min-width: 0">
+              <span class="num trunc" style="font-size: 12px; color: #98a1b4; line-height: 1.25;">06 12 44 08 31</span>
+              <span style="font-size: 9.5px; color: #6b7488; line-height: 1.25;">mobile</span>
+            </div>
+            <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; color: #98a1b4; background: rgba(152,161,180,0.10); border-color: #333c4e; background: transparent; border-style: dashed;">Jamais déployé</span></span>
+            <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; color: #98a1b4; background: rgba(152,161,180,0.10); border-color: #333c4e; background: transparent; border-style: dashed;">Jamais contacté</span></span>
+          </div>
+        
+          <div style="display: grid; grid-template-columns: 58px minmax(0, 1fr) 186px 136px 126px 140px; align-items: center; gap: 14px; height: 44px; padding: 0 12px; border: 1px solid; border-radius: 9px; background: transparent; border-color: transparent;">
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 3px">
+              <span class="num" style="font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 700; line-height: 1; color: #6d92ff;">72</span>
+              <span style="display: flex; gap: 2px"><span style="display: block; width: 9px; height: 3px; border-radius: 2px; background: #6d92ff;"></span><span style="display: block; width: 8px; height: 3px; border-radius: 2px; background: #5a7de0;"></span><span style="display: block; width: 4px; height: 3px; border-radius: 2px; background: #3f568f;"></span></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+              <span class="trunc" style="font-weight: 500">Chauffage Bellevue</span>
+              <span class="badge b-mute" style="flex: none">Plombier</span>
+            </div>
+            <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; color: #98a1b4; background: rgba(152,161,180,0.10); border-color: #333c4e;">Fiche annuaire uniquement</span></span>
+            <div style="display: flex; flex-direction: column; gap: 0; min-width: 0">
+              <span class="num trunc" style="font-size: 12px; color: #98a1b4; line-height: 1.25;">02 40 76 55 12</span>
+              <span style="font-size: 9.5px; color: #6b7488; line-height: 1.25;">fixe</span>
+            </div>
+            <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; color: #86e3c1; background: rgba(79,209,165,0.13); border-color: rgba(79,209,165,0.28);">En ligne</span></span>
+            <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; color: #98a1b4; background: rgba(152,161,180,0.10); border-color: #333c4e; background: transparent; border-style: dashed;">Jamais contacté</span></span>
+          </div>
+        
+          <div style="display: grid; grid-template-columns: 58px minmax(0, 1fr) 186px 136px 126px 140px; align-items: center; gap: 14px; height: 44px; padding: 0 12px; border: 1px solid; border-radius: 9px; background: transparent; border-color: transparent;">
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 3px">
+              <span class="num" style="font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 700; line-height: 1; color: #6d92ff;">70</span>
+              <span style="display: flex; gap: 2px"><span style="display: block; width: 11px; height: 3px; border-radius: 2px; background: #6d92ff;"></span><span style="display: block; width: 6px; height: 3px; border-radius: 2px; background: #5a7de0;"></span><span style="display: block; width: 6px; height: 3px; border-radius: 2px; background: #3f568f;"></span></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+              <span class="trunc" style="font-weight: 500">Dépannage Loire Plomberie</span>
+              <span class="badge b-mute" style="flex: none">Plombier</span>
+            </div>
+            <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; color: #98a1b4; background: rgba(152,161,180,0.10); border-color: #333c4e;">Aucune présence web</span></span>
+            <div style="display: flex; flex-direction: column; gap: 0; min-width: 0">
+              <span class="num trunc" style="font-size: 12px; color: #98a1b4; line-height: 1.25;">06 33 51 27 45</span>
+              <span style="font-size: 9.5px; color: #6b7488; line-height: 1.25;">mobile</span>
+            </div>
+            <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; color: #a9c2ff; background: rgba(109,146,255,0.13); border-color: rgba(109,146,255,0.28);">Rédaction écrite</span></span>
+            <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; color: #98a1b4; background: rgba(152,161,180,0.10); border-color: #333c4e;">À contacter</span></span>
+          </div>
+        
+          <div style="display: grid; grid-template-columns: 58px minmax(0, 1fr) 186px 136px 126px 140px; align-items: center; gap: 14px; height: 44px; padding: 0 12px; border: 1px solid; border-radius: 9px; background: transparent; border-color: transparent;">
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 3px">
+              <span class="num" style="font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 700; line-height: 1; color: #98a1b4;">66</span>
+              <span style="display: flex; gap: 2px"><span style="display: block; width: 9px; height: 3px; border-radius: 2px; background: #6d92ff;"></span><span style="display: block; width: 6px; height: 3px; border-radius: 2px; background: #5a7de0;"></span><span style="display: block; width: 6px; height: 3px; border-radius: 2px; background: #3f568f;"></span></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+              <span class="trunc" style="font-weight: 500">Clés &amp; Cylindres Chantenay</span>
+              <span class="badge b-mute" style="flex: none">Serrurier</span>
+            </div>
+            <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; color: #98a1b4; background: rgba(152,161,180,0.10); border-color: #333c4e;">Page sociale, aucun site</span></span>
+            <div style="display: flex; flex-direction: column; gap: 0; min-width: 0">
+              <span class="num trunc" style="font-size: 12px; color: #98a1b4; line-height: 1.25;">06 51 88 03 77</span>
+              <span style="font-size: 9.5px; color: #6b7488; line-height: 1.25;">mobile</span>
+            </div>
+            <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; color: #98a1b4; background: rgba(152,161,180,0.10); border-color: #333c4e; background: transparent; border-style: dashed;">Jamais déployé</span></span>
+            <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; color: #98a1b4; background: rgba(152,161,180,0.10); border-color: #333c4e; background: transparent; border-style: dashed;">Jamais contacté</span></span>
+          </div>
+        
+          <div style="display: grid; grid-template-columns: 58px minmax(0, 1fr) 186px 136px 126px 140px; align-items: center; gap: 14px; height: 44px; padding: 0 12px; border: 1px solid; border-radius: 9px; background: transparent; border-color: transparent;">
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 3px">
+              <span class="num" style="font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 700; line-height: 1; color: #98a1b4;">64</span>
+              <span style="display: flex; gap: 2px"><span style="display: block; width: 9px; height: 3px; border-radius: 2px; background: #6d92ff;"></span><span style="display: block; width: 6px; height: 3px; border-radius: 2px; background: #5a7de0;"></span><span style="display: block; width: 4px; height: 3px; border-radius: 2px; background: #3f568f;"></span></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+              <span class="trunc" style="font-weight: 500">Plomberie de la Beaujoire</span>
+              <span class="badge b-mute" style="flex: none">Plombier</span>
+            </div>
+            <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; color: #98a1b4; background: rgba(152,161,180,0.10); border-color: #333c4e;">Page sociale, aucun site</span></span>
+            <div style="display: flex; flex-direction: column; gap: 0; min-width: 0">
+              <span class="num trunc" style="font-size: 12px; color: #98a1b4; line-height: 1.25;">02 40 12 66 08</span>
+              <span style="font-size: 9.5px; color: #6b7488; line-height: 1.25;">fixe</span>
+            </div>
+            <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; color: #86e3c1; background: rgba(79,209,165,0.13); border-color: rgba(79,209,165,0.28);">En ligne</span></span>
+            <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; color: #98a1b4; background: rgba(152,161,180,0.10); border-color: #333c4e;">À contacter</span></span>
+          </div>
+        
+          <div style="display: grid; grid-template-columns: 58px minmax(0, 1fr) 186px 136px 126px 140px; align-items: center; gap: 14px; height: 44px; padding: 0 12px; border: 1px solid; border-radius: 9px; background: transparent; border-color: transparent;">
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 3px">
+              <span class="num" style="font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 700; line-height: 1; color: #98a1b4;">61</span>
+              <span style="display: flex; gap: 2px"><span style="display: block; width: 11px; height: 3px; border-radius: 2px; background: #6d92ff;"></span><span style="display: block; width: 5px; height: 3px; border-radius: 2px; background: #5a7de0;"></span><span style="display: block; width: 0px; height: 3px; border-radius: 2px; background: #3f568f;"></span></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+              <span class="trunc" style="font-weight: 500">Serrurerie Doulon</span>
+              <span class="badge b-mute" style="flex: none">Serrurier</span>
+            </div>
+            <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; color: #98a1b4; background: rgba(152,161,180,0.10); border-color: #333c4e;">Aucune présence web</span></span>
+            <div style="display: flex; flex-direction: column; gap: 0; min-width: 0">
+              <span class="num trunc" style="font-family: var(--ui); font-size: 11px; font-style: italic; color: #6b7488;">aucune coordonnée</span>
+              <span style="font-size: 9.5px; font-style: italic; color: #6b7488; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">étage « enrich » non passé</span>
+            </div>
+            <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; color: #98a1b4; background: rgba(152,161,180,0.10); border-color: #333c4e; background: transparent; border-style: dashed;">Jamais déployé</span></span>
+            <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; color: #98a1b4; background: rgba(152,161,180,0.10); border-color: #333c4e; background: transparent; border-style: dashed;">Jamais contacté</span></span>
+          </div>
+        
+          <div style="display: grid; grid-template-columns: 58px minmax(0, 1fr) 186px 136px 126px 140px; align-items: center; gap: 14px; height: 44px; padding: 0 12px; border: 1px solid; border-radius: 9px; background: transparent; border-color: transparent;">
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 3px">
+              <span class="num" style="font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 700; line-height: 1; color: #98a1b4;">58</span>
+              <span style="display: flex; gap: 2px"><span style="display: block; width: 8px; height: 3px; border-radius: 2px; background: #6d92ff;"></span><span style="display: block; width: 4px; height: 3px; border-radius: 2px; background: #5a7de0;"></span><span style="display: block; width: 6px; height: 3px; border-radius: 2px; background: #3f568f;"></span></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+              <span class="trunc" style="font-weight: 500">Ouest Sanitaire Services</span>
+              <span class="badge b-mute" style="flex: none">Plombier</span>
+            </div>
+            <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; color: #98a1b4; background: rgba(152,161,180,0.10); border-color: #333c4e;">Fiche annuaire uniquement</span></span>
+            <div style="display: flex; flex-direction: column; gap: 0; min-width: 0">
+              <span class="num trunc" style="font-size: 12px; color: #98a1b4; line-height: 1.25;">06 07 43 19 62</span>
+              <span style="font-size: 9.5px; color: #6b7488; line-height: 1.25;">mobile</span>
+            </div>
+            <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; color: #86e3c1; background: rgba(79,209,165,0.13); border-color: rgba(79,209,165,0.28);">En ligne</span></span>
+            <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; color: #98a1b4; background: rgba(152,161,180,0.10); border-color: #333c4e; background: transparent; border-style: dashed;">Jamais contacté</span></span>
+          </div>
+        
+          <div style="display: grid; grid-template-columns: 58px minmax(0, 1fr) 186px 136px 126px 140px; align-items: center; gap: 14px; height: 44px; padding: 0 12px; border: 1px solid; border-radius: 9px; background: transparent; border-color: transparent;">
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 3px">
+              <span class="num" style="font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 700; line-height: 1; color: #98a1b4;">55</span>
+              <span style="display: flex; gap: 2px"><span style="display: block; width: 7px; height: 3px; border-radius: 2px; background: #6d92ff;"></span><span style="display: block; width: 4px; height: 3px; border-radius: 2px; background: #5a7de0;"></span><span style="display: block; width: 4px; height: 3px; border-radius: 2px; background: #3f568f;"></span></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+              <span class="trunc" style="font-weight: 500">AMS Dépannage Serrurerie</span>
+              <span class="badge b-mute" style="flex: none">Serrurier</span>
+            </div>
+            <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; color: #98a1b4; background: rgba(152,161,180,0.10); border-color: #333c4e;">Site en panne ou obsolète</span></span>
+            <div style="display: flex; flex-direction: column; gap: 0; min-width: 0">
+              <span class="num trunc" style="font-size: 12px; color: #98a1b4; line-height: 1.25;">02 51 84 30 25</span>
+              <span style="font-size: 9.5px; color: #6b7488; line-height: 1.25;">fixe</span>
+            </div>
+            <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; color: #f5cd92; background: rgba(240,180,92,0.13); border-color: rgba(240,180,92,0.28);">Dépublié</span></span>
+            <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; color: #98a1b4; background: rgba(152,161,180,0.10); border-color: #333c4e; background: transparent; border-style: dashed;">Jamais contacté</span></span>
+          </div>
+        
+          <div style="display: grid; grid-template-columns: 58px minmax(0, 1fr) 186px 136px 126px 140px; align-items: center; gap: 14px; height: 44px; padding: 0 12px; border: 1px solid; border-radius: 9px; background: transparent; border-color: transparent;">
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 3px">
+              <span class="num" style="font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 700; line-height: 1; color: #98a1b4;">52</span>
+              <span style="display: flex; gap: 2px"><span style="display: block; width: 0px; height: 3px; border-radius: 2px; background: #6d92ff;"></span><span style="display: block; width: 8px; height: 3px; border-radius: 2px; background: #5a7de0;"></span><span style="display: block; width: 6px; height: 3px; border-radius: 2px; background: #3f568f;"></span></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+              <span class="trunc" style="font-weight: 500">Plomberie Malakoff</span>
+              <span class="badge b-mute" style="flex: none">Plombier</span>
+            </div>
+            <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; color: #98a1b4; background: rgba(152,161,180,0.10); border-color: #333c4e; background: transparent; border-style: dashed;">Présence web pas encore sondée</span></span>
+            <div style="display: flex; flex-direction: column; gap: 0; min-width: 0">
+              <span class="num trunc" style="font-size: 12px; color: #98a1b4; line-height: 1.25;">06 62 05 71 39</span>
+              <span style="font-size: 9.5px; color: #6b7488; line-height: 1.25;">mobile</span>
+            </div>
+            <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; color: #98a1b4; background: rgba(152,161,180,0.10); border-color: #333c4e; background: transparent; border-style: dashed;">Jamais déployé</span></span>
+            <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; color: #98a1b4; background: rgba(152,161,180,0.10); border-color: #333c4e; background: transparent; border-style: dashed;">Jamais contacté</span></span>
+          </div>
+        
+      </div>
+
+      
+
+      <div style="flex: 1;"></div>
+
+      <!-- Pagination : DIX lignes par page, taille fixe. La hauteur mesurée a
+           été écartée (voir VeilleArbitrages, arbitrage 3). -->
+      <div style="display: flex; align-items: center; gap: 10px; height: 44px; border-top: 1px solid #252b38; flex: none;">
+        <span style="font-size: 11.5px; color: var(--faint)">1–10 sur 127</span>
+        <span class="badge b-mute b-dash">10 par page</span>
+        <div style="flex: 1"></div>
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <button class="pgBtn pgBtn-nav pgBtn-off" disabled aria-label="Page précédente">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            Précédentes
+          </button>
+          <button class="pgBtn pgBtn-on" aria-current="page">1</button>
+          <button class="pgBtn">2</button>
+          <button class="pgBtn">3</button>
+          <button class="pgBtn">4</button>
+          <span class="pgBtn" style="color: var(--faint)">&hellip;</span>
+          <button class="pgBtn">13</button>
+          <button class="pgBtn pgBtn-nav" aria-label="Page suivante">
+            Suivantes
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+        </div>
+        <span style="display: none;">une seule page &mdash; les boutons de page ne s'affichent pas</span>
+      </div>
+      </div>
+
+<aside style="position: absolute; top: 0; right: 0; bottom: 0; width: 720px; z-index: 20; border-left: 1px solid var(--border2); background: var(--surface); box-shadow: -20px 0 48px rgba(0,0,0,0.55); display: flex; flex-direction: column; overflow: hidden">
+
+        <div style="padding: 18px 22px 0">
+          <div style="display: flex; align-items: flex-start; gap: 14px">
+            <div style="flex: 1; min-width: 0">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px">
+                <span class="badge b-mute">Prospect <span class="num">2</span> / <span class="num">10</span></span>
+                <span style="color: var(--faint); font-size: 11px">↑ ↓ pour naviguer</span>
+              </div>
+              <h2 style="font-size: 24px; letter-spacing: -0.025em">Aquatech Nantes</h2>
+              <div style="display: flex; align-items: center; gap: 6px; margin-top: 8px; flex-wrap: wrap">
+                <span class="badge b-mute b-dash">Jamais contacté</span>
+                <span class="badge b-mute b-dash">Jamais déployé</span>
+                <span class="badge b-blue">Plombier</span>
+                <div class="tip">
+                  <span class="badge b-rose">Pas de site déclaré</span>
+                  <span class="tipBody"><span class="tipK">Motif de qualification</span>Aucun site trouvé par la sonde web, et aucune URL déclarée sur la fiche Google. C'est le signal le plus lourd du barème : +30 points.</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="tip" style="flex: none">
+              <div style="position: relative; width: 84px; height: 84px">
+                <svg width="84" height="84" viewBox="0 0 84 84">
+                  <circle cx="42" cy="42" r="35" fill="none" stroke="#232936" stroke-width="8"/>
+                  <circle cx="42" cy="42" r="35" fill="none" stroke="#6d92ff" stroke-width="8" stroke-linecap="round" stroke-dasharray="219.9" stroke-dashoffset="57.2" transform="rotate(-90 42 42)"/>
+                </svg>
+                <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center">
+                  <span class="num" style="font-size: 26px; font-weight: 700; line-height: 1; letter-spacing: -0.03em">74</span>
+                  <span style="font-size: 9.5px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.07em">sur 100</span>
+                </div>
+              </div>
+              <span class="tipBody"><span class="tipK">Score · barème v3</span>Présence 30 · Vitalité 26 · Joignabilité 18. Calculé le 2 septembre.</span>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 8px; margin-top: 18px">
+            <button style="display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 14px; border-radius: 9px; background: #6d92ff; color: #0b0d12; font-weight: 600; font-size: 12.5px">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a1 1 0 0 1-1 1A16 16 0 0 1 4 5a1 1 0 0 1 1-1z"/></svg>
+              Appeler 06 12 44 08 31
+            </button>
+            <button style="display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 13px; border-radius: 9px; border: 1px solid var(--border2); color: var(--text); font-size: 12.5px">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+              Déployer le site
+            </button>
+            <button style="display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 13px; border-radius: 9px; border: 1px solid var(--border2); color: var(--text); font-size: 12.5px">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V6M6 12l6-6 6 6"/></svg>
+              Marquer contacté
+            </button>
+            <div style="flex: 1"></div>
+            <button style="width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--border2); color: var(--muted); display: inline-flex; align-items: center; justify-content: center">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+          </div>
+
+          <div style="display: flex; gap: 2px; margin-top: 18px; border-bottom: 1px solid var(--border)">
+            
+              <button style="display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 13px; font-size: 12.5px; font-weight: 600; color: #e4e8f0; border-bottom: 2px solid #6d92ff; margin-bottom: -1px;">
+                Fiche
+                <span style="font-family: JetBrains Mono, monospace; font-size: 10px; padding: 1px 5px; border-radius: 999px; background: rgba(109,146,255,0.16); color: #a9c2ff;">12</span>
+              </button>
+            
+              <button style="display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 13px; font-size: 12.5px; font-weight: 400; color: #98a1b4; border-bottom: 2px solid transparent; margin-bottom: -1px;">
+                Site
+                <span style="font-family: JetBrains Mono, monospace; font-size: 10px; padding: 1px 5px; border-radius: 999px; background: rgba(152,161,180,0.10); color: #6b7488;">1</span>
+              </button>
+            
+              <button style="display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 13px; font-size: 12.5px; font-weight: 400; color: #98a1b4; border-bottom: 2px solid transparent; margin-bottom: -1px;">
+                Messages
+                <span style="font-family: JetBrains Mono, monospace; font-size: 10px; padding: 1px 5px; border-radius: 999px; background: rgba(152,161,180,0.10); color: #6b7488;">2</span>
+              </button>
+            
+              <button style="display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 13px; font-size: 12.5px; font-weight: 400; color: #98a1b4; border-bottom: 2px solid transparent; margin-bottom: -1px;">
+                Historique
+                <span style="font-family: JetBrains Mono, monospace; font-size: 10px; padding: 1px 5px; border-radius: 999px; background: rgba(152,161,180,0.10); color: #6b7488;">6</span>
+              </button>
+            
+          </div>
+        </div>
+
+        <div style="flex: 1; min-height: 0; overflow: hidden; padding: 18px 22px">
+
+          
+            <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+
+              <div style="background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 14px">
+                <div style="display: flex; align-items: center; gap: 7px; margin-bottom: 11px; color: var(--muted)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V8l7-5 7 5v13"/><path d="M10 21v-5h4v5"/></svg>
+                  <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 600">Identité</span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 9px">
+                  <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px"><span style="color: var(--muted)">SIRET</span><span class="num">812 456 789 00023</span></div>
+                  <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px"><span style="color: var(--muted); flex: none">Adresse</span><span style="text-align: right">14 rue des Olivettes, 44000 Nantes</span></div>
+                  <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px"><span style="color: var(--muted)">Créée</span><span class="num">12/03/2019</span></div>
+                  <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px"><span style="color: var(--muted)">Effectif</span><span>3 à 5 salariés</span></div>
+                </div>
+              </div>
+
+              <div style="background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 14px">
+                <div style="display: flex; align-items: center; gap: 7px; margin-bottom: 11px; color: var(--muted)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a1 1 0 0 1-1 1A16 16 0 0 1 4 5a1 1 0 0 1 1-1z"/></svg>
+                  <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 600">Joignabilité</span>
+                  <div style="flex: 1"></div>
+                  <span class="badge b-mint" style="height: 19px; font-size: 10px">Google · 94 %</span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 9px">
+                  <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px"><span style="color: var(--muted)">Téléphone</span><span class="num">+33 6 12 34 56 78 <span style="color: var(--faint); font-family: var(--ui)">mobile</span></span></div>
+                  <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px"><span style="color: var(--muted)">Note</span><span><span class="num">4,6</span> <span style="color: var(--faint)">★</span></span></div>
+                  <div class="tip" style="display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px; width: 100%">
+                    <span style="color: var(--muted)">Nombre d'avis</span>
+                    <span style="color: var(--faint); font-style: italic">non publié par la source</span>
+                    <span class="tipBody" style="left: auto; right: 0; transform: none"><span class="tipK">Ce n'est pas un trou de collecte</span>Google ne publie plus le nombre d'avis depuis août 2026. Ce champ ne se remplira pas en relançant l'enrichissement.</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px"><span style="color: var(--muted)">URL déclarée</span><span style="color: var(--faint); font-style: italic">aucune</span></div>
+                </div>
+              </div>
+
+              <div style="grid-column: span 2; background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 14px">
+                <div style="display: flex; align-items: center; gap: 7px; margin-bottom: 12px; color: var(--muted)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>
+                  <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 600">Composition du score</span>
+                  <div style="flex: 1"></div>
+                  <span style="font-size: 11.5px; color: var(--blue)">Voir le reçu ligne par ligne ▾</span>
+                </div>
+                <div style="display: flex; gap: 10px">
+                  <div class="tip" style="flex: 1">
+                    <div style="width: 100%">
+                      <div style="display: flex; justify-content: space-between; font-size: 11.5px; margin-bottom: 5px"><span style="color: var(--muted)">Présence</span><span class="num" style="color: var(--text); font-weight: 700">30</span></div>
+                      <div style="height: 6px; border-radius: 999px; background: #232936; overflow: hidden"><div style="width: 100%; height: 100%; background: #6d92ff"></div></div>
+                    </div>
+                    <span class="tipBody"><span class="tipK">Présence · 30 / 30</span>Aucun site (+30). C'est le motif de présence du prospect dans la file.</span>
+                  </div>
+                  <div class="tip" style="flex: 1">
+                    <div style="width: 100%">
+                      <div style="display: flex; justify-content: space-between; font-size: 11.5px; margin-bottom: 5px"><span style="color: var(--muted)">Vitalité</span><span class="num" style="color: var(--text); font-weight: 700">26</span></div>
+                      <div style="height: 6px; border-radius: 999px; background: #232936; overflow: hidden"><div style="width: 74%; height: 100%; background: #5a7de0"></div></div>
+                    </div>
+                    <span class="tipBody"><span class="tipK">Vitalité · 26 / 35</span>Note 4,6 (+16) · entreprise de plus de 3 ans (+10). Effectif inconnu : rien n'est compté.</span>
+                  </div>
+                  <div class="tip" style="flex: 1">
+                    <div style="width: 100%">
+                      <div style="display: flex; justify-content: space-between; font-size: 11.5px; margin-bottom: 5px"><span style="color: var(--muted)">Joignabilité</span><span class="num" style="color: var(--text); font-weight: 700">18</span></div>
+                      <div style="height: 6px; border-radius: 999px; background: #232936; overflow: hidden"><div style="width: 51%; height: 100%; background: #3f568f"></div></div>
+                    </div>
+                    <span class="tipBody"><span class="tipK">Joignabilité · 18 / 35</span>Mobile trouvé (+18). Aucune adresse email : le canal écrit reste fermé.</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          
+
+          
+
+          
+
+          
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
