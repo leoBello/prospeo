@@ -115,7 +115,12 @@ export function RangeeVeille({ prospect, onglet, selectionne, now, onSelect }: P
   return (
     <button
       type="button"
-      id={`prospect-${prospect.id}`}
+      // `veille-` et non `prospect-` (le prefixe de `ProspectRow`) : un
+      // prospect relance figure a la fois dans la bande et dans cet onglet
+      // (decision 2A), et deux noeuds ne peuvent legitimement partager un
+      // meme `id` — HTML invalide, et `document.getElementById` n'en
+      // rendrait qu'un (releve de revue, tache 9).
+      id={`veille-prospect-${prospect.id}`}
       className={`${styles.rangee} ${selectionne ? styles.selectionnee : ''}`}
       aria-current={selectionne ? 'true' : undefined}
       onClick={() => onSelect(prospect.id)}

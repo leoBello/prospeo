@@ -18,7 +18,15 @@ export const MAX_ROWS_PER_LIST = 12;
  */
 const STATUTS_CLOS = new Set(['ne_pas_contacter', 'gagne', 'perdu']);
 
-/** Statuts qui valent « jamais engagé », donc éligibles à la file des nouveaux. */
+/**
+ * Statuts qui valent « jamais engagé ».
+ *
+ * La file des nouveaux, qui s'en servait pour se peupler, a disparu (elle
+ * est devenue l'onglet « à contacter » de la table de veille, décision 1A).
+ * Cette constante ne sert plus qu'à EXCLURE `a_contacter` de la file des
+ * relances ci-dessous : un prospect qu'on n'a encore jamais engagé n'a rien
+ * à « relancer ».
+ */
 const STATUTS_NON_ENGAGES = new Set(['a_contacter']);
 
 export interface FollowUpReason {

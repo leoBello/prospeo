@@ -91,6 +91,49 @@ describe('ProspectRow', () => {
     expect(screen.getByText(/Aucune présence web/)).toBeDefined();
   });
 
+  it('rend la pastille d avertissement de coherence quand la ligne cable dataWarnings vers ScoreBar', () => {
+    // Correctif de revue (tache 9) : ce cablage `ProspectRow -> dataWarnings
+    // -> ScoreBar` n'avait plus aucun garde d'integration — seuls le calcul
+    // (`domain/coherence.test.ts`) et le rendu de la pastille
+    // (`ui/ScoreBar.test.tsx`) l'etaient. Categorie « aucune presence web »
+    // dementie par une URL declaree (§ coherence.ts, cas 1) : le seul
+    // ecart qui n'exige pas d'aligner deux horodatages pour se produire.
+    rendre(
+      ligne({
+        score: {
+          total: 30,
+          rulesetVersion: 'v2',
+          computedAt: '2026-09-02T00:00:00Z',
+          breakdown: [
+            { code: 'presence_none', label: 'Aucune présence web', points: 35, group: 'presence' },
+            { code: 'phone_none', label: 'Aucun téléphone', points: -25, group: 'joignabilite' },
+          ],
+        },
+        presence: {
+          category: 'none',
+          finalUrl: null,
+          httpStatus: null,
+          domainAvailable: null,
+          probedAt: null,
+        },
+        enrichment: {
+          status: 'ok',
+          phoneE164: null,
+          phoneKind: null,
+          rating: null,
+          reviewCount: null,
+          declaredUrl: 'https://aubert-services.fr/serrurier-nantes/',
+          matchedName: 'Aubert Services',
+          matchConfidence: 0.99,
+          enrichedAt: '2026-09-01T00:00:00Z',
+        },
+      }),
+    );
+    const pastille = screen.getAllByRole('img').find((el) => el.textContent === '!');
+    expect(pastille).toBeDefined();
+    expect(pastille?.getAttribute('title')).toContain('démentie par le site déclaré');
+  });
+
   it('nomme l absence de score par un mot, jamais par un zero ni par un vide', () => {
     rendre(ligne({ score: null }));
     expect(screen.getByText('pas encore scoré')).toBeDefined();

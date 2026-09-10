@@ -26,10 +26,14 @@ export const fr = {
   // ici ne connaît l'identité de la personne connectée.
   'account.button': 'Préférences du compte',
 
-  // Le champ dit explicitement ce qu'il filtre — les listes de travail déjà
-  // affichées sur cet écran — et jamais les 139 prospects de la base, hors
-  // périmètre du chantier (décision du pilote, lot 3 tâche 2).
-  'header.search.label': 'Filtrer les listes du jour (relances dues, nouveaux prospects à fort score)',
+  // Le champ dit explicitement ce qu'il filtre — la bande des relances dues
+  // ET la table de veille, puisque la recherche s'applique en amont des
+  // deux (`TodayScreen`) — et ce sur quoi il NE le fait jamais : la table
+  // montre désormais toute la base (tâche 9), mais toujours les prospects
+  // déjà chargés en mémoire, jamais une requête de plus. Réécrit tâche 9,
+  // correctif de revue : l'ancien texte nommait « nouveaux prospects à fort
+  // score », une liste que cette même tâche a supprimée.
+  'header.search.label': 'Filtrer les relances dues et la table de statuts, parmi les prospects déjà chargés',
   // `{modifier}` vaut « ⌘ » ou « Ctrl+ » selon la plateforme détectée
   // (`ui/plateforme.ts`) : afficher ⌘K sur Windows serait une promesse que
   // rien ne tient.

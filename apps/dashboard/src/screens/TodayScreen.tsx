@@ -280,7 +280,15 @@ export function TodayScreen({
 
   useEffect(() => {
     if (selectedId === null) return;
-    const ligne = document.getElementById(`prospect-${selectedId}`);
+    // Deux surfaces peuvent porter le même prospect (la bande et la table,
+    // décision 2A) : `ProspectRow` pose `prospect-<id>`, `RangeeVeille` pose
+    // `veille-prospect-<id>` — deux préfixes distincts, parce que deux
+    // nœuds ne peuvent légitimement partager un même `id` (HTML invalide).
+    // On cherche donc les deux, dans l'ordre visuel (la bande d'abord, la
+    // table ensuite), et on défile vers le premier trouvé.
+    const ligne =
+      document.getElementById(`prospect-${selectedId}`) ??
+      document.getElementById(`veille-prospect-${selectedId}`);
     // `scrollIntoView` manque à jsdom, et manquerait aussi à tout
     // environnement sans mise en page : la garde évite de faire échouer le
     // rendu pour un confort de défilement.

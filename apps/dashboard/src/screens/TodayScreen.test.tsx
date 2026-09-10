@@ -373,8 +373,12 @@ describe('TodayScreen', () => {
     // retiree ici : elle portait sur la pastille « ! » de `ProspectRow`, et ce
     // prospect ne passe plus par cette rangee-la — sans ligne de suivi, il est
     // dans la TABLE, dont les six colonnes (tache 6) ne portent pas ce
-    // signalement. Le fait reste vrai pour une relance due, qui passe encore
-    // par `ProspectRow` : c'est `ui/ProspectRow.test.tsx` qui le couvre.
+    // signalement. Correctif de revue (tache 9) : ce fichier n'a JAMAIS eu
+    // d'assertion sur la pastille — dit ici a tort dans une version anterieure
+    // de ce commentaire. Le calcul de l'ecart est couvert par
+    // `domain/coherence.test.ts`, le rendu de la pastille par
+    // `ui/ScoreBar.test.tsx`, et le CABLAGE `ProspectRow -> dataWarnings ->
+    // ScoreBar` par `ui/ProspectRow.test.tsx` (cas ajoute au meme correctif).
     // Reserve reportee au rapport de la tache 9.
   });
 });
@@ -383,12 +387,33 @@ describe('TodayScreen — la table de veille remplace la liste plafonnee (tache 
   it('montre la table par onglets a la place de l ancienne liste plafonnee', () => {
     // L'ancienne liste s'arretait a douze lignes et annoncait le reste par
     // « N de plus, non affiches ici » (`list.overflow`). C'est le defaut que
-    // ce chantier corrige : quinze prospects scores tiennent desormais sur
-    // deux pages, aucun n'est annonce sans etre atteignable.
-    rendre(quinzeProspectsScores());
+    // ce chantier corrige POUR LA TABLE : quinze prospects scores tiennent
+    // desormais sur deux pages, aucun n'est annonce sans etre atteignable.
+    //
+    // Correctif de revue (tache 9) : sur la seule fixture `quinzeProspectsScores`
+    // (aucune ligne de suivi, donc aucune relance due), le texte ne pouvait
+    // de toute facon jamais apparaitre nulle part — la bande des relances
+    // etant vide de naissance, l'assertion etait incapable de rougir. Elle
+    // porte maintenant sur une fixture qui AJOUTE quatorze relances en
+    // retard : la bande (WorkListSection, inchangee par cette tache) plafonne
+    // toujours et affiche bien le texte — la ligne suivante le prouve avant
+    // de verifier qu'il reste absent de LA TABLE precisement.
+    rendre([
+      ...quinzeProspectsScores(),
+      ...Array.from({ length: 14 }, (_, i) =>
+        vue(`r${i}`, {
+          score: score(50 - i),
+          pipeline: { status: 'relance', nextActionAt: '2026-08-20T10:00:00', updatedAt: '2026-08-20T10:00:00Z' },
+        }),
+      ),
+    ]);
     expect(screen.getByRole('tablist', { name: 'Statut de suivi' })).toBeDefined();
     expect(screen.getAllByRole('tab')).toHaveLength(8);
-    expect(screen.queryByText(/de plus, non affichés ici/)).toBeNull();
+    // La bande porte bien le texte : preuve que la fixture atteint le seuil
+    // et que l'assertion suivante teste quelque chose de reel.
+    expect(screen.getByText(/de plus, non affichés ici/)).toBeDefined();
+    const table = screen.getByRole('region', { name: 'Toute la veille' });
+    expect(within(table).queryByText(/de plus, non affichés ici/)).toBeNull();
   });
 
   it('ne descend jamais sous dix lignes affichees quand l onglet en contient plus', () => {
@@ -432,9 +457,37 @@ describe('TodayScreen — la table de veille remplace la liste plafonnee (tache 
     expect(document.getElementById('prospect-due')?.getAttribute('aria-current')).toBe('true');
 
     // Seconde fleche : la ligne SUIVANTE de la table, et non un retour sur
-    // « due » — qui figure pourtant aussi dans l'onglet ouvert.
+    // « due » — qui figure pourtant aussi dans l'onglet ouvert. Prefixe
+    // `veille-prospect-` : c'est la ligne de `RangeeVeille`, jamais celle de
+    // `ProspectRow` (constat de revue, tache 9 — deux noeuds ne peuvent
+    // partager un meme id).
     await user.keyboard('{ArrowDown}');
-    expect(document.getElementById('prospect-a-venir')?.getAttribute('aria-current')).toBe('true');
+    expect(document.getElementById('veille-prospect-a-venir')?.getAttribute('aria-current')).toBe('true');
+  });
+
+  it('pose deux identifiants distincts quand le meme prospect figure dans la bande et la table', async () => {
+    // Decision 2A, cas nominal : un prospect relance figure a la fois dans
+    // la bande (`ProspectRow`, id `prospect-<id>`) et dans son onglet
+    // (`RangeeVeille`, id `veille-prospect-<id>`). Deux noeuds ne peuvent
+    // legitimement partager un meme `id` (HTML invalide) : la preuve porte
+    // sur les DEUX identifiants, chacun unique dans le document.
+    const user = userEvent.setup();
+    rendre([
+      vue('due', {
+        score: score(90),
+        pipeline: { status: 'relance', nextActionAt: '2026-08-30T10:00:00', updatedAt: '2026-08-30T10:00:00Z' },
+      }),
+    ]);
+
+    await user.click(screen.getByRole('tab', { name: 'Relancé : 1 prospect' }));
+
+    const ligneBande = document.getElementById('prospect-due');
+    const ligneTable = document.getElementById('veille-prospect-due');
+    expect(ligneBande).not.toBeNull();
+    expect(ligneTable).not.toBeNull();
+    expect(ligneBande).not.toBe(ligneTable);
+    expect(document.querySelectorAll('[id="prospect-due"]')).toHaveLength(1);
+    expect(document.querySelectorAll('[id="veille-prospect-due"]')).toHaveLength(1);
   });
 
   it('revient a la premiere page quand l onglet change', async () => {
@@ -531,7 +584,7 @@ describe('TodayScreen — la recherche de la barre du haut (lot 3, tache 2)', ()
     expect(screen.getByText('PLOMBERIE ALPHA')).toBeDefined();
     expect(screen.getByText('SERRURERIE BETA')).toBeDefined();
 
-    const champ = screen.getByRole('searchbox', { name: /Filtrer les listes du jour/ });
+    const champ = screen.getByRole('searchbox', { name: /Filtrer les relances dues et la table de statuts/ });
     await user.type(champ, 'alpha');
 
     expect(screen.getByText('PLOMBERIE ALPHA')).toBeDefined();

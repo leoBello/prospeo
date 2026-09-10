@@ -25,7 +25,7 @@ export const en: Record<keyof typeof fr, string> = {
 
   'account.button': 'Account preferences',
 
-  'header.search.label': 'Filter today’s lists (follow-ups due, new high-scoring prospects)',
+  'header.search.label': 'Filter follow-ups due and the status table, among already-loaded prospects',
   'header.search.shortcut': '{modifier}K',
 
   'auth.title': 'Prospeo',
