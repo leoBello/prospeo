@@ -66,6 +66,55 @@ describe('TableVeille', () => {
     expect(screen.queryByText('10 jamais scorés, non classables')).toBeNull();
   });
 
+  it('dit, sur « à contacter », combien de lignes sont classables et combien de prospects n ont aucun suivi', () => {
+    // page().total = 127 et COMPTES.sansSuivi = 137 : deux nombres distincts,
+    // pour qu'une inversion des deux paramètres se voie dans le texte rendu.
+    renderWithPreferences(<TableVeille {...props} onglet="a_contacter" page={page()} />);
+    expect(
+      screen.getByText('127 classables, sur 137 sans aucune ligne de suivi en base'),
+    ).toBeDefined();
+  });
+
+  it('dit, sur « toutes », combien de lignes sont classables et combien de prospects sont en base', () => {
+    // COMPTES.parOnglet.toutes = 129 et props.totalEnBase = 139 : distincts.
+    renderWithPreferences(<TableVeille {...props} onglet="toutes" page={page()} />);
+    expect(screen.getByText('129 classables, sur 139 prospects en base')).toBeDefined();
+  });
+
+  it('dit le compte d un onglet de statut au pluriel', () => {
+    renderWithPreferences(
+      <TableVeille
+        {...props}
+        onglet="relance"
+        page={page({ total: 5, pages: 1, lignes: [prospect('a', 60)], dernier: 1 })}
+      />,
+    );
+    // 5 lignes dans l'onglet, 129 classables dans toute la base : distincts.
+    expect(screen.getByText('5 prospects, sur 129 classables')).toBeDefined();
+  });
+
+  it('dit le compte d un onglet de statut au singulier, pour un unique prospect', () => {
+    renderWithPreferences(
+      <TableVeille
+        {...props}
+        onglet="contacte"
+        page={page({ total: 1, pages: 1, lignes: [prospect('a', 60)], dernier: 1 })}
+      />,
+    );
+    expect(screen.getByText('1 prospect, sur 129 classables')).toBeDefined();
+  });
+
+  it('nomme un onglet de statut à zéro, sans lui prêter de chiffre', () => {
+    renderWithPreferences(
+      <TableVeille
+        {...props}
+        onglet="gagne"
+        page={page({ lignes: [], total: 0, pages: 1, premier: 0, dernier: 0 })}
+      />,
+    );
+    expect(screen.getByText('aucun prospect à ce statut')).toBeDefined();
+  });
+
   it('nomme un onglet vide, et n affiche alors ni colonnes ni pagination', () => {
     renderWithPreferences(
       <TableVeille {...props} onglet="gagne" page={page({ lignes: [], total: 0, pages: 1, premier: 0, dernier: 0 })} />,
