@@ -73,11 +73,21 @@ function resumeObjectif(jeu: JeuState): ResumeObjectif {
  *
  * **L'objectif dans le résumé (divergence maquette/plan).** `VeilleCompacte.dc.html`
  * montre « Objectif pas encore connu » sur la ligne repliée ; le pseudo-code
- * du plan ne rendait que le compte de relances. La maquette gouverne, mais
- * sans `veille.brief.objectif` ni recalcul de l'anneau : `resumeObjectif`
- * relit `jeu.objectifDuJour`/`realiseAujourdHui`, et l'affichage réemploie
- * `jeu.objectif.titre` et `jeu.objectif.denominateur[.inconnu]`, les clés
- * mêmes que `BandeProgression` consomme déjà pour dire la même chose.
+ * du plan ne rendait que le compte de relances. La maquette gouverne :
+ * `resumeObjectif` relit `jeu.objectifDuJour`/`realiseAujourdHui`, sans
+ * recalcul de l'anneau.
+ *
+ * **Vocabulaire partagé, mais pas jusqu'au doublon de sens (correctif de
+ * revue, tâche 8).** `jeu.objectif.titre` (« Objectif du jour ») est
+ * réemployée telle quelle : elle dit exactement ce qu'il faut, ici comme
+ * dans `BandeProgression`. `jeu.objectif.denominateur.inconnu` (« pas
+ * encore »), en revanche, a été écrite pour tenir sous un chiffre, dans
+ * l'anneau — un dénominateur, pas une fin de phrase ; réemployée telle
+ * quelle ici, elle aurait laissé « pas encore » en suspens, un fragment et
+ * non une formulation sobre. D'où `veille.brief.objectif.inconnu`, dédiée à
+ * ce résumé : le vocabulaire du kit interdit le doublon de *sens*, pas le
+ * doublon de *chaîne* — une clé qui change de rôle grammatical en changeant
+ * de contexte se dédouble, elle ne s'étire pas.
  */
 export function BriefDuJour({
   jeu, relances, selectedId, currentRulesetVersion, emptyKey, now, onSelect,
@@ -109,7 +119,7 @@ export function BriefDuJour({
               {objectif.connu ? (
                 `${objectif.realise} ${t('jeu.objectif.denominateur', { objectif: objectif.cible })}`
               ) : (
-                <span className={styles.absent}>{t('jeu.objectif.denominateur.inconnu')}</span>
+                <span className={styles.absent}>{t('veille.brief.objectif.inconnu')}</span>
               )}
             </span>
             <span className={styles.separateur} aria-hidden="true" />

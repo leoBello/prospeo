@@ -1,43 +1,11 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { BriefDuJour } from './BriefDuJour.js';
 import { renderWithPreferences } from '../test-utils.js';
 import type { ProspectView, WorkList } from '../domain/prospect.js';
 import type { Jeu } from '../domain/jeu.js';
 import type { JeuState } from '../data/useJeu.js';
-
-/**
- * Sous ce jsdom (sans URL http(s) configurée), `window.localStorage` vaut
- * `undefined` — constaté par une sonde directe, pas supposé : l'avertissement
- * Node « localStorage is not available because --localstorage-file was not
- * provided » le confirme. `preferences.tsx` s'en accommode (son écriture
- * échoue en silence), mais ce test-ci doit vérifier une **vraie**
- * persistance d'un montage à l'autre : sans un magasin qui survit, le
- * troisième cas ne pourrait jamais être vert pour la bonne raison. Ce
- * palliatif reste local à ce fichier — il ne touche ni `test-setup.ts` ni la
- * configuration Vitest, qui gouvernent toute la suite.
- */
-class MagasinMemoire {
-  private valeurs = new Map<string, string>();
-  clear(): void {
-    this.valeurs.clear();
-  }
-  getItem(cle: string): string | null {
-    return this.valeurs.has(cle) ? this.valeurs.get(cle)! : null;
-  }
-  setItem(cle: string, valeur: string): void {
-    this.valeurs.set(cle, valeur);
-  }
-}
-
-beforeAll(() => {
-  Object.defineProperty(window, 'localStorage', {
-    value: new MagasinMemoire(),
-    writable: true,
-    configurable: true,
-  });
-});
 
 const RELANCES = {
   items: [],
@@ -166,17 +134,22 @@ describe('BriefDuJour', () => {
    * du plan l'omettait. C'est le cas RÉEL des données au 10 septembre 2026
    * (`historique_insuffisant` : la table `pipeline_event` vient d'être créée)
    * — l'absence se nomme, jamais elle ne se vide ni ne se rend par un zéro.
+   *
+   * Le texte attendu vient de `jeu.objectif.titre` + `veille.brief.objectif.inconnu`
+   * (`fr.ts`) — pas de `jeu.objectif.denominateur.inconnu` (« pas encore »
+   * seul) : cette dernière est taillée pour l'anneau de `BandeProgression`,
+   * pas pour finir une phrase (correctif de revue, tâche 8).
    */
   it('nomme l objectif inconnu dans le résumé replié, plutôt que de le taire ou de le rendre par un zéro', async () => {
-    // `container.textContent`, et non `getByText` : « pas encore » vit dans
-    // un `<span>` imbriqué (`styles.absent`), et `getByText` ne compare que
-    // le texte des nœuds ENFANTS DIRECTS d'un élément — un des pièges
+    // `container.textContent`, et non `getByText` : « pas encore connu » vit
+    // dans un `<span>` imbriqué (`styles.absent`), et `getByText` ne compare
+    // que le texte des nœuds ENFANTS DIRECTS d'un élément — un des pièges
     // documentés de cette suite.
     const jeu = jeuPret({ objectifDuJour: { connue: false, motif: 'historique_insuffisant' } });
     const { container } = renderWithPreferences(<BriefDuJour {...props} jeu={jeu} />);
     await userEvent.click(screen.getByRole('button', { name: 'Replier le brief' }));
 
-    expect(container.textContent).toContain('Objectif du jour pas encore');
+    expect(container.textContent).toContain('Objectif du jour pas encore connu');
   });
 
   it('reprend, dans le résumé replié, le réalisé et son dénominateur — les mêmes chiffres que l anneau de BandeProgression', async () => {

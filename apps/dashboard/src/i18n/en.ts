@@ -147,16 +147,15 @@ export const en: Record<keyof typeof fr, string> = {
   'veille.vide.recherche.effacer': 'Clear the search',
 
   // Today's brief, collapsible (mockups Veille.dc.html, VeilleCompacte.dc.html).
-  // No `veille.brief.objectif`: the collapsed summary reuses
-  // `jeu.objectif.titre` and `jeu.objectif.denominateur.inconnu`
-  // (`ui/BandeProgression.tsx`) rather than duplicating what those keys
-  // already say — see `ui/BriefDuJour.tsx`.
+  // See fr.ts for why `jeu.objectif.denominateur.inconnu` is not reused
+  // here, and `veille.brief.objectif.inconnu` exists instead.
   'veille.brief.titre': 'Today’s brief',
   'veille.brief.replier': 'Collapse the brief',
   'veille.brief.deplier': 'Expand',
   'veille.brief.relances': '{count} follow-ups due, {retard} overdue',
   'veille.brief.relances_one': '{count} follow-up due, {retard} overdue',
   'veille.brief.relances.aucune': 'no follow-up due',
+  'veille.brief.objectif.inconnu': 'not known yet',
 
   // The only two trades in `packages/core/src/trades.ts`.
   'trade.plombier': 'Plumber',

@@ -162,16 +162,24 @@ export const fr = {
   'veille.vide.recherche.effacer': 'Effacer la recherche',
 
   // Le brief du jour, repliable (maquettes Veille.dc.html, VeilleCompacte.dc.html).
-  // Pas de `veille.brief.objectif` : le résumé replié réemploie
-  // `jeu.objectif.titre` et `jeu.objectif.denominateur.inconnu`
-  // (`ui/BandeProgression.tsx`) plutôt que de dupliquer ce que ces clés
-  // disent déjà — voir `ui/BriefDuJour.tsx`.
+  // Le résumé replié réemploie `jeu.objectif.titre` (« Objectif du jour ») :
+  // cette clé-là dit exactement ce qu'il faut, dans les deux contextes.
+  // `jeu.objectif.denominateur.inconnu` (« pas encore »), en revanche,
+  // n'est PAS reprise ici : elle a été écrite pour tenir sous un chiffre,
+  // dans l'anneau de `BandeProgression` — un dénominateur, pas une fin de
+  // phrase. Sortie de ce contexte elle laisse « pas encore » en suspens, un
+  // fragment plutôt qu'une formulation sobre (correctif de revue, tâche 8).
+  // D'où `veille.brief.objectif.inconnu`, dédiée : le vocabulaire partagé
+  // interdit le doublon de *sens*, pas le doublon de *chaîne* — une clé qui
+  // change de rôle grammatical en changeant de contexte se dédouble, elle ne
+  // s'étire pas.
   'veille.brief.titre': 'Brief du jour',
   'veille.brief.replier': 'Replier le brief',
   'veille.brief.deplier': 'Déplier',
   'veille.brief.relances': '{count} relances dues, dont {retard} en retard',
   'veille.brief.relances_one': '{count} relance due, dont {retard} en retard',
   'veille.brief.relances.aucune': 'aucune relance due',
+  'veille.brief.objectif.inconnu': 'pas encore connu',
 
   // Les deux seuls métiers de `packages/core/src/trades.ts` : `RangeeVeille.tsx`
   // compose `trade.${prospect.tradeSlug}` sur ces slugs plutôt que de lire
