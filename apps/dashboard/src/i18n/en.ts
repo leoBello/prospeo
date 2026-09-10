@@ -70,6 +70,16 @@ export const en: Record<keyof typeof fr, string> = {
   'veille.onglet.compte.aria': '{label}: {count} prospects',
   'veille.onglet.compte.aria_one': '{label}: {count} prospect',
 
+  // The pagination bar, in the kit (`ui/kit/Pagination.tsx`): shared with the
+  // Deployments screen, it knows neither prospect, nor tab, nor score.
+  'pagination.etendue': '{premier}–{dernier} of {total}',
+  'pagination.taille': '{count} per page',
+  'pagination.unePage': 'a single page — page buttons are not shown',
+  'pagination.precedentes': 'Previous',
+  'pagination.suivantes': 'Next',
+  'pagination.page.aria': 'Page {page} of {pages}',
+  'pagination.aria': 'Watch list pagination',
+
   'jeu.objectif.titre': "Today's goal",
   'jeu.objectif.valeur': '{count} follow-ups honored',
   'jeu.objectif.valeur_one': '{count} follow-up honored',

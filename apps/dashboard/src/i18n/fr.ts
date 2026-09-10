@@ -82,6 +82,16 @@ export const fr = {
   'veille.onglet.compte.aria': '{label} : {count} prospects',
   'veille.onglet.compte.aria_one': '{label} : {count} prospect',
 
+  // La barre de pagination, au kit (`ui/kit/Pagination.tsx`) : partagée avec
+  // l'écran Déploiements, elle ne connaît ni prospect, ni onglet, ni score.
+  'pagination.etendue': '{premier}–{dernier} sur {total}',
+  'pagination.taille': '{count} par page',
+  'pagination.unePage': 'une seule page — les boutons de page ne s’affichent pas',
+  'pagination.precedentes': 'Précédentes',
+  'pagination.suivantes': 'Suivantes',
+  'pagination.page.aria': 'Page {page} sur {pages}',
+  'pagination.aria': 'Pagination de la veille',
+
   // Lot 3, tâche 8 — la bande de progression qui remplace `KpiBand` sous le
   // titre « Aujourd'hui », et le compteur de série de la barre du haut. Voir
   // `ui/BandeProgression.tsx` pour la doctrine des quatre absences distinctes
