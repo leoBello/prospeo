@@ -661,7 +661,7 @@ Sous le bloc `today.*`, ajoute :
   'pagination.precedentes': 'Précédentes',
   'pagination.suivantes': 'Suivantes',
   'pagination.page.aria': 'Page {page} sur {pages}',
-  'pagination.aria': 'Pagination de la veille',
+  'pagination.aria': 'Pagination de la liste',
 ```
 
 - [ ] **Étape 2 : Ajouter les mêmes clés à `en.ts`**
@@ -761,7 +761,7 @@ Mêmes clés, traduites. Les formes `_one` sont obligatoires partout où la form
   'pagination.precedentes': 'Previous',
   'pagination.suivantes': 'Next',
   'pagination.page.aria': 'Page {page} of {pages}',
-  'pagination.aria': 'Watch list pagination',
+  'pagination.aria': 'List pagination',
 ```
 
 - [ ] **Étape 3 : Lancer, constater l'échec attendu, ne PAS commiter**
@@ -1146,6 +1146,26 @@ describe('Pagination', () => {
     expect(onAller).toHaveBeenCalledWith(2);
   });
 
+  it('ne pose jamais un saut sur une seule page manquante', () => {
+    // Un saut qui cache exactement un numéro coûte un clic pour rien : la page
+    // devient moins atteignable qu'elle ne devrait, sans rien gagner en place.
+    expect(numerosDePage(4, 8)).toEqual([1, 2, 3, 4, 5, 'saut', 8]);
+  });
+
+  it('rend une sortie strictement croissante, sans doublon ni sauts consécutifs', () => {
+    for (const pages of [1, 7, 8, 13, 200]) {
+      for (const page of [1, 2, Math.ceil(pages / 2), pages - 1, pages].filter((p) => p >= 1 && p <= pages)) {
+        const sortie = numerosDePage(page, pages);
+        const nombres = sortie.filter((n): n is number => n !== 'saut');
+        expect(nombres[0], `${page}/${pages}`).toBe(1);
+        expect(nombres[nombres.length - 1], `${page}/${pages}`).toBe(pages);
+        expect(new Set(nombres).size, `${page}/${pages}`).toBe(nombres.length);
+        expect([...nombres].sort((a, b) => a - b), `${page}/${pages}`).toEqual(nombres);
+        expect(sortie.some((n, i) => n === 'saut' && sortie[i + 1] === 'saut')).toBe(false);
+      }
+    }
+  });
+
   it('abrège les pages du milieu sans jamais perdre la première ni la dernière', () => {
     renderWithPreferences(
       <Pagination page={7} pages={13} premier={61} dernier={70} total={127} taille={10} onAller={() => {}} />,
@@ -1284,7 +1304,12 @@ export function numerosDePage(page: number, pages: number): Array<number | 'saut
   const sortie: Array<number | 'saut'> = [];
   let precedent = 0;
   for (const n of retenus) {
-    if (n - precedent > 1) sortie.push('saut');
+    // Un saut ne s'affiche que s'il cache AU MOINS DEUX numéros. Quand il n'en
+    // cache qu'un, c'est ce numéro qu'on rend : un saut posé sur une seule page
+    // la rend moins atteignable qu'elle ne devrait, pour un clic de plus et
+    // rien en échange.
+    if (n - precedent === 2) sortie.push(n - 1);
+    else if (n - precedent > 2) sortie.push('saut');
     sortie.push(n);
     precedent = n;
   }
@@ -1373,7 +1398,7 @@ export function Pagination({ page, pages, premier, dernier, total, taille, onAll
 - [ ] **Étape 5 : Lancer, vérifier que ça passe**
 
 Run : `pnpm --filter @prospeo/dashboard test`
-Attendu : les sept cas de `Pagination` passent.
+Attendu : les neuf cas de `Pagination` passent.
 
 - [ ] **Étape 6 : Prouver que les assertions peuvent échouer**
 
