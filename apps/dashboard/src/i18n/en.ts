@@ -146,6 +146,18 @@ export const en: Record<keyof typeof fr, string> = {
     '{count} prospect is indeed in this tab — it does not match “{query}”.',
   'veille.vide.recherche.effacer': 'Clear the search',
 
+  // Today's brief, collapsible (mockups Veille.dc.html, VeilleCompacte.dc.html).
+  // No `veille.brief.objectif`: the collapsed summary reuses
+  // `jeu.objectif.titre` and `jeu.objectif.denominateur.inconnu`
+  // (`ui/BandeProgression.tsx`) rather than duplicating what those keys
+  // already say — see `ui/BriefDuJour.tsx`.
+  'veille.brief.titre': 'Today’s brief',
+  'veille.brief.replier': 'Collapse the brief',
+  'veille.brief.deplier': 'Expand',
+  'veille.brief.relances': '{count} follow-ups due, {retard} overdue',
+  'veille.brief.relances_one': '{count} follow-up due, {retard} overdue',
+  'veille.brief.relances.aucune': 'no follow-up due',
+
   // The only two trades in `packages/core/src/trades.ts`.
   'trade.plombier': 'Plumber',
   'trade.serrurier': 'Locksmith',

@@ -161,6 +161,18 @@ export const fr = {
     '{count} prospect est bien dans cet onglet — il ne porte pas « {query} ».',
   'veille.vide.recherche.effacer': 'Effacer la recherche',
 
+  // Le brief du jour, repliable (maquettes Veille.dc.html, VeilleCompacte.dc.html).
+  // Pas de `veille.brief.objectif` : le résumé replié réemploie
+  // `jeu.objectif.titre` et `jeu.objectif.denominateur.inconnu`
+  // (`ui/BandeProgression.tsx`) plutôt que de dupliquer ce que ces clés
+  // disent déjà — voir `ui/BriefDuJour.tsx`.
+  'veille.brief.titre': 'Brief du jour',
+  'veille.brief.replier': 'Replier le brief',
+  'veille.brief.deplier': 'Déplier',
+  'veille.brief.relances': '{count} relances dues, dont {retard} en retard',
+  'veille.brief.relances_one': '{count} relance due, dont {retard} en retard',
+  'veille.brief.relances.aucune': 'aucune relance due',
+
   // Les deux seuls métiers de `packages/core/src/trades.ts` : `RangeeVeille.tsx`
   // compose `trade.${prospect.tradeSlug}` sur ces slugs plutôt que de lire
   // `getTrade(...)?.label`, pour que le badge de métier passe par `t()` comme
