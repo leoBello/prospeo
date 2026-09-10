@@ -56,15 +56,15 @@ export const fr = {
   'today.subtitle': 'Ce que la base sait, et ce qu’elle ne sait pas encore.',
 
   'today.section.followUps': 'Relances dues',
-  'today.section.newHighScore': 'Nouveaux prospects à fort score',
 
   'today.empty.followUps':
     'Aucune relance : la table de suivi ne contient encore aucune ligne. Aucun écrivain ne l’alimente à ce jour.',
-  'today.empty.newHighScore': 'Aucun prospect scoré pour le moment.',
-  // Distincte des deux ci-dessus : une recherche sans résultat ne dit rien
-  // sur l'état réel des relances ou des nouveaux prospects, seulement sur ce
-  // qui a été tapé. Les confondre ferait croire, une fois la recherche
-  // effacée, que la liste avait toujours été vide.
+  // Distincte de celle ci-dessus : une recherche sans résultat ne dit rien
+  // sur l'état réel des relances dues, seulement sur ce qui a été tapé. Les
+  // confondre ferait croire, une fois la recherche effacée, que la bande
+  // avait toujours été vide. La table de veille tient la même distinction de
+  // son côté, avec ses propres textes (`veille.vide.recherche.*`) : elle
+  // peut, elle, dire combien de lignes l'onglet contient malgré tout.
   'today.empty.search': 'Aucune ligne ne correspond à votre recherche.',
 
   'today.reason.followUp.today': 'relance prévue aujourd’hui',

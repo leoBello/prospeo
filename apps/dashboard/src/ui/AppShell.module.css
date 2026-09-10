@@ -22,14 +22,22 @@
  * désormais dans `BarreHaut` / `BarreHaut.module.css` — cette feuille ne
  * porte plus que la disposition qui l'entoure.
  *
- * La liste ne disparait jamais (§9.1). Le panneau s'ouvre a cote d'elle et
- * non par-dessus : c'est le contexte du classement qui reste visible pendant
- * qu'on inspecte un prospect.
+ * La liste ne disparait jamais (§9.1) : elle reste MONTEE derriere le
+ * panneau, avec son defilement, et on la retrouve intacte en le fermant.
+ * Ce qui a change le 2026-09-10, c'est qu'elle ne rétrécit plus pour lui —
+ * voir le commentaire de `.panel`, ProspectPanel.module.css.
+ *
+ * `position: relative` a TOUTES les largeurs, et non plus sous 900 px
+ * seulement : le panneau est desormais un calque partout. C'est ce bloc qui
+ * lui sert de cadre — l'autre moitie de la regle, la superposition
+ * elle-meme, est dans `ProspectPanel.module.css`, parce que c'est le panneau
+ * qui se positionne et non la coquille qui le range.
  */
 .body {
   display: flex;
   flex: 1;
   min-height: 0;
+  position: relative;
 }
 
 .list {
@@ -37,18 +45,4 @@
   min-width: 0;
   overflow-y: auto;
   padding: var(--space-4);
-}
-
-@media (max-width: 900px) {
-  /* Sous cette largeur, deux colonnes rendent chacune illisible : le panneau
-     passe alors au-dessus de la liste, qui reste montee derriere lui.
-
-     La moitie de la regle qui vit ici est le bloc de reference : c'est ce
-     `position: relative` qui donne au panneau absolu son cadre. L'autre
-     moitie — la superposition elle-meme — est dans
-     `ProspectPanel.module.css`, avec le meme point de bascule, parce que
-     c'est le panneau qui se positionne et non la coquille qui le range. */
-  .body {
-    position: relative;
-  }
 }

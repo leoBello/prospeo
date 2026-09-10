@@ -208,6 +208,16 @@ async function flush(): Promise<void> {
   });
 }
 
+/**
+ * Quinze prospects scorés, sans aucune ligne de suivi : ils tombent donc tous
+ * dans « à contacter » (décision 1A), et l'onglet compte plus que les dix
+ * lignes d'une page. C'est le cas que l'ancienne liste plafonnée à douze
+ * lignes ne savait pas montrer.
+ */
+function quinzeProspectsScores(): ProspectView[] {
+  return Array.from({ length: 15 }, (_, i) => vue(`p${i}`, { score: score(90 - i) }));
+}
+
 function rendre(prospects: ProspectView[]) {
   return renderWithPreferences(
     <TodayScreen
@@ -359,8 +369,154 @@ describe('TodayScreen', () => {
     await user.keyboard('{ArrowDown}');
     const panneau = screen.getByRole('complementary');
     expect(within(panneau).getByText(/démentie par le site déclaré/)).toBeDefined();
-    // Et l'ecart est visible sans ouvrir le panneau.
-    expect(screen.getAllByText('!').length).toBeGreaterThan(0);
+    // L'assertion « et l'ecart est visible sans ouvrir le panneau » a ete
+    // retiree ici : elle portait sur la pastille « ! » de `ProspectRow`, et ce
+    // prospect ne passe plus par cette rangee-la — sans ligne de suivi, il est
+    // dans la TABLE, dont les six colonnes (tache 6) ne portent pas ce
+    // signalement. Le fait reste vrai pour une relance due, qui passe encore
+    // par `ProspectRow` : c'est `ui/ProspectRow.test.tsx` qui le couvre.
+    // Reserve reportee au rapport de la tache 9.
+  });
+});
+
+describe('TodayScreen — la table de veille remplace la liste plafonnee (tache 9)', () => {
+  it('montre la table par onglets a la place de l ancienne liste plafonnee', () => {
+    // L'ancienne liste s'arretait a douze lignes et annoncait le reste par
+    // « N de plus, non affiches ici » (`list.overflow`). C'est le defaut que
+    // ce chantier corrige : quinze prospects scores tiennent desormais sur
+    // deux pages, aucun n'est annonce sans etre atteignable.
+    rendre(quinzeProspectsScores());
+    expect(screen.getByRole('tablist', { name: 'Statut de suivi' })).toBeDefined();
+    expect(screen.getAllByRole('tab')).toHaveLength(8);
+    expect(screen.queryByText(/de plus, non affichés ici/)).toBeNull();
+  });
+
+  it('ne descend jamais sous dix lignes affichees quand l onglet en contient plus', () => {
+    rendre(quinzeProspectsScores());
+    expect(screen.getByText('1–10 sur 15')).toBeDefined();
+  });
+
+  it('ne titre nulle part « Toute la veille » : c est le nom accessible de la section, et rien d autre', () => {
+    // Decision du 2026-09-10. La maquette titre la section par le nom de
+    // l'onglet ouvert ; « Toute la veille » ne designe pas un onglet mais
+    // l'assemblage entier, et l'ecrire a l'ecran ferait deux titres pour une
+    // seule chose.
+    rendre(quinzeProspectsScores());
+    expect(screen.getByRole('region', { name: 'Toute la veille' })).toBeDefined();
+    expect(screen.queryByText('Toute la veille')).toBeNull();
+  });
+
+  it('parcourt les relances puis la table sans buter sur un prospect present dans les deux', async () => {
+    // Decision 2A : la bande « Relances dues » et l'onglet « Relance » se
+    // recouvrent, et le MEME prospect figure dans les deux. Sans
+    // dedoublonnage des `ids`, `indexOf` ramenerait toujours a sa premiere
+    // occurrence et la fleche resterait bloquee sur lui, sans jamais
+    // atteindre la ligne suivante de la table.
+    const user = userEvent.setup();
+    rendre([
+      vue('due', {
+        score: score(90),
+        pipeline: { status: 'relance', nextActionAt: '2026-08-30T10:00:00', updatedAt: '2026-08-30T10:00:00Z' },
+      }),
+      // Echeance a venir : dans l'onglet « Relance », jamais dans la bande.
+      vue('a-venir', {
+        score: score(80),
+        pipeline: { status: 'relance', nextActionAt: '2026-09-10T10:00:00', updatedAt: '2026-08-30T10:00:00Z' },
+      }),
+    ]);
+
+    await user.click(screen.getByRole('tab', { name: 'Relancé : 2 prospects' }));
+
+    // Premiere fleche : la ligne de relance, en tete de la bande.
+    await user.keyboard('{ArrowDown}');
+    expect(document.getElementById('prospect-due')?.getAttribute('aria-current')).toBe('true');
+
+    // Seconde fleche : la ligne SUIVANTE de la table, et non un retour sur
+    // « due » — qui figure pourtant aussi dans l'onglet ouvert.
+    await user.keyboard('{ArrowDown}');
+    expect(document.getElementById('prospect-a-venir')?.getAttribute('aria-current')).toBe('true');
+  });
+
+  it('revient a la premiere page quand l onglet change', async () => {
+    // `pageVeille` borne deja la page rendue : ce que ce geste corrige, c'est
+    // l'ETAT, qui resterait sinon sur un numero que plus rien ne justifie —
+    // une page 2 heritee d'un autre onglet, ouverte au milieu du classement.
+    const user = userEvent.setup();
+    rendre([
+      ...quinzeProspectsScores(),
+      ...Array.from({ length: 12 }, (_, i) =>
+        vue(`c${i}`, {
+          score: score(70 - i),
+          pipeline: { status: 'contacte', nextActionAt: null, updatedAt: '2026-08-25T10:00:00Z' },
+        }),
+      ),
+    ]);
+
+    await user.click(screen.getByRole('button', { name: 'Page 2 sur 2' }));
+    expect(screen.getByText('11–15 sur 15')).toBeDefined();
+
+    await user.click(screen.getByRole('tab', { name: 'Contacté : 12 prospects' }));
+    expect(screen.getByText('1–10 sur 12')).toBeDefined();
+  });
+
+  it('revient a la premiere page quand l ordre change', async () => {
+    const user = userEvent.setup();
+    rendre(quinzeProspectsScores());
+
+    await user.click(screen.getByRole('button', { name: 'Page 2 sur 2' }));
+    expect(screen.getByText('11–15 sur 15')).toBeDefined();
+
+    await user.click(screen.getByRole('button', { name: 'Tri : score décroissant' }));
+    expect(screen.getByText('1–10 sur 15')).toBeDefined();
+  });
+
+  it('revient a la premiere page quand la recherche change', async () => {
+    const user = userEvent.setup();
+    rendre(quinzeProspectsScores());
+
+    await user.click(screen.getByRole('button', { name: 'Page 2 sur 2' }));
+    expect(screen.getByText('11–15 sur 15')).toBeDefined();
+
+    // « ENTREPRISE » les retient tous les quinze : la page 2 existe toujours,
+    // et c'est bien l'etat qui doit revenir a 1, pas le bornage.
+    await user.type(screen.getByRole('searchbox'), 'entreprise');
+    expect(screen.getByText('1–10 sur 15')).toBeDefined();
+  });
+
+  it('distingue un onglet vide par la recherche d un onglet vide de naissance', async () => {
+    // `ongletPleinSansRecherche` se calcule sur `prospects`, jamais sur les
+    // prospects filtres : sur ces derniers il vaudrait zero au moment precis
+    // ou il sert, et l'ecran attribuerait au vide une cause qui n'est pas la
+    // sienne.
+    const user = userEvent.setup();
+    rendre([vue('a', { score: score(90) }), vue('b', { score: score(80) })]);
+
+    await user.type(screen.getByRole('searchbox'), 'aucune-entreprise-ne-porte-ce-nom');
+
+    expect(screen.getByText('Aucune ligne ne correspond à votre recherche')).toBeDefined();
+    expect(screen.queryByText('Aucun prospect à contacter')).toBeNull();
+    // Et la sortie proposee efface la recherche plutot que de laisser l'ecran
+    // dans un vide sans issue.
+    await user.click(screen.getByRole('button', { name: 'Effacer la recherche' }));
+    expect(screen.getByText('1–2 sur 2')).toBeDefined();
+  });
+
+  it('garde le texte d un onglet vide de naissance, meme pendant une recherche', async () => {
+    // L'onglet « a contacter » n'a jamais rien contenu ici : le seul prospect
+    // porte une ligne de suivi « relance ». Lui attribuer le vide de la
+    // recherche mentirait sur la cause.
+    const user = userEvent.setup();
+    rendre([
+      vue('r', {
+        score: score(90),
+        pipeline: { status: 'relance', nextActionAt: '2026-08-30T10:00:00', updatedAt: '2026-08-30T10:00:00Z' },
+      }),
+    ]);
+
+    await user.type(screen.getByRole('searchbox'), 'aucune-entreprise-ne-porte-ce-nom');
+
+    expect(screen.getByText('Aucun prospect à contacter')).toBeDefined();
+    expect(screen.queryByText('Aucune ligne ne correspond à votre recherche')).toBeNull();
   });
 });
 
@@ -422,17 +578,26 @@ describe('TodayScreen — la recherche de la barre du haut (lot 3, tache 2)', ()
     ).toBe('ENTREPRISE haut');
   });
 
-  it('dit qu aucune ligne ne correspond a la recherche, distinctement d une liste vide pour une autre raison', async () => {
+  it('dit qu aucune relance ne correspond a la recherche, distinctement d une bande vide pour une autre raison', async () => {
+    // `today.empty.search` garde son consommateur : la recherche filtre
+    // encore la bande des relances dues. Le prospect porte donc ici une
+    // echeance echue — sans elle, la bande serait vide de naissance et ce
+    // n'est pas ce que ce cas verifie.
     const user = userEvent.setup();
-    rendre([vue('a', { score: score(90) })]);
+    rendre([
+      vue('a', {
+        score: score(90),
+        pipeline: { status: 'relance', nextActionAt: '2026-08-30T10:00:00', updatedAt: '2026-08-30T10:00:00Z' },
+      }),
+    ]);
 
     const champ = screen.getByRole('searchbox');
     await user.type(champ, 'aucune-entreprise-ne-porte-ce-nom');
 
     expect(screen.getByText('Aucune ligne ne correspond à votre recherche.')).toBeDefined();
-    // Distinct du texte d'un vide "naturel" (aucun prospect score) : la
-    // recherche ne doit pas emprunter ce message-la, ni l'inverse.
-    expect(screen.queryByText('Aucun prospect scoré pour le moment.')).toBeNull();
+    // Distinct du texte d'un vide "naturel" (aucune ligne de suivi en base) :
+    // la recherche ne doit pas emprunter ce message-la, ni l'inverse.
+    expect(screen.queryByText(/la table de suivi ne contient encore aucune ligne/)).toBeNull();
   });
 
   it('garde le texte d un vide naturel quand la recherche est vide, sans jamais parler de recherche', () => {

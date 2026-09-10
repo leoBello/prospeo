@@ -48,11 +48,9 @@ export const en: Record<keyof typeof fr, string> = {
   'today.subtitle': 'What the database knows, and what it does not know yet.',
 
   'today.section.followUps': 'Follow-ups due',
-  'today.section.newHighScore': 'New high-scoring prospects',
 
   'today.empty.followUps':
     'No follow-up: the pipeline table holds no rows yet. Nothing writes to it so far.',
-  'today.empty.newHighScore': 'No scored prospect yet.',
   'today.empty.search': 'No row matches your search.',
 
   'today.reason.followUp.today': 'follow-up due today',
