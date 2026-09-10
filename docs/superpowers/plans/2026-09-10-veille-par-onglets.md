@@ -46,6 +46,7 @@ Rendu local ouvrable : `node docs/design/maquettes/aplatir.mjs`, puis `docs/desi
 - **Écris le test d'abord**, vérifie qu'il échoue **pour la bonne raison**, et prouve que chaque assertion peut échouer : casse le code qu'elle couvre, observe le rouge, restaure, observe le vert.
 - **Le texte d'une assertion se lit dans `fr.ts`**, jamais ne s'invente — pas même depuis ce plan.
 - **N'écris jamais un test qui prétend voir une mise en page.** `jsdom` ne calcule ni largeur, ni hauteur, ni débordement. La conformité visuelle se contrôle à la tâche 10, au navigateur.
+- **`joursCivils` compte en dates civiles LOCALES** (`domain/today.ts`) : une fixture d'horodatage suffixée `Z` donne un écart d'un jour de plus ou de moins selon le fuseau de la machine. Les tests de ce dépôt écrivent donc leurs dates **sans `Z`** — `'2026-09-07T23:00:00.000'` et non `'2026-09-07T23:00:00.000'`. Le code de test de ce plan a été corrigé pour cela ; ne réintroduis pas le suffixe.
 - **`@testing-library/jest-dom` n'est PAS installé dans ce dépôt.** Ni `toBeInTheDocument`, ni `toBeDisabled`, ni `toHaveAttribute`, ni `toHaveAccessibleName` n'existent. Les idiomes maison, lisibles dans `ui/ProspectRow.test.tsx` et `ui/kit/Badge.test.tsx` : `expect(screen.getByText(…)).toBeDefined()`, `expect(screen.queryByText(…)).toBeNull()`, `expect(el.getAttribute('aria-current')).toBe('true')`, `expect(container.querySelector('[data-ton="danger"]')).not.toBeNull()`. L'utilitaire de rendu se nomme `renderWithPreferences` (`src/test-utils.tsx`).
 - Pièges de cette suite, qui y ont déjà produit des assertions mortes : `getByText`/`queryByText` comparent le texte **entier du nœud** ; `queryByRole` filtre par défaut sur `hidden: false` ; `getAllByText` **lève** à zéro correspondance, donc un `.length > 0` qui suit ne teste rien.
 - **Un argument `-- <motif>` ne restreint PAS un run vitest** dans cette configuration : la suite entière s'exécute. Ne prétends jamais avoir lancé un sous-ensemble.
@@ -145,7 +146,7 @@ function prospect(surcharges: Partial<ProspectView> = {}): ProspectView {
     dateCreation: null,
     effectifCode: null,
     isClosed: false,
-    discoveredAt: '2026-09-01T00:00:00.000Z',
+    discoveredAt: '2026-09-01T00:00:00.000',
     score: null,
     presence: null,
     enrichment: null,
@@ -180,7 +181,7 @@ describe('ongletDe', () => {
 
   it('range un prospect au statut « a_contacter » dans le même onglet, sans les confondre pour autant', () => {
     const pose = prospect({
-      pipeline: { status: 'a_contacter', nextActionAt: null, updatedAt: '2026-09-02T00:00:00.000Z' },
+      pipeline: { status: 'a_contacter', nextActionAt: null, updatedAt: '2026-09-02T00:00:00.000' },
     });
     expect(ongletDe(pose)).toBe('a_contacter');
     // La distinction survit : elle est portée par `pipeline`, que la rangée lit.
@@ -190,7 +191,7 @@ describe('ongletDe', () => {
   it('rend le statut de la ligne de suivi quand elle existe', () => {
     for (const statut of ['contacte', 'relance', 'interesse', 'gagne', 'perdu', 'ne_pas_contacter'] as const) {
       expect(
-        ongletDe(prospect({ pipeline: { status: statut, nextActionAt: null, updatedAt: '2026-09-02T00:00:00.000Z' } })),
+        ongletDe(prospect({ pipeline: { status: statut, nextActionAt: null, updatedAt: '2026-09-02T00:00:00.000' } })),
       ).toBe(statut);
     }
   });
@@ -287,7 +288,7 @@ import type { ScoreView } from './prospect.js';
 
 /** Un score réduit à son total : la décomposition n'entre dans aucune décision de ce module. */
 function score(total: number): ScoreView {
-  return { total, rulesetVersion: 'v3', computedAt: '2026-09-02T00:00:00.000Z', breakdown: [] };
+  return { total, rulesetVersion: 'v3', computedAt: '2026-09-02T00:00:00.000', breakdown: [] };
 }
 
 describe('comptesVeille', () => {
@@ -298,7 +299,7 @@ describe('comptesVeille', () => {
       prospect({
         id: 'c',
         score: score(60),
-        pipeline: { status: 'contacte', nextActionAt: null, updatedAt: '2026-09-02T00:00:00.000Z' },
+        pipeline: { status: 'contacte', nextActionAt: null, updatedAt: '2026-09-02T00:00:00.000' },
       }),
     ]);
     expect(comptes.parOnglet.a_contacter).toBe(2);
@@ -326,7 +327,7 @@ describe('comptesVeille', () => {
       prospect({
         id: 'c',
         score: score(60),
-        pipeline: { status: 'contacte', nextActionAt: null, updatedAt: '2026-09-02T00:00:00.000Z' },
+        pipeline: { status: 'contacte', nextActionAt: null, updatedAt: '2026-09-02T00:00:00.000' },
       }),
     ]);
     expect(comptes.sansSuivi).toBe(2);
@@ -1443,7 +1444,7 @@ import type { ProspectView } from '../domain/prospect.js';
 import { RangeeVeille } from './RangeeVeille.js';
 import { renderWithPreferences } from '../test-utils.js';
 
-const MAINTENANT = new Date('2026-09-10T09:00:00.000Z');
+const MAINTENANT = new Date('2026-09-10T09:00:00.000');
 
 function prospect(surcharges: Partial<ProspectView> = {}): ProspectView {
   return {
@@ -1458,8 +1459,8 @@ function prospect(surcharges: Partial<ProspectView> = {}): ProspectView {
     dateCreation: null,
     effectifCode: null,
     isClosed: false,
-    discoveredAt: '2026-09-01T00:00:00.000Z',
-    score: { total: 74, rulesetVersion: 'v3', computedAt: '2026-09-02T00:00:00.000Z', breakdown: [] },
+    discoveredAt: '2026-09-01T00:00:00.000',
+    score: { total: 74, rulesetVersion: 'v3', computedAt: '2026-09-02T00:00:00.000', breakdown: [] },
     presence: null,
     enrichment: null,
     pipeline: null,
@@ -1480,7 +1481,7 @@ describe('RangeeVeille — les absences, chacune nommée à sa façon', () => {
 
     renderWithPreferences(
       <RangeeVeille
-        prospect={prospect({ pipeline: { status: 'a_contacter', nextActionAt: null, updatedAt: '2026-09-02T00:00:00.000Z' } })}
+        prospect={prospect({ pipeline: { status: 'a_contacter', nextActionAt: null, updatedAt: '2026-09-02T00:00:00.000' } })}
         onglet="a_contacter"
         selectionne={false}
         now={MAINTENANT}
@@ -1500,7 +1501,7 @@ describe('RangeeVeille — les absences, chacune nommée à sa façon', () => {
 
     renderWithPreferences(
       <RangeeVeille
-        prospect={prospect({ presence: { category: 'none', finalUrl: null, httpStatus: null, domainAvailable: null, probedAt: '2026-09-02T00:00:00.000Z' } })}
+        prospect={prospect({ presence: { category: 'none', finalUrl: null, httpStatus: null, domainAvailable: null, probedAt: '2026-09-02T00:00:00.000' } })}
         onglet="a_contacter"
         selectionne={false}
         now={MAINTENANT}
@@ -1525,7 +1526,7 @@ describe('RangeeVeille — les absences, chacune nommée à sa façon', () => {
           enrichment: {
             status: 'ok', phoneE164: '+33612440831', phoneKind: 'mobile', rating: null,
             reviewCount: null, declaredUrl: null, matchedName: null, matchConfidence: null,
-            enrichedAt: '2026-09-02T00:00:00.000Z',
+            enrichedAt: '2026-09-02T00:00:00.000',
           },
         })}
         onglet="a_contacter"
@@ -1540,11 +1541,11 @@ describe('RangeeVeille — les absences, chacune nommée à sa façon', () => {
 
 describe('RangeeVeille — la colonne contextuelle', () => {
   const engage = (nextActionAt: string | null) =>
-    prospect({ pipeline: { status: 'contacte', nextActionAt, updatedAt: '2026-09-08T00:00:00.000Z' } });
+    prospect({ pipeline: { status: 'contacte', nextActionAt, updatedAt: '2026-09-08T00:00:00.000' } });
 
   it('porte l échéance dans les onglets d engagement, en dates civiles', () => {
     renderWithPreferences(
-      <RangeeVeille prospect={engage('2026-09-07T23:00:00.000Z')} onglet="contacte" selectionne={false} now={MAINTENANT} onSelect={() => {}} />,
+      <RangeeVeille prospect={engage('2026-09-07T23:00:00.000')} onglet="contacte" selectionne={false} now={MAINTENANT} onSelect={() => {}} />,
     );
     // Trois jours civils, pas deux tranches de 24 h et des poussières.
     expect(screen.getByText('en retard de 3 j')).toBeDefined();
@@ -1963,14 +1964,14 @@ import type { ProspectView } from '../domain/prospect.js';
 import { TableVeille } from './TableVeille.js';
 import { renderWithPreferences } from '../test-utils.js';
 
-const MAINTENANT = new Date('2026-09-10T09:00:00.000Z');
+const MAINTENANT = new Date('2026-09-10T09:00:00.000');
 
 function prospect(id: string, total: number): ProspectView {
   return {
     id, siret: '12345678900011', denomination: `Prospect ${id}`, denominationUsuelle: null,
     tradeSlug: 'plombier', address: '', postalCode: '44000', city: 'Nantes', dateCreation: null,
-    effectifCode: null, isClosed: false, discoveredAt: '2026-09-01T00:00:00.000Z',
-    score: { total, rulesetVersion: 'v3', computedAt: '2026-09-02T00:00:00.000Z', breakdown: [] },
+    effectifCode: null, isClosed: false, discoveredAt: '2026-09-01T00:00:00.000',
+    score: { total, rulesetVersion: 'v3', computedAt: '2026-09-02T00:00:00.000', breakdown: [] },
     presence: null, enrichment: null, pipeline: null, site: null, messages: [],
   };
 }
@@ -2510,7 +2511,7 @@ const props = {
   selectedId: null,
   currentRulesetVersion: 'v3',
   emptyKey: 'today.empty.followUps' as const,
-  now: new Date('2026-09-10T09:00:00.000Z'),
+  now: new Date('2026-09-10T09:00:00.000'),
   onSelect: () => {},
 };
 
@@ -2925,10 +2926,10 @@ Les cas qui affirmaient sur « Nouveaux prospects à fort score » deviennent de
     // occurrence et la flèche resterait bloquée sur lui.
     const relance: ProspectView = {
       ...prospectScore('r1', 90),
-      pipeline: { status: 'relance', nextActionAt: '2026-09-09T00:00:00.000Z', updatedAt: '2026-09-09T00:00:00.000Z' },
+      pipeline: { status: 'relance', nextActionAt: '2026-09-09T00:00:00.000', updatedAt: '2026-09-09T00:00:00.000' },
     };
     const autre = prospectScore('a1', 80);
-    render(<TodayScreen {...props} prospects={[relance, autre]} now={new Date('2026-09-10T09:00:00.000Z')} />);
+    render(<TodayScreen {...props} prospects={[relance, autre]} now={new Date('2026-09-10T09:00:00.000')} />);
 
     // Première flèche : la ligne de relance, en tête de la bande.
     await userEvent.keyboard('{ArrowDown}');
