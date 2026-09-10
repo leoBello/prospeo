@@ -31,7 +31,12 @@ export function numerosDePage(page: number, pages: number): Array<number | 'saut
   const sortie: Array<number | 'saut'> = [];
   let precedent = 0;
   for (const n of retenus) {
-    if (n - precedent > 1) sortie.push('saut');
+    const ecart = n - precedent;
+    // Un écart de 2 ne cache qu'un seul numéro : le rendre coûte moins qu'un
+    // saut, qui déplacerait un clic sur une page pourtant à portée. Le saut
+    // ne se justifie qu'à partir de deux numéros cachés.
+    if (ecart === 2) sortie.push(precedent + 1);
+    else if (ecart > 2) sortie.push('saut');
     sortie.push(n);
     precedent = n;
   }

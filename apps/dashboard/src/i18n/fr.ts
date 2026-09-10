@@ -90,7 +90,7 @@ export const fr = {
   'pagination.precedentes': 'Précédentes',
   'pagination.suivantes': 'Suivantes',
   'pagination.page.aria': 'Page {page} sur {pages}',
-  'pagination.aria': 'Pagination de la veille',
+  'pagination.aria': 'Pagination de la liste',
 
   // Lot 3, tâche 8 — la bande de progression qui remplace `KpiBand` sous le
   // titre « Aujourd'hui », et le compteur de série de la barre du haut. Voir

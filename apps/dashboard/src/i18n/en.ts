@@ -78,7 +78,7 @@ export const en: Record<keyof typeof fr, string> = {
   'pagination.precedentes': 'Previous',
   'pagination.suivantes': 'Next',
   'pagination.page.aria': 'Page {page} of {pages}',
-  'pagination.aria': 'Watch list pagination',
+  'pagination.aria': 'List pagination',
 
   'jeu.objectif.titre': "Today's goal",
   'jeu.objectif.valeur': '{count} follow-ups honored',
