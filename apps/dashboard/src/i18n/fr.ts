@@ -77,10 +77,39 @@ export const fr = {
   'today.reason.separator': ' · ',
 
   // La veille par onglets (maquettes Veille.dc.html, VeilleEtats.dc.html).
+  'veille.titre': 'Toute la veille',
   'veille.onglets.aria': 'Statut de suivi',
   'veille.onglet.toutes': 'Toutes',
   'veille.onglet.compte.aria': '{label} : {count} prospects',
   'veille.onglet.compte.aria_one': '{label} : {count} prospect',
+
+  // La ligne de compte de `TableVeille.tsx` : ce que l'onglet montre, et ce
+  // qu'il ne montre pas.
+  'veille.compte.a_contacter':
+    '{classables} classables, sur {total} sans aucune ligne de suivi en base',
+  'veille.compte.statut': '{count} prospects, sur {classables} classables',
+  'veille.compte.statut_one': '{count} prospect, sur {classables} classables',
+  'veille.compte.vide': 'aucun prospect à ce statut',
+  'veille.compte.toutes': '{classables} classables, sur {total} prospects en base',
+  'veille.sansScore':
+    "{count} jamais scorés, non classables",
+  'veille.sansScore_one': '{count} jamais scoré, non classable',
+  'veille.sansScore.hint':
+    "Un score manquant n'est pas un score nul : ces prospects n'ont pas de rang, et n'apparaissent donc dans aucun onglet. L'étage « score » n'est pas passé sur eux.",
+
+  'veille.colonne.score': 'Score',
+  'veille.colonne.prospect': 'Prospect',
+  'veille.colonne.presence': 'Présence web',
+  'veille.colonne.telephone': 'Téléphone',
+  'veille.colonne.site': 'Site',
+  'veille.colonne.suivi': 'Suivi',
+  'veille.colonne.prochaineAction': 'Prochaine action',
+  'veille.colonne.closDepuis': 'Clos depuis',
+  'veille.colonne.depuis': 'Depuis',
+  'veille.colonne.statut': 'Statut',
+
+  'veille.tri.score_desc': 'Tri : score décroissant',
+  'veille.tri.score_asc': 'Tri : score croissant',
 
   // La colonne « Téléphone » et la colonne contextuelle de `RangeeVeille.tsx`.
   'veille.telephone.mobile': 'mobile',
@@ -97,6 +126,40 @@ export const fr = {
   'veille.depuis': '{days} j',
   'veille.depuis_one': '{days} j',
   'veille.depuis.absente': 'non datée',
+
+  // Les vides nommés de `TableVeille.tsx` (maquette `VeilleEtats.dc.html`,
+  // blocs A à D) : une absence par onglet, jamais un texte générique.
+  'veille.vide.a_contacter.titre': 'Aucun prospect à contacter',
+  'veille.vide.a_contacter.texte':
+    'Tous les prospects scorés portent une décision. La collecte en apportera d’autres.',
+  'veille.vide.contacte.titre': 'Aucun prospect contacté pour l’instant',
+  'veille.vide.contacte.texte':
+    'Un prospect arrive ici dès qu’un premier message part. L’onglet reste visible à zéro : c’est une étape du parcours, pas une absence de données.',
+  'veille.vide.relance.titre': 'Aucune relance en cours',
+  'veille.vide.relance.texte':
+    'Un prospect relancé sans réponse arrive ici. L’onglet reste visible à zéro : c’est une étape du parcours, pas une absence de données.',
+  'veille.vide.interesse.titre': 'Aucun prospect intéressé pour l’instant',
+  'veille.vide.interesse.texte':
+    'Un prospect arrive ici quand il répond favorablement. L’onglet reste visible à zéro : c’est une étape du parcours, pas une absence de données.',
+  'veille.vide.gagne.titre': 'Aucune vente conclue pour l’instant',
+  'veille.vide.gagne.texte':
+    'Le premier prospect passé à « Gagné » débloquera aussi le jalon verrouillé du brief. La table est neuve, pas en panne.',
+  'veille.vide.perdu.titre': 'Aucun prospect perdu',
+  'veille.vide.perdu.texte':
+    'Un prospect classé « Perdu » quitte les files de travail mais garde son onglet : on doit pouvoir relire pourquoi une piste s’est fermée.',
+  'veille.vide.ne_pas_contacter.titre': 'Aucun refus enregistré',
+  'veille.vide.ne_pas_contacter.texte':
+    'Un prospect qui demande à ne plus être contacté arrive ici, définitivement. Une liste vide est une bonne nouvelle, pas une panne de lecture.',
+  'veille.vide.toutes.titre': 'Aucun prospect classable',
+  'veille.vide.toutes.texte':
+    'Aucun prospect n’a encore de score : l’étage « score » n’est pas passé. La collecte et le scoring rempliront cette table.',
+  'veille.vide.sortie': 'Voir les {count} à contacter',
+  'veille.vide.recherche.titre': 'Aucune ligne ne correspond à votre recherche',
+  'veille.vide.recherche.texte':
+    '{count} prospects sont bien dans cet onglet — aucun ne porte « {query} ».',
+  'veille.vide.recherche.texte_one':
+    '{count} prospect est bien dans cet onglet — il ne porte pas « {query} ».',
+  'veille.vide.recherche.effacer': 'Effacer la recherche',
 
   // Les deux seuls métiers de `packages/core/src/trades.ts` : `RangeeVeille.tsx`
   // compose `trade.${prospect.tradeSlug}` sur ces slugs plutôt que de lire
