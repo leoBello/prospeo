@@ -79,6 +79,9 @@ const COMPOSEES_A_L_EXECUTION: readonly string[] = [
   // l'énumération `interaction_kind` de la base. Aucune de ces cinq clés
   // n'apparaît littéralement dans le code.
   'interaction.kind.',
+  // `RangeeVeille.tsx` compose `trade.${prospect.tradeSlug}` sur les slugs de
+  // `TRADES` ; aucune de ces clés n'apparaît littéralement dans le code.
+  'trade.',
 ];
 
 /** Tous les `.ts`/`.tsx` du dashboard hors catalogues et hors tests. */

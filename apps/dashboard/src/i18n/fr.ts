@@ -82,6 +82,29 @@ export const fr = {
   'veille.onglet.compte.aria': '{label} : {count} prospects',
   'veille.onglet.compte.aria_one': '{label} : {count} prospect',
 
+  // La colonne « Téléphone » et la colonne contextuelle de `RangeeVeille.tsx`.
+  'veille.telephone.mobile': 'mobile',
+  'veille.telephone.fixe': 'fixe',
+  'veille.telephone.absent': 'aucune coordonnée',
+  'veille.telephone.absent.detail': 'étage « enrich » non passé',
+
+  'veille.echeance.aujourdhui': 'aujourd’hui',
+  'veille.echeance.retard': 'en retard de {days} j',
+  'veille.echeance.retard_one': 'en retard d’un jour',
+  'veille.echeance.future': 'dans {days} j',
+  'veille.echeance.future_one': 'demain',
+  'veille.echeance.absente': 'non datée',
+  'veille.depuis': '{days} j',
+  'veille.depuis_one': '{days} j',
+  'veille.depuis.absente': 'non datée',
+
+  // Les deux seuls métiers de `packages/core/src/trades.ts` : `RangeeVeille.tsx`
+  // compose `trade.${prospect.tradeSlug}` sur ces slugs plutôt que de lire
+  // `getTrade(...)?.label`, pour que le badge de métier passe par `t()` comme
+  // tout le reste de la rangée.
+  'trade.plombier': 'Plombier',
+  'trade.serrurier': 'Serrurier',
+
   // La barre de pagination, au kit (`ui/kit/Pagination.tsx`) : partagée avec
   // l'écran Déploiements, elle ne connaît ni prospect, ni onglet, ni score.
   'pagination.etendue': '{premier}–{dernier} sur {total}',

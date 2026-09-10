@@ -1,0 +1,135 @@
+/*
+ * Six colonnes fixes. La grille est déclarée ICI et nulle part ailleurs :
+ * l'en-tête de `TableVeille` la reprend par composition (`.grille`), pour que
+ * les colonnes de l'en-tête et celles des rangées ne puissent pas diverger.
+ */
+.grille {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) 186px 136px 126px 140px;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 0 var(--space-3);
+}
+
+.rangee {
+  composes: grille;
+  width: 100%;
+  /* 44 px : le plancher de cible tactile, et la hauteur qui fait tenir dix
+     rangées dans une fenêtre de 720 px avec le brief replié. */
+  height: 44px;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font: inherit;
+  color: inherit;
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+.rangee:hover {
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+
+.selectionnee {
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  border-color: color-mix(in srgb, var(--color-accent) 35%, transparent);
+}
+
+.score {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+}
+
+.total {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-lg);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--color-text-muted);
+}
+
+.total[data-fort='true'] {
+  color: var(--color-accent);
+}
+
+.segments {
+  display: flex;
+  gap: 2px;
+}
+
+.segment {
+  display: block;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.identite {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/*
+ * `min-width: 0` SEUL, jamais `flex: 1` : le nom doit pouvoir RÉTRÉCIR, pas
+ * grandir. Avec `flex: 1` il pousserait le badge de métier à l'autre bout de
+ * la cellule — le piège déjà payé une fois sur `ProspectRow`.
+ */
+.nom {
+  min-width: 0;
+  font-weight: 500;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.telephone {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.numero {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  line-height: 1.25;
+}
+
+.type {
+  font-size: 9.5px;
+  color: var(--color-text-faint);
+  line-height: 1.25;
+}
+
+/* L'absence : italique et discrète, jamais une case vide. */
+.absent {
+  font-size: var(--text-xs);
+  font-style: italic;
+  color: var(--color-text-faint);
+  line-height: 1.25;
+}
+
+.detailAbsent {
+  composes: absent;
+  font-size: 9.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.echeance {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.echeance[data-retard='true'] {
+  color: var(--color-warning);
+}

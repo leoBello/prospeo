@@ -70,6 +70,26 @@ export const en: Record<keyof typeof fr, string> = {
   'veille.onglet.compte.aria': '{label}: {count} prospects',
   'veille.onglet.compte.aria_one': '{label}: {count} prospect',
 
+  // The "Phone" column and the contextual column of `RangeeVeille.tsx`.
+  'veille.telephone.mobile': 'mobile',
+  'veille.telephone.fixe': 'landline',
+  'veille.telephone.absent': 'no contact details',
+  'veille.telephone.absent.detail': '“enrich” stage has not run',
+
+  'veille.echeance.aujourdhui': 'today',
+  'veille.echeance.retard': '{days} days overdue',
+  'veille.echeance.retard_one': 'one day overdue',
+  'veille.echeance.future': 'in {days} days',
+  'veille.echeance.future_one': 'tomorrow',
+  'veille.echeance.absente': 'undated',
+  'veille.depuis': '{days} days',
+  'veille.depuis_one': '{days} day',
+  'veille.depuis.absente': 'undated',
+
+  // The only two trades in `packages/core/src/trades.ts`.
+  'trade.plombier': 'Plumber',
+  'trade.serrurier': 'Locksmith',
+
   // The pagination bar, in the kit (`ui/kit/Pagination.tsx`): shared with the
   // Deployments screen, it knows neither prospect, nor tab, nor score.
   'pagination.etendue': '{premier}–{dernier} of {total}',
