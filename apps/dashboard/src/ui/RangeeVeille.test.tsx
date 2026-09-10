@@ -137,12 +137,129 @@ describe('RangeeVeille — la colonne contextuelle', () => {
     expect(screen.getByText('non datée')).toBeDefined();
   });
 
+  it('nomme le jour même, distinct du retard et de l échéance à venir', () => {
+    // Même jour civil que MAINTENANT (09 h locale) : 08 h locale, le 10.
+    renderWithPreferences(
+      <RangeeVeille prospect={engage('2026-09-10T08:00:00')} onglet="contacte" selectionne={false} now={MAINTENANT} onSelect={() => {}} />,
+    );
+    expect(screen.getByText('aujourd’hui')).toBeDefined();
+  });
+
+  it('porte une échéance à venir, distincte du retard', () => {
+    // Cinq jours civils après MAINTENANT (le 10) : le 15, heure locale.
+    renderWithPreferences(
+      <RangeeVeille prospect={engage('2026-09-15T08:00:00')} onglet="contacte" selectionne={false} now={MAINTENANT} onSelect={() => {}} />,
+    );
+    expect(screen.getByText('dans 5 j')).toBeDefined();
+  });
+
+  it('ne rend jamais « NaN » pour une chaîne de date invalide, et la traite comme non datée', () => {
+    renderWithPreferences(
+      <RangeeVeille prospect={engage('pas-une-date')} onglet="contacte" selectionne={false} now={MAINTENANT} onSelect={() => {}} />,
+    );
+    expect(screen.getByText('non datée')).toBeDefined();
+    // Ceinture et bretelles : même si le libellé changeait un jour, aucun
+    // nœud de la rangée ne doit jamais porter la chaîne « NaN » à l'écran.
+    expect(screen.queryByText(/NaN/)).toBeNull();
+  });
+
   it('porte le statut dans l onglet « toutes », le seul qui mélange les statuts', () => {
     renderWithPreferences(
       <RangeeVeille prospect={engage(null)} onglet="toutes" selectionne={false} now={MAINTENANT} onSelect={() => {}} />,
     );
     expect(screen.getByText('Contacté')).toBeDefined();
     expect(screen.queryByText('non datée')).toBeNull();
+  });
+
+  it('porte « Depuis » dans les onglets fermés, en jours civils depuis la dernière mise à jour', () => {
+    const clos = prospect({ pipeline: { status: 'gagne', nextActionAt: null, updatedAt: '2026-09-05T00:00:00' } });
+    renderWithPreferences(
+      <RangeeVeille prospect={clos} onglet="gagne" selectionne={false} now={MAINTENANT} onSelect={() => {}} />,
+    );
+    // Cinq jours civils entre le 5 et le 10 (MAINTENANT).
+    expect(screen.getByText('5 j')).toBeDefined();
+  });
+
+  it('nomme l absence de mise à jour dans un onglet fermé, plutôt que d en inventer une', () => {
+    // `PipelineView.updatedAt` n'est jamais nul tant qu'une ligne existe : la
+    // seule façon d'atteindre l'absence, ici, est l'absence de ligne elle-même.
+    renderWithPreferences(
+      <RangeeVeille prospect={prospect({ pipeline: null })} onglet="perdu" selectionne={false} now={MAINTENANT} onSelect={() => {}} />,
+    );
+    expect(screen.getByText('non datée')).toBeDefined();
+  });
+});
+
+describe('RangeeVeille — la colonne Site', () => {
+  // Chacun des quatre rendus de `celluleSite` : le trait discontinu ne porte
+  // QUE l'étage jamais passé, jamais un fait établi comme le retrait.
+  const siteBase = {
+    repoUrl: null,
+    deploymentUrl: null,
+    promptVersion: null,
+    model: null,
+    generatedAt: null,
+    publishedAt: null,
+    unpublishedAt: null,
+    contentRejectedAt: null,
+    redaction: null,
+  };
+
+  it('nomme « Jamais déployé », discontinu, quand l étage n est pas passé', () => {
+    renderWithPreferences(
+      <RangeeVeille prospect={prospect({ site: null })} onglet="a_contacter" selectionne={false} now={MAINTENANT} onSelect={() => {}} />,
+    );
+    const badge = screen.getByText('Jamais déployé');
+    expect(badge).toBeDefined();
+    expect(badge.getAttribute('data-ton')).toBe('neutre');
+    expect(badge.getAttribute('data-discontinu')).toBe('true');
+  });
+
+  it('nomme « En ligne », plein, quand le site est déployé et publié', () => {
+    const site = {
+      ...siteBase,
+      deploymentUrl: 'https://aquatech-nantes.pages.dev',
+      generatedAt: '2026-09-02T00:00:00.000Z',
+      publishedAt: '2026-09-03T00:00:00.000Z',
+    };
+    renderWithPreferences(
+      <RangeeVeille prospect={prospect({ site })} onglet="a_contacter" selectionne={false} now={MAINTENANT} onSelect={() => {}} />,
+    );
+    const badge = screen.getByText('En ligne');
+    expect(badge).toBeDefined();
+    expect(badge.getAttribute('data-ton')).toBe('succes');
+    // Un fait établi : jamais le trait discontinu, réservé à l'étage manquant.
+    expect(badge.getAttribute('data-discontinu')).toBeNull();
+  });
+
+  it('nomme « Dépublié », plein et ambre, un site retiré étant un fait établi — pas une donnée manquante', () => {
+    const site = {
+      ...siteBase,
+      deploymentUrl: 'https://aquatech-nantes.pages.dev',
+      generatedAt: '2026-09-02T00:00:00.000Z',
+      publishedAt: '2026-09-03T00:00:00.000Z',
+      unpublishedAt: '2026-09-08T00:00:00.000Z',
+    };
+    renderWithPreferences(
+      <RangeeVeille prospect={prospect({ site })} onglet="a_contacter" selectionne={false} now={MAINTENANT} onSelect={() => {}} />,
+    );
+    const badge = screen.getByText('Dépublié');
+    expect(badge).toBeDefined();
+    expect(badge.getAttribute('data-ton')).toBe('alerte');
+    // La distinction que le trait discontinu doit garder : un retrait n'est
+    // pas une absence, il ne le porte donc jamais.
+    expect(badge.getAttribute('data-discontinu')).toBeNull();
+  });
+
+  it('nomme l étape de rédaction, plein, quand le site est généré mais pas encore publié', () => {
+    const site = { ...siteBase, generatedAt: '2026-09-02T00:00:00.000Z' };
+    renderWithPreferences(
+      <RangeeVeille prospect={prospect({ site })} onglet="a_contacter" selectionne={false} now={MAINTENANT} onSelect={() => {}} />,
+    );
+    const badge = screen.getByText('Rédaction');
+    expect(badge).toBeDefined();
+    expect(badge.getAttribute('data-ton')).toBe('accent');
+    expect(badge.getAttribute('data-discontinu')).toBeNull();
   });
 });
 
