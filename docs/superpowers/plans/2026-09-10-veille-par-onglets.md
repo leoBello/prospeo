@@ -46,6 +46,7 @@ Rendu local ouvrable : `node docs/design/maquettes/aplatir.mjs`, puis `docs/desi
 - **Écris le test d'abord**, vérifie qu'il échoue **pour la bonne raison**, et prouve que chaque assertion peut échouer : casse le code qu'elle couvre, observe le rouge, restaure, observe le vert.
 - **Le texte d'une assertion se lit dans `fr.ts`**, jamais ne s'invente — pas même depuis ce plan.
 - **N'écris jamais un test qui prétend voir une mise en page.** `jsdom` ne calcule ni largeur, ni hauteur, ni débordement. La conformité visuelle se contrôle à la tâche 10, au navigateur.
+- **`@testing-library/jest-dom` n'est PAS installé dans ce dépôt.** Ni `toBeInTheDocument`, ni `toBeDisabled`, ni `toHaveAttribute`, ni `toHaveAccessibleName` n'existent. Les idiomes maison, lisibles dans `ui/ProspectRow.test.tsx` et `ui/kit/Badge.test.tsx` : `expect(screen.getByText(…)).toBeDefined()`, `expect(screen.queryByText(…)).toBeNull()`, `expect(el.getAttribute('aria-current')).toBe('true')`, `expect(container.querySelector('[data-ton="danger"]')).not.toBeNull()`. L'utilitaire de rendu se nomme `renderWithPreferences` (`src/test-utils.tsx`).
 - Pièges de cette suite, qui y ont déjà produit des assertions mortes : `getByText`/`queryByText` comparent le texte **entier du nœud** ; `queryByRole` filtre par défaut sur `hidden: false` ; `getAllByText` **lève** à zéro correspondance, donc un `.length > 0` qui suit ne teste rien.
 - **Un argument `-- <motif>` ne restreint PAS un run vitest** dans cette configuration : la suite entière s'exécute. Ne prétends jamais avoir lancé un sous-ensemble.
 
@@ -799,7 +800,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { ComptesVeille } from '../domain/veille.js';
 import { OngletsVeille } from './OngletsVeille.js';
-import { renderAvecPreferences } from '../test-utils.js';
+import { renderWithPreferences } from '../test-utils.js';
 
 function comptes(surcharges: Partial<ComptesVeille['parOnglet']> = {}): ComptesVeille {
   return {
@@ -821,7 +822,7 @@ function comptes(surcharges: Partial<ComptesVeille['parOnglet']> = {}): ComptesV
 
 describe('OngletsVeille', () => {
   it('rend les huit onglets, y compris ceux à zéro — un onglet vide est une étape du parcours', () => {
-    renderAvecPreferences(
+    renderWithPreferences(
       <OngletsVeille onglet="a_contacter" comptes={comptes()} onChoisir={() => {}} />,
     );
     const onglets = screen.getAllByRole('tab');
@@ -840,23 +841,23 @@ describe('OngletsVeille', () => {
   });
 
   it('marque l onglet courant par `aria-selected`, et non par la seule couleur', () => {
-    renderAvecPreferences(
+    renderWithPreferences(
       <OngletsVeille onglet="relance" comptes={comptes()} onChoisir={() => {}} />,
     );
-    expect(screen.getByRole('tab', { selected: true })).toHaveAccessibleName(/Relancé/);
+    expect(screen.getByRole('tab', { selected: true }).getAttribute('aria-label')).toMatch(/Relancé/);
   });
 
   it('annonce le compte en toutes lettres, un chiffre nu étant imprononçable', () => {
-    renderAvecPreferences(
+    renderWithPreferences(
       <OngletsVeille onglet="a_contacter" comptes={comptes()} onChoisir={() => {}} />,
     );
-    expect(screen.getByRole('tab', { name: 'À contacter : 127 prospects' })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Contacté : 1 prospect' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'À contacter : 127 prospects' })).toBeDefined();
+    expect(screen.getByRole('tab', { name: 'Contacté : 1 prospect' })).toBeDefined();
   });
 
   it('prévient l appelant de l onglet choisi', async () => {
     const onChoisir = vi.fn();
-    renderAvecPreferences(
+    renderWithPreferences(
       <OngletsVeille onglet="a_contacter" comptes={comptes()} onChoisir={onChoisir} />,
     );
     await userEvent.click(screen.getByRole('tab', { name: /^Gagné/ }));
@@ -865,7 +866,7 @@ describe('OngletsVeille', () => {
 });
 ```
 
-> **Vérifie d'abord le nom réel de l'utilitaire de rendu.** `src/test-utils.tsx` existe déjà et enveloppe le rendu dans `PreferencesProvider` ; ouvre-le et emploie l'export qu'il expose plutôt que `renderAvecPreferences` si le nom diffère. Un composant qui appelle `useT` sans ce fournisseur lève.
+> **Vérifie d'abord le nom réel de l'utilitaire de rendu.** `src/test-utils.tsx` existe déjà et enveloppe le rendu dans `PreferencesProvider` ; ouvre-le et emploie l'export qu'il expose plutôt que `renderWithPreferences` si le nom diffère. Un composant qui appelle `useT` sans ce fournisseur lève.
 
 - [ ] **Étape 2 : Lancer, vérifier l'échec**
 
@@ -1094,51 +1095,51 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { Pagination } from './Pagination.js';
-import { renderAvecPreferences } from '../../test-utils.js';
+import { renderWithPreferences } from '../../test-utils.js';
 
 describe('Pagination', () => {
   it('annonce l étendue affichée et la taille de page', () => {
-    renderAvecPreferences(
+    renderWithPreferences(
       <Pagination page={1} pages={13} premier={1} dernier={10} total={127} taille={10} onAller={() => {}} />,
     );
-    expect(screen.getByText('1–10 sur 127')).toBeInTheDocument();
-    expect(screen.getByText('10 par page')).toBeInTheDocument();
+    expect(screen.getByText('1–10 sur 127')).toBeDefined();
+    expect(screen.getByText('10 par page')).toBeDefined();
   });
 
   it('désactive « Précédentes » sur la première page, plutôt que de la masquer', () => {
     // Un bouton qui disparaît déplace ses voisins à chaque changement de page.
-    renderAvecPreferences(
+    renderWithPreferences(
       <Pagination page={1} pages={13} premier={1} dernier={10} total={127} taille={10} onAller={() => {}} />,
     );
-    expect(screen.getByRole('button', { name: 'Précédentes' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Suivantes' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Précédentes' }).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByRole('button', { name: 'Suivantes' }).hasAttribute('disabled')).toBe(false);
   });
 
   it('désactive « Suivantes » sur la dernière page', () => {
-    renderAvecPreferences(
+    renderWithPreferences(
       <Pagination page={13} pages={13} premier={121} dernier={127} total={127} taille={10} onAller={() => {}} />,
     );
-    expect(screen.getByRole('button', { name: 'Suivantes' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Suivantes' }).hasAttribute('disabled')).toBe(true);
   });
 
   it('marque la page courante par `aria-current`, et non par la seule couleur', () => {
-    renderAvecPreferences(
+    renderWithPreferences(
       <Pagination page={3} pages={13} premier={21} dernier={30} total={127} taille={10} onAller={() => {}} />,
     );
-    expect(screen.getByRole('button', { current: 'page' })).toHaveAccessibleName('Page 3 sur 13');
+    expect(screen.getByRole('button', { current: 'page' }).getAttribute('aria-label')).toBe('Page 3 sur 13');
   });
 
   it('dit pourquoi les boutons de page manquent quand il n y a qu une page', () => {
-    renderAvecPreferences(
+    renderWithPreferences(
       <Pagination page={1} pages={1} premier={1} dernier={1} total={1} taille={10} onAller={() => {}} />,
     );
-    expect(screen.getByText('une seule page — les boutons de page ne s’affichent pas')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Suivantes' })).not.toBeInTheDocument();
+    expect(screen.getByText('une seule page — les boutons de page ne s’affichent pas')).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Suivantes' })).toBeNull();
   });
 
   it('prévient l appelant de la page demandée', async () => {
     const onAller = vi.fn();
-    renderAvecPreferences(
+    renderWithPreferences(
       <Pagination page={1} pages={13} premier={1} dernier={10} total={127} taille={10} onAller={onAller} />,
     );
     await userEvent.click(screen.getByRole('button', { name: 'Suivantes' }));
@@ -1146,12 +1147,12 @@ describe('Pagination', () => {
   });
 
   it('abrège les pages du milieu sans jamais perdre la première ni la dernière', () => {
-    renderAvecPreferences(
+    renderWithPreferences(
       <Pagination page={7} pages={13} premier={61} dernier={70} total={127} taille={10} onAller={() => {}} />,
     );
-    expect(screen.getByRole('button', { name: 'Page 1 sur 13' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Page 13 sur 13' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Page 4 sur 13' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Page 1 sur 13' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Page 13 sur 13' })).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Page 4 sur 13' })).toBeNull();
   });
 });
 ```
@@ -1415,7 +1416,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { ProspectView } from '../domain/prospect.js';
 import { RangeeVeille } from './RangeeVeille.js';
-import { renderAvecPreferences } from '../test-utils.js';
+import { renderWithPreferences } from '../test-utils.js';
 
 const MAINTENANT = new Date('2026-09-10T09:00:00.000Z');
 
@@ -1446,13 +1447,13 @@ function prospect(surcharges: Partial<ProspectView> = {}): ProspectView {
 describe('RangeeVeille — les absences, chacune nommée à sa façon', () => {
   it('distingue « jamais contacté » de « à contacter », dans le même onglet', () => {
     // Décision 1A : les deux populations partagent l'onglet, jamais le libellé.
-    const { unmount } = renderAvecPreferences(
+    const { unmount } = renderWithPreferences(
       <RangeeVeille prospect={prospect({ pipeline: null })} onglet="a_contacter" selectionne={false} now={MAINTENANT} onSelect={() => {}} />,
     );
-    expect(screen.getByText('Jamais contacté')).toBeInTheDocument();
+    expect(screen.getByText('Jamais contacté')).toBeDefined();
     unmount();
 
-    renderAvecPreferences(
+    renderWithPreferences(
       <RangeeVeille
         prospect={prospect({ pipeline: { status: 'a_contacter', nextActionAt: null, updatedAt: '2026-09-02T00:00:00.000Z' } })}
         onglet="a_contacter"
@@ -1461,18 +1462,18 @@ describe('RangeeVeille — les absences, chacune nommée à sa façon', () => {
         onSelect={() => {}}
       />,
     );
-    expect(screen.getByText('À contacter')).toBeInTheDocument();
-    expect(screen.queryByText('Jamais contacté')).not.toBeInTheDocument();
+    expect(screen.getByText('À contacter')).toBeDefined();
+    expect(screen.queryByText('Jamais contacté')).toBeNull();
   });
 
   it('nomme une présence web pas encore sondée, sans la confondre avec « aucune présence web »', () => {
-    const { unmount } = renderAvecPreferences(
+    const { unmount } = renderWithPreferences(
       <RangeeVeille prospect={prospect({ presence: null })} onglet="a_contacter" selectionne={false} now={MAINTENANT} onSelect={() => {}} />,
     );
-    expect(screen.getByText('Présence web pas encore sondée')).toBeInTheDocument();
+    expect(screen.getByText('Présence web pas encore sondée')).toBeDefined();
     unmount();
 
-    renderAvecPreferences(
+    renderWithPreferences(
       <RangeeVeille
         prospect={prospect({ presence: { category: 'none', finalUrl: null, httpStatus: null, domainAvailable: null, probedAt: '2026-09-02T00:00:00.000Z' } })}
         onglet="a_contacter"
@@ -1481,19 +1482,19 @@ describe('RangeeVeille — les absences, chacune nommée à sa façon', () => {
         onSelect={() => {}}
       />,
     );
-    expect(screen.getByText('Aucune présence web')).toBeInTheDocument();
+    expect(screen.getByText('Aucune présence web')).toBeDefined();
   });
 
   it('dit quel étage n a pas produit le téléphone, plutôt que de laisser la case vide', () => {
-    renderAvecPreferences(
+    renderWithPreferences(
       <RangeeVeille prospect={prospect({ enrichment: null })} onglet="a_contacter" selectionne={false} now={MAINTENANT} onSelect={() => {}} />,
     );
-    expect(screen.getByText('aucune coordonnée')).toBeInTheDocument();
-    expect(screen.getByText('étage « enrich » non passé')).toBeInTheDocument();
+    expect(screen.getByText('aucune coordonnée')).toBeDefined();
+    expect(screen.getByText('étage « enrich » non passé')).toBeDefined();
   });
 
   it('distingue le type de numéro, que le barème paye différemment', () => {
-    renderAvecPreferences(
+    renderWithPreferences(
       <RangeeVeille
         prospect={prospect({
           enrichment: {
@@ -1508,7 +1509,7 @@ describe('RangeeVeille — les absences, chacune nommée à sa façon', () => {
         onSelect={() => {}}
       />,
     );
-    expect(screen.getByText('mobile')).toBeInTheDocument();
+    expect(screen.getByText('mobile')).toBeDefined();
   });
 });
 
@@ -1517,40 +1518,40 @@ describe('RangeeVeille — la colonne contextuelle', () => {
     prospect({ pipeline: { status: 'contacte', nextActionAt, updatedAt: '2026-09-08T00:00:00.000Z' } });
 
   it('porte l échéance dans les onglets d engagement, en dates civiles', () => {
-    renderAvecPreferences(
+    renderWithPreferences(
       <RangeeVeille prospect={engage('2026-09-07T23:00:00.000Z')} onglet="contacte" selectionne={false} now={MAINTENANT} onSelect={() => {}} />,
     );
     // Trois jours civils, pas deux tranches de 24 h et des poussières.
-    expect(screen.getByText('en retard de 3 j')).toBeInTheDocument();
+    expect(screen.getByText('en retard de 3 j')).toBeDefined();
   });
 
   it('nomme une échéance absente plutôt que d en inventer une', () => {
-    renderAvecPreferences(
+    renderWithPreferences(
       <RangeeVeille prospect={engage(null)} onglet="contacte" selectionne={false} now={MAINTENANT} onSelect={() => {}} />,
     );
-    expect(screen.getByText('non datée')).toBeInTheDocument();
+    expect(screen.getByText('non datée')).toBeDefined();
   });
 
   it('porte le statut dans l onglet « toutes », le seul qui mélange les statuts', () => {
-    renderAvecPreferences(
+    renderWithPreferences(
       <RangeeVeille prospect={engage(null)} onglet="toutes" selectionne={false} now={MAINTENANT} onSelect={() => {}} />,
     );
-    expect(screen.getByText('Contacté')).toBeInTheDocument();
-    expect(screen.queryByText('non datée')).not.toBeInTheDocument();
+    expect(screen.getByText('Contacté')).toBeDefined();
+    expect(screen.queryByText('non datée')).toBeNull();
   });
 });
 
 describe('RangeeVeille — la sélection', () => {
   it('porte `aria-current`, la couleur ne suffisant jamais à dire un état', () => {
-    renderAvecPreferences(
+    renderWithPreferences(
       <RangeeVeille prospect={prospect()} onglet="a_contacter" selectionne now={MAINTENANT} onSelect={() => {}} />,
     );
-    expect(screen.getByRole('button')).toHaveAttribute('aria-current', 'true');
+    expect(screen.getByRole('button').getAttribute('aria-current')).toBe('true');
   });
 
   it('prévient l appelant du prospect choisi', async () => {
     const onSelect = vi.fn();
-    renderAvecPreferences(
+    renderWithPreferences(
       <RangeeVeille prospect={prospect()} onglet="a_contacter" selectionne={false} now={MAINTENANT} onSelect={onSelect} />,
     );
     await userEvent.click(screen.getByRole('button'));
@@ -1935,7 +1936,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ComptesVeille, PageVeille } from '../domain/veille.js';
 import type { ProspectView } from '../domain/prospect.js';
 import { TableVeille } from './TableVeille.js';
-import { renderAvecPreferences } from '../test-utils.js';
+import { renderWithPreferences } from '../test-utils.js';
 
 const MAINTENANT = new Date('2026-09-10T09:00:00.000Z');
 
@@ -1972,43 +1973,43 @@ const props = {
 
 describe('TableVeille', () => {
   it('titre ses six colonnes, la dernière portant le sens de l onglet ouvert', () => {
-    const { unmount } = renderAvecPreferences(
+    const { unmount } = renderWithPreferences(
       <TableVeille {...props} onglet="a_contacter" page={page()} />,
     );
     for (const titre of ['Score', 'Prospect', 'Présence web', 'Téléphone', 'Site', 'Suivi']) {
-      expect(screen.getByText(titre)).toBeInTheDocument();
+      expect(screen.getByText(titre)).toBeDefined();
     }
     unmount();
 
-    renderAvecPreferences(<TableVeille {...props} onglet="contacte" page={page()} />);
-    expect(screen.getByText('Prochaine action')).toBeInTheDocument();
-    expect(screen.queryByText('Suivi')).not.toBeInTheDocument();
+    renderWithPreferences(<TableVeille {...props} onglet="contacte" page={page()} />);
+    expect(screen.getByText('Prochaine action')).toBeDefined();
+    expect(screen.queryByText('Suivi')).toBeNull();
   });
 
   it('nomme les prospects jamais scorés, qui ne sont dans aucun onglet', () => {
-    renderAvecPreferences(<TableVeille {...props} onglet="a_contacter" page={page()} />);
-    expect(screen.getByText('10 jamais scorés, non classables')).toBeInTheDocument();
+    renderWithPreferences(<TableVeille {...props} onglet="a_contacter" page={page()} />);
+    expect(screen.getByText('10 jamais scorés, non classables')).toBeDefined();
   });
 
   it('ne parle des jamais scorés que là où un classement de la base a lieu', () => {
     // Sur un onglet d'une ligne, cette phrase annonce une exclusion d'une
     // liste qui n'existe pas.
-    renderAvecPreferences(<TableVeille {...props} onglet="contacte" page={page({ total: 1, pages: 1, lignes: [prospect('a', 74)], dernier: 1 })} />);
-    expect(screen.queryByText('10 jamais scorés, non classables')).not.toBeInTheDocument();
+    renderWithPreferences(<TableVeille {...props} onglet="contacte" page={page({ total: 1, pages: 1, lignes: [prospect('a', 74)], dernier: 1 })} />);
+    expect(screen.queryByText('10 jamais scorés, non classables')).toBeNull();
   });
 
   it('nomme un onglet vide, et n affiche alors ni colonnes ni pagination', () => {
-    renderAvecPreferences(
+    renderWithPreferences(
       <TableVeille {...props} onglet="gagne" page={page({ lignes: [], total: 0, pages: 1, premier: 0, dernier: 0 })} />,
     );
-    expect(screen.getByText('Aucune vente conclue pour l’instant')).toBeInTheDocument();
-    expect(screen.queryByText('Score')).not.toBeInTheDocument();
-    expect(screen.queryByText('10 par page')).not.toBeInTheDocument();
+    expect(screen.getByText('Aucune vente conclue pour l’instant')).toBeDefined();
+    expect(screen.queryByText('Score')).toBeNull();
+    expect(screen.queryByText('10 par page')).toBeNull();
   });
 
   it('offre depuis un onglet vide une sortie vers l onglet plein', async () => {
     const onChoisirOnglet = vi.fn();
-    renderAvecPreferences(
+    renderWithPreferences(
       <TableVeille {...props} onChoisirOnglet={onChoisirOnglet} onglet="gagne" page={page({ lignes: [], total: 0, pages: 1, premier: 0, dernier: 0 })} />,
     );
     await userEvent.click(screen.getByRole('button', { name: 'Voir les 127 à contacter' }));
@@ -2020,7 +2021,7 @@ describe('TableVeille', () => {
     // ici » et « votre recherche ne rend rien ». Les confondre ferait annoncer
     // « Aucune vente conclue » à quelqu'un qui a tapé « couvreur ».
     const onEffacerRecherche = vi.fn();
-    renderAvecPreferences(
+    renderWithPreferences(
       <TableVeille
         {...props}
         onglet="a_contacter"
@@ -2030,11 +2031,11 @@ describe('TableVeille', () => {
         page={page({ lignes: [], total: 0, pages: 1, premier: 0, dernier: 0 })}
       />,
     );
-    expect(screen.getByText('Aucune ligne ne correspond à votre recherche')).toBeInTheDocument();
+    expect(screen.getByText('Aucune ligne ne correspond à votre recherche')).toBeDefined();
     expect(
       screen.getByText('127 prospects sont bien dans cet onglet — aucun ne porte « couvreur ».'),
-    ).toBeInTheDocument();
-    expect(screen.queryByText('Aucun prospect à contacter')).not.toBeInTheDocument();
+    ).toBeDefined();
+    expect(screen.queryByText('Aucun prospect à contacter')).toBeNull();
 
     await userEvent.click(screen.getByRole('button', { name: 'Effacer la recherche' }));
     expect(onEffacerRecherche).toHaveBeenCalled();
@@ -2042,7 +2043,7 @@ describe('TableVeille', () => {
 
   it('garde le vide de l onglet quand la recherche n y est pour rien', () => {
     // L'onglet était déjà vide sans elle : la recherche n'explique pas ce vide.
-    renderAvecPreferences(
+    renderWithPreferences(
       <TableVeille
         {...props}
         onglet="gagne"
@@ -2051,12 +2052,12 @@ describe('TableVeille', () => {
         page={page({ lignes: [], total: 0, pages: 1, premier: 0, dernier: 0 })}
       />,
     );
-    expect(screen.getByText('Aucune vente conclue pour l’instant')).toBeInTheDocument();
+    expect(screen.getByText('Aucune vente conclue pour l’instant')).toBeDefined();
   });
 
   it('bascule l ordre du classement, et le dit', async () => {
     const onBasculerOrdre = vi.fn();
-    renderAvecPreferences(
+    renderWithPreferences(
       <TableVeille {...props} onBasculerOrdre={onBasculerOrdre} onglet="a_contacter" page={page()} />,
     );
     const tri = screen.getByRole('button', { name: 'Tri : score décroissant' });
@@ -2471,7 +2472,7 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { BriefDuJour } from './BriefDuJour.js';
-import { renderAvecPreferences } from '../test-utils.js';
+import { renderWithPreferences } from '../test-utils.js';
 
 const RELANCES = {
   items: [],
@@ -2494,24 +2495,24 @@ describe('BriefDuJour', () => {
   });
 
   it('est déplié par défaut : on ne cache pas ce qui est dû à la première visite', () => {
-    renderAvecPreferences(<BriefDuJour {...props} />);
-    expect(screen.getByRole('button', { name: 'Replier le brief' })).toBeInTheDocument();
+    renderWithPreferences(<BriefDuJour {...props} />);
+    expect(screen.getByRole('button', { name: 'Replier le brief' })).toBeDefined();
   });
 
   it('se replie en un résumé, qui compte encore ce qui est dû', async () => {
-    renderAvecPreferences(<BriefDuJour {...props} />);
+    renderWithPreferences(<BriefDuJour {...props} />);
     await userEvent.click(screen.getByRole('button', { name: 'Replier le brief' }));
-    expect(screen.getByText('Brief du jour')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Déplier' })).toBeInTheDocument();
+    expect(screen.getByText('Brief du jour')).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Déplier' })).toBeDefined();
   });
 
   it('retient le repli d une visite à l autre', async () => {
-    const { unmount } = renderAvecPreferences(<BriefDuJour {...props} />);
+    const { unmount } = renderWithPreferences(<BriefDuJour {...props} />);
     await userEvent.click(screen.getByRole('button', { name: 'Replier le brief' }));
     unmount();
 
-    renderAvecPreferences(<BriefDuJour {...props} />);
-    expect(screen.getByRole('button', { name: 'Déplier' })).toBeInTheDocument();
+    renderWithPreferences(<BriefDuJour {...props} />);
+    expect(screen.getByRole('button', { name: 'Déplier' })).toBeDefined();
   });
 });
 ```
@@ -2882,14 +2883,14 @@ Les cas qui affirmaient sur « Nouveaux prospects à fort score » deviennent de
     // L'ancienne liste s'arrêtait à douze lignes et annonçait le reste par
     // « N de plus, non affichés ici ». C'est le défaut que ce chantier corrige.
     render(<TodayScreen {...props} prospects={quinzeProspectsScores()} />);
-    expect(screen.getByRole('tablist', { name: 'Statut de suivi' })).toBeInTheDocument();
+    expect(screen.getByRole('tablist', { name: 'Statut de suivi' })).toBeDefined();
     expect(screen.getAllByRole('tab')).toHaveLength(8);
-    expect(screen.queryByText(/de plus, non affichés ici/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/de plus, non affichés ici/)).toBeNull();
   });
 
   it('ne descend jamais sous dix lignes affichées quand l onglet en contient plus', () => {
     render(<TodayScreen {...props} prospects={quinzeProspectsScores()} />);
-    expect(screen.getByText('1–10 sur 15')).toBeInTheDocument();
+    expect(screen.getByText('1–10 sur 15')).toBeDefined();
   });
 
   it('parcourt les relances puis la table sans buter sur un prospect présent dans les deux', async () => {
@@ -2906,12 +2907,12 @@ Les cas qui affirmaient sur « Nouveaux prospects à fort score » deviennent de
 
     // Première flèche : la ligne de relance, en tête de la bande.
     await userEvent.keyboard('{ArrowDown}');
-    expect(document.getElementById('prospect-r1')).toHaveAttribute('aria-current', 'true');
+    expect(document.getElementById('prospect-r1')?.getAttribute('aria-current')).toBe('true');
 
     // Seconde flèche : la ligne SUIVANTE de la table, et non un retour sur
     // `r1` — qui figure pourtant aussi dans l'onglet « À contacter ».
     await userEvent.keyboard('{ArrowDown}');
-    expect(document.getElementById('prospect-a1')).toHaveAttribute('aria-current', 'true');
+    expect(document.getElementById('prospect-a1')?.getAttribute('aria-current')).toBe('true');
   });
 ```
 
