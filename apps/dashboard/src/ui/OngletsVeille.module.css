@@ -1,0 +1,80 @@
+/*
+ * La barre d'onglets de la veille (maquette Veille.dc.html).
+ *
+ * Le trait bas de 1px n'est PAS ici : il est porté par `.barreHaut` de
+ * `TableVeille`, qui contient aussi le bouton de tri à droite. Chaque onglet le
+ * recouvre d'un `margin-bottom: -1px` — c'est ce qui fait que l'onglet courant
+ * semble ouvert sur la table, au lieu de flotter au-dessus d'un trait continu.
+ */
+.barre {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  height: 34px;
+  flex: none;
+}
+
+.onglet {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 var(--space-3);
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  margin-bottom: -1px;
+  background: none;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.onglet:hover {
+  color: var(--color-text);
+}
+
+.onglet[aria-selected='true'] {
+  background: var(--color-surface-2);
+  border-bottom-color: var(--color-accent);
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+/*
+ * La pastille double le mot, elle ne le remplace jamais : le libellé du statut
+ * est toujours écrit à côté, et `aria-hidden` la retire de l'annonce.
+ */
+.pastille {
+  width: 5px;
+  height: 5px;
+  border-radius: var(--radius-pill);
+  flex: none;
+}
+
+.pastille[data-discontinu='true'] {
+  background: transparent;
+  border: 1px dashed currentColor;
+}
+
+.compte {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+}
+
+.onglet[aria-selected='true'] .compte {
+  color: var(--color-text);
+}
+
+/* Le trait qui sépare les sept statuts de la vue d'ensemble. */
+.separateur {
+  width: 1px;
+  height: 18px;
+  background: var(--color-border-strong);
+  align-self: center;
+  margin: 0 var(--space-2);
+  flex: none;
+}

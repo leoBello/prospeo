@@ -76,6 +76,12 @@ export const fr = {
 
   'today.reason.separator': ' · ',
 
+  // La veille par onglets (maquettes Veille.dc.html, VeilleEtats.dc.html).
+  'veille.onglets.aria': 'Statut de suivi',
+  'veille.onglet.toutes': 'Toutes',
+  'veille.onglet.compte.aria': '{label} : {count} prospects',
+  'veille.onglet.compte.aria_one': '{label} : {count} prospect',
+
   // Lot 3, tâche 8 — la bande de progression qui remplace `KpiBand` sous le
   // titre « Aujourd'hui », et le compteur de série de la barre du haut. Voir
   // `ui/BandeProgression.tsx` pour la doctrine des quatre absences distinctes

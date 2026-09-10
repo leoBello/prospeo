@@ -64,6 +64,12 @@ export const en: Record<keyof typeof fr, string> = {
 
   'today.reason.separator': ' · ',
 
+  // Prospect watch, by status tab (mockups Veille.dc.html, VeilleEtats.dc.html).
+  'veille.onglets.aria': 'Follow-up status',
+  'veille.onglet.toutes': 'All',
+  'veille.onglet.compte.aria': '{label}: {count} prospects',
+  'veille.onglet.compte.aria_one': '{label}: {count} prospect',
+
   'jeu.objectif.titre': "Today's goal",
   'jeu.objectif.valeur': '{count} follow-ups honored',
   'jeu.objectif.valeur_one': '{count} follow-up honored',
