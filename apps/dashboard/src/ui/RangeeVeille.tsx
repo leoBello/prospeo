@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { affichageTelephone } from '@prospeo/core';
 import { joursCivils } from '../domain/today.js';
 import type { ProspectView } from '../domain/prospect.js';
 import type { OngletVeille } from '../domain/veille.js';
@@ -162,7 +163,11 @@ export function RangeeVeille({ prospect, onglet, selectionne, now, onSelect }: P
           </>
         ) : (
           <>
-            <span className={styles.numero}>{telephone}</span>
+            {/* Mis en forme, jamais brut : cette colonne sert à APPELER, et
+               `+33612440831` n'est ni lu ni composé par personne. La
+               fonction vient de `@prospeo/core` — la recopier ici aurait
+               fait exister deux vérités sur la même donnée. */}
+            <span className={styles.numero}>{affichageTelephone(telephone)}</span>
             <span className={styles.type}>
               {t(type === 'mobile' ? 'veille.telephone.mobile' : 'veille.telephone.fixe')}
             </span>

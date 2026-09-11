@@ -1,4 +1,4 @@
-import { normalizePhone } from './phone.js';
+import { affichageTelephone, normalizePhone } from './phone.js';
 import { SCORING_RULESET } from './scoring.js';
 import { getTrade } from './trades.js';
 
@@ -219,12 +219,6 @@ function decoupeAdresse(input: SiteFactsInput): SiteFacts['adresse'] {
  * `AQUATIO` a 3,4 et `ERDRE CHAUFFAGE` a 2,6.
  */
 export const NOTE_MINIMALE_AFFICHABLE = SCORING_RULESET.reputation.minRating;
-
-/** `+33602002360` → `06 02 00 23 60`, la forme que l'on lit à voix haute. */
-function affichageTelephone(e164: string): string {
-  const national = `0${e164.slice(3)}`;
-  return national.replace(/(\d{2})(?=\d)/g, '$1 ').trim();
-}
 
 /**
  * Assemble les faits publiables d'un prospect, ou `null` s'il n'est pas

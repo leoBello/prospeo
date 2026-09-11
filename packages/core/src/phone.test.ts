@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizePhone } from './phone.js';
+import { affichageTelephone, normalizePhone } from './phone.js';
 
 describe('normalizePhone', () => {
   it('reconnaît un mobile au format national', () => {
@@ -38,5 +38,22 @@ describe('normalizePhone', () => {
 
   it('rejette une chaîne sans aucun chiffre', () => {
     expect(normalizePhone('appeler le patron')).toBeNull();
+  });
+});
+
+describe('affichageTelephone', () => {
+  it('rend un mobile par groupes de deux chiffres, comme on le lit à voix haute', () => {
+    expect(affichageTelephone('+33612440831')).toBe('06 12 44 08 31');
+  });
+
+  it('rend un fixe de la même façon — le format ne dépend pas du type', () => {
+    expect(affichageTelephone('+33240765512')).toBe('02 40 76 55 12');
+  });
+
+  it('laisse intact un numéro qui n est pas français, plutôt que de le tronquer', () => {
+    // Cette fonction met en forme, elle ne valide pas : c'est `normalizePhone`
+    // qui valide. Un numéro étranger découpé selon le plan français serait
+    // faux, et un numéro affiché faux se compose faux.
+    expect(affichageTelephone('+3225551234')).toBe('+3225551234');
   });
 });

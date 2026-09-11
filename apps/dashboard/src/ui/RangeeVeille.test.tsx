@@ -115,6 +115,29 @@ describe('RangeeVeille — les absences, chacune nommée à sa façon', () => {
     );
     expect(screen.getByText('mobile')).toBeDefined();
   });
+
+  it('affiche le numéro sous la forme qu on lit et qu on compose, jamais en E.164', () => {
+    // La colonne sert à APPELER. `+33612440831` est du format machine : il ne
+    // se lit pas à voix haute et ne se compose pas. Le défaut n'a été vu qu'au
+    // navigateur — aucun test ne regardait le texte du numéro.
+    renderWithPreferences(
+      <RangeeVeille
+        prospect={prospect({
+          enrichment: {
+            status: 'ok', phoneE164: '+33612440831', phoneKind: 'mobile', rating: null,
+            reviewCount: null, declaredUrl: null, matchedName: null, matchConfidence: null,
+            enrichedAt: '2026-09-02T00:00:00.000',
+          },
+        })}
+        onglet="a_contacter"
+        selectionne={false}
+        now={MAINTENANT}
+        onSelect={() => {}}
+      />,
+    );
+    expect(screen.getByText('06 12 44 08 31')).toBeDefined();
+    expect(screen.queryByText('+33612440831')).toBeNull();
+  });
 });
 
 describe('RangeeVeille — la colonne contextuelle', () => {

@@ -139,11 +139,23 @@ export function TableVeille({
       <div className={styles.ligneCompte}>
         <span className={styles.titre}>{t(TITRE_ONGLET[onglet])}</span>
         <span className={styles.compte}>{compte}</span>
+        {/*
+          L'enveloppe `span` autour du badge n'est pas décorative : `Badge` est
+          un composant fonction sans `forwardRef`, et `Tooltip.Trigger` a besoin
+          d'un vrai nœud à référencer. Passé directement, React émet « Function
+          components cannot be given refs » et la référence tombe dans le vide —
+          défaut qu'aucun test de ce dépôt ne voit, `jsdom` ne calculant aucun
+          placement. `tabIndex` rend le déclencheur atteignable au clavier, sans
+          quoi l'explication n'existerait qu'à la souris. C'est le patron de
+          `kit/Bientot.tsx`, qui enveloppe un badge de la même façon.
+        */}
         {CLASSEMENT_DE_LA_BASE.includes(onglet) && comptes.sansScore > 0 ? (
           <Tooltip contenu={t('veille.sansScore.hint')}>
-            <Badge ton="alerte" taille="compacte" discontinu>
-              {t('veille.sansScore', { count: comptes.sansScore })}
-            </Badge>
+            <span tabIndex={0}>
+              <Badge ton="alerte" taille="compacte" discontinu>
+                {t('veille.sansScore', { count: comptes.sansScore })}
+              </Badge>
+            </span>
           </Tooltip>
         ) : null}
       </div>
