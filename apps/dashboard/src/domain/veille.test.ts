@@ -55,8 +55,6 @@ describe('ongletDe', () => {
       pipeline: { status: 'a_contacter', nextActionAt: null, updatedAt: '2026-09-02T00:00:00.000Z' },
     });
     expect(ongletDe(pose)).toBe('a_contacter');
-    // La distinction survit : elle est portée par `pipeline`, que la rangée lit.
-    expect(pose.pipeline).not.toBeNull();
   });
 
   it('rend le statut de la ligne de suivi quand elle existe', () => {

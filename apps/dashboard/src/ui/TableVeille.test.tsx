@@ -126,6 +126,24 @@ describe('TableVeille', () => {
     expect(screen.queryByText('10 par page')).toBeNull();
   });
 
+  it('nomme l onglet « à contacter » vide sans lui offrir de sortie, puisqu on y est déjà', () => {
+    // Les autres onglets vides proposent « Voir les N à contacter » : une
+    // sortie VERS cet onglet-là. Ici, l'absence n'a nulle part où renvoyer —
+    // c'est la seule branche du composant qui nomme le vide sans bouton.
+    renderWithPreferences(
+      <TableVeille
+        {...props}
+        onglet="a_contacter"
+        page={page({ lignes: [], total: 0, pages: 1, premier: 0, dernier: 0 })}
+      />,
+    );
+    expect(screen.getByText('Aucun prospect à contacter')).toBeDefined();
+    expect(
+      screen.getByText('Tous les prospects scorés portent une décision. La collecte en apportera d’autres.'),
+    ).toBeDefined();
+    expect(screen.queryByRole('button', { name: /^Voir les/ })).toBeNull();
+  });
+
   it('offre depuis un onglet vide une sortie vers l onglet plein', async () => {
     const onChoisirOnglet = vi.fn();
     renderWithPreferences(

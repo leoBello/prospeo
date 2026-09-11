@@ -1,25 +1,16 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithPreferences } from '../test-utils.js';
 import { BarreHaut } from './BarreHaut.js';
 
+// Le thème et la langue persistent en `localStorage` (`preferences.tsx`) :
+// sans un nettoyage entre les tests, celui qui bascule la préférence ferait
+// démarrer le suivant sur l'état laissé par le précédent, dans l'ordre où
+// vitest choisit de les exécuter. Ce nettoyage vit dans `test-setup.ts`
+// (`afterEach(() => magasin.clear())`), partagé par toute la suite : il n'y a
+// plus rien à faire ici.
 describe('BarreHaut', () => {
-  beforeEach(() => {
-    // Le thème et la langue persistent en `localStorage` (`preferences.tsx`) :
-    // sans ce nettoyage, un test qui bascule la préférence ferait démarrer le
-    // suivant sur l'état laissé par le précédent, dans l'ordre où vitest
-    // choisit de les exécuter. `try/catch` : sous jsdom, sans URL http(s)
-    // configurée, `window.localStorage` est `undefined` plutôt que vide —
-    // exactement le cas que `preferences.tsx` enveloppe déjà de son côté.
-    try {
-      window.localStorage.clear();
-    } catch {
-      // Rien à nettoyer : `preferences.tsx` retombe alors toujours sur ses
-      // valeurs par défaut, ce qui revient au même pour ce test.
-    }
-  });
-
   it('affiche le nom de l application', () => {
     renderWithPreferences(<BarreHaut onSignOut={vi.fn()} />);
     expect(screen.getByText('Prospeo')).toBeDefined();

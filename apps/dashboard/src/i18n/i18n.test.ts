@@ -8,6 +8,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { TRADES } from '@prospeo/core';
 import { fr } from './fr.js';
 import { en } from './en.js';
 import { LOCALES, translate } from './translate.js';
@@ -121,5 +122,21 @@ describe('clés orphelines', () => {
     });
 
     expect(orphelines).toEqual([]);
+  });
+});
+
+describe('clés de métier', () => {
+  it('donne à chaque slug de TRADES sa clé `trade.<slug>`, en français et en anglais', () => {
+    // `RangeeVeille.tsx` compose `trade.${prospect.tradeSlug}` à l'exécution
+    // (voir `COMPOSEES_A_L_EXECUTION` ci-dessus) : aucune recherche textuelle
+    // ne peut la rattacher à un slug précis. Un métier ajouté à `trades.ts`
+    // sans sa clé afficherait la chaîne brute « trade.<slug> » dans la table,
+    // et le préfixe entré dans `COMPOSEES_A_L_EXECUTION` empêcherait le test
+    // des clés orphelines de la voir.
+    for (const trade of TRADES) {
+      const cle = `trade.${trade.slug}`;
+      expect(fr, cle).toHaveProperty(cle);
+      expect(en, cle).toHaveProperty(cle);
+    }
   });
 });

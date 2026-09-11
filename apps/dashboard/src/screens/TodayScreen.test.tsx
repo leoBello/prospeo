@@ -292,7 +292,7 @@ describe('TodayScreen', () => {
     expect(screen.getByText('ENTREPRISE a')).toBeDefined();
   });
 
-  it('traverse la frontiere entre les deux listes sans reprendre la souris', async () => {
+  it('traverse la frontiere entre la bande des relances et la table sans reprendre la souris', async () => {
     // Une relance due, puis un prospect neuf : deux sections distinctes, un
     // seul parcours. Buter en fin de section obligerait a reprendre la souris
     // a chaque titre.

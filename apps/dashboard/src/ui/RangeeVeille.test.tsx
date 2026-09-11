@@ -182,13 +182,16 @@ describe('RangeeVeille — la colonne contextuelle', () => {
   });
 
   it('ne rend jamais « NaN » pour une chaîne de date invalide, et la traite comme non datée', () => {
-    renderWithPreferences(
+    const { container } = renderWithPreferences(
       <RangeeVeille prospect={engage('pas-une-date')} onglet="contacte" selectionne={false} now={MAINTENANT} onSelect={() => {}} />,
     );
     expect(screen.getByText('non datée')).toBeDefined();
-    // Ceinture et bretelles : même si le libellé changeait un jour, aucun
-    // nœud de la rangée ne doit jamais porter la chaîne « NaN » à l'écran.
-    expect(screen.queryByText(/NaN/)).toBeNull();
+    // Sur le texte du conteneur entier, et non sur `queryByText(/NaN/)` : ce
+    // dernier passerait aussi sur un écran vide, où aucun nœud ne porte la
+    // chaîne « NaN » faute d'avoir été rendu du tout. Ici, la rangée EST
+    // rendue, avec sa colonne contextuelle garnie ; c'est ce texte-là qu'on
+    // veut prouver exempt de « NaN ».
+    expect(container.textContent).not.toMatch(/NaN/);
   });
 
   it('porte le statut dans l onglet « toutes », le seul qui mélange les statuts', () => {

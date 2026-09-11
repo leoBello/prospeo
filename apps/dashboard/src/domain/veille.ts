@@ -1,5 +1,5 @@
 import type { Enums } from '@prospeo/db';
-import type { ProspectView } from './prospect.js';
+import type { ProspectView, ScoreView } from './prospect.js';
 
 /** Un onglet de la veille : les sept statuts du pipeline, plus la vue d'ensemble. */
 export type OngletVeille = Enums<'pipeline_status'> | 'toutes';
@@ -73,8 +73,17 @@ export interface ComptesVeille {
   sansScore: number;
 }
 
-/** Un prospect entre-t-il au classement ? Non sans score : il n'a pas de rang. */
-function classable(prospect: ProspectView): boolean {
+/** Un prospect scoré : un score qui n'est jamais lu comme un zéro. */
+type ProspectClassable = ProspectView & { score: ScoreView };
+
+/**
+ * Un prospect entre-t-il au classement ? Non sans score : il n'a pas de rang.
+ *
+ * En garde de type plutôt qu'en simple booléen : le `.filter` de `pageVeille`
+ * en tire un tableau où `score` est garanti présent, et le tri qui suit n'a
+ * plus besoin d'un `?? 0` — un score absent n'y est jamais lu comme un zéro.
+ */
+function classable(prospect: ProspectView): prospect is ProspectClassable {
   return prospect.score !== null;
 }
 
@@ -127,9 +136,13 @@ export function pageVeille(
   page: number,
 ): PageVeille {
   const retenus = prospects
-    .filter((p) => classable(p) && (onglet === 'toutes' || ongletDe(p) === onglet))
+    // `classable` en garde de type d'abord : le tableau qui en sort a `score`
+    // garanti présent, et le tri ci-dessous n'a plus à choisir entre lire ou
+    // inventer un score absent.
+    .filter(classable)
+    .filter((p) => onglet === 'toutes' || ongletDe(p) === onglet)
     .sort((a, b) => {
-      const ecart = (b.score?.total ?? 0) - (a.score?.total ?? 0);
+      const ecart = b.score.total - a.score.total;
       const parScore = ordre === 'score_asc' ? -ecart : ecart;
       return parScore !== 0 ? parScore : a.denomination.localeCompare(b.denomination, 'fr');
     });
