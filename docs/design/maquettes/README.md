@@ -66,11 +66,38 @@ code postal (139 prospects, tous à Nantes), et la colonne aurait répété la m
 valeur cent trente-neuf fois. Elle est remplacée par « Téléphone », qui porte le
 numéro, son type (`mobile` / `fixe`) et son absence.
 
-**Les hauteurs sont mesurées, pas estimées.** Les trois artboards d'écran ont
-été rendus dans un navigateur et mesurés : 900 px pour `Veille` et
+**Les hauteurs des artboards sont mesurées, pas estimées.** Les trois artboards
+d'écran ont été rendus dans un navigateur et mesurés : 900 px pour `Veille` et
 `VeilleDetail` dans une fenêtre de 900, 720 px pour `VeilleCompacte` dans une
 fenêtre de 720. Une correction de mise en page se revérifie de la même façon —
 `jsdom` ne verra jamais rien de tout cela.
+
+> ### ⚠ L'écran livré ne tient pas ce budget, et le dessin est en cause
+>
+> Mesuré sur l'écran réel le 10 septembre 2026, avec 139 prospects :
+>
+> | État | Débordement | Ce que l'artboard promet |
+> |---|---|---|
+> | Brief **replié**, 1440 × 900 | **0 px** | 0 |
+> | Brief déplié, 1440 × 900 | **194 px** | 0 (`Veille`) |
+> | Brief replié, 1440 × 720 | **69 px** | 0 (`VeilleCompacte`) |
+>
+> **La table n'y est pour rien** : ses dix rangées de 44 px, son en-tête et sa
+> pagination tiennent exactement dans le budget dessiné. C'est le **brief** qui
+> mesure 331 px là où ces artboards en dessinent ~176, et l'**intro** 87 px là
+> où ils en dessinent 26 — parce qu'ils ont redessiné plus compacts des
+> composants que le chantier n'a pas construits (`BandeProgression`,
+> `ProspectRow` dans la bande, l'intro de `TodayScreen`).
+>
+> Les 68 px qui resteraient même après avoir compacté l'intro, déplacé le
+> bouton « Replier » sur la ligne de titre et ramené les relances dues à une
+> ligne sont ceux de `BandeProgression`, livrée par le chantier n°6.
+>
+> **Décision à prendre, pas encore prise** : compacter le brief pour que le code
+> rejoigne le dessin, ou redessiner le brief à sa hauteur réelle et assumer que
+> « sans défilement » vaut brief replié. Les mesures détaillées sont dans
+> [`../HANDOFF.md`](../HANDOFF.md). **Ne pas lire ces trois artboards comme
+> décrivant l'écran d'aujourd'hui** tant que ce n'est pas tranché.
 
 ---
 

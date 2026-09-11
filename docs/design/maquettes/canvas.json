@@ -264,6 +264,14 @@
       "y": 2190,
       "w": 900,
       "text": "Trois décisions, tranchées le 2026-09-10 par le propriétaire : A, A, 1. Elles sont ici avec les options écartées et leur coût, parce qu'une décision sans son motif se redéfait au chantier suivant.\n\n1A — les 137 prospects sans ligne de suivi (98 % de la base) vont dans « À contacter », et la colonne « Suivi » distingue « Jamais contacté » de « À contacter ». Aucune migration.\n2A — la bande « Relances dues » reste, dans le brief repliable. Une échéance n'est pas un statut.\n3-1 — dix lignes par page, taille constante ; c'est le brief qui se replie, pas la table qui se mesure.\n\nLa quatrième décision, le panneau en surimpression, était demandée. Sa contrepartie est énoncée : le panneau recouvre trois colonnes."
+    },
+    {
+      "id": "note-veille-ecart",
+      "page": "page-5",
+      "x": 3120,
+      "y": 800,
+      "w": 800,
+      "text": "MESURÉ SUR L'ÉCRAN RÉEL, 10 septembre 2026 — et le dessin est en cause.\n\nBrief replié à 1440 × 900 : 0 px de débordement, dix rangées et la pagination tiennent. C'est l'état qui marche.\n\nBrief déplié à 1440 × 900 : 194 px de débordement. Brief replié à 1440 × 720 : 69 px. Ces deux artboards promettent 0.\n\nLa table n'y est pour rien : ses dix rangées de 44 px, son en-tête et sa pagination tiennent exactement dans le budget dessiné. C'est le brief qui mesure 331 px là où on en a dessiné ~176, et l'intro 87 px là où on en a dessiné 26 — parce qu'on a redessiné plus compacts des composants que ce chantier n'a pas construits.\n\nDécision à prendre : compacter le brief pour que le code rejoigne le dessin, ou redessiner le brief à sa hauteur réelle et assumer que « sans défilement » vaut brief replié."
     }
   ],
   "launch": {
