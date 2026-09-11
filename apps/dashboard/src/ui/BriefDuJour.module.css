@@ -47,8 +47,16 @@
   flex: 1;
 }
 
-.barreTitre {
-  display: flex;
-  align-items: center;
-  flex: none;
+/*
+ * Le contour du bouton n'est pas réécrit ici : `PanelActions.module.css` le
+ * porte déjà, et ce vocabulaire de bouton est celui du kit — on l'étend, on
+ * ne le double pas (correctif de revue, constat 5 : sans classe, ce bouton
+ * affichait le fond gris et la bordure 3D du navigateur).
+ */
+.boutonDeplier {
+  composes: bouton from './PanelActions.module.css';
+  height: 20px;
+  padding: 0 var(--space-2);
+  font-size: var(--text-xs);
+  border: none;
 }

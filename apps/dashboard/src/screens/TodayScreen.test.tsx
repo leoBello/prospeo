@@ -573,6 +573,105 @@ describe('TodayScreen — la table de veille remplace la liste plafonnee (tache 
   });
 });
 
+describe('TodayScreen — le bouton de repli du brief est sur la ligne de titre (constat de revue 4 et 5)', () => {
+  it('pose « Replier le brief » sur la ligne du titre « Aujourd hui », pas dans une rangée séparée', async () => {
+    const user = userEvent.setup();
+    rendre([vue('a', { score: score(90) })]);
+
+    const titre = screen.getByRole('heading', { level: 1, name: 'Aujourd\'hui' });
+    const bouton = screen.getByRole('button', { name: 'Replier le brief' });
+    // Même parent : c'est la preuve, indépendante de toute mise en page, que
+    // le bouton est sur LA MÊME LIGNE que le titre — et non sous l'intro,
+    // dans une rangée à lui seul (relevé de revue, constat 4).
+    expect(bouton.parentElement).toBe(titre.parentElement);
+
+    // Il fonctionne réellement depuis là, et la préférence partagée avec
+    // `BriefDuJour` (`usePreferences`) bascule bien vers le résumé replié.
+    await user.click(bouton);
+    expect(screen.queryByRole('button', { name: 'Replier le brief' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Déplier' })).toBeDefined();
+  });
+
+  it('efface le bouton de la ligne de titre une fois le brief replié : « Déplier » reste dans le résumé, jamais dans le titre', async () => {
+    const user = userEvent.setup();
+    rendre([vue('a', { score: score(90) })]);
+
+    const titre = screen.getByRole('heading', { level: 1, name: 'Aujourd\'hui' });
+    await user.click(screen.getByRole('button', { name: 'Replier le brief' }));
+
+    const deplier = screen.getByRole('button', { name: 'Déplier' });
+    expect(deplier.parentElement).not.toBe(titre.parentElement);
+  });
+
+  it('donne une classe aux deux boutons du brief, jamais le bouton nu du navigateur (constat de revue 5)', async () => {
+    const user = userEvent.setup();
+    rendre([vue('a', { score: score(90) })]);
+
+    const replier = screen.getByRole('button', { name: 'Replier le brief' });
+    expect(replier.className).not.toBe('');
+
+    await user.click(replier);
+    expect(screen.getByRole('button', { name: 'Déplier' }).className).not.toBe('');
+  });
+});
+
+describe('TodayScreen — les nombres qui disent « en base » restent vrais pendant une recherche (constat de revue 2)', () => {
+  it('garde les deux nombres de l onglet « Toutes » sur la meme population — la base entiere — meme sous recherche', async () => {
+    const user = userEvent.setup();
+    rendre([
+      vue('alpha', { denomination: 'PLOMBERIE ALPHA', score: score(90) }),
+      vue('beta', { denomination: 'SERRURERIE BETA', score: score(80) }),
+      vue('gamma', { denomination: 'ENTREPRISE GAMMA', score: null }),
+    ]);
+
+    // Le nom accessible de l'onglet porte aussi son compte
+    // (`veille.onglet.compte.aria`) : « Toutes » seul ne correspond à rien.
+    await user.click(screen.getByRole('tab', { name: /^Toutes/ }));
+    await user.type(screen.getByRole('searchbox'), 'alpha');
+
+    // Avant le correctif : « 1 classables, sur 3 prospects en base » — le
+    // numerateur filtre par la recherche (seul alpha la contient), le
+    // denominateur non — une fraction qui pretend que seul 1 prospect sur 3
+    // serait classable dans TOUTE la base, alors que 2 le sont reellement
+    // (alpha et beta). Les deux nombres doivent decrire la MEME population :
+    // la base entiere, insensible a la recherche.
+    expect(screen.getByText('2 classables, sur 3 prospects en base')).toBeDefined();
+  });
+
+  it('dit vrai sur « en base », a contacter aussi : le denominateur ignore la recherche, le numerateur continue de montrer ce qui est affiche', async () => {
+    const user = userEvent.setup();
+    rendre([
+      vue('alpha', { denomination: 'PLOMBERIE ALPHA', score: score(90) }), // sans ligne de suivi
+      vue('beta', { denomination: 'SERRURERIE BETA', score: score(80) }), // sans ligne de suivi
+    ]);
+
+    await user.type(screen.getByRole('searchbox'), 'alpha');
+
+    // Sans le correctif : « 1 classables, sur 1 sans aucune ligne de suivi en
+    // base » — les deux nombres etaient filtres (alpha seul), et le second
+    // pretendait pourtant decrire la base entiere (qui compte deux prospects
+    // sans ligne de suivi, alpha ET beta). Le correctif ne touche que le
+    // denominateur : le numerateur reste ce que la recherche montre.
+    expect(screen.getByText('1 classables, sur 2 sans aucune ligne de suivi en base')).toBeDefined();
+  });
+
+  it('garde le badge des jamais scores sur son compte reel de la base, meme sous recherche', async () => {
+    const user = userEvent.setup();
+    rendre([
+      vue('alpha', { denomination: 'PLOMBERIE ALPHA', score: score(90) }),
+      vue('gamma', { denomination: 'ENTREPRISE GAMMA', score: null }),
+    ]);
+
+    await user.type(screen.getByRole('searchbox'), 'alpha');
+
+    // La recherche « alpha » exclut gamma des prospects filtres : si le
+    // badge se recalculait sur cette liste filtree (comme avant ce
+    // correctif), il disparaitrait alors que le prospect jamais score existe
+    // toujours en base.
+    expect(screen.getByText('1 jamais scoré, non classable')).toBeDefined();
+  });
+});
+
 describe('TodayScreen — la recherche de la barre du haut (lot 3, tache 2)', () => {
   it('filtre reellement les listes de travail affichees', async () => {
     const user = userEvent.setup();

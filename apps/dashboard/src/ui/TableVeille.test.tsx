@@ -33,7 +33,9 @@ function page(surcharges: Partial<PageVeille> = {}): PageVeille {
 }
 
 const props = {
-  comptes: COMPTES, ordre: 'score_desc' as const, totalEnBase: 139, selectedId: null,
+  // Identiques par défaut : la plupart des tests ne portent pas sur la
+  // recherche, et `comptes`/`comptesEnBase` doivent alors coïncider.
+  comptes: COMPTES, comptesEnBase: COMPTES, ordre: 'score_desc' as const, totalEnBase: 139, selectedId: null,
   now: MAINTENANT, recherche: '', ongletPleinSansRecherche: 0,
   onChoisirOnglet: () => {}, onAllerPage: () => {}, onBasculerOrdre: () => {},
   onSelect: () => {}, onEffacerRecherche: () => {},
@@ -170,6 +172,31 @@ describe('TableVeille', () => {
       />,
     );
     expect(screen.getByText('Aucune vente conclue pour l’instant')).toBeDefined();
+  });
+
+  it('puise les nombres qui disent « en base » dans comptesEnBase, jamais dans comptes filtré par la recherche', () => {
+    // `comptes` simule ici une recherche en cours (des nombres bien plus
+    // petits que la base réelle) ; `comptesEnBase` simule la base entière.
+    // Les trois usages qui parlent explicitement de la base — le
+    // dénominateur de « à contacter », les deux nombres de « toutes », et le
+    // badge des jamais scorés — doivent tous lire `comptesEnBase` (relevé de
+    // revue, constat 2).
+    const comptesFiltres: ComptesVeille = {
+      parOnglet: { a_contacter: 1, contacte: 0, relance: 0, interesse: 0, gagne: 0, perdu: 0, ne_pas_contacter: 0, toutes: 1 },
+      sansScore: 0,
+      sansSuivi: 1,
+    };
+    const { unmount } = renderWithPreferences(
+      <TableVeille {...props} comptes={comptesFiltres} comptesEnBase={COMPTES} onglet="a_contacter" page={page({ total: 1 })} />,
+    );
+    expect(screen.getByText('1 classables, sur 137 sans aucune ligne de suivi en base')).toBeDefined();
+    expect(screen.getByText('10 jamais scorés, non classables')).toBeDefined();
+    unmount();
+
+    renderWithPreferences(
+      <TableVeille {...props} comptes={comptesFiltres} comptesEnBase={COMPTES} onglet="toutes" page={page({ total: 1 })} />,
+    );
+    expect(screen.getByText('129 classables, sur 139 prospects en base')).toBeDefined();
   });
 
   it('bascule l ordre du classement, et le dit', async () => {

@@ -131,7 +131,7 @@ export function BriefDuJour({
             : t('veille.brief.relances', { count: relances.totalCount, retard: enRetard })}
         </span>
         <span className={styles.espace} />
-        <button type="button" onClick={() => setBriefReplie(false)}>
+        <button type="button" className={styles.boutonDeplier} onClick={() => setBriefReplie(false)}>
           {t('veille.brief.deplier')}
           <svg {...CHEVRON}><path d="m6 9 6 6 6-6" /></svg>
         </button>
@@ -139,16 +139,14 @@ export function BriefDuJour({
     );
   }
 
+  // Le bouton « Replier le brief » n'est plus rendu ICI : la maquette
+  // (`Veille.dc.html`) le pose sur la ligne du titre « Aujourd'hui », pas
+  // dans sa propre rangée sous l'intro — c'est `TodayScreen` qui le rend
+  // désormais, à l'endroit exact que la maquette dessine (relevé de revue,
+  // constat 4). `TodayScreen` lit la même préférence (`usePreferences`),
+  // il n'existe donc qu'un seul mécanisme de repli.
   return (
     <div className={styles.brief}>
-      <div className={styles.barreTitre}>
-        <span className={styles.espace} />
-        <button type="button" onClick={() => setBriefReplie(true)}>
-          {t('veille.brief.replier')}
-          <svg {...CHEVRON}><path d="m18 15-6-6-6 6" /></svg>
-        </button>
-      </div>
-
       <BandeProgression jeu={jeu} />
 
       <WorkListSection

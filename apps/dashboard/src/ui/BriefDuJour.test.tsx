@@ -78,28 +78,55 @@ describe('BriefDuJour', () => {
     window.localStorage.clear();
   });
 
+  // Correctif de revue (constat 4) : le bouton « Replier le brief » a
+  // déménagé sur la ligne de titre de `TodayScreen` (la maquette le pose sur
+  // la ligne « Aujourd'hui », jamais dans sa propre rangée). Ce fichier ne
+  // teste donc plus ce bouton — il n'appartient plus à `BriefDuJour` — mais
+  // continue de tester CE que ce composant rend encore lui-même : le corps
+  // déplié, et le résumé replié avec son bouton « Déplier » (resté ici, la
+  // maquette `VeilleCompacte.dc.html` le laissant dans la barre de résumé).
+  // Le câblage du bouton déménagé est couvert par `TodayScreen.test.tsx`.
   it('est déplié par défaut : on ne cache pas ce qui est dû à la première visite', () => {
     renderWithPreferences(<BriefDuJour {...props} />);
-    expect(screen.getByRole('button', { name: 'Replier le brief' })).toBeDefined();
+    // Le résumé replié (et son bouton « Déplier ») n'existe que dans l'AUTRE
+    // branche du rendu : son absence prouve l'état déplié par défaut.
+    expect(screen.queryByRole('button', { name: 'Déplier' })).toBeNull();
+    // La bande de progression, elle, ne se monte que déplié.
+    expect(screen.getByRole('status')).toBeDefined();
   });
 
-  it('se replie en un résumé, qui compte encore ce qui est dû', async () => {
+  it('affiche le résumé replié, qui compte encore ce qui est dû, quand la préférence de repli est active', () => {
+    // Plus de clic ICI sur un bouton de repli : il a déménagé (constat 4).
+    // On simule directement une préférence déjà repliée, comme le ferait une
+    // visite suivante — `setBriefReplie` (ui/preferences.tsx) écrit à cette
+    // même clé.
+    window.localStorage.setItem('prospeo.briefReplie', 'true');
     renderWithPreferences(<BriefDuJour {...props} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Replier le brief' }));
     expect(screen.getByText('Brief du jour')).toBeDefined();
     expect(screen.getByRole('button', { name: 'Déplier' })).toBeDefined();
   });
 
-  it('retient le repli d une visite à l autre', async () => {
+  it('retient le dépli d une visite à l autre', async () => {
+    window.localStorage.setItem('prospeo.briefReplie', 'true');
     const { unmount } = renderWithPreferences(<BriefDuJour {...props} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Replier le brief' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Déplier' }));
     unmount();
 
     renderWithPreferences(<BriefDuJour {...props} />);
-    expect(screen.getByRole('button', { name: 'Déplier' })).toBeDefined();
+    // Remonté déplié : le résumé et son bouton « Déplier » ont disparu.
+    expect(screen.queryByRole('button', { name: 'Déplier' })).toBeNull();
   });
 
-  it('distingue, dans le résumé replié, les relances en retard de celles qui ne le sont pas encore', async () => {
+  it('donne une classe au bouton « Déplier », pas le bouton nu du navigateur (constat de revue 5)', () => {
+    // `ui/theme.css` ne pose que `font`, `color` et `cursor` sur `button` :
+    // sans classe, ce bouton affiche le fond gris et la bordure 3D du
+    // navigateur — invisible pour `jsdom`, mais bien réel à l'écran.
+    window.localStorage.setItem('prospeo.briefReplie', 'true');
+    renderWithPreferences(<BriefDuJour {...props} />);
+    expect(screen.getByRole('button', { name: 'Déplier' }).className).not.toBe('');
+  });
+
+  it('distingue, dans le résumé replié, les relances en retard de celles qui ne le sont pas encore', () => {
     // Une échéance passée (8 septembre) et une échéance future (12 septembre),
     // par rapport à `props.now` (10 septembre) : une seule est en retard.
     const relances: WorkList = {
@@ -122,8 +149,8 @@ describe('BriefDuJour', () => {
       totalCount: 2,
     };
 
+    window.localStorage.setItem('prospeo.briefReplie', 'true');
     renderWithPreferences(<BriefDuJour {...props} relances={relances} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Replier le brief' }));
 
     expect(screen.getByText('2 relances dues, dont 1 en retard')).toBeDefined();
   });
@@ -140,29 +167,29 @@ describe('BriefDuJour', () => {
    * seul) : cette dernière est taillée pour l'anneau de `BandeProgression`,
    * pas pour finir une phrase (correctif de revue, tâche 8).
    */
-  it('nomme l objectif inconnu dans le résumé replié, plutôt que de le taire ou de le rendre par un zéro', async () => {
+  it('nomme l objectif inconnu dans le résumé replié, plutôt que de le taire ou de le rendre par un zéro', () => {
     // `container.textContent`, et non `getByText` : « pas encore connu » vit
     // dans un `<span>` imbriqué (`styles.absent`), et `getByText` ne compare
     // que le texte des nœuds ENFANTS DIRECTS d'un élément — un des pièges
     // documentés de cette suite.
     const jeu = jeuPret({ objectifDuJour: { connue: false, motif: 'historique_insuffisant' } });
+    window.localStorage.setItem('prospeo.briefReplie', 'true');
     const { container } = renderWithPreferences(<BriefDuJour {...props} jeu={jeu} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Replier le brief' }));
 
     expect(container.textContent).toContain('Objectif du jour pas encore connu');
   });
 
-  it('reprend, dans le résumé replié, le réalisé et son dénominateur — les mêmes chiffres que l anneau de BandeProgression', async () => {
+  it('reprend, dans le résumé replié, le réalisé et son dénominateur — les mêmes chiffres que l anneau de BandeProgression', () => {
     const jeu = jeuPret({ objectifDuJour: { connue: true, valeur: 15 }, realiseAujourdHui: 12 });
+    window.localStorage.setItem('prospeo.briefReplie', 'true');
     renderWithPreferences(<BriefDuJour {...props} jeu={jeu} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Replier le brief' }));
 
     expect(screen.getByText('Objectif du jour 12 / 15')).toBeDefined();
   });
 
-  it('ne prétend rien sur l objectif tant que le jeu charge : aucun résumé ne serait honnête', async () => {
+  it('ne prétend rien sur l objectif tant que le jeu charge : aucun résumé ne serait honnête', () => {
+    window.localStorage.setItem('prospeo.briefReplie', 'true');
     renderWithPreferences(<BriefDuJour {...props} jeu={{ status: 'loading' }} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Replier le brief' }));
 
     expect(screen.queryByText('Objectif du jour', { exact: false })).toBeNull();
   });

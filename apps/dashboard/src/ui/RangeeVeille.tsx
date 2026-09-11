@@ -2,6 +2,8 @@ import type { ReactNode } from 'react';
 import { affichageTelephone } from '@prospeo/core';
 import { joursCivils } from '../domain/today.js';
 import type { ProspectView } from '../domain/prospect.js';
+import { scoreSegments } from '../domain/score.js';
+import type { ScoreBarGroup } from '../domain/score.js';
 import type { OngletVeille } from '../domain/veille.js';
 import type { TranslationKey, TranslationParams } from '../i18n/translate.js';
 import { Badge } from './kit/Badge.js';
@@ -12,11 +14,21 @@ import styles from './RangeeVeille.module.css';
 /** Les onglets où la dernière colonne porte une échéance : ceux d'un engagement en cours. */
 const ENGAGEMENT: readonly OngletVeille[] = ['contacte', 'relance', 'interesse'];
 
-const COULEUR_SEGMENT = [
-  'var(--color-seg-presence)',
-  'var(--color-seg-vitalite)',
-  'var(--color-seg-joignabilite)',
-] as const;
+/** Les mêmes trois tokens que `ScoreBar.tsx` : c'est la même décomposition, jamais un second vocabulaire. */
+const COULEUR_SEGMENT: Record<ScoreBarGroup, string> = {
+  presence: 'var(--color-seg-presence)',
+  vitalite: 'var(--color-seg-vitalite)',
+  joignabilite: 'var(--color-seg-joignabilite)',
+};
+
+/**
+ * La largeur totale de l'indicateur pour un score plein (100).
+ *
+ * Reprend l'encombrement des trois segments fixes qu'il remplace (11 + 9 + 7,
+ * l'ancien maximum codé en dur) : la correction change QUI pilote chaque
+ * largeur, pas la place que l'indicateur occupe sous le total.
+ */
+const LARGEUR_SEGMENTS = 27;
 
 /** Le seuil au-delà duquel le score se met à l'accent. Repris de la maquette. */
 const SCORE_FORT = 70;
@@ -112,6 +124,16 @@ export function RangeeVeille({ prospect, onglet, selectionne, now, onSelect }: P
   const categorie = prospect.presence?.category ?? null;
   const telephone = prospect.enrichment?.phoneE164 ?? null;
   const type = prospect.enrichment?.phoneKind ?? null;
+  // `breakdown` vide (plusieurs fixtures de test, et tout score dont le
+  // détail n'a jamais été lu) : `scoreSegments` y répond par trois largeurs
+  // nulles, donc aucun segment ne survit au filtre ci-dessous — jamais les
+  // trois blocs fixes que cette rangée dessinait avant ce correctif, une
+  // décomposition identique sur toutes les lignes quel que soit le prospect
+  // (relevé de revue, constat 1).
+  const segments =
+    total === null
+      ? []
+      : scoreSegments(prospect.score?.breakdown ?? [], total).filter((segment) => segment.widthPercent > 0);
 
   return (
     <button
@@ -134,8 +156,16 @@ export function RangeeVeille({ prospect, onglet, selectionne, now, onSelect }: P
           {total ?? '—'}
         </span>
         <span className={styles.segments} aria-hidden="true">
-          {COULEUR_SEGMENT.map((couleur, i) => (
-            <span key={i} className={styles.segment} style={{ width: 11 - i * 2, background: couleur }} />
+          {segments.map((segment) => (
+            <span
+              key={segment.group}
+              data-segment={segment.group}
+              className={styles.segment}
+              style={{
+                width: `${(segment.widthPercent / 100) * LARGEUR_SEGMENTS}px`,
+                background: COULEUR_SEGMENT[segment.group],
+              }}
+            />
           ))}
         </span>
       </span>

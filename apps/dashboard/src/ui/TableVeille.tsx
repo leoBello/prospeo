@@ -66,6 +66,18 @@ const CLASSEMENT_DE_LA_BASE: readonly OngletVeille[] = ['a_contacter', 'toutes']
 interface Props {
   onglet: OngletVeille;
   comptes: ComptesVeille;
+  /**
+   * Les mêmes comptes, mais calculés SANS la recherche.
+   *
+   * Seule source légitime des trois chiffres qui parlent explicitement de la
+   * base : le dénominateur de `veille.compte.a_contacter`, les deux nombres
+   * de `veille.compte.toutes`, et le badge des jamais scorés. `comptes`
+   * (ci-dessus, potentiellement filtré par une recherche) reste la source de
+   * la barre d'onglets et du numérateur de « à contacter » — des chiffres
+   * qui ne prétendent décrire que ce que la recherche montre, jamais la base
+   * entière (relevé de revue, constat 2).
+   */
+  comptesEnBase: ComptesVeille;
   page: PageVeille;
   ordre: OrdreVeille;
   /** Le nombre de prospects en base, scorés ou non — il n'est pas déductible des comptes. */
@@ -98,7 +110,7 @@ interface Props {
  * vide nommé prend leur place, et porte une sortie vers l'onglet plein.
  */
 export function TableVeille({
-  onglet, comptes, page, ordre, totalEnBase, selectedId, now, recherche, ongletPleinSansRecherche,
+  onglet, comptes, comptesEnBase, page, ordre, totalEnBase, selectedId, now, recherche, ongletPleinSansRecherche,
   onChoisirOnglet, onAllerPage, onBasculerOrdre, onSelect, onEffacerRecherche,
 }: Props) {
   const t = useT();
@@ -112,9 +124,9 @@ export function TableVeille({
 
   const compte =
     onglet === 'a_contacter'
-      ? t('veille.compte.a_contacter', { classables: page.total, total: comptes.sansSuivi })
+      ? t('veille.compte.a_contacter', { classables: page.total, total: comptesEnBase.sansSuivi })
       : onglet === 'toutes'
-        ? t('veille.compte.toutes', { classables, total: totalEnBase })
+        ? t('veille.compte.toutes', { classables: comptesEnBase.parOnglet.toutes, total: totalEnBase })
         : page.total === 0
           ? t('veille.compte.vide')
           : t('veille.compte.statut', { count: page.total, classables });
@@ -149,11 +161,11 @@ export function TableVeille({
           quoi l'explication n'existerait qu'à la souris. C'est le patron de
           `kit/Bientot.tsx`, qui enveloppe un badge de la même façon.
         */}
-        {CLASSEMENT_DE_LA_BASE.includes(onglet) && comptes.sansScore > 0 ? (
+        {CLASSEMENT_DE_LA_BASE.includes(onglet) && comptesEnBase.sansScore > 0 ? (
           <Tooltip contenu={t('veille.sansScore.hint')}>
             <span tabIndex={0}>
               <Badge ton="alerte" taille="compacte" discontinu>
-                {t('veille.sansScore', { count: comptes.sansScore })}
+                {t('veille.sansScore', { count: comptesEnBase.sansScore })}
               </Badge>
             </span>
           </Tooltip>

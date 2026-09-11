@@ -1,9 +1,14 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import type { ScoreLine } from '@prospeo/core';
 import type { ProspectView } from '../domain/prospect.js';
 import { RangeeVeille } from './RangeeVeille.js';
 import { renderWithPreferences } from '../test-utils.js';
+
+function score(total: number, breakdown: ScoreLine[] = []) {
+  return { total, rulesetVersion: 'v3', computedAt: '2026-09-02T00:00:00.000Z', breakdown };
+}
 
 // Heure locale, sans « Z » : `joursCivils` lit `getFullYear`/`getMonth`/
 // `getDate`, donc l'heure LOCALE de la machine qui exécute le test. Un
@@ -301,5 +306,89 @@ describe('RangeeVeille — la sélection', () => {
     );
     await userEvent.click(screen.getByRole('button'));
     expect(onSelect).toHaveBeenCalledWith('p1');
+  });
+});
+
+describe('RangeeVeille — la colonne Score (constat de revue 3, sans test jusqu ici)', () => {
+  it('affiche le total du score, pas seulement sa décoration', () => {
+    renderWithPreferences(
+      <RangeeVeille prospect={prospect({ score: score(83) })} onglet="a_contacter" selectionne={false} now={MAINTENANT} onSelect={() => {}} />,
+    );
+    expect(screen.getByText('83')).toBeDefined();
+  });
+
+  it('nomme l absence de score par un tiret, jamais par un zéro', () => {
+    renderWithPreferences(
+      <RangeeVeille prospect={prospect({ score: null })} onglet="a_contacter" selectionne={false} now={MAINTENANT} onSelect={() => {}} />,
+    );
+    expect(screen.getByText('—')).toBeDefined();
+    expect(screen.queryByText('0')).toBeNull();
+  });
+
+  it('met le score à l accent au seuil SCORE_FORT, jamais juste en-dessous', () => {
+    const { unmount } = renderWithPreferences(
+      <RangeeVeille prospect={prospect({ score: score(70) })} onglet="a_contacter" selectionne={false} now={MAINTENANT} onSelect={() => {}} />,
+    );
+    expect(screen.getByText('70').getAttribute('data-fort')).toBe('true');
+    unmount();
+
+    renderWithPreferences(
+      <RangeeVeille prospect={prospect({ score: score(69) })} onglet="a_contacter" selectionne={false} now={MAINTENANT} onSelect={() => {}} />,
+    );
+    expect(screen.getByText('69').getAttribute('data-fort')).toBeNull();
+  });
+
+  it('porte le badge de métier, distinct par prospect', () => {
+    const { unmount } = renderWithPreferences(
+      <RangeeVeille prospect={prospect({ tradeSlug: 'plombier' })} onglet="a_contacter" selectionne={false} now={MAINTENANT} onSelect={() => {}} />,
+    );
+    expect(screen.getByText('Plombier')).toBeDefined();
+    unmount();
+
+    renderWithPreferences(
+      <RangeeVeille prospect={prospect({ tradeSlug: 'serrurier' })} onglet="a_contacter" selectionne={false} now={MAINTENANT} onSelect={() => {}} />,
+    );
+    expect(screen.getByText('Serrurier')).toBeDefined();
+  });
+
+  it('ne dessine aucun segment quand le barème n a jamais été détaillé, plutôt que trois blocs inventés', () => {
+    // Plusieurs fixtures de cette suite (dont `prospect()` ci-dessus) passent
+    // un `breakdown` vide avec un total non nul : `scoreSegments` y répond
+    // par trois largeurs nulles (aucun point positif à répartir), et la
+    // rangée ne doit alors RIEN dessiner — jamais les trois segments fixes
+    // 11/9/7 qu'elle dessinait avant ce correctif, identiques sur toutes les
+    // rangées quel que soit le prospect (constat de revue 1).
+    const { container } = renderWithPreferences(
+      <RangeeVeille prospect={prospect({ score: score(74) })} onglet="a_contacter" selectionne={false} now={MAINTENANT} onSelect={() => {}} />,
+    );
+    expect(container.querySelectorAll('[data-segment]')).toHaveLength(0);
+  });
+
+  it('ne dessine pas de segment pour un bloc sans points positifs, comme ScoreBar', () => {
+    const breakdown: ScoreLine[] = [
+      { code: 'presence_has_site', label: 'Site correct', points: -100, group: 'presence' },
+      { code: 'staff', label: 'Au moins 3 salariés', points: 10, group: 'vitalite' },
+      { code: 'phone_mobile', label: 'Mobile trouvé', points: 20, group: 'joignabilite' },
+    ];
+    const { container } = renderWithPreferences(
+      <RangeeVeille prospect={prospect({ score: score(30, breakdown) })} onglet="a_contacter" selectionne={false} now={MAINTENANT} onSelect={() => {}} />,
+    );
+    const segments = [...container.querySelectorAll('[data-segment]')].map((s) => s.getAttribute('data-segment'));
+    expect(segments).toEqual(['vitalite', 'joignabilite']);
+  });
+
+  it('fait varier les segments avec la décomposition réelle, jamais une largeur constante', () => {
+    // Avant ce correctif, les trois largeurs étaient écrites en dur
+    // (`11 - i * 2`) : un prospect dont TOUT le score vient de la présence
+    // dessinait quand même trois segments. Ici, un seul groupe porte des
+    // points : un seul segment doit apparaître.
+    const breakdown: ScoreLine[] = [
+      { code: 'presence_none', label: 'Aucune présence web', points: 35, group: 'presence' },
+    ];
+    const { container } = renderWithPreferences(
+      <RangeeVeille prospect={prospect({ score: score(35, breakdown) })} onglet="a_contacter" selectionne={false} now={MAINTENANT} onSelect={() => {}} />,
+    );
+    const segments = [...container.querySelectorAll('[data-segment]')].map((s) => s.getAttribute('data-segment'));
+    expect(segments).toEqual(['presence']);
   });
 });

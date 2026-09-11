@@ -17,7 +17,7 @@ import { TableVeille } from '../ui/TableVeille.js';
 import { useListNavigation } from '../ui/useListNavigation.js';
 import { useDeploymentEvents } from '../data/useDeploymentEvents.js';
 import { useJeu } from '../data/useJeu.js';
-import { useT } from '../ui/preferences.js';
+import { useT, usePreferences } from '../ui/preferences.js';
 import { estMac } from '../ui/plateforme.js';
 import styles from './TodayScreen.module.css';
 
@@ -40,6 +40,24 @@ function IconeRecherche() {
     </svg>
   );
 }
+
+/**
+ * Le chevron du bouton « Replier le brief » — même tracé que celui que
+ * `BriefDuJour` posait sur ce bouton avant qu'il ne déménage ici (constat de
+ * revue 4). Dupliqué plutôt qu'importé : `BriefDuJour` garde son propre
+ * chevron, vers le bas, pour « Déplier ».
+ */
+const CHEVRON_HAUT = {
+  width: 12,
+  height: 12,
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 2,
+  strokeLinecap: 'round' as const,
+  strokeLinejoin: 'round' as const,
+  'aria-hidden': true,
+} as const;
 
 interface Props {
   prospects: ProspectView[];
@@ -74,6 +92,10 @@ export function TodayScreen({
   nav,
 }: Props) {
   const t = useT();
+  // Même préférence que `BriefDuJour` (`usePreferences`) : le bouton qui la
+  // bascule vit ici (ligne de titre, constat de revue 4), sa lecture pour le
+  // résumé replié reste dans `BriefDuJour` — un seul mécanisme de repli.
+  const { briefReplie, setBriefReplie } = usePreferences();
   // Mémorisé : une `Date` reconstruite à chaque rendu changerait d'identité en
   // permanence et recomposerait les listes sans fin.
   const instant = useMemo(() => now ?? new Date(), [now]);
@@ -97,6 +119,22 @@ export function TodayScreen({
   const [ordre, setOrdre] = useState<OrdreVeille>('score_desc');
 
   const comptes = useMemo(() => comptesVeille(prospectsFiltres), [prospectsFiltres]);
+  /**
+   * Les mêmes comptes, mais SANS la recherche (relevé de revue, constat 2).
+   *
+   * `comptes` ci-dessus sert la barre d'onglets et les nombres de la table :
+   * là, refléter la recherche est le but. Mais deux phrases de `TableVeille`
+   * disent explicitement « en base » (`veille.compte.a_contacter`,
+   * `veille.compte.toutes`), et le badge des jamais scorés signale un fait
+   * sur la BASE, pas sur une recherche en cours — trois usages qui doivent
+   * décrire la même population que `totalEnBase` (`prospects.length`,
+   * ci-dessous), jamais celle que la recherche a retenue. Sans ce second
+   * calcul, taper « alpha » puis ouvrir « Toutes » annonçait par exemple
+   * « 2 classables, sur 139 prospects en base » — un numérateur filtré par
+   * la recherche accolé à un dénominateur qui ne l'est pas, une fraction qui
+   * n'a jamais existé. Même patron que `ongletPleinSansRecherche` ci-dessous.
+   */
+  const comptesEnBase = useMemo(() => comptesVeille(prospects), [prospects]);
   const page = useMemo(
     () => pageVeille(prospectsFiltres, onglet, ordre, numeroPage),
     [prospectsFiltres, onglet, ordre, numeroPage],
@@ -326,7 +364,23 @@ export function TodayScreen({
       list={
         <>
           <div className={styles.intro}>
-            <h1 className={styles.title}>{t('today.title')}</h1>
+            <div className={styles.titreLigne}>
+              <h1 className={styles.title}>{t('today.title')}</h1>
+              <span className={styles.titreEspace} />
+              {/* Rendu seulement déplié : replié, la maquette
+                  (`VeilleCompacte.dc.html`) laisse « Déplier » dans le résumé
+                  de `BriefDuJour`, jamais sur cette ligne de titre. */}
+              {!briefReplie ? (
+                <button
+                  type="button"
+                  className={styles.boutonReplier}
+                  onClick={() => setBriefReplie(true)}
+                >
+                  {t('veille.brief.replier')}
+                  <svg {...CHEVRON_HAUT}><path d="m18 15-6-6-6 6" /></svg>
+                </button>
+              ) : null}
+            </div>
             <p className={styles.subtitle}>{t('today.subtitle')}</p>
           </div>
 
@@ -348,6 +402,7 @@ export function TodayScreen({
           <TableVeille
             onglet={onglet}
             comptes={comptes}
+            comptesEnBase={comptesEnBase}
             page={page}
             ordre={ordre}
             totalEnBase={prospects.length}
