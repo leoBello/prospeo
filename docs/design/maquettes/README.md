@@ -79,7 +79,7 @@ fenêtre de 720. Une correction de mise en page se revérifie de la même façon
 > | État | Débordement | Ce que l'artboard promet |
 > |---|---|---|
 > | Brief **replié**, 1440 × 900 | **0 px** | 0 |
-> | Brief déplié, 1440 × 900 | **194 px** | 0 (`Veille`) |
+> | Brief déplié, 1440 × 900 | **169 px** | 0 (`Veille`) |
 > | Brief replié, 1440 × 720 | **69 px** | 0 (`VeilleCompacte`) |
 >
 > **La table n'y est pour rien** : ses dix rangées de 44 px, son en-tête et sa
@@ -89,9 +89,10 @@ fenêtre de 720. Une correction de mise en page se revérifie de la même façon
 > composants que le chantier n'a pas construits (`BandeProgression`,
 > `ProspectRow` dans la bande, l'intro de `TodayScreen`).
 >
-> Les 68 px qui resteraient même après avoir compacté l'intro, déplacé le
-> bouton « Replier » sur la ligne de titre et ramené les relances dues à une
-> ligne sont ceux de `BandeProgression`, livrée par le chantier n°6.
+> Le bouton « Replier » est depuis remonté sur la ligne de titre, comme
+> l'artboard le dessine : 194 px de débordement sont devenus 169. Les 68 px qui
+> resteraient même après avoir compacté l'intro et ramené les relances dues à
+> une ligne sont ceux de `BandeProgression`, livrée par le chantier n°6.
 >
 > **Décision à prendre, pas encore prise** : compacter le brief pour que le code
 > rejoigne le dessin, ou redessiner le brief à sa hauteur réelle et assumer que
