@@ -72,30 +72,56 @@
   --shadow-popup: 0 8px 24px rgb(0 0 0 / 45%);
 }
 
+/*
+ * Thème clair, direction « bleu ardoise ».
+ *
+ * La première version posait #ffffff sur #fafafa : deux surfaces à 100 % et
+ * 96 % de luminance, c'est-à-dire un écran qui renvoie la quasi-totalité de
+ * ce que la dalle peut émettre, sur une application où l'on passe l'heure à
+ * balayer des lignes. Le contraste, lui, était excellent — le défaut n'était
+ * pas là, il était dans la luminance absolue.
+ *
+ * Le fond descend donc à 75 % et les surfaces à 85 %, et l'ensemble prend la
+ * teinte bleutée du thème sombre : #0b0d12 est un bleu-noir, son pendant
+ * clair est un bleu-gris, pas un blanc neutre posé à côté. Une direction
+ * chaude (ivoire) avait été essayée avant celle-ci et écartée au rendu.
+ *
+ * Le texte y perd un peu de contraste (15,3:1 contre 17,4:1) et reste très
+ * au-dessus du seuil AAA ; le texte secondaire, lui, y GAGNE (6,20:1 contre
+ * 5,02:1), parce qu'un gris moyen se détache mieux d'un bleu-gris que d'un
+ * blanc pur. C'est la raison de fond pour laquelle baisser la luminosité
+ * n'abîme pas la lisibilité ici : elle l'améliore.
+ *
+ * La hiérarchie du thème sombre est conservée telle quelle : le fond est le
+ * sol, les surfaces se lèvent au-dessus de lui.
+ */
 :root[data-theme='light'] {
   color-scheme: light;
 
-  --color-bg: #fafafa;
-  --color-surface: #ffffff;
-  --color-surface-2: #f4f4f6;
-  --color-border: #e8e8e8;
-  --color-border-strong: #cfcfd6;
-  --color-text: #1a1a1a;
-  --color-text-muted: #6f6f6f;
-  --color-text-faint: #8a8a8a;
-  --color-accent: #4f46e5;
+  --color-bg: #dbe1ec;
+  --color-surface: #e9eef6;
+  --color-surface-2: #d9e0ec;
+  --color-border: #c6d0df;
+  --color-border-strong: #9fadc1;
+  --color-text: #121822;
+  --color-text-muted: #4d5867;
+  --color-text-faint: #727e8e;
+  --color-accent: #2d4bb8;
 
   --color-seg-presence: var(--color-accent);
-  --color-seg-vitalite: #8b85ee;
-  --color-seg-joignabilite: #c9c5f7;
-  --color-seg-empty: #ececf0;
+  --color-seg-vitalite: #6277d2;
+  --color-seg-joignabilite: #a3b0e0;
+  --color-seg-empty: #d3dae6;
 
-  --color-success: #0f7a5a;
-  --color-danger: #c23b3b;
-  --color-warning: #a06a10;
-  --color-info: #6d4bd8;
+  --color-success: #0d6b4d;
+  --color-danger: #ac3540;
+  --color-warning: #7d5810;
+  --color-info: #5940b4;
 
-  --shadow-popup: 0 8px 24px rgb(0 0 0 / 12%);
+  /* Une ombre se lit contre son fond. Les 12 % de la version blanche
+     disparaissaient sur un sol descendu à 75 % : le calque ne flottait plus,
+     il était collé. */
+  --shadow-popup: 0 8px 24px rgb(0 0 0 / 16%);
 }
 
 * {
