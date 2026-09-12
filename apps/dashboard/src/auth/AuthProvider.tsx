@@ -7,6 +7,8 @@ export interface Auth {
   /** `undefined` tant qu'on ne sait pas encore, `null` quand personne n'est connecté. */
   session: Session | null | undefined;
   signIn: (email: string, password: string) => Promise<void>;
+  /** Ouvre le flux OAuth Google avec le scope d'envoi. Redirige la page. */
+  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -57,11 +59,32 @@ export function AuthProvider({
     [client],
   );
 
+  const signInWithGoogle = useCallback(async () => {
+    const { error } = await client.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        // Le scope le plus etroit qui permette d'envoyer : il ne donne AUCUN
+        // acces en lecture a la boite (§7.1 du spec).
+        scopes: 'https://www.googleapis.com/auth/gmail.send',
+        // `prompt: 'consent'` SANS `access_type: 'offline'`. Ce dernier ferait
+        // rendre par Google un jeton de rafraichissement, que Supabase rangerait
+        // dans la session stockee du navigateur — c'est-a-dire un identifiant
+        // Google durable, ce que D5 exclut. Le jeton d'une heure est le prix
+        // assume de cette decision.
+        queryParams: { prompt: 'consent' },
+      },
+    });
+    if (error !== null) throw error;
+  }, [client]);
+
   const signOut = useCallback(async () => {
     await client.auth.signOut();
   }, [client]);
 
-  const value = useMemo<Auth>(() => ({ session, signIn, signOut }), [session, signIn, signOut]);
+  const value = useMemo<Auth>(
+    () => ({ session, signIn, signInWithGoogle, signOut }),
+    [session, signIn, signInWithGoogle, signOut],
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

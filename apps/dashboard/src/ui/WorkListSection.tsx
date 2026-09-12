@@ -15,11 +15,13 @@ interface Props {
 }
 
 /**
- * Une des listes de travail de l'écran « Aujourd'hui » (§9.2).
+ * La bande des relances dues de l'écran « Aujourd'hui » (§9.2) — seule liste
+ * de travail restante depuis le retrait de « Nouveaux prospects à fort
+ * score », remplacée par la table de veille.
  *
  * Le compteur du titre porte `totalCount` et non le nombre de lignes rendues :
- * les listes sont plafonnées, et annoncer le nombre affiché reviendrait à
- * cacher cent prospects derrière un titre rassurant.
+ * la liste est plafonnée, et annoncer le nombre affiché reviendrait à cacher
+ * cent prospects derrière un titre rassurant.
  */
 export function WorkListSection({
   titleKey,

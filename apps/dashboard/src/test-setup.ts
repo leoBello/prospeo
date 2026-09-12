@@ -2,6 +2,60 @@ import { afterEach } from 'vitest';
 import { cleanup } from '@testing-library/react';
 
 /**
+ * Sous ce jsdom (sans URL http(s) configurée), `window.localStorage` vaut
+ * `undefined` — constaté par une sonde directe, pas supposé : l'avertissement
+ * Node « localStorage is not available because --localstorage-file was not
+ * provided » le confirme. `preferences.tsx` s'en accommode pour ses trois
+ * préférences (thème, locale, repli du brief) : son écriture échoue en
+ * silence, et un test qui se contente de lire les valeurs par défaut ne voit
+ * jamais le trou.
+ *
+ * Mais un test qui veut prouver une **vraie** persistance — démonter un
+ * composant, le remonter, vérifier que la préférence a survécu — a besoin
+ * d'un magasin qui survit réellement, pas d'un `undefined` qui avale
+ * silencieusement chaque écriture. `BriefDuJour.test.tsx` portait ce
+ * palliatif en local (tâche 8) ; il est remonté ici, partagé, après qu'un
+ * second fichier (`BarreHaut.test.tsx`) s'est mis à contourner le même trou
+ * sans le combler — la preuve qu'un palliatif local se réinvente ou
+ * s'omet à la tâche suivante plutôt que de se retrouver.
+ *
+ * Le magasin est remis à zéro après CHAQUE test (`afterEach`), pas une
+ * seule fois pour toute la suite : sans ça, l'ordre dans lequel Vitest
+ * choisit d'exécuter les fichiers déciderait quels tests héritent des
+ * écritures de leurs voisins — un couplage invisible en lecture de test.
+ *
+ * À retirer si ce dépôt adopte un jour un jsdom configuré avec une URL
+ * http(s) (ce qui active son propre `localStorage`), ou une dépendance
+ * dédiée (`jest-environment-jsdom` en porte un ; ce dépôt ne l'installe
+ * pas).
+ */
+class MagasinMemoire {
+  private valeurs = new Map<string, string>();
+  clear(): void {
+    this.valeurs.clear();
+  }
+  getItem(cle: string): string | null {
+    return this.valeurs.has(cle) ? this.valeurs.get(cle)! : null;
+  }
+  setItem(cle: string, valeur: string): void {
+    this.valeurs.set(cle, valeur);
+  }
+}
+
+// Ce fichier sert aussi les tests qui déclarent l'environnement `node` (voir
+// `i18n/i18n.test.ts`, `ui/theme.test.ts`, `ui/guidelines.test.ts`) : là où
+// il n'y a pas de `window`, il n'y a pas de `localStorage` à poser.
+if (typeof window !== 'undefined') {
+  const magasin = new MagasinMemoire();
+  Object.defineProperty(window, 'localStorage', {
+    value: magasin,
+    writable: true,
+    configurable: true,
+  });
+  afterEach(() => magasin.clear());
+}
+
+/**
  * Sans ce démontage, deux tests qui rendent le même composant laissent deux
  * copies dans le document : les requêtes `getByText` deviennent ambiguës et
  * échouent sur un « found multiple elements » qui n'a rien à voir avec la

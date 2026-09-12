@@ -70,6 +70,10 @@
   /* L'ombre d'un calque flottant se lit contre son fond : dense sur le thème
      sombre, presque effacée sur le clair, où la même densité ferait une tache. */
   --shadow-popup: 0 8px 24px rgb(0 0 0 / 45%);
+
+  /* L'ombre du panneau, qui est un calque posé sur la liste : elle porte à
+     gauche, et c'est elle qui dit qu'il flotte plutôt qu'il ne pousse. */
+  --shadow-panel: -20px 0 48px rgb(0 0 0 / 55%);
 }
 
 /*
@@ -118,10 +122,11 @@
   --color-warning: #7d5810;
   --color-info: #5940b4;
 
-  /* Une ombre se lit contre son fond. Les 12 % de la version blanche
-     disparaissaient sur un sol descendu à 75 % : le calque ne flottait plus,
-     il était collé. */
+  /* Une ombre se lit contre son fond. Les 12 % et 14 % de la version blanche
+     disparaissaient sur un sol descendu à 75 % : ni le calque flottant ni le
+     panneau ne flottaient plus, ils étaient collés. */
   --shadow-popup: 0 8px 24px rgb(0 0 0 / 16%);
+  --shadow-panel: -20px 0 48px rgb(0 0 0 / 18%);
 }
 
 * {

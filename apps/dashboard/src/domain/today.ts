@@ -1,6 +1,5 @@
-import type { ScoreLine } from '@prospeo/core';
 import type { TranslationKey, TranslationParams } from '../i18n/translate.js';
-import type { ProspectView, ReasonFragment, WorkList, WorkRow } from './prospect.js';
+import type { ProspectView, WorkList, WorkRow } from './prospect.js';
 
 /**
  * Plafond d'affichage d'une liste de travail.
@@ -11,9 +10,6 @@ import type { ProspectView, ReasonFragment, WorkList, WorkRow } from './prospect
  */
 export const MAX_ROWS_PER_LIST = 12;
 
-/** Nombre de signaux repris dans la raison d'un prospect à fort score. */
-const MAX_REASON_LINES = 3;
-
 /**
  * Statuts qui retirent définitivement un prospect des files de travail.
  *
@@ -22,7 +18,15 @@ const MAX_REASON_LINES = 3;
  */
 const STATUTS_CLOS = new Set(['ne_pas_contacter', 'gagne', 'perdu']);
 
-/** Statuts qui valent « jamais engagé », donc éligibles à la file des nouveaux. */
+/**
+ * Statuts qui valent « jamais engagé ».
+ *
+ * La file des nouveaux, qui s'en servait pour se peupler, a disparu (elle
+ * est devenue l'onglet « à contacter » de la table de veille, décision 1A).
+ * Cette constante ne sert plus qu'à EXCLURE `a_contacter` de la file des
+ * relances ci-dessous : un prospect qu'on n'a encore jamais engagé n'a rien
+ * à « relancer ».
+ */
 const STATUTS_NON_ENGAGES = new Set(['a_contacter']);
 
 export interface FollowUpReason {
@@ -70,23 +74,6 @@ export function followUpReason(nextActionAt: string | null, now: Date): FollowUp
 }
 
 /**
- * Les signaux qui justifient un score, du plus lourd au plus léger.
- *
- * La présence web ouvre toujours la liste, quel que soit son poids : c'est le
- * motif de qualification du prospect, et le reste n'est qu'un renfort. Une
- * ligne à points négatifs ou nuls est écartée — une raison de figurer dans la
- * file ne se justifie pas par un manque.
- */
-export function highlightLines(breakdown: ScoreLine[], max = MAX_REASON_LINES): ScoreLine[] {
-  const positives = breakdown.filter((l) => l.points > 0);
-  const presence = positives.filter((l) => l.group === 'presence');
-  const autres = positives
-    .filter((l) => l.group !== 'presence')
-    .sort((a, b) => b.points - a.points);
-  return [...presence, ...autres].slice(0, max);
-}
-
-/**
  * Neutralise casse et diacritiques, pour que « nantes » retrouve « NANTES »
  * comme « Nântes » : la dénomination vient de sources externes (INSEE,
  * Google) qui ne garantissent aucune normalisation commune.
@@ -100,10 +87,12 @@ function normalise(texte: string): string {
  * haut ?
  *
  * Comparé à la dénomination et, quand il existe, au nom usuel : c'est ce
- * qu'un opérateur reconnaît en cherchant une fiche précise parmi les listes
- * de travail déjà affichées. Cette recherche ne porte QUE sur elles — jamais
- * sur les 139 prospects de la base, hors périmètre du chantier (décision du
- * pilote, lot 3 tâche 2) — d'où son emploi dans `buildToday`, jamais ailleurs.
+ * qu'un opérateur reconnaît en cherchant une fiche précise. Appliqué une
+ * seule fois, dans `TodayScreen`, en amont de tout le reste : la bande des
+ * relances dues comme la table de veille se composent ensuite du même jeu
+ * filtré. Depuis que la table montre TOUTE la base (chantier « veille par
+ * onglets »), cette recherche la couvre donc entièrement — ce qui n'était pas
+ * le cas quand seules deux listes de douze lignes étaient affichées.
  */
 export function matchesQuery(prospect: ProspectView, query: string): boolean {
   const cible = normalise(query.trim());
@@ -115,7 +104,6 @@ export function matchesQuery(prospect: ProspectView, query: string): boolean {
 
 export interface TodayLists {
   followUps: WorkList;
-  newHighScore: WorkList;
 }
 
 function liste(rows: WorkRow[]): WorkList {
@@ -127,20 +115,20 @@ function estClos(prospect: ProspectView): boolean {
 }
 
 /**
- * Compose les deux listes de travail du §9.2.
+ * Compose la file des relances dues — ce qui est ÉCHU, et rien d'autre.
  *
- * Les prospects sans score n'y figurent pas. Ils sont pourtant les quatre
- * cinquièmes de la base, et ce n'est pas un oubli : une ligne sans score
- * n'offre aucune action, et douze d'entre elles en tête d'écran coûteraient
- * douze arrêts aux flèches pour rien. Cette page ne compte plus leur nombre
- * nulle part — l'ancien couple « En base » / « Qualifiés » de la bande de
- * progression a été retiré pour tenir dans la largeur réelle de la colonne
- * (voir le rapport de la tâche 8, alignement sur la maquette). Leur parcours
- * relèvera de l'écran Exploration.
+ * Elle ne compose plus qu'une liste. La seconde, « Nouveaux prospects à fort
+ * score », plafonnait à douze lignes et cachait le reste ; la table de veille
+ * (`domain/veille.ts`, `ui/TableVeille.tsx`) la remplace avec toute la base,
+ * par onglets de statut et par pages.
+ *
+ * Ce qui reste ici est ce que la table ne dit pas : une ÉCHÉANCE n'est pas un
+ * statut (décision 2A du 2026-09-10). Un prospect relancé figure donc dans
+ * cette file ET dans son onglet, et c'est voulu — c'est l'écran qui
+ * dédoublonne le parcours clavier (voir `ids`, `screens/TodayScreen.tsx`).
  */
 export function buildToday(prospects: ProspectView[], now: Date): TodayLists {
   const followUps: Array<WorkRow & { echeance: number | null }> = [];
-  const newHighScore: WorkRow[] = [];
 
   for (const prospect of prospects) {
     if (estClos(prospect)) continue;
@@ -152,24 +140,17 @@ export function buildToday(prospects: ProspectView[], now: Date): TodayLists {
         joursCivils(new Date(pipeline.nextActionAt), now) >= 0) &&
       !STATUTS_NON_ENGAGES.has(pipeline.status);
 
-    if (echeanceDue) {
-      const raison = followUpReason(pipeline.nextActionAt, now);
-      followUps.push({
-        prospect,
-        reason: [{ kind: 'key', key: raison.key, params: raison.params }],
-        // Les relances sans date passent après les échéances datées : elles
-        // n'ont pas d'ancienneté à comparer, et les faire remonter en tête
-        // reléguerait des engagements réellement en retard.
-        echeance: pipeline.nextActionAt === null ? null : new Date(pipeline.nextActionAt).getTime(),
-      });
-      continue;
-    }
+    if (!echeanceDue) continue;
 
-    const jamaisEngage = pipeline === null || STATUTS_NON_ENGAGES.has(pipeline.status);
-
-    if (prospect.score !== null && jamaisEngage) {
-      newHighScore.push({ prospect, reason: reasonForScore(prospect) });
-    }
+    const raison = followUpReason(pipeline.nextActionAt, now);
+    followUps.push({
+      prospect,
+      reason: [{ kind: 'key', key: raison.key, params: raison.params }],
+      // Les relances sans date passent après les échéances datées : elles
+      // n'ont pas d'ancienneté à comparer, et les faire remonter en tête
+      // reléguerait des engagements réellement en retard.
+      echeance: pipeline.nextActionAt === null ? null : new Date(pipeline.nextActionAt).getTime(),
+    });
   }
 
   followUps.sort((a, b) => {
@@ -178,38 +159,7 @@ export function buildToday(prospects: ProspectView[], now: Date): TodayLists {
     return a.echeance - b.echeance;
   });
 
-  newHighScore.sort((a, b) => (b.prospect.score?.total ?? 0) - (a.prospect.score?.total ?? 0));
-
   return {
     followUps: liste(followUps.map(({ prospect, reason }) => ({ prospect, reason }))),
-    newHighScore: liste(newHighScore),
   };
-}
-
-/**
- * La raison d'un prospect scoré : sa catégorie de présence, puis ses meilleurs
- * signaux.
- *
- * La catégorie est reprise de `web_presence` quand elle existe, et non du
- * libellé stocké dans le barème : elle est alors une valeur d'énumération,
- * donc traduisible, là où le libellé du barème est du texte figé en français.
- */
-function reasonForScore(prospect: ProspectView): ReasonFragment[] {
-  const lignes = highlightLines(prospect.score?.breakdown ?? []);
-  const categorie = prospect.presence?.category ?? null;
-
-  const fragments = lignes.map((ligne): ReasonFragment => {
-    if (ligne.group === 'presence' && categorie !== null) {
-      return { kind: 'key', key: `presence.${categorie}` };
-    }
-    return { kind: 'raw', text: ligne.label };
-  });
-
-  // Un score sans aucune ligne positive existe : `has_site` vaut −100 et rien
-  // ne le compense. La ligne reste dans la file avec sa catégorie pour seule
-  // raison, plutôt qu'avec une raison vide.
-  if (fragments.length === 0 && categorie !== null) {
-    return [{ kind: 'key', key: `presence.${categorie}` }];
-  }
-  return fragments;
 }

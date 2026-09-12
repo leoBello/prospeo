@@ -1,0 +1,297 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+  <style>
+    :root {
+      --bg: #0b0d12; --surface: #14171f; --surface2: #1a1e28; --surface3: #232936;
+      --border: #252b38; --border2: #333c4e;
+      --text: #e4e8f0; --muted: #98a1b4; --faint: #6b7488;
+      --blue: #6d92ff; --mint: #4fd1a5; --amber: #f0b45c; --rose: #ff7a85; --violet: #a78bfa;
+      --seg1: #6d92ff; --seg2: #5a7de0; --seg3: #3f568f; --segvide: #232936;
+      --display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+      --ui: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
+      --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--ui); font-size: 13px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+    a { color: var(--blue); text-decoration: none; }
+    a:hover { color: #8fabff; }
+    h1, h2, h3, h4 { margin: 0; font-family: var(--display); font-weight: 600; letter-spacing: -0.015em; }
+    button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+    .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+    .sectT { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--faint); font-weight: 600; }
+
+    .tip { position: relative; display: inline-flex; }
+    .tip > .tipBody {
+      position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%) translateY(3px);
+      background: #030509; border: 1px solid var(--border2); color: var(--text);
+      padding: 7px 10px; border-radius: 8px; font-size: 11.5px; line-height: 1.4; width: max-content; max-width: 240px;
+      opacity: 0; pointer-events: none; transition: opacity 140ms ease, transform 140ms ease; z-index: 40;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.55);
+    }
+    .tip:hover > .tipBody { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .tipK { color: var(--faint); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 2px; }
+
+    .badge { display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; border: 1px solid transparent; white-space: nowrap; }
+    .badge .dot { width: 5px; height: 5px; border-radius: 999px; background: currentColor; flex: none; }
+    .b-mute { color: var(--muted); background: rgba(152,161,180,0.10); border-color: var(--border2); }
+    .b-blue { color: #a9c2ff; background: rgba(109,146,255,0.13); border-color: rgba(109,146,255,0.28); }
+    .b-mint { color: #86e3c1; background: rgba(79,209,165,0.13); border-color: rgba(79,209,165,0.28); }
+    .b-amber { color: #f5cd92; background: rgba(240,180,92,0.13); border-color: rgba(240,180,92,0.28); }
+    .b-violet { color: #c4b5fd; background: rgba(167,139,250,0.13); border-color: rgba(167,139,250,0.30); }
+    .b-rose { color: #ffa8b0; background: rgba(255,122,133,0.13); border-color: rgba(255,122,133,0.28); }
+    .b-dash { background: transparent; border-style: dashed; }
+
+    .trunc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .absent { color: var(--faint); font-size: 11px; font-style: italic; }
+
+    /* --- La barre d'onglets : un onglet par statut de `pipeline_status`. --- */
+    .tabs { display: flex; align-items: stretch; gap: 2px; height: 34px; border-bottom: 1px solid var(--border); flex: none; }
+    .tab { display: inline-flex; align-items: center; gap: 7px; padding: 0 11px; border-radius: 8px 8px 0 0; border-bottom: 2px solid transparent; margin-bottom: -1px; font-size: 12.5px; font-weight: 500; color: var(--muted); white-space: nowrap; }
+    .tab .pt { width: 5px; height: 5px; border-radius: 999px; flex: none; }
+    .tab .ring { width: 5px; height: 5px; border-radius: 999px; border: 1px dashed currentColor; flex: none; }
+    .tab .n { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 11px; color: var(--faint); }
+    .tab-on { color: var(--text); font-weight: 600; background: var(--surface2); border-bottom-color: var(--blue); }
+    .tab-on .n { color: var(--text); }
+
+    /* --- La rangée : six colonnes, la dernière change de sens selon l'onglet. --- */
+    .rowT { display: grid; grid-template-columns: 58px minmax(0, 1fr) 186px 136px 126px 140px; align-items: center; gap: 14px; height: 42px; padding: 0 12px; border: 1px solid transparent; border-radius: 9px; }
+    .rowSep { height: 1px; background: var(--border); flex: none; }
+    .rowT-on { background: rgba(109,146,255,0.10); border-color: rgba(109,146,255,0.35); }
+
+    .pgBtn { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 26px; padding: 0 7px; border-radius: 7px; border: 1px solid transparent; font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+    .pgBtn-on { color: var(--text); background: var(--surface3); border-color: var(--border2); font-weight: 700; }
+    .pgBtn-nav { border-color: var(--border2); padding: 0 9px; font-family: var(--ui); font-size: 12px; gap: 5px; }
+    .pgBtn-off { color: var(--faint); border-color: var(--border); }
+
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 28px; padding: 0 11px; border-radius: 8px; border: 1px solid var(--border2); font-size: 12px; font-weight: 500; color: var(--muted); }
+    .btn:hover { color: var(--text); border-color: var(--faint); }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
+  </style>
+</helmet>
+
+<!-- Les trois arbitrages ouverts, avec les options écartées et leur coût.
+     Gardé pour la trace : une décision sans son motif se redéfait au
+     chantier suivant. -->
+<div style="width: 1440px; height: 1120px; background: var(--bg); overflow: hidden; padding: 26px 28px; display: flex; flex-direction: column; gap: 18px">
+
+  <div>
+    <div style="display: flex; align-items: center; gap: 10px">
+      <h2 style="font-size: 19px">Les trois arbitrages, tranchés le 2026-09-10</h2>
+      <span class="badge b-mint"><span class="dot"></span>A, A, 1 &mdash; validés par le propriétaire</span>
+    </div>
+    <p style="margin: 4px 0 0; font-size: 12px; color: var(--muted); max-width: 1040px">
+      Gardés pour la trace&nbsp;: ce qui a été retenu, et ce que les deux autres options auraient coûté. Une décision sans son motif se redéfait au chantier suivant. Un quatrième choix est acquis sans dessin concurrent — <b style="color: var(--text); font-weight: 600">le panneau de détail passe en surimpression</b> — mais il a une contrepartie, énoncée en bas.
+    </p>
+  </div>
+
+  <!-- ============ 1 — LES 137 SANS LIGNE DE SUIVI ============ -->
+  <div>
+    <div style="display: flex; align-items: baseline; gap: 10px">
+      <span class="sectT">1 — Où vont les 137 prospects sans aucune ligne de suivi</span>
+      <span style="font-size: 11.5px; color: var(--muted)">c'est <b style="color: var(--text); font-weight: 600">98 %</b> de la base : <span class="num">prospect_pipeline</span> compte 2 lignes sur 139 (2 septembre 2026)</span>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 10px">
+
+      <div class="card" style="padding: 14px; display: flex; flex-direction: column; gap: 10px; border-color: var(--blue)">
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span style="font-size: 13px; font-weight: 600">A — Dans «&nbsp;À contacter&nbsp;», la colonne les sépare</span>
+          <span class="badge b-mint"><span class="dot"></span>Retenue le 2026-09-10</span>
+        </div>
+        <div style="padding: 9px 10px; background: #090b0f; border-radius: 9px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 7px">
+          <span class="tab tab-on" style="height: 24px; font-size: 11px; align-self: flex-start"><span class="pt" style="background: var(--muted)"></span>À contacter <span class="n">127</span></span>
+          <div style="display: flex; gap: 7px">
+            <span class="badge b-mute b-dash">Jamais contacté</span>
+            <span class="badge b-mute"><span class="dot"></span>À contacter</span>
+          </div>
+        </div>
+        <p style="margin: 0; font-size: 11.5px; color: var(--muted); line-height: 1.5">
+          Un onglet par valeur de <span class="num">pipeline_status</span>, et rien d'autre : aucun vocabulaire nouveau. Les deux absences restent <b style="color: var(--text); font-weight: 600">distinctes</b> — dans la colonne «&nbsp;Suivi&nbsp;», là où on les lit ligne par ligne.
+        </p>
+        <p style="margin: 0; font-size: 11.5px; color: var(--faint); line-height: 1.5">
+          <span style="color: #ffa8b0">Coût</span> : la distinction quitte la barre d'onglets pour une colonne, et cette colonne est la première que le panneau ouvert recouvre.
+        </p>
+      </div>
+
+      <div class="card" style="padding: 14px; display: flex; flex-direction: column; gap: 10px">
+        <span style="font-size: 13px; font-weight: 600">B — Un huitième onglet «&nbsp;Jamais contacté&nbsp;»</span>
+        <div style="padding: 9px 10px; background: #090b0f; border-radius: 9px; border: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 4px">
+          <span class="tab tab-on" style="height: 24px; font-size: 11px"><span class="ring"></span>Jamais contacté <span class="n">127</span></span>
+          <span class="tab" style="height: 24px; font-size: 11px"><span class="pt" style="background: var(--muted)"></span>À contacter <span class="n">0</span></span>
+          <span class="tab" style="height: 24px; font-size: 11px"><span class="pt" style="background: var(--blue)"></span>Contacté <span class="n">1</span></span>
+        </div>
+        <p style="margin: 0; font-size: 11.5px; color: var(--muted); line-height: 1.5">
+          La distinction est dans la barre, visible sans ouvrir une ligne, et chaque onglet ne contient qu'une seule population.
+        </p>
+        <p style="margin: 0; font-size: 11.5px; color: var(--faint); line-height: 1.5">
+          <span style="color: #ffa8b0">Coût</span> : un onglet qui ne correspond à <b style="color: var(--text); font-weight: 600">aucune valeur de l'énumération</b> — donc un huitième statut de fait, que <span class="num">StatusBadge</span> ne porte pas. Et neuf onglets tiennent mal dans la largeur, dont un à zéro qui a l'air d'un doublon du premier.
+        </p>
+      </div>
+
+      <div class="card" style="padding: 14px; display: flex; flex-direction: column; gap: 10px">
+        <span style="font-size: 13px; font-weight: 600">C — Leur créer une ligne <span class="num">a_contacter</span> en base</span>
+        <div style="padding: 9px 10px; background: #090b0f; border-radius: 9px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px">
+          <span class="num" style="font-size: 11px; color: var(--muted)">INSERT INTO prospect_pipeline …</span>
+          <span class="num" style="font-size: 11px; color: var(--faint)">137 lignes, status = 'a_contacter'</span>
+        </div>
+        <p style="margin: 0; font-size: 11.5px; color: var(--muted); line-height: 1.5">
+          Plus aucune absence à rendre : la colonne «&nbsp;Suivi&nbsp;» disparaît, et l'onglet «&nbsp;À contacter&nbsp;» ne contient qu'une seule population.
+        </p>
+        <p style="margin: 0; font-size: 11.5px; color: var(--faint); line-height: 1.5">
+          <span style="color: #ffa8b0">Coût</span> : <b style="color: var(--text); font-weight: 600">ça réécrit le passé.</b> 137 lignes datées d'aujourd'hui pour des prospects découverts il y a des semaines — le piège déjà payé une fois par ce dépôt (« une table d'événements créée en cours de route ne connaît pas le passé »). Et <span class="num">pipeline.absent</span> perd son unique emploi.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 2 — LE SORT DE « RELANCES DUES » ============ -->
+  <div>
+    <div style="display: flex; align-items: baseline; gap: 10px">
+      <span class="sectT">2 — Ce que devient la bande «&nbsp;Relances dues&nbsp;»</span>
+      <span style="font-size: 11.5px; color: var(--muted)">une échéance n'est pas un statut : aucun des sept onglets ne la porte</span>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 10px">
+
+      <div class="card" style="padding: 14px; display: flex; flex-direction: column; gap: 10px; border-color: var(--blue)">
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span style="font-size: 13px; font-weight: 600">A — Elle reste, dans le brief repliable</span>
+          <span class="badge b-mint"><span class="dot"></span>Retenue le 2026-09-10</span>
+        </div>
+        <div style="padding: 9px 10px; background: #090b0f; border-radius: 9px; border: 1px solid var(--border); display: flex; align-items: center; gap: 10px">
+          <span class="sectT">Relances dues</span>
+          <span class="badge b-mute"><span class="num">2</span></span>
+          <span style="font-size: 11px; color: var(--amber)">1 en retard</span>
+        </div>
+        <p style="margin: 0; font-size: 11.5px; color: var(--muted); line-height: 1.5">
+          Ce qui est <b style="color: var(--text); font-weight: 600">dû aujourd'hui</b> se voit en arrivant, sans changer d'onglet. C'est la question à laquelle l'écran «&nbsp;Aujourd'hui&nbsp;» répond, et les onglets n'y répondent pas.
+        </p>
+        <p style="margin: 0; font-size: 11.5px; color: var(--faint); line-height: 1.5">
+          <span style="color: #ffa8b0">Coût</span> : la page porte deux listes de prospects, et une même ligne peut figurer dans les deux (bande et onglet «&nbsp;Relancé&nbsp;»).
+        </p>
+      </div>
+
+      <div class="card" style="padding: 14px; display: flex; flex-direction: column; gap: 10px">
+        <span style="font-size: 13px; font-weight: 600">B — Supprimée, l'échéance devient une colonne triable</span>
+        <div style="padding: 9px 10px; background: #090b0f; border-radius: 9px; border: 1px solid var(--border); display: flex; align-items: center; gap: 10px">
+          <span class="sectT">Prochaine action</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#98a1b4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          <span class="num" style="font-size: 11px; color: var(--amber)">en retard de 3 j</span>
+        </div>
+        <p style="margin: 0; font-size: 11.5px; color: var(--muted); line-height: 1.5">
+          Une seule liste sur l'écran, et 130 px de hauteur rendus à la table. Aucune ligne n'apparaît deux fois.
+        </p>
+        <p style="margin: 0; font-size: 11.5px; color: var(--faint); line-height: 1.5">
+          <span style="color: #ffa8b0">Coût</span> : une relance en retard n'est plus visible sans <b style="color: var(--text); font-weight: 600">ouvrir le bon onglet et trier</b>. Un engagement tenu en retard est exactement ce qu'on ne veut pas avoir à aller chercher.
+        </p>
+      </div>
+
+      <div class="card" style="padding: 14px; display: flex; flex-direction: column; gap: 10px">
+        <span style="font-size: 13px; font-weight: 600">C — Un compteur d'échéance sur les onglets</span>
+        <div style="padding: 9px 10px; background: #090b0f; border-radius: 9px; border: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 4px">
+          <span class="tab" style="height: 24px; font-size: 11px"><span class="pt" style="background: var(--blue)"></span>Contacté <span class="n">1</span> <span class="n" style="color: var(--amber)">· 1 dû</span></span>
+          <span class="tab" style="height: 24px; font-size: 11px"><span class="pt" style="background: var(--amber)"></span>Relancé <span class="n">1</span> <span class="n" style="color: var(--amber)">· 1 en retard</span></span>
+        </div>
+        <p style="margin: 0; font-size: 11.5px; color: var(--muted); line-height: 1.5">
+          L'urgence est signalée là où l'on choisit son onglet, sans rien coûter en hauteur.
+        </p>
+        <p style="margin: 0; font-size: 11.5px; color: var(--faint); line-height: 1.5">
+          <span style="color: #ffa8b0">Coût</span> : on sait qu'une urgence existe, jamais <b style="color: var(--text); font-weight: 600">laquelle</b>. Et un onglet porte alors deux nombres de natures différentes, collés — le premier compte une population, le second une échéance.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 3 — CE QU'UNE PAGE CONTIENT ============ -->
+  <div>
+    <div style="display: flex; align-items: baseline; gap: 10px">
+      <span class="sectT">3 — Ce qu'une page contient</span>
+      <span style="font-size: 11.5px; color: var(--muted)">l'exigence : la table tient sur une page, sans défilement</span>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 10px">
+
+      <div class="card" style="padding: 14px; display: flex; flex-direction: column; gap: 10px; border-color: var(--blue)">
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span style="font-size: 13px; font-weight: 600">1 — Dix lignes, taille fixe, brief repliable</span>
+          <span class="badge b-mint"><span class="dot"></span>Retenue le 2026-09-10</span>
+        </div>
+        <div style="padding: 8px; background: #090b0f; border-radius: 9px; border: 1px solid var(--border); display: flex; align-items: center; gap: 8px">
+          <span style="font-size: 11px; color: var(--faint)"><span class="num">1</span>–<span class="num">10</span> sur <span class="num">127</span></span>
+          <span class="badge b-mute b-dash">10 par page</span>
+          <div style="flex: 1"></div>
+          <span class="pgBtn pgBtn-on">1</span>
+          <span class="pgBtn">2</span>
+          <span class="pgBtn" style="color: var(--faint)">…</span>
+          <span class="pgBtn">13</span>
+        </div>
+        <p style="margin: 0; font-size: 11.5px; color: var(--muted); line-height: 1.5">
+          Un nombre par page <b style="color: var(--text); font-weight: 600">constant</b> : rien à mesurer, et un rang stable d'une session à l'autre. Ce qui s'ajuste à la fenêtre, c'est le brief — replié, son état mémorisé (voir <span class="num">VeilleCompacte</span>, 1440 × 720).
+        </p>
+        <p style="margin: 0; font-size: 11.5px; color: var(--faint); line-height: 1.5">
+          <span style="color: #ffa8b0">Coût</span> : sous une fenêtre de ~700 px de haut, brief replié compris, la page défile. On l'assume plutôt que de mesurer.
+        </p>
+      </div>
+
+      <div class="card" style="padding: 14px; display: flex; flex-direction: column; gap: 10px">
+        <span style="font-size: 13px; font-weight: 600">2 — La hauteur disponible est mesurée</span>
+        <div style="padding: 8px; background: #090b0f; border-radius: 9px; border: 1px solid var(--border); display: flex; align-items: center; gap: 8px">
+          <span style="font-size: 11px; color: var(--faint)"><span class="num">1</span>–<span class="num">8</span> sur <span class="num">127</span></span>
+          <span class="badge b-mute b-dash">8 lignes tiennent</span>
+        </div>
+        <p style="margin: 0; font-size: 11.5px; color: var(--muted); line-height: 1.5">
+          La page ne défile jamais, par construction : la taille de page découle de ce qui tient réellement.
+        </p>
+        <p style="margin: 0; font-size: 11.5px; color: var(--faint); line-height: 1.5">
+          <span style="color: #ffa8b0">Coût, mesuré ailleurs</span> : essayé puis <b style="color: var(--text); font-weight: 600">abandonné le 2026-09-10</b> dans le projet voisin, sur écran réel — la hauteur mesurée tombait à zéro sur un portable et la liste n'affichait plus <b style="color: var(--text); font-weight: 600">aucune ligne</b>. On n'en refait pas l'expérience.
+        </p>
+      </div>
+
+      <div class="card" style="padding: 14px; display: flex; flex-direction: column; gap: 10px">
+        <span style="font-size: 13px; font-weight: 600">3 — «&nbsp;Charger 25 de plus&nbsp;»</span>
+        <div style="padding: 8px; background: #090b0f; border-radius: 9px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center">
+          <span class="btn">Charger 25 prospects de plus</span>
+        </div>
+        <p style="margin: 0; font-size: 11.5px; color: var(--muted); line-height: 1.5">
+          Aucun rang à calculer, aucune barre de pagination à dessiner, et un seul geste pour aller plus loin.
+        </p>
+        <p style="margin: 0; font-size: 11.5px; color: var(--faint); line-height: 1.5">
+          <span style="color: #ffa8b0">Coût</span> : c'est le défilement qui revient, en pire — la page <b style="color: var(--text); font-weight: 600">grandit sans fin</b>, on ne sait plus où l'on en est, et revenir en haut devient un geste. C'est exactement le défaut qu'on corrige.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ CE QUE LES DÉCISIONS OBLIGENT ============ -->
+  <div class="card" style="padding: 12px 16px; display: flex; align-items: flex-start; gap: 16px; border-color: var(--border2)">
+    <span class="badge b-mute" style="flex: none; margin-top: 2px">Ce que ça oblige</span>
+    <span style="font-size: 12px; color: var(--muted); flex: 1; line-height: 1.6">
+      <b style="color: var(--text); font-weight: 600">1A</b> &mdash; l'onglet «&nbsp;À contacter&nbsp;» retient les prospects dont <span class="num">pipeline</span> vaut <span class="num">null</span> <b style="color: var(--text); font-weight: 600">et</b> <span class="num">a_contacter</span>, et la colonne «&nbsp;Suivi&nbsp;» les distingue par <span class="num">StatusBadge</span> &mdash; jamais par la seule couleur. Aucune migration&nbsp;: rien ne crée de ligne de suivi.
+      &nbsp;&middot;&nbsp;
+      <b style="color: var(--text); font-weight: 600">2A</b> &mdash; <span class="num">buildToday</span> garde sa file de relances telle quelle&nbsp;; la table à onglets s'ajoute à côté, elle ne la remplace pas. Une ligne peut donc figurer deux fois sur l'écran, et c'est voulu.
+      &nbsp;&middot;&nbsp;
+      <b style="color: var(--text); font-weight: 600">3-1</b> &mdash; dix lignes par page, <b style="color: var(--text); font-weight: 600">constante</b>&nbsp;: aucun code ne mesure une hauteur pour en déduire une taille de page. Le repli du brief est un état persistant, pas un réglage de session.
+    </span>
+  </div>
+
+  <!-- ============ ACQUIS : LE PANNEAU EN SURIMPRESSION ============ -->
+  <div class="card" style="padding: 12px 16px; display: flex; align-items: center; gap: 16px; border-color: var(--border2)">
+    <span class="badge b-blue" style="flex: none"><span class="dot"></span>Acquis — demandé</span>
+    <span style="font-size: 12px; color: var(--muted); flex: 1">
+      <b style="color: var(--text); font-weight: 600">Le panneau de détail passe au-dessus de la liste</b>, et non plus à côté d'elle : la table garde ses 1 344 px et ses six colonnes ne se recalculent pas à l'ouverture.
+      <span style="color: #ffa8b0">Contrepartie</span> : le panneau <b style="color: var(--text); font-weight: 600">recouvre</b> les trois colonnes de droite. Restent lisibles à gauche le score, le nom et la présence web — ceux qui servent à naviguer aux flèches pendant que la fiche est ouverte.
+      Ce que ça déplace dans le code : <span class="num">.body</span> devient <span class="num">position: relative</span> à toutes les largeurs, <span class="num">.panel</span> devient un calque à <span class="num">--z-panel</span>, et la bascule à 900 px de <span class="num">ProspectPanel.module.css</span> n'a plus lieu d'être — c'est déjà le comportement, partout.
+    </span>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

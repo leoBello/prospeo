@@ -1,0 +1,558 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+  <style>
+    :root {
+      --bg: #0b0d12; --surface: #14171f; --surface2: #1a1e28; --surface3: #232936;
+      --border: #252b38; --border2: #333c4e;
+      --text: #e4e8f0; --muted: #98a1b4; --faint: #6b7488;
+      --blue: #6d92ff; --mint: #4fd1a5; --amber: #f0b45c; --rose: #ff7a85; --violet: #a78bfa;
+      --seg1: #6d92ff; --seg2: #5a7de0; --seg3: #3f568f; --segvide: #232936;
+      --display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+      --ui: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
+      --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--ui); font-size: 13px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+    a { color: var(--blue); text-decoration: none; }
+    a:hover { color: #8fabff; }
+    h1, h2, h3, h4 { margin: 0; font-family: var(--display); font-weight: 600; letter-spacing: -0.015em; }
+    button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+    .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+    .sectT { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--faint); font-weight: 600; }
+
+    .tip { position: relative; display: inline-flex; }
+    .tip > .tipBody {
+      position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%) translateY(3px);
+      background: #030509; border: 1px solid var(--border2); color: var(--text);
+      padding: 7px 10px; border-radius: 8px; font-size: 11.5px; line-height: 1.4; width: max-content; max-width: 240px;
+      opacity: 0; pointer-events: none; transition: opacity 140ms ease, transform 140ms ease; z-index: 40;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.55);
+    }
+    .tip:hover > .tipBody { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .tipK { color: var(--faint); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 2px; }
+
+    .badge { display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; border: 1px solid transparent; white-space: nowrap; }
+    .badge .dot { width: 5px; height: 5px; border-radius: 999px; background: currentColor; flex: none; }
+    .b-mute { color: var(--muted); background: rgba(152,161,180,0.10); border-color: var(--border2); }
+    .b-blue { color: #a9c2ff; background: rgba(109,146,255,0.13); border-color: rgba(109,146,255,0.28); }
+    .b-mint { color: #86e3c1; background: rgba(79,209,165,0.13); border-color: rgba(79,209,165,0.28); }
+    .b-amber { color: #f5cd92; background: rgba(240,180,92,0.13); border-color: rgba(240,180,92,0.28); }
+    .b-violet { color: #c4b5fd; background: rgba(167,139,250,0.13); border-color: rgba(167,139,250,0.30); }
+    .b-rose { color: #ffa8b0; background: rgba(255,122,133,0.13); border-color: rgba(255,122,133,0.28); }
+    .b-dash { background: transparent; border-style: dashed; }
+
+    .trunc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .absent { color: var(--faint); font-size: 11px; font-style: italic; }
+
+    /* --- La barre d'onglets : un onglet par statut de `pipeline_status`. --- */
+    .tabs { display: flex; align-items: stretch; gap: 2px; height: 34px; border-bottom: 1px solid var(--border); flex: none; }
+    .tab { display: inline-flex; align-items: center; gap: 7px; padding: 0 11px; border-radius: 8px 8px 0 0; border-bottom: 2px solid transparent; margin-bottom: -1px; font-size: 12.5px; font-weight: 500; color: var(--muted); white-space: nowrap; }
+    .tab .pt { width: 5px; height: 5px; border-radius: 999px; flex: none; }
+    .tab .ring { width: 5px; height: 5px; border-radius: 999px; border: 1px dashed currentColor; flex: none; }
+    .tab .n { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 11px; color: var(--faint); }
+    .tab-on { color: var(--text); font-weight: 600; background: var(--surface2); border-bottom-color: var(--blue); }
+    .tab-on .n { color: var(--text); }
+
+    /* --- La rangée : six colonnes, la dernière change de sens selon l'onglet. --- */
+    .rowT { display: grid; grid-template-columns: 58px minmax(0, 1fr) 186px 136px 126px 140px; align-items: center; gap: 14px; height: 42px; padding: 0 12px; border: 1px solid transparent; border-radius: 9px; }
+    .rowSep { height: 1px; background: var(--border); flex: none; }
+    .rowT-on { background: rgba(109,146,255,0.10); border-color: rgba(109,146,255,0.35); }
+
+    .pgBtn { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 26px; padding: 0 7px; border-radius: 7px; border: 1px solid transparent; font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+    .pgBtn-on { color: var(--text); background: var(--surface3); border-color: var(--border2); font-weight: 700; }
+    .pgBtn-nav { border-color: var(--border2); padding: 0 9px; font-family: var(--ui); font-size: 12px; gap: 5px; }
+    .pgBtn-off { color: var(--faint); border-color: var(--border); }
+
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 28px; padding: 0 11px; border-radius: 8px; border: 1px solid var(--border2); font-size: 12px; font-weight: 500; color: var(--muted); }
+    .btn:hover { color: var(--text); border-color: var(--faint); }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
+  </style>
+</helmet>
+
+<div style="width: 1440px; height: 900px; display: flex; background: var(--bg); overflow: hidden">
+  <div style="width: 56px; flex: none; border-right: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; align-items: center; padding: 12px 0; gap: 6px">
+    <div style="width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(150deg, var(--blue), var(--violet)); display: flex; align-items: center; justify-content: center; font-family: var(--display); font-weight: 700; font-size: 15px; color: #0b0d12; margin-bottom: 10px">P</div>
+    <div class="tip">
+      <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(109,146,255,0.14); color: var(--blue); display: flex; align-items: center; justify-content: center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>
+      </div>
+      <span class="tipBody"><span class="tipK">Aujourd'hui</span>Le brief du jour, puis toute la veille par statut.</span>
+    </div>
+    <div class="tip">
+      <div style="width: 36px; height: 36px; border-radius: 10px; color: var(--faint); display: flex; align-items: center; justify-content: center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v16"/></svg>
+      </div>
+      <span class="tipBody"><span class="tipK">Campagne</span>Site, mail, envoi — les prospects jamais touchés.</span>
+    </div>
+    <div class="tip">
+      <div style="width: 36px; height: 36px; border-radius: 10px; color: var(--faint); display: flex; align-items: center; justify-content: center; position: relative">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+      </div>
+      <span class="tipBody"><span class="tipK">Déploiements</span>Les cinq étapes de publication d'un site.</span>
+    </div>
+    <div class="tip">
+      <div style="width: 36px; height: 36px; border-radius: 10px; color: var(--faint); display: flex; align-items: center; justify-content: center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
+      </div>
+      <span class="tipBody"><span class="tipK">Gabarit</span>Le dépôt GitHub qui sert de modèle aux sites.</span>
+    </div>
+  </div>
+
+  <div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+    <header style="height: 52px; flex: none; border-bottom: 1px solid var(--border); background: var(--surface); display: flex; align-items: center; gap: 16px; padding: 0 16px">
+      <span style="font-family: var(--display); font-weight: 700; font-size: 15px; letter-spacing: -0.02em">Prospeo</span>
+      <span style="color: var(--faint); font-size: 12px">Nantes &middot; plomberie &amp; serrurerie</span>
+      <div style="flex: 1"></div>
+      <div style="display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px 0 9px; border: 1px solid var(--border2); border-radius: 8px; color: var(--faint); font-size: 12px; min-width: 230px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+        <span style="flex: 1">Chercher un prospect, une action&hellip;</span>
+        <span class="num" style="font-size: 10.5px; border: 1px solid var(--border2); border-radius: 5px; padding: 1px 5px">Ctrl+K</span>
+      </div>
+      <div class="tip">
+        <span class="badge b-mute b-dash">Série&nbsp;: pas encore connue</span>
+        <span class="tipBody"><span class="tipK">Série de jours</span>Aucun fait observé en base&nbsp;: `pipeline_event` ne contient que deux lignes d'amorçage. Un zéro affiché se lirait comme un échec.</span>
+      </div>
+      <div style="width: 30px; height: 30px; border-radius: 999px; background: var(--surface3); border: 1px solid var(--border2); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: var(--muted)">LB</div>
+    </header>
+
+    <!-- `position: relative` : c'est CE bloc qui sert de cadre au panneau de
+         détail, posé en surimpression au-dessus de la liste (VeilleDetail).
+         La liste garde donc sa largeur, et ses colonnes ne bougent pas quand
+         un prospect s'ouvre. -->
+    <div style="flex: 1; min-height: 0; display: flex; position: relative">
+      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 14px 20px 0; overflow: hidden">
+      <div style="display: flex; align-items: baseline; gap: 10px; flex: none">
+        <h1 style="font-size: 19px">Aujourd'hui</h1>
+        <span style="color: var(--faint); font-size: 12px">jeudi 10 septembre</span>
+        <div style="flex: 1"></div>
+        <button class="btn" style="height: 26px; align-self: center">
+          Replier le brief
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+        </button>
+      </div>
+      <!-- LE BRIEF DU JOUR : bande de progression + relances dues. Repliable,
+           et l'état du repli est mémorisé d'une visite à l'autre — c'est lui
+           qui rend la table tenable sur un écran de portable (voir
+           VeilleCompacte). -->
+      <div style="display: flex; align-items: center; gap: 18px; margin-top: 12px; padding: 10px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; flex: none">
+        <div class="tip" style="flex: none">
+          <div style="position: relative; width: 46px; height: 46px">
+            <svg width="46" height="46" viewBox="0 0 46 46">
+              <circle cx="23" cy="23" r="19" fill="none" stroke="#232936" stroke-width="5"/>
+              <circle cx="23" cy="23" r="19" fill="none" stroke="var(--border2)" stroke-width="5" stroke-linecap="round" stroke-dasharray="4 6" transform="rotate(-90 23 23)"/>
+            </svg>
+            <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center">
+              <span style="font-size: 15px; color: var(--faint)">&mdash;</span>
+            </div>
+          </div>
+          <span class="tipBody"><span class="tipK">Objectif du jour</span>Pas encore connue&nbsp;: l'objectif est la médiane de vos 14 derniers jours, et aucun fait observé n'est encore en base.</span>
+        </div>
+
+        <div style="flex: 1; min-width: 0">
+          <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 5px">
+            <span style="font-size: 12px; color: var(--muted)">Objectif du jour <b style="color: var(--text)">pas encore connu</b></span>
+            <span class="absent">14 jours de faits observés sont nécessaires</span>
+          </div>
+          <div style="height: 6px; border-radius: 999px; background: #232936; border: 1px dashed var(--border2)"></div>
+        </div>
+
+        <div style="display: flex; gap: 6px; flex: none; padding-left: 16px; border-left: 1px solid var(--border)">
+          <div class="tip">
+            <div style="width: 32px; height: 32px; border-radius: 10px; background: var(--surface2); border: 1px dashed var(--border2); color: var(--faint); display: flex; align-items: center; justify-content: center">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+            </div>
+            <span class="tipBody"><span class="tipK">Verrouillé &mdash; Premier site en ligne</span>`deployment_event` est vide&nbsp;: le collector n'a pas encore tourné.</span>
+          </div>
+          <div class="tip">
+            <div style="width: 32px; height: 32px; border-radius: 10px; background: var(--surface2); border: 1px dashed var(--border2); color: var(--faint); display: flex; align-items: center; justify-content: center">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+            </div>
+            <span class="tipBody"><span class="tipK">Verrouillé &mdash; Dix relances tenues</span>Aucune relance observée&nbsp;: les deux seules lignes de `pipeline_event` sont des amorçages.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- RELANCES DUES : une échéance n'est pas un statut, et aucun onglet ne
+           la porte. La bande reste donc, au-dessus de la veille. -->
+      <div style="display: flex; align-items: center; gap: 8px; margin-top: 12px; flex: none">
+        <span class="sectT">Relances dues</span>
+        <span class="badge b-mute"><span class="num">2</span>&nbsp;prospects</span>
+        <div style="flex: 1; height: 1px; background: var(--border)"></div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 2px; margin-top: 4px; flex: none">
+        <div style="display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 12px; border-radius: 8px">
+          <span class="num" style="font-size: 13px; font-weight: 700; width: 26px; text-align: right; color: var(--blue)">81</span>
+          <span class="trunc" style="font-weight: 500; min-width: 0">Serrurerie du Bouffay</span>
+          <span class="badge b-amber"><span class="dot"></span>Relancé</span>
+          <span style="font-size: 11.5px; color: var(--amber)">relance en retard de 3 j</span>
+          <div style="flex: 1"></div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 12px; border-radius: 8px">
+          <span class="num" style="font-size: 13px; font-weight: 700; width: 26px; text-align: right; color: var(--blue)">74</span>
+          <span class="trunc" style="font-weight: 500; min-width: 0">Plomberie Guérin &amp; Fils</span>
+          <span class="badge b-blue"><span class="dot"></span>Contacté</span>
+          <span style="font-size: 11.5px; color: var(--muted)">relance prévue aujourd'hui</span>
+          <div style="flex: 1"></div>
+        </div>
+      </div>
+      <!-- LA VEILLE : un onglet par statut de `pipeline_status`, jamais un
+           statut masqué. La pastille est celle de `StatusBadge`, au ton près. -->
+      <div class="tabs" role="tablist" aria-label="Statut de suivi" style="margin-top: 14px">
+        <sc-for list="{{ onglets }}" as="o" hint-placeholder-count="7">
+          <button role="tab" aria-selected="{{ o.actif }}" style="{{ o.style }}" onClick="{{ o.choisir }}">
+            <span style="{{ o.pastille }}"></span>
+            {{ o.libelle }} <span class="num" style="{{ o.compteStyle }}">{{ o.compte }}</span>
+          </button>
+        </sc-for>
+        <span style="width: 1px; height: 18px; background: var(--border2); align-self: center; margin: 0 6px"></span>
+        <button role="tab" aria-selected="{{ toutes.actif }}" style="{{ toutes.style }}" onClick="{{ toutes.choisir }}">
+          {{ toutes.libelle }} <span class="num" style="{{ toutes.compteStyle }}">{{ toutes.compte }}</span>
+        </button>
+
+        <div style="flex: 1"></div>
+        <div style="display: flex; align-items: center; gap: 7px; align-self: center; padding-bottom: 4px">
+          <button class="btn" style="height: 26px">
+            Tri&nbsp;: score
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- La ligne de compte dit ce que l'onglet montre ET ce qu'il ne montre pas. -->
+      <div style="display: flex; align-items: center; gap: 12px; height: 22px; margin: 9px 0; flex: none">
+        <span class="sectT">{{ compteTitre }}</span>
+        <span style="font-size: 11.5px; color: var(--muted)">{{ compteTexte }}</span>
+        <span class="badge b-amber b-dash" style="{{ sansScoreStyle }}">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
+          10 jamais scorés, non classables
+        </span>
+      </div>
+
+      <div class="rowT" style="{{ enTeteStyle }}">
+        <span class="sectT" style="text-align: right">Score</span>
+        <span class="sectT">Prospect</span>
+        <span class="sectT">Présence web</span>
+        <span class="sectT">Téléphone</span>
+        <span class="sectT">Site</span>
+        <span class="sectT">{{ colonneContexte }}</span>
+      </div>
+      <div class="rowSep" style="{{ separateurStyle }}"></div>
+
+      <div style="flex: none">
+        <sc-for list="{{ rangees }}" as="r" hint-placeholder-count="10">
+          <div style="{{ r.style }}">
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 3px">
+              <span class="num" style="{{ r.scoreStyle }}">{{ r.score }}</span>
+              <span style="display: flex; gap: 2px"><span style="{{ r.s1 }}"></span><span style="{{ r.s2 }}"></span><span style="{{ r.s3 }}"></span></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+              <span class="trunc" style="font-weight: 500">{{ r.nom }}</span>
+              <span class="badge b-mute" style="flex: none">{{ r.metier }}</span>
+            </div>
+            <span><span style="{{ r.presenceStyle }}">{{ r.presence }}</span></span>
+            <div style="display: flex; flex-direction: column; gap: 0; min-width: 0">
+              <span class="num trunc" style="{{ r.telStyle }}">{{ r.tel }}</span>
+              <span style="{{ r.telKindStyle }}">{{ r.telKind }}</span>
+            </div>
+            <span><span style="{{ r.siteStyle }}">{{ r.site }}</span></span>
+            <span><span style="{{ r.ctxStyle }}">{{ r.ctx }}</span></span>
+          </div>
+        </sc-for>
+      </div>
+
+      <sc-if value="{{ vide }}" hint-placeholder-val="{{ false }}">
+      <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; margin: 10px 0 16px; border: 1px dashed var(--border2); border-radius: 12px">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6b7488" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 12 2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
+        <span style="font-size: 13px; font-weight: 600">{{ videTitre }}</span>
+        <span style="font-size: 12px; color: var(--muted); text-align: center; max-width: 420px">{{ videTexte }}</span>
+        <button class="btn" style="margin-top: 4px">Voir les 127 à contacter</button>
+      </div>
+      </sc-if>
+
+      <div style="{{ espaceurStyle }}"></div>
+
+      <!-- Pagination : DIX lignes par page, taille fixe. La hauteur mesurée a
+           été écartée (voir VeilleArbitrages, arbitrage 3). -->
+      <div style="{{ barrePaginationStyle }}">
+        <span style="font-size: 11.5px; color: var(--faint)">{{ etendue }}</span>
+        <span class="badge b-mute b-dash">10 par page</span>
+        <div style="flex: 1"></div>
+        <div style="{{ paginationStyle }}">
+          <button class="pgBtn pgBtn-nav pgBtn-off" disabled aria-label="Page précédente">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            Précédentes
+          </button>
+          <button class="pgBtn pgBtn-on" aria-current="page">1</button>
+          <button class="pgBtn">2</button>
+          <button class="pgBtn">3</button>
+          <button class="pgBtn">4</button>
+          <span class="pgBtn" style="color: var(--faint)">&hellip;</span>
+          <button class="pgBtn">13</button>
+          <button class="pgBtn pgBtn-nav" aria-label="Page suivante">
+            Suivantes
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+        </div>
+        <span style="{{ unePageStyle }}">une seule page &mdash; les boutons de page ne s'affichent pas</span>
+      </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"accent":{"editor":"color","default":"#6d92ff","options":["#6d92ff","#4f46e5","#4fd1a5","#a78bfa"]},"$preview":{"width":1440,"height":900}}'>
+/*
+ * L’état des onglets, et rien d’autre.
+ *
+ * Les six colonnes sont fixes ; SEULE la dernière change de sens selon
+ * l’onglet ouvert — « Suivi » quand rien n’a encore été fait, « Prochaine
+ * action » quand un engagement existe, « Clos depuis » quand le dossier est
+ * fermé, « Statut » dans « Toutes ». C’est le seul moyen de ne pas afficher
+ * une colonne vide sur cinq onglets sur huit.
+ */
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { onglet: 'a_contacter' };
+  }
+
+  accent() {
+    return this.props.accent ?? '#6d92ff';
+  }
+
+  seg(largeur, couleur) {
+    return 'display: block; width: ' + largeur + 'px; height: 3px; border-radius: 2px; background: ' + couleur + ';';
+  }
+
+  /* Les tons repris de `StatusBadge` : on n'en invente pas un huitième. */
+  badge(ton, discontinu) {
+    const T = {
+      mute: 'color: #98a1b4; background: rgba(152,161,180,0.10); border-color: #333c4e;',
+      blue: 'color: #a9c2ff; background: rgba(109,146,255,0.13); border-color: rgba(109,146,255,0.28);',
+      amber: 'color: #f5cd92; background: rgba(240,180,92,0.13); border-color: rgba(240,180,92,0.28);',
+      violet: 'color: #c4b5fd; background: rgba(167,139,250,0.13); border-color: rgba(167,139,250,0.30);',
+      mint: 'color: #86e3c1; background: rgba(79,209,165,0.13); border-color: rgba(79,209,165,0.28);',
+      rose: 'color: #ffa8b0; background: rgba(255,122,133,0.13); border-color: rgba(255,122,133,0.28);',
+    };
+    return 'display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px;'
+      + ' font-size: 10.5px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; '
+      + T[ton] + (discontinu ? ' background: transparent; border-style: dashed;' : '');
+  }
+
+  ligne(p, choisie) {
+    const fond = choisie
+      ? 'background: rgba(109,146,255,0.10); border-color: rgba(109,146,255,0.35);'
+      : 'background: transparent; border-color: transparent;';
+    const sansTel = p.tel === null;
+    return {
+      nom: p.nom,
+      metier: p.metier,
+      presence: p.presence,
+      /* La présence reste NEUTRE de ton : l'information est dans le mot, pas
+         dans la teinte. Un vert sur « aucune présence web » se lirait comme
+         « site correct ». Seule l'absence de sondage porte le trait
+         discontinu, comme partout ailleurs dans ce vocabulaire. */
+      presenceStyle: p.presence === 'Présence web pas encore sondée'
+        ? this.badge('mute', true)
+        : this.badge('mute', false),
+      tel: sansTel ? 'aucune coordonnée' : p.tel,
+      telStyle: sansTel
+        ? 'font-family: var(--ui); font-size: 11px; font-style: italic; color: #6b7488;'
+        : 'font-size: 12px; color: #98a1b4; line-height: 1.25;',
+      telKind: sansTel ? 'étage « enrich » non passé' : p.telKind,
+      telKindStyle: sansTel
+        ? 'font-size: 9.5px; font-style: italic; color: #6b7488; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;'
+        : 'font-size: 9.5px; color: #6b7488; line-height: 1.25;',
+      site: p.site,
+      siteStyle: this.badge(p.siteTon, p.siteDash === true),
+      ctx: p.ctx,
+      ctxStyle: p.ctxKind === 'badge'
+        ? this.badge(p.ctxTon, p.ctxDash === true)
+        : p.ctxKind === 'absent'
+          ? 'font-size: 11px; font-style: italic; color: #6b7488;'
+          : 'font-family: var(--mono); font-size: 11.5px; color: ' + (p.ctxTon === 'amber' ? '#f0b45c' : '#98a1b4') + ';',
+      score: p.score,
+      scoreStyle: 'font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 700; line-height: 1; color: '
+        + (p.score >= 70 ? this.accent() : '#98a1b4') + ';',
+      s1: this.seg(p.parts[0], this.accent()),
+      s2: this.seg(p.parts[1], '#5a7de0'),
+      s3: this.seg(p.parts[2], '#3f568f'),
+      style: 'display: grid; grid-template-columns: 58px minmax(0, 1fr) 186px 136px 126px 140px; align-items: center; gap: 14px;'
+        + ' height: 44px; padding: 0 12px; border: 1px solid; border-radius: 9px; ' + fond,
+    };
+  }
+
+  onglet(id, libelle, compte, couleur, discontinu) {
+    const actif = this.state.onglet === id;
+    return {
+      libelle: libelle,
+      compte: compte,
+      actif: actif ? 'true' : 'false',
+      choisir: () => this.setState({ onglet: id }),
+      pastille: couleur === null
+        ? 'display: none;'
+        : discontinu
+          ? 'width: 5px; height: 5px; border-radius: 999px; border: 1px dashed ' + couleur + '; flex: none;'
+          : 'width: 5px; height: 5px; border-radius: 999px; background: ' + couleur + '; flex: none;',
+      style: 'display: inline-flex; align-items: center; gap: 7px; padding: 0 11px; border-radius: 8px 8px 0 0; margin-bottom: -1px;'
+        + ' font-size: 12.5px; white-space: nowrap; border-bottom: 2px solid ' + (actif ? this.accent() : 'transparent') + ';'
+        + ' font-weight: ' + (actif ? '600' : '500') + '; color: ' + (actif ? '#e4e8f0' : '#98a1b4') + ';'
+        + (actif ? ' background: #1a1e28;' : ''),
+      compteStyle: 'font-size: 11px; color: ' + (actif ? '#e4e8f0' : '#6b7488') + ';',
+    };
+  }
+
+  renderVals() {
+    const A_CONTACTER = [
+      { nom: 'Serrurier Express 44', metier: 'Serrurier', presence: 'Site en panne ou obsolète', tel: '06 78 21 90 14', telKind: 'mobile', site: 'En ligne', siteTon: 'mint', score: 79, parts: [10, 8, 6] },
+      { nom: 'Aquatech Nantes', metier: 'Plombier', presence: 'Aucune présence web', tel: '06 12 44 08 31', telKind: 'mobile', site: 'Jamais déployé', siteTon: 'mute', siteDash: true, score: 74, parts: [11, 9, 6] },
+      { nom: 'Chauffage Bellevue', metier: 'Plombier', presence: 'Fiche annuaire uniquement', tel: '02 40 76 55 12', telKind: 'fixe', site: 'En ligne', siteTon: 'mint', score: 72, parts: [9, 8, 4] },
+      { nom: 'Dépannage Loire Plomberie', metier: 'Plombier', presence: 'Aucune présence web', tel: '06 33 51 27 45', telKind: 'mobile', site: 'Rédaction écrite', siteTon: 'blue', score: 70, parts: [11, 6, 6] },
+      { nom: 'Clés &amp; Cylindres Chantenay', metier: 'Serrurier', presence: 'Page sociale, aucun site', tel: '06 51 88 03 77', telKind: 'mobile', site: 'Jamais déployé', siteTon: 'mute', siteDash: true, score: 66, parts: [9, 6, 6] },
+      { nom: 'Plomberie de la Beaujoire', metier: 'Plombier', presence: 'Page sociale, aucun site', tel: '02 40 12 66 08', telKind: 'fixe', site: 'En ligne', siteTon: 'mint', score: 64, parts: [9, 6, 4] },
+      { nom: 'Serrurerie Doulon', metier: 'Serrurier', presence: 'Aucune présence web', tel: null, telKind: null, site: 'Jamais déployé', siteTon: 'mute', siteDash: true, score: 61, parts: [11, 5, 0] },
+      { nom: 'Ouest Sanitaire Services', metier: 'Plombier', presence: 'Fiche annuaire uniquement', tel: '06 07 43 19 62', telKind: 'mobile', site: 'En ligne', siteTon: 'mint', score: 58, parts: [8, 4, 6] },
+      { nom: 'AMS Dépannage Serrurerie', metier: 'Serrurier', presence: 'Site en panne ou obsolète', tel: '02 51 84 30 25', telKind: 'fixe', site: 'Dépublié', siteTon: 'amber', score: 55, parts: [7, 4, 4] },
+      { nom: 'Plomberie Malakoff', metier: 'Plombier', presence: 'Présence web pas encore sondée', tel: '06 62 05 71 39', telKind: 'mobile', site: 'Jamais déployé', siteTon: 'mute', siteDash: true, score: 52, parts: [0, 8, 6] },
+    ];
+
+    /* La colonne contextuelle de « À contacter » distingue les DEUX absences
+       que ce dépôt refuse de confondre : aucune ligne de suivi en base
+       (« Jamais contacté », `pipeline` vaut null) et une ligne posée au
+       statut `a_contacter` (« À contacter »). Voir `StatusBadge`. */
+    const SUIVI = ['Jamais contacté', 'Jamais contacté', 'Jamais contacté', 'À contacter', 'Jamais contacté',
+      'À contacter', 'Jamais contacté', 'Jamais contacté', 'Jamais contacté', 'Jamais contacté'];
+
+    const TABLES = {
+      a_contacter: {
+        titre: 'À contacter',
+        texte: '127 classables, sur 137 sans aucune ligne de suivi en base',
+        colonne: 'Suivi',
+        rangees: A_CONTACTER.map((p, i) => this.ligne({
+          nom: p.nom, metier: p.metier, presence: p.presence, tel: p.tel, telKind: p.telKind,
+          site: p.site, siteTon: p.siteTon, siteDash: p.siteDash, score: p.score, parts: p.parts,
+          ctx: SUIVI[i], ctxKind: 'badge', ctxTon: 'mute', ctxDash: SUIVI[i] === 'Jamais contacté',
+        }, i === 1)),
+        etendue: '1–10 sur 127',
+        pages: true,
+      },
+      contacte: {
+        titre: 'Contacté',
+        texte: '1 prospect, sur 129 classables',
+        colonne: 'Prochaine action',
+        rangees: [this.ligne({
+          nom: 'Plomberie Guérin &amp; Fils', metier: 'Plombier', presence: 'Aucune présence web',
+          tel: '06 19 55 42 08', telKind: 'mobile', site: 'En ligne', siteTon: 'mint', score: 74, parts: [11, 8, 6],
+          ctx: 'aujourd’hui', ctxKind: 'date', ctxTon: 'mute',
+        }, false)],
+        etendue: '1–1 sur 1',
+        pages: false,
+      },
+      relance: {
+        titre: 'Relancé',
+        texte: '1 prospect, sur 129 classables',
+        colonne: 'Prochaine action',
+        rangees: [this.ligne({
+          nom: 'Serrurerie du Bouffay', metier: 'Serrurier', presence: 'Aucune présence web',
+          tel: '06 84 12 77 50', telKind: 'mobile', site: 'En ligne', siteTon: 'mint', score: 81, parts: [11, 9, 6],
+          ctx: 'en retard de 3 j', ctxKind: 'date', ctxTon: 'amber',
+        }, false)],
+        etendue: '1–1 sur 1',
+        pages: false,
+      },
+      interesse: {
+        titre: 'Intéressé', texte: 'aucun prospect à ce statut', colonne: 'Prochaine action', rangees: [],
+        etendue: '0 sur 0', pages: false,
+        videTitre: 'Aucun prospect intéressé pour l’instant',
+        videTexte: 'Un prospect arrive ici quand il répond favorablement. L’onglet reste visible à zéro : c’est une étape du parcours, pas une absence de données.',
+      },
+      gagne: {
+        titre: 'Gagné', texte: 'aucun prospect à ce statut', colonne: 'Clos depuis', rangees: [],
+        etendue: '0 sur 0', pages: false,
+        videTitre: 'Aucune vente conclue pour l’instant',
+        videTexte: 'Le premier prospect passé à « Gagné » débloquera aussi le jalon verrouillé du brief. La table est neuve, pas en panne.',
+      },
+      perdu: {
+        titre: 'Perdu', texte: 'aucun prospect à ce statut', colonne: 'Clos depuis', rangees: [],
+        etendue: '0 sur 0', pages: false,
+        videTitre: 'Aucun prospect perdu',
+        videTexte: 'Un prospect classé « Perdu » quitte les files de travail mais garde son onglet : on doit pouvoir relire pourquoi une piste s’est fermée.',
+      },
+      ne_pas_contacter: {
+        titre: 'Ne pas contacter', texte: 'aucun prospect à ce statut', colonne: 'Depuis', rangees: [],
+        etendue: '0 sur 0', pages: false,
+        videTitre: 'Aucun refus enregistré',
+        videTexte: 'Un prospect qui demande à ne plus être contacté arrive ici, définitivement (§11). Une liste vide est une bonne nouvelle, pas une panne de lecture.',
+      },
+      toutes: {
+        titre: 'Toutes',
+        texte: '129 classables, sur 139 prospects en base',
+        colonne: 'Statut',
+        rangees: [
+          this.ligne({ nom: 'Serrurerie du Bouffay', metier: 'Serrurier', presence: 'Aucune présence web', tel: '06 84 12 77 50', telKind: 'mobile', site: 'En ligne', siteTon: 'mint', score: 81, parts: [11, 9, 6], ctx: 'Relancé', ctxKind: 'badge', ctxTon: 'amber' }, false),
+          this.ligne({ nom: 'Serrurier Express 44', metier: 'Serrurier', presence: 'Site en panne ou obsolète', tel: '06 78 21 90 14', telKind: 'mobile', site: 'En ligne', siteTon: 'mint', score: 79, parts: [10, 8, 6], ctx: 'Jamais contacté', ctxKind: 'badge', ctxTon: 'mute', ctxDash: true }, false),
+          this.ligne({ nom: 'Aquatech Nantes', metier: 'Plombier', presence: 'Aucune présence web', tel: '06 12 44 08 31', telKind: 'mobile', site: 'Jamais déployé', siteTon: 'mute', siteDash: true, score: 74, parts: [11, 9, 6], ctx: 'Jamais contacté', ctxKind: 'badge', ctxTon: 'mute', ctxDash: true }, false),
+          this.ligne({ nom: 'Plomberie Guérin &amp; Fils', metier: 'Plombier', presence: 'Aucune présence web', tel: '06 19 55 42 08', telKind: 'mobile', site: 'En ligne', siteTon: 'mint', score: 74, parts: [11, 8, 6], ctx: 'Contacté', ctxKind: 'badge', ctxTon: 'blue' }, false),
+          this.ligne({ nom: 'Chauffage Bellevue', metier: 'Plombier', presence: 'Fiche annuaire uniquement', tel: '02 40 76 55 12', telKind: 'fixe', site: 'En ligne', siteTon: 'mint', score: 72, parts: [9, 8, 4], ctx: 'Jamais contacté', ctxKind: 'badge', ctxTon: 'mute', ctxDash: true }, false),
+          this.ligne({ nom: 'Dépannage Loire Plomberie', metier: 'Plombier', presence: 'Aucune présence web', tel: '06 33 51 27 45', telKind: 'mobile', site: 'Rédaction écrite', siteTon: 'blue', score: 70, parts: [11, 6, 6], ctx: 'Jamais contacté', ctxKind: 'badge', ctxTon: 'mute', ctxDash: true }, false),
+          this.ligne({ nom: 'Clés &amp; Cylindres Chantenay', metier: 'Serrurier', presence: 'Page sociale, aucun site', tel: '06 51 88 03 77', telKind: 'mobile', site: 'Jamais déployé', siteTon: 'mute', siteDash: true, score: 66, parts: [9, 6, 6], ctx: 'Jamais contacté', ctxKind: 'badge', ctxTon: 'mute', ctxDash: true }, false),
+          this.ligne({ nom: 'Plomberie de la Beaujoire', metier: 'Plombier', presence: 'Page sociale, aucun site', tel: '02 40 12 66 08', telKind: 'fixe', site: 'En ligne', siteTon: 'mint', score: 64, parts: [9, 6, 4], ctx: 'À contacter', ctxKind: 'badge', ctxTon: 'mute' }, false),
+          this.ligne({ nom: 'Serrurerie Doulon', metier: 'Serrurier', presence: 'Aucune présence web', tel: null, telKind: null, site: 'Jamais déployé', siteTon: 'mute', siteDash: true, score: 61, parts: [11, 5, 0], ctx: 'Jamais contacté', ctxKind: 'badge', ctxTon: 'mute', ctxDash: true }, false),
+          this.ligne({ nom: 'Ouest Sanitaire Services', metier: 'Plombier', presence: 'Fiche annuaire uniquement', tel: '06 07 43 19 62', telKind: 'mobile', site: 'En ligne', siteTon: 'mint', score: 58, parts: [8, 4, 6], ctx: 'Jamais contacté', ctxKind: 'badge', ctxTon: 'mute', ctxDash: true }, false),
+        ],
+        etendue: '1–10 sur 129',
+        pages: true,
+      },
+    };
+
+    const courant = TABLES[this.state.onglet];
+
+    return {
+      accent: this.accent(),
+      onglets: [
+        this.onglet('a_contacter', 'À contacter', '127', '#98a1b4', false),
+        this.onglet('contacte', 'Contacté', '1', this.accent(), false),
+        this.onglet('relance', 'Relancé', '1', '#f0b45c', false),
+        this.onglet('interesse', 'Intéressé', '0', '#a78bfa', false),
+        this.onglet('gagne', 'Gagné', '0', '#4fd1a5', false),
+        this.onglet('perdu', 'Perdu', '0', '#ff7a85', false),
+        this.onglet('ne_pas_contacter', 'Ne pas contacter', '0', '#ff7a85', true),
+      ],
+      toutes: this.onglet('toutes', 'Toutes', '129', null, false),
+      compteTitre: courant.titre,
+      compteTexte: courant.texte,
+      colonneContexte: courant.colonne,
+      rangees: courant.rangees,
+      vide: courant.rangees.length === 0,
+      videTitre: courant.videTitre ?? '',
+      videTexte: courant.videTexte ?? '',
+      etendue: courant.etendue,
+      sansScoreStyle: (this.state.onglet === 'a_contacter' || this.state.onglet === 'toutes')
+        ? ''
+        : 'display: none;',
+      espaceurStyle: courant.rangees.length === 0 ? 'display: none;' : 'flex: 1;',
+      separateurStyle: courant.rangees.length === 0
+        ? 'display: none;'
+        : 'height: 1px; background: #252b38; flex: none;',
+      enTeteStyle: courant.rangees.length === 0
+        ? 'display: none;'
+        : 'display: grid; grid-template-columns: 58px minmax(0, 1fr) 186px 136px 126px 140px; align-items: center; gap: 14px; height: 22px; padding: 0 12px; flex: none;',
+      barrePaginationStyle: courant.rangees.length === 0
+        ? 'display: none;'
+        : 'display: flex; align-items: center; gap: 10px; height: 44px; border-top: 1px solid #252b38; flex: none;',
+      paginationStyle: courant.pages ? 'display: flex; align-items: center; gap: 4px;' : 'display: none;',
+      unePageStyle: courant.pages ? 'display: none;' : 'font-size: 11.5px; color: #6b7488;',
+    };
+  }
+}
+</script>
+</body>
+</html>

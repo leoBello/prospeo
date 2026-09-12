@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { renderWithPreferences } from '../test-utils.js';
 import { BandeConditions, workerVivant } from './BandeConditions.js';
 
@@ -36,6 +37,8 @@ describe('BandeConditions', () => {
       <BandeConditions
         heartbeat={{ beatAt: '2026-09-03T11:59:55Z', inFlight: 0 }}
         maintenant={MAINTENANT}
+        compteEnvoi={null}
+        onReconnecter={() => {}}
       />,
     );
 
@@ -51,6 +54,8 @@ describe('BandeConditions', () => {
       <BandeConditions
         heartbeat={{ beatAt: '2026-09-03T11:00:00Z', inFlight: 0 }}
         maintenant={MAINTENANT}
+        compteEnvoi={null}
+        onReconnecter={() => {}}
       />,
     );
 
@@ -65,10 +70,85 @@ describe('BandeConditions', () => {
     // Deux absences de natures differentes. Sans cette distinction, un
     // heartbeat absent afficherait « depuis 0 min » — un fait fabrique, et
     // le seul chiffre de la bande serait faux.
-    renderWithPreferences(<BandeConditions heartbeat={null} maintenant={MAINTENANT} />);
+    renderWithPreferences(
+      <BandeConditions
+        heartbeat={null}
+        maintenant={MAINTENANT}
+        compteEnvoi={null}
+        onReconnecter={() => {}}
+      />,
+    );
 
     expect(screen.getByText('État du collector inconnu')).toBeTruthy();
     // L autre formulation ne doit surtout pas apparaitre a sa place.
     expect(screen.queryByText(/Aucun signe de vie depuis/)).toBeNull();
+  });
+});
+
+describe('BandeConditions — le compte d’envoi', () => {
+  /** Le worker vivant : la moitié « envoi » se lit seule, sans bruit à côté. */
+  function rendreBande(
+    compteEnvoi: Parameters<typeof BandeConditions>[0]['compteEnvoi'],
+    onReconnecter: () => void = () => {},
+  ) {
+    renderWithPreferences(
+      <BandeConditions
+        heartbeat={{ beatAt: '2026-09-03T11:59:55Z', inFlight: 0 }}
+        maintenant={MAINTENANT}
+        compteEnvoi={compteEnvoi}
+        onReconnecter={onReconnecter}
+      />,
+    );
+  }
+
+  it('ne dit rien de l’envoi tant qu’on ne sait pas', () => {
+    // « On ne sait pas encore » ne s'affiche pas comme une panne : la bande
+    // clignoterait « aucun compte d'envoi » à chaque chargement.
+    rendreBande(null);
+    expect(screen.queryByText('Aucun compte d’envoi')).toBeNull();
+    expect(screen.queryByText('Jeton expiré')).toBeNull();
+    expect(screen.queryByText(/Le mail partira de/)).toBeNull();
+  });
+
+  it('nomme l’absence de compte d’envoi, sans la confondre avec un jeton expiré', () => {
+    // Valeurs lues dans fr.ts, clés `campagne.envoi.sansJeton*`.
+    rendreBande({ etat: 'sans_jeton' });
+    expect(screen.getByText('Aucun compte d’envoi')).toBeTruthy();
+    expect(screen.queryByText('Jeton expiré')).toBeNull();
+    expect(
+      screen.getByText(/Session ouverte par mot de passe/),
+    ).toBeTruthy();
+    // Sa remédiation à lui, distincte de celle du jeton expiré : personne ne
+    // « reprend » ce qui n'a jamais commencé.
+    expect(screen.getByRole('button', { name: 'Se reconnecter avec Google' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Se reconnecter et reprendre' })).toBeNull();
+  });
+
+  it('nomme le jeton expiré, et propose de reprendre', () => {
+    rendreBande({ etat: 'jeton_expire', expediteur: 'leo@gmail.com' });
+    expect(screen.getByText('Jeton expiré')).toBeTruthy();
+    expect(screen.getByText(/vit une heure et ne se renouvelle pas seul/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Se reconnecter et reprendre' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Se reconnecter avec Google' })).toBeNull();
+  });
+
+  it('dit de quelle adresse le mail partira quand le compte est prêt', () => {
+    rendreBande({ etat: 'pret', expediteur: 'leo@gmail.com' });
+    expect(screen.getByText('Le mail partira de leo@gmail.com.')).toBeTruthy();
+  });
+
+  it('ne propose aucune remédiation quand le compte est prêt', () => {
+    rendreBande({ etat: 'pret', expediteur: 'leo@gmail.com' });
+    expect(screen.queryByRole('button', { name: /Se reconnecter/ })).toBeNull();
+  });
+
+  it('rappelle la connexion quand on clique la remédiation', async () => {
+    const onReconnecter = vi.fn();
+    const user = userEvent.setup();
+    rendreBande({ etat: 'jeton_expire', expediteur: 'leo@gmail.com' }, onReconnecter);
+
+    await user.click(screen.getByRole('button', { name: 'Se reconnecter et reprendre' }));
+
+    expect(onReconnecter).toHaveBeenCalledTimes(1);
   });
 });

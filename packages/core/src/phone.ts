@@ -27,3 +27,23 @@ export function normalizePhone(raw: string | null): NormalizedPhone | null {
   const kind = digits.startsWith('06') || digits.startsWith('07') ? 'mobile' : 'landline';
   return { e164: `+33${digits.slice(1)}`, kind };
 }
+
+/**
+ * `+33602002360` → `06 02 00 23 60`, la forme que l'on lit à voix haute.
+ *
+ * Vit ici plutôt que dans `site-facts.ts`, où elle était privée : le dashboard
+ * en a besoin pour la colonne « Téléphone » de la veille, qui est une colonne
+ * faite pour appeler — un `+33602002360` y est du format machine, qu'on ne lit
+ * ni ne compose. La recopier côté interface aurait fait exister deux vérités
+ * sur la même donnée.
+ *
+ * Une entrée qui ne commence pas par `+33` est rendue **telle quelle** : cette
+ * fonction met en forme, elle ne valide pas. La validation est le travail de
+ * `normalizePhone`, et un numéro étranger affiché intact vaut mieux qu'un
+ * numéro tronqué par une découpe qui ne le concerne pas.
+ */
+export function affichageTelephone(e164: string): string {
+  if (!e164.startsWith('+33')) return e164;
+  const national = `0${e164.slice(3)}`;
+  return national.replace(/(\d{2})(?=\d)/g, '$1 ').trim();
+}

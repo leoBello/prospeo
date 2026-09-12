@@ -82,6 +82,28 @@
   cursor: progress;
 }
 
+.google {
+  /* Le second geste, donc le second niveau visuel : contour plutôt que plein.
+     Mêmes 44 px de cible tactile que la soumission. */
+  min-height: 44px;
+  margin-top: var(--space-3);
+  background: transparent;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  transition: background 180ms ease;
+}
+
+.google:hover:not(:disabled) {
+  background: var(--color-surface-2);
+}
+
+.google:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+
 .note {
   margin: var(--space-4) 0 0;
   color: var(--color-text-muted);

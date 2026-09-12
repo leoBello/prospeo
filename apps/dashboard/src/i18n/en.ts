@@ -25,7 +25,7 @@ export const en: Record<keyof typeof fr, string> = {
 
   'account.button': 'Account preferences',
 
-  'header.search.label': 'Filter today’s lists (follow-ups due, new high-scoring prospects)',
+  'header.search.label': 'Filter follow-ups due and the status table, among already-loaded prospects',
   'header.search.shortcut': '{modifier}K',
 
   'auth.title': 'Prospeo',
@@ -34,6 +34,8 @@ export const en: Record<keyof typeof fr, string> = {
   'auth.password': 'Password',
   'auth.submit': 'Sign in',
   'auth.pending': 'Signing in…',
+  'auth.google': 'Continue with Google',
+  'auth.googleAide': 'Required to send emails from your account.',
   'auth.error.credentials': 'Incorrect email address or password.',
   'auth.error.generic': 'Sign-in failed: {message}',
   'auth.noSignup': 'Single account, created in Supabase. There is no sign-up on this screen.',
@@ -46,11 +48,9 @@ export const en: Record<keyof typeof fr, string> = {
   'today.subtitle': 'What the database knows, and what it does not know yet.',
 
   'today.section.followUps': 'Follow-ups due',
-  'today.section.newHighScore': 'New high-scoring prospects',
 
   'today.empty.followUps':
     'No follow-up: the pipeline table holds no rows yet. Nothing writes to it so far.',
-  'today.empty.newHighScore': 'No scored prospect yet.',
   'today.empty.search': 'No row matches your search.',
 
   'today.reason.followUp.today': 'follow-up due today',
@@ -61,6 +61,113 @@ export const en: Record<keyof typeof fr, string> = {
   'today.reason.followUp.undated': 'follow-up with no date set',
 
   'today.reason.separator': ' · ',
+
+  // Prospect watch, by status tab (mockups Veille.dc.html, VeilleEtats.dc.html).
+  'veille.titre': 'All prospects',
+  'veille.onglets.aria': 'Follow-up status',
+  'veille.onglet.toutes': 'All',
+  'veille.onglet.compte.aria': '{label}: {count} prospects',
+  'veille.onglet.compte.aria_one': '{label}: {count} prospect',
+
+  // The count line of `TableVeille.tsx`: what the tab shows, and what it does not.
+  'veille.compte.a_contacter': '{classables} rankable, out of {total} with no follow-up row',
+  'veille.compte.statut': '{count} prospects, out of {classables} rankable',
+  'veille.compte.statut_one': '{count} prospect, out of {classables} rankable',
+  'veille.compte.vide': 'no prospect at this status',
+  'veille.compte.toutes': '{classables} rankable, out of {total} prospects on record',
+  'veille.sansScore': '{count} never scored, not rankable',
+  'veille.sansScore_one': '{count} never scored, not rankable',
+  'veille.sansScore.hint':
+    'A missing score is not a zero score: these prospects have no rank, and therefore appear in no tab. The “score” stage has not run on them.',
+
+  'veille.colonne.score': 'Score',
+  'veille.colonne.prospect': 'Prospect',
+  'veille.colonne.presence': 'Web presence',
+  'veille.colonne.telephone': 'Phone',
+  'veille.colonne.site': 'Site',
+  'veille.colonne.suivi': 'Follow-up',
+  'veille.colonne.prochaineAction': 'Next action',
+  'veille.colonne.closDepuis': 'Closed for',
+  'veille.colonne.depuis': 'For',
+  'veille.colonne.statut': 'Status',
+
+  'veille.tri.score_desc': 'Sort: score, highest first',
+  'veille.tri.score_asc': 'Sort: score, lowest first',
+
+  // The "Phone" column and the contextual column of `RangeeVeille.tsx`.
+  'veille.telephone.mobile': 'mobile',
+  'veille.telephone.fixe': 'landline',
+  'veille.telephone.absent': 'no contact details',
+  'veille.telephone.absent.detail': '“enrich” stage has not run',
+
+  'veille.echeance.aujourdhui': 'today',
+  'veille.echeance.retard': '{days} days overdue',
+  'veille.echeance.retard_one': 'one day overdue',
+  'veille.echeance.future': 'in {days} days',
+  'veille.echeance.future_one': 'tomorrow',
+  'veille.echeance.absente': 'undated',
+  'veille.depuis': '{days} days',
+  'veille.depuis_one': '{days} day',
+  'veille.depuis.absente': 'undated',
+
+  // The named empty states of `TableVeille.tsx` (mockup `VeilleEtats.dc.html`,
+  // blocks A to D): one absence per tab, never a generic text.
+  'veille.vide.a_contacter.titre': 'No prospect left to contact',
+  'veille.vide.a_contacter.texte':
+    'Every scored prospect carries a decision. Collection will bring more.',
+  'veille.vide.contacte.titre': 'No prospect contacted yet',
+  'veille.vide.contacte.texte':
+    'A prospect lands here as soon as a first message goes out. The tab stays visible at zero: it is a step of the journey, not missing data.',
+  'veille.vide.relance.titre': 'No follow-up in progress',
+  'veille.vide.relance.texte':
+    'A prospect followed up without an answer lands here. The tab stays visible at zero: it is a step of the journey, not missing data.',
+  'veille.vide.interesse.titre': 'No interested prospect yet',
+  'veille.vide.interesse.texte':
+    'A prospect lands here when they answer favourably. The tab stays visible at zero: it is a step of the journey, not missing data.',
+  'veille.vide.gagne.titre': 'No sale closed yet',
+  'veille.vide.gagne.texte':
+    'The first prospect marked “Won” will also unlock the locked milestone in the brief. The table is new, not broken.',
+  'veille.vide.perdu.titre': 'No prospect lost',
+  'veille.vide.perdu.texte':
+    'A prospect marked “Lost” leaves the work queues but keeps its tab: you must be able to read back why a lead closed.',
+  'veille.vide.ne_pas_contacter.titre': 'No opt-out recorded',
+  'veille.vide.ne_pas_contacter.texte':
+    'A prospect who asks not to be contacted again lands here, permanently. An empty list is good news, not a reading failure.',
+  'veille.vide.toutes.titre': 'No rankable prospect',
+  'veille.vide.toutes.texte':
+    'No prospect has a score yet: the “score” stage has not run. Collection and scoring will fill this table.',
+  'veille.vide.sortie': 'See the {count} to contact',
+  'veille.vide.recherche.titre': 'No row matches your search',
+  'veille.vide.recherche.texte':
+    '{count} prospects are indeed in this tab — none matches “{query}”.',
+  'veille.vide.recherche.texte_one':
+    '{count} prospect is indeed in this tab — it does not match “{query}”.',
+  'veille.vide.recherche.effacer': 'Clear the search',
+
+  // Today's brief, collapsible (mockups Veille.dc.html, VeilleCompacte.dc.html).
+  // See fr.ts for why `jeu.objectif.denominateur.inconnu` is not reused
+  // here, and `veille.brief.objectif.inconnu` exists instead.
+  'veille.brief.titre': 'Today’s brief',
+  'veille.brief.replier': 'Collapse the brief',
+  'veille.brief.deplier': 'Expand',
+  'veille.brief.relances': '{count} follow-ups due, {retard} overdue',
+  'veille.brief.relances_one': '{count} follow-up due, {retard} overdue',
+  'veille.brief.relances.aucune': 'no follow-up due',
+  'veille.brief.objectif.inconnu': 'not known yet',
+
+  // The only two trades in `packages/core/src/trades.ts`.
+  'trade.plombier': 'Plumber',
+  'trade.serrurier': 'Locksmith',
+
+  // The pagination bar, in the kit (`ui/kit/Pagination.tsx`): shared with the
+  // Deployments screen, it knows neither prospect, nor tab, nor score.
+  'pagination.etendue': '{premier}–{dernier} of {total}',
+  'pagination.taille': '{count} per page',
+  'pagination.unePage': 'a single page — page buttons are not shown',
+  'pagination.precedentes': 'Previous',
+  'pagination.suivantes': 'Next',
+  'pagination.page.aria': 'Page {page} of {pages}',
+  'pagination.aria': 'List pagination',
 
   'jeu.objectif.titre': "Today's goal",
   'jeu.objectif.valeur': '{count} follow-ups honored',
@@ -377,9 +484,52 @@ export const en: Record<keyof typeof fr, string> = {
 
   'campagne.action.deployer': 'Deploy',
   'campagne.action.rejouer': 'Replay',
+  'campagne.action.relire': 'Review',
   'campagne.action.retirer': 'Remove',
   'campagne.action.impossible':
     'The collector is stopped: a request filed now would not go anywhere.',
+  'relecture.destinataire': 'Recipient',
+  'relecture.origine.saisie': 'Entered',
+  'relecture.origine.collecte': 'Collected',
+  'relecture.origine.aucune': 'No address',
+  'relecture.origineAide.saisie': 'Address typed by hand on this screen.',
+  'relecture.origineAide.collecte': 'Address collected automatically during enrichment.',
+  'relecture.origineAide.aucune':
+    'No address was found or entered. Entering one makes sending possible.',
+  'relecture.corriger': 'Correct',
+  'relecture.saisir': 'Enter the address',
+  'relecture.enregistrer': 'Save',
+  'relecture.annuler': 'Cancel',
+  'relecture.objet': 'Subject',
+  'relecture.corps': 'Message body',
+  'relecture.tracabilite': 'Written by {modele} · instructions {consignes} · {date}',
+  'relecture.pasDeMail': 'No email has been written for this prospect yet.',
+  'relecture.partiraDe': 'The email will be sent from {expediteur}. Replies will land in that inbox.',
+  'relecture.consequence':
+    'On sending, the prospect moves to “contacted” and the exchange joins its history.',
+  'relecture.envoyer': 'Send',
+  'relecture.envoiEnCours': 'Sending…',
+  'relecture.dejaEnvoye': 'Already sent',
+  'relecture.echecPrise': 'A send is already under way or completed for this prospect.',
+  'relecture.echecGmail': 'Gmail refused the send: {message}',
+  'relecture.echecSuite':
+    'The email was sent, but the follow-up failed: {message}. The prospect may be one status behind.',
+  'relecture.adresseEchec': 'The address could not be saved: {message}',
+
+  'campagne.envoi.titre': 'Sending ready',
+  'campagne.envoi.pret': 'The email will be sent from {expediteur}.',
+  'campagne.envoi.sansJeton': 'No sending account',
+  'campagne.envoi.sansJetonRaison':
+    'Session opened with a password. Deployment and drafting work; sending does not.',
+  'campagne.envoi.sansJetonRemede':
+    'Sending requires a Google token, which is only granted at sign-in. Deploying and drafting stay available until then.',
+  'campagne.envoi.sansJetonAction': 'Sign in again with Google',
+  'campagne.envoi.expire': 'Token expired',
+  'campagne.envoi.expireRaison':
+    'Sending is paused. Nothing is lost: the drafts live in the database.',
+  'campagne.envoi.expireRemede':
+    'The sending token lasts one hour and does not renew itself. Signing in again resumes where sending stopped.',
+  'campagne.envoi.expireAction': 'Sign in again and resume',
   'campagne.worker.ecoute': 'Collector listening',
   'campagne.worker.arret': 'Collector stopped',
   'campagne.worker.arret.raison':

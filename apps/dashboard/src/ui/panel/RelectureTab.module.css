@@ -1,0 +1,172 @@
+/*
+ * Le panneau de relecture, tel que `Campagne.dc.html` (392-500) le dessine :
+ * une colonne de blocs, puis un pied collé en bas qui porte l'envoi et ce
+ * qu'il engage.
+ */
+.panneau {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+}
+
+.bloc {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.intitule {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.ligne {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+/*
+ * `min-width: 0` : sans lui, une adresse longue refuserait de se replier et
+ * pousserait le badge d'origine hors de la ligne — la ligne est en `flex`, et
+ * un enfant y prend par défaut sa largeur de contenu.
+ */
+.adresse {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--text-md);
+  color: var(--color-text);
+}
+
+.etiquette {
+  flex: none;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.champ {
+  flex: 1;
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-md);
+}
+
+.objet {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-md);
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+/*
+ * `pre-wrap`, et ce n'est pas un choix de style : les sauts de ligne du corps
+ * sont signifiants. La ligne isolée qui porte l'URL EST l'argument de vente,
+ * et la replier ferait relire autre chose que ce qui partira.
+ */
+.corps {
+  margin: 0;
+  padding: var(--space-3);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  /* La famille de l'interface, et non une monospace : c'est le texte que
+     l'artisan lira dans sa boîte, pas du code. */
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  line-height: 1.55;
+  color: var(--color-text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.tracabilite {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.pied {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.avant {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.motif {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.erreur {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-danger);
+}
+
+.principal {
+  /* 44 px : cible tactile minimale, comme la soumission de la connexion. */
+  min-height: 44px;
+  margin-top: var(--space-2);
+  background: var(--color-accent);
+  /* `var(--color-bg)` en encre, jamais un blanc figé : sur l'accent du thème
+     clair il passerait sous le seuil de contraste, et il ne basculerait pas
+     avec le thème. */
+  color: var(--color-bg);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  transition: opacity 180ms ease;
+}
+
+.principal:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.principal:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.secondaire {
+  flex: none;
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  background: transparent;
+  color: var(--color-text);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  transition: background 180ms ease;
+}
+
+.secondaire:hover {
+  background: var(--color-surface);
+}

@@ -1,0 +1,62 @@
+.brief {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+}
+
+.replie {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 26px;
+  padding: 0 var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  flex: none;
+}
+
+.titre {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--color-text-faint);
+  font-weight: 600;
+}
+
+.resume {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* L'objectif inconnu, dans le résumé replié : pareil à `RangeeVeille.absent` —
+   une absence se nomme, jamais elle ne se vide. */
+.absent {
+  font-style: italic;
+  color: var(--color-text-faint);
+}
+
+.separateur {
+  width: 1px;
+  height: 12px;
+  background: var(--color-border-strong);
+  flex: none;
+}
+
+.espace {
+  flex: 1;
+}
+
+/*
+ * Le contour du bouton n'est pas réécrit ici : `PanelActions.module.css` le
+ * porte déjà, et ce vocabulaire de bouton est celui du kit — on l'étend, on
+ * ne le double pas (correctif de revue, constat 5 : sans classe, ce bouton
+ * affichait le fond gris et la bordure 3D du navigateur).
+ */
+.boutonDeplier {
+  composes: bouton from './PanelActions.module.css';
+  height: 20px;
+  padding: 0 var(--space-2);
+  font-size: var(--text-xs);
+  border: none;
+}

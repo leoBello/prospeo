@@ -1,0 +1,110 @@
+.section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/*
+ * Le trait bas est porté ICI et non par `OngletsVeille` : le bouton de tri est
+ * à droite dans la même bande, et un trait qui s'arrêterait au dernier onglet
+ * laisserait ce bouton flotter au-dessus du vide.
+ */
+.barreHaut {
+  display: flex;
+  align-items: stretch;
+  height: 34px;
+  border-bottom: 1px solid var(--color-border);
+  flex: none;
+}
+
+.espace {
+  flex: 1;
+}
+
+.tri {
+  align-self: center;
+  padding-bottom: var(--space-1);
+}
+
+/*
+ * Le contour du bouton n'est pas réécrit ici : `PanelActions.module.css` le
+ * porte déjà, et ce vocabulaire de bouton est celui du kit — on l'étend, on
+ * ne le double pas.
+ */
+.boutonTri {
+  composes: bouton from './PanelActions.module.css';
+}
+
+.ligneCompte {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 22px;
+  margin: 9px 0;
+  flex: none;
+}
+
+.titre {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--color-text-faint);
+  font-weight: 600;
+}
+
+.compte {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/*
+ * L'en-tête reprend la grille des rangées par composition : les colonnes de
+ * l'en-tête et celles du corps ne peuvent donc pas diverger, faute de valeur à
+ * recopier.
+ */
+.entete {
+  composes: grille from './RangeeVeille.module.css';
+  height: 22px;
+  flex: none;
+}
+
+.separateur {
+  height: 1px;
+  background: var(--color-border);
+  flex: none;
+}
+
+.corps {
+  flex: none;
+}
+
+.vide {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 var(--space-4);
+  padding: var(--space-5);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+}
+
+.videTitre {
+  font-size: var(--text-md);
+  font-weight: 600;
+  text-align: center;
+}
+
+.videTexte {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  text-align: center;
+  max-width: 420px;
+}
+
+.sortie {
+  composes: bouton from './PanelActions.module.css';
+  margin-top: var(--space-1);
+}

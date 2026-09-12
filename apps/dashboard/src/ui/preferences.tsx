@@ -10,12 +10,22 @@ export interface Preferences {
   setLocale: (locale: Locale) => void;
   theme: Theme;
   setTheme: (theme: Theme) => void;
+  /**
+   * Le brief du jour est-il replié ?
+   *
+   * Persisté, et non tenu en état de session : c'est le seul réglage qui rende
+   * la table de veille tenable sur un écran de portable (décision 3-1 du
+   * 2026-09-10), et le redemander à chaque visite le rendrait inutile.
+   */
+  briefReplie: boolean;
+  setBriefReplie: (replie: boolean) => void;
   /** Traduit dans la locale courante. Aucun composant n'écrit de chaîne en dur. */
   t: (key: TranslationKey, params?: TranslationParams) => string;
 }
 
 const CLE_LOCALE = 'prospeo.locale';
 const CLE_THEME = 'prospeo.theme';
+const CLE_BRIEF = 'prospeo.briefReplie';
 
 const PreferencesContext = createContext<Preferences | null>(null);
 
@@ -49,6 +59,9 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   // Thème sombre par défaut (§9.4), thème clair en bascule.
   const [theme, setThemeState] = useState<Theme>(() => lire(CLE_THEME, ['dark', 'light'], 'dark'));
   const [locale, setLocaleState] = useState<Locale>(() => lire(CLE_LOCALE, LOCALES, 'fr'));
+  const [briefReplie, setBriefReplieState] = useState<boolean>(
+    () => lire(CLE_BRIEF, ['true', 'false'] as const, 'false') === 'true',
+  );
 
   useEffect(() => {
     // Le thème s'applique sur `documentElement` et non sur un conteneur React :
@@ -74,15 +87,22 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     ecrire(CLE_LOCALE, valeur);
   }, []);
 
+  const setBriefReplie = useCallback((replie: boolean) => {
+    setBriefReplieState(replie);
+    ecrire(CLE_BRIEF, String(replie));
+  }, []);
+
   const value = useMemo<Preferences>(
     () => ({
       locale,
       setLocale,
       theme,
       setTheme,
+      briefReplie,
+      setBriefReplie,
       t: (key, params) => translate(locale, key, params),
     }),
-    [locale, setLocale, theme, setTheme],
+    [locale, setLocale, theme, setTheme, briefReplie, setBriefReplie],
   );
 
   return <PreferencesContext.Provider value={value}>{children}</PreferencesContext.Provider>;

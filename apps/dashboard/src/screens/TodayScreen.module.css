@@ -2,6 +2,32 @@
   margin-bottom: var(--space-4);
 }
 
+/*
+ * La ligne du titre : « Aujourd'hui » et le bouton de repli du brief, sur la
+ * même ligne (`Veille.dc.html`, bloc d'intro) — jamais le bouton dans sa
+ * propre rangée sous l'intro (relevé de revue, constat 4).
+ */
+.titreLigne {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.titreEspace {
+  flex: 1;
+}
+
+/*
+ * Le contour du bouton n'est pas réécrit ici : `PanelActions.module.css` le
+ * porte déjà, et ce vocabulaire de bouton est celui du kit — on l'étend, on
+ * ne le double pas (correctif de revue, constat 5).
+ */
+.boutonReplier {
+  composes: bouton from '../ui/PanelActions.module.css';
+  height: 26px;
+  align-self: center;
+}
+
 .title {
   margin: 0;
   /* Titre d'écran : la maquette le confie à la fonte d'affichage, comme tous

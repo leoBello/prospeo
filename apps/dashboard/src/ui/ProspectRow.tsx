@@ -13,8 +13,7 @@ interface Props {
 }
 
 /**
- * Une ligne de liste de travail (§9.2, maquette « Relances dues » /
- * « Nouveaux prospects à fort score »).
+ * Une ligne de liste de travail (§9.2, maquette « Relances dues »).
  *
  * C'est un `<button>` et non un `<div>` avec un `role` : la sémantique native
  * apporte gratuitement le focus, l'activation à la touche Entrée et l'annonce

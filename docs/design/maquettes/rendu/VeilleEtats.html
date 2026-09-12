@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VeilleEtats — maquette Prospeo</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+  <style>
+    :root {
+      --bg: #0b0d12; --surface: #14171f; --surface2: #1a1e28; --surface3: #232936;
+      --border: #252b38; --border2: #333c4e;
+      --text: #e4e8f0; --muted: #98a1b4; --faint: #6b7488;
+      --blue: #6d92ff; --mint: #4fd1a5; --amber: #f0b45c; --rose: #ff7a85; --violet: #a78bfa;
+      --seg1: #6d92ff; --seg2: #5a7de0; --seg3: #3f568f; --segvide: #232936;
+      --display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+      --ui: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
+      --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--ui); font-size: 13px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+    a { color: var(--blue); text-decoration: none; }
+    a:hover { color: #8fabff; }
+    h1, h2, h3, h4 { margin: 0; font-family: var(--display); font-weight: 600; letter-spacing: -0.015em; }
+    button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+    .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+    .sectT { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--faint); font-weight: 600; }
+
+    .tip { position: relative; display: inline-flex; }
+    .tip > .tipBody {
+      position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%) translateY(3px);
+      background: #030509; border: 1px solid var(--border2); color: var(--text);
+      padding: 7px 10px; border-radius: 8px; font-size: 11.5px; line-height: 1.4; width: max-content; max-width: 240px;
+      opacity: 0; pointer-events: none; transition: opacity 140ms ease, transform 140ms ease; z-index: 40;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.55);
+    }
+    .tip:hover > .tipBody { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .tipK { color: var(--faint); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 2px; }
+
+    .badge { display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; border: 1px solid transparent; white-space: nowrap; }
+    .badge .dot { width: 5px; height: 5px; border-radius: 999px; background: currentColor; flex: none; }
+    .b-mute { color: var(--muted); background: rgba(152,161,180,0.10); border-color: var(--border2); }
+    .b-blue { color: #a9c2ff; background: rgba(109,146,255,0.13); border-color: rgba(109,146,255,0.28); }
+    .b-mint { color: #86e3c1; background: rgba(79,209,165,0.13); border-color: rgba(79,209,165,0.28); }
+    .b-amber { color: #f5cd92; background: rgba(240,180,92,0.13); border-color: rgba(240,180,92,0.28); }
+    .b-violet { color: #c4b5fd; background: rgba(167,139,250,0.13); border-color: rgba(167,139,250,0.30); }
+    .b-rose { color: #ffa8b0; background: rgba(255,122,133,0.13); border-color: rgba(255,122,133,0.28); }
+    .b-dash { background: transparent; border-style: dashed; }
+
+    .trunc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .absent { color: var(--faint); font-size: 11px; font-style: italic; }
+
+    /* --- La barre d'onglets : un onglet par statut de `pipeline_status`. --- */
+    .tabs { display: flex; align-items: stretch; gap: 2px; height: 34px; border-bottom: 1px solid var(--border); flex: none; }
+    .tab { display: inline-flex; align-items: center; gap: 7px; padding: 0 11px; border-radius: 8px 8px 0 0; border-bottom: 2px solid transparent; margin-bottom: -1px; font-size: 12.5px; font-weight: 500; color: var(--muted); white-space: nowrap; }
+    .tab .pt { width: 5px; height: 5px; border-radius: 999px; flex: none; }
+    .tab .ring { width: 5px; height: 5px; border-radius: 999px; border: 1px dashed currentColor; flex: none; }
+    .tab .n { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 11px; color: var(--faint); }
+    .tab-on { color: var(--text); font-weight: 600; background: var(--surface2); border-bottom-color: var(--blue); }
+    .tab-on .n { color: var(--text); }
+
+    /* --- La rangée : six colonnes, la dernière change de sens selon l'onglet. --- */
+    .rowT { display: grid; grid-template-columns: 58px minmax(0, 1fr) 186px 136px 126px 140px; align-items: center; gap: 14px; height: 42px; padding: 0 12px; border: 1px solid transparent; border-radius: 9px; }
+    .rowSep { height: 1px; background: var(--border); flex: none; }
+    .rowT-on { background: rgba(109,146,255,0.10); border-color: rgba(109,146,255,0.35); }
+
+    .pgBtn { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 26px; padding: 0 7px; border-radius: 7px; border: 1px solid transparent; font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+    .pgBtn-on { color: var(--text); background: var(--surface3); border-color: var(--border2); font-weight: 700; }
+    .pgBtn-nav { border-color: var(--border2); padding: 0 9px; font-family: var(--ui); font-size: 12px; gap: 5px; }
+    .pgBtn-off { color: var(--faint); border-color: var(--border); }
+
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 28px; padding: 0 11px; border-radius: 8px; border: 1px solid var(--border2); font-size: 12px; font-weight: 500; color: var(--muted); }
+    .btn:hover { color: var(--text); border-color: var(--faint); }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
+  </style>
+<style>body { margin: 0; background: #0b0d12; }</style>
+</head>
+<body>
+<!-- Les états qui décident de la forme de la table à onglets. Aucun test de
+     ce dépôt ne voit une mise en page : c'est ici que se contrôlent les
+     absences, les vides et les comptes pas encore reçus. -->
+<div style="width: 1440px; height: 1300px; background: var(--bg); overflow: hidden; padding: 26px 28px; display: flex; flex-direction: column; gap: 20px">
+
+  <div>
+    <h2 style="font-size: 19px">La veille par onglets — les états qui décident</h2>
+    <p style="margin: 4px 0 0; font-size: 12px; color: var(--muted); max-width: 1000px">
+      L'artboard qui existe parce que les guidelines en font un critère d'«&nbsp;important&nbsp;» : un composant qui rend une <strong style="color: var(--text); font-weight: 600">absence</strong>, une erreur ou un chargement est précisément là où ce dépôt s'est trompé le plus souvent. Six situations que la barre d'onglets crée et qu'aucun écran n'a aujourd'hui.
+    </p>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px">
+
+    <!-- A — UN ONGLET À ZÉRO SE NOMME -->
+    <div class="card" style="padding: 14px 16px 16px; display: flex; flex-direction: column">
+      <span class="sectT" style="margin-bottom: 10px">A — Onglet «&nbsp;Gagné&nbsp;», à zéro</span>
+
+      <div class="tabs" style="margin-bottom: 14px">
+        <button class="tab"><span class="pt" style="background: var(--muted)"></span>À contacter <span class="n">127</span></button>
+        <button class="tab"><span class="pt" style="background: var(--violet)"></span>Intéressé <span class="n">0</span></button>
+        <button class="tab tab-on"><span class="pt" style="background: var(--mint)"></span>Gagné <span class="n">0</span></button>
+      </div>
+
+      <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 26px 18px; border: 1px dashed var(--border2); border-radius: 12px">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6b7488" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 12 2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
+        <span style="font-size: 13px; font-weight: 600; text-align: center">Aucune vente conclue pour l'instant</span>
+        <span style="font-size: 12px; color: var(--muted); text-align: center">L'onglet reste visible à zéro : c'est une <b style="color: var(--text); font-weight: 600">étape du parcours</b>, pas une absence de données.</span>
+        <button class="btn" style="margin-top: 4px">Voir les 127 à contacter</button>
+      </div>
+
+      <p style="margin: 10px 0 0; font-size: 11.5px; color: var(--faint); line-height: 1.5">
+        Cinq des huit onglets sont à zéro aujourd'hui, et ce n'est pas un défaut d'affichage : <span class="num">prospect_pipeline</span> ne compte que <span class="num">2</span> lignes sur <span class="num">139</span> prospects (relevé du 2 septembre 2026).
+      </p>
+    </div>
+
+    <!-- B — LES COMPTES PAS ENCORE REÇUS -->
+    <div class="card" style="padding: 14px 16px 16px; display: flex; flex-direction: column">
+      <span class="sectT" style="margin-bottom: 4px">B — Comptes pas encore reçus</span>
+      <span style="font-size: 11.5px; color: var(--muted); margin-bottom: 12px">un zéro affiché avant la réponse serait une affirmation fausse</span>
+
+      <div class="tabs" style="margin-bottom: 14px">
+        <button class="tab tab-on"><span class="pt" style="background: var(--muted)"></span>À contacter <span class="n" style="color: var(--faint)">—</span></button>
+        <button class="tab"><span class="pt" style="background: var(--blue)"></span>Contacté <span class="n" style="color: var(--faint)">—</span></button>
+        <button class="tab"><span class="pt" style="background: var(--amber)"></span>Relancé <span class="n" style="color: var(--faint)">—</span></button>
+      </div>
+
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 6px">
+        <div style="height: 42px; border-radius: 9px; background: var(--surface2); border: 1px solid var(--border)"></div>
+        <div style="height: 42px; border-radius: 9px; background: var(--surface2); border: 1px solid var(--border); opacity: 0.7"></div>
+        <div style="height: 42px; border-radius: 9px; background: var(--surface2); border: 1px solid var(--border); opacity: 0.4"></div>
+      </div>
+
+      <p style="margin: 10px 0 0; font-size: 11.5px; color: var(--faint); line-height: 1.5">
+        Un tiret, pas un <span class="num">0</span> : «&nbsp;pas encore reçu&nbsp;» et «&nbsp;aucun&nbsp;» sont <b style="color: var(--text); font-weight: 600">deux absences de natures différentes</b>. Les rangées gardent leur hauteur pour que rien ne saute à l'arrivée des données.
+      </p>
+    </div>
+
+    <!-- C — LA RECHERCHE QUI NE REND RIEN -->
+    <div class="card" style="padding: 14px 16px 16px; display: flex; flex-direction: column">
+      <span class="sectT" style="margin-bottom: 4px">C — Recherche sans résultat</span>
+      <span style="font-size: 11.5px; color: var(--muted); margin-bottom: 12px">à distinguer de l'onglet A, qui est vide pour une autre raison</span>
+
+      <div style="display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px 0 9px; border: 1px solid var(--blue); border-radius: 8px; color: var(--text); font-size: 12px; margin-bottom: 12px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+        <span style="flex: 1">couvreur</span>
+      </div>
+
+      <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 26px 18px; border: 1px dashed var(--border2); border-radius: 12px">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6b7488" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+        <span style="font-size: 13px; font-weight: 600; text-align: center">Aucune ligne ne correspond à votre recherche</span>
+        <span style="font-size: 12px; color: var(--muted); text-align: center"><span class="num">127</span> prospects sont bien dans cet onglet — aucun ne porte «&nbsp;couvreur&nbsp;».</span>
+        <button class="btn" style="margin-top: 4px">Effacer la recherche</button>
+      </div>
+
+      <p style="margin: 10px 0 0; font-size: 11.5px; color: var(--faint); line-height: 1.5">
+        La condition qui sépare A de C existe déjà dans le code : <span class="num">clefAbsence</span> (<span class="num">TodayScreen.tsx</span>) choisit le message de recherche seulement si la liste n'était <b style="color: var(--text); font-weight: 600">pas déjà vide</b> sans elle.
+      </p>
+    </div>
+  </div>
+
+  <!-- D — LA COLONNE CONTEXTUELLE, SES QUATRE SENS -->
+  <div class="card" style="padding: 14px 16px 16px">
+    <div style="display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px">
+      <span class="sectT">D — La dernière colonne change de sens selon l'onglet</span>
+      <span style="font-size: 11.5px; color: var(--muted)">cinq colonnes fixes, une contextuelle — sans quoi cinq onglets sur huit afficheraient une colonne vide</span>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-top: 12px">
+
+      <div style="background: var(--surface2); border: 1px solid var(--border); border-radius: 11px; padding: 12px 14px">
+        <div style="display: flex; align-items: center; gap: 7px; margin-bottom: 10px">
+          <span class="badge b-mute"><span class="dot"></span>À contacter</span>
+          <span class="sectT">Suivi</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 7px">
+          <span class="badge b-mute b-dash" style="align-self: flex-start">Jamais contacté</span>
+          <span class="badge b-mute" style="align-self: flex-start"><span class="dot"></span>À contacter</span>
+        </div>
+        <p style="margin: 10px 0 0; font-size: 11px; color: var(--faint); line-height: 1.5">
+          Aucune ligne de suivi en base (<span class="num">pipeline</span> vaut <span class="num">null</span>) contre une ligne posée au statut <span class="num">a_contacter</span>. «&nbsp;Pas encore&nbsp;» n'est pas «&nbsp;jamais&nbsp;», et c'est ici qu'on refuse de les confondre.
+        </p>
+      </div>
+
+      <div style="background: var(--surface2); border: 1px solid var(--border); border-radius: 11px; padding: 12px 14px">
+        <div style="display: flex; align-items: center; gap: 7px; margin-bottom: 10px">
+          <span class="badge b-blue"><span class="dot"></span>Contacté</span>
+          <span class="sectT">Prochaine action</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 7px">
+          <span class="num" style="font-size: 11.5px; color: var(--amber)">en retard de 3 j</span>
+          <span class="num" style="font-size: 11.5px; color: var(--muted)">aujourd'hui</span>
+          <span class="absent">non datée</span>
+        </div>
+        <p style="margin: 10px 0 0; font-size: 11px; color: var(--faint); line-height: 1.5">
+          «&nbsp;non datée&nbsp;» plutôt qu'une case vide ou une date inventée : <span class="num">next_action_at</span> est nul sur cette ligne, le statut ayant été posé sans elle. Le décompte est en <b style="color: var(--text); font-weight: 600">dates civiles</b> (<span class="num">joursCivils</span>), pas en tranches de 24&nbsp;h.
+        </p>
+      </div>
+
+      <div style="background: var(--surface2); border: 1px solid var(--border); border-radius: 11px; padding: 12px 14px">
+        <div style="display: flex; align-items: center; gap: 7px; margin-bottom: 10px">
+          <span class="badge b-rose"><span class="dot"></span>Perdu</span>
+          <span class="sectT">Clos depuis</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 7px">
+          <span class="num" style="font-size: 11.5px; color: var(--muted)">4 j</span>
+          <span class="num" style="font-size: 11.5px; color: var(--muted)">26 j</span>
+        </div>
+        <p style="margin: 10px 0 0; font-size: 11px; color: var(--faint); line-height: 1.5">
+          <span class="num">updated_at</span> de la ligne de suivi — la seule date que la table porte réellement pour un dossier fermé. Rien n'enregistre encore la date de <b style="color: var(--text); font-weight: 600">fermeture</b> elle-même, et l'écrire ici serait l'inventer.
+        </p>
+      </div>
+
+      <div style="background: var(--surface2); border: 1px solid var(--border); border-radius: 11px; padding: 12px 14px">
+        <div style="display: flex; align-items: center; gap: 7px; margin-bottom: 10px">
+          <span class="badge b-mute">Toutes</span>
+          <span class="sectT">Statut</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 7px">
+          <span class="badge b-blue" style="align-self: flex-start"><span class="dot"></span>Contacté</span>
+          <span class="badge b-rose b-dash" style="align-self: flex-start"><span class="dot"></span>Ne pas contacter</span>
+        </div>
+        <p style="margin: 10px 0 0; font-size: 11px; color: var(--faint); line-height: 1.5">
+          C'est le seul onglet qui mélange les statuts : la colonne les nomme. Ailleurs elle serait redondante avec l'onglet ouvert — une colonne qui répète son en-tête sur dix lignes ne dit rien.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- E — LES ABSENCES QUE LA TABLE RENCONTRE -->
+  <div class="card" style="padding: 14px 16px 16px">
+    <div style="display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px">
+      <span class="sectT">E — Les six absences d'une rangée, et leur rendu distinct</span>
+      <span style="font-size: 11.5px; color: var(--muted)">aucune n'est une case vide ; aucune n'emprunte le rendu d'une autre</span>
+    </div>
+
+    <div class="rowT" style="height: 22px">
+      <span class="sectT" style="text-align: right">Score</span>
+      <span class="sectT">Prospect</span>
+      <span class="sectT">Présence web</span>
+      <span class="sectT">Téléphone</span>
+      <span class="sectT">Site</span>
+      <span class="sectT">Suivi</span>
+    </div>
+    <div class="rowSep"></div>
+
+    <div class="rowT">
+      <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 3px">
+        <span class="num" style="font-size: 15px; font-weight: 700; line-height: 1; color: var(--blue)">74</span>
+        <span style="display: flex; gap: 2px"><span style="display: block; width: 11px; height: 3px; border-radius: 2px; background: var(--seg1)"></span><span style="display: block; width: 9px; height: 3px; border-radius: 2px; background: var(--seg2)"></span><span style="display: block; width: 6px; height: 3px; border-radius: 2px; background: var(--seg3)"></span></span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+        <span class="trunc" style="font-weight: 500">Aquatech Nantes</span>
+        <span class="badge b-mute" style="flex: none">Plombier</span>
+      </div>
+      <span><span class="badge b-mute">Aucune présence web</span></span>
+      <div style="display: flex; flex-direction: column">
+        <span class="num" style="font-size: 12px; color: var(--muted); line-height: 1.25">06 12 44 08 31</span>
+        <span style="font-size: 9.5px; color: var(--faint); line-height: 1.25">mobile</span>
+      </div>
+      <span><span class="badge b-mute b-dash">Jamais déployé</span></span>
+      <span><span class="badge b-mute b-dash">Jamais contacté</span></span>
+    </div>
+
+    <div class="rowT">
+      <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 3px">
+        <span class="num" style="font-size: 15px; font-weight: 700; line-height: 1; color: var(--muted)">61</span>
+        <span style="display: flex; gap: 2px"><span style="display: block; width: 11px; height: 3px; border-radius: 2px; background: var(--seg1)"></span><span style="display: block; width: 5px; height: 3px; border-radius: 2px; background: var(--seg2)"></span><span style="display: block; width: 0; height: 3px; border-radius: 2px; background: var(--seg3)"></span></span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+        <span class="trunc" style="font-weight: 500">Serrurerie Doulon</span>
+        <span class="badge b-mute" style="flex: none">Serrurier</span>
+      </div>
+      <span><span class="badge b-mute b-dash">Présence web pas encore sondée</span></span>
+      <div style="display: flex; flex-direction: column">
+        <span style="font-size: 11px; font-style: italic; color: var(--faint); line-height: 1.25">aucune coordonnée</span>
+        <span style="font-size: 9.5px; font-style: italic; color: var(--faint); line-height: 1.25">étage «&nbsp;enrich&nbsp;» non passé</span>
+      </div>
+      <span><span class="badge b-amber">Dépublié</span></span>
+      <span><span class="badge b-mute"><span class="dot"></span>À contacter</span></span>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border)">
+      <p style="margin: 0; font-size: 11.5px; color: var(--faint); line-height: 1.55">
+        <b style="color: var(--text); font-weight: 600">Le trait discontinu ne veut dire qu'une chose</b> : l'étage qui produit ce fait n'est <b style="color: var(--text); font-weight: 600">pas encore passé</b>. Il ne dit jamais «&nbsp;mauvais&nbsp;». C'est pour cela que «&nbsp;Dépublié&nbsp;» est plein et ambre : un site retiré est un fait établi, pas une donnée manquante.
+      </p>
+      <p style="margin: 0; font-size: 11.5px; color: var(--faint); line-height: 1.55">
+        <b style="color: var(--text); font-weight: 600">La présence web reste neutre de ton.</b> «&nbsp;Aucune présence web&nbsp;» est le meilleur signal du barème (+45), et l'afficher en vert le ferait lire comme «&nbsp;site correct&nbsp;». L'information est dans le <b style="color: var(--text); font-weight: 600">mot</b> ; la couleur ne porte jamais un état à elle seule.
+      </p>
+      <p style="margin: 0; font-size: 11.5px; color: var(--faint); line-height: 1.55">
+        <b style="color: var(--text); font-weight: 600">Un score manquant n'est pas un score nul</b>, et une colonne «&nbsp;Score&nbsp;» n'a pas la place de le dire. Les <span class="num">10</span> prospects jamais scorés ne sont donc <b style="color: var(--text); font-weight: 600">pas classables</b> : ils sortent du classement, et la ligne de compte les nomme — comme le fait déjà l'écran Campagne (<span class="num">campagne.sansScore</span>).
+      </p>
+    </div>
+  </div>
+
+  <!-- F — LA LIGNE QUI QUITTE L'ONGLET -->
+  <div class="card" style="padding: 14px 16px 16px">
+    <div style="display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px">
+      <span class="sectT">F — Changer le statut depuis la fiche fait sortir la ligne de l'onglet</span>
+      <span style="font-size: 11.5px; color: var(--muted)">le seul risque d'usage vraiment nouveau qu'apportent les onglets</span>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 12px">
+
+      <div style="background: var(--surface2); border: 1px solid var(--border); border-radius: 11px; padding: 12px 14px">
+        <span class="sectT" style="display: block; margin-bottom: 10px">Avant — onglet «&nbsp;À contacter&nbsp;», fiche ouverte</span>
+        <div style="display: flex; flex-direction: column; gap: 3px">
+          <div style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 8px; background: rgba(109,146,255,0.10); border: 1px solid rgba(109,146,255,0.35)">
+            <span class="num" style="font-size: 13px; font-weight: 700; width: 24px; text-align: right; color: var(--blue)">74</span>
+            <span class="trunc" style="flex: 1; font-weight: 500">Aquatech Nantes</span>
+            <span class="badge b-mute b-dash">Jamais contacté</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 8px">
+            <span class="num" style="font-size: 13px; font-weight: 700; width: 24px; text-align: right; color: var(--blue)">79</span>
+            <span class="trunc" style="flex: 1; font-weight: 500; color: var(--muted)">Serrurier Express 44</span>
+            <span class="badge b-mute b-dash">Jamais contacté</span>
+          </div>
+        </div>
+        <p style="margin: 10px 0 0; font-size: 11px; color: var(--faint); line-height: 1.5">
+          On clique «&nbsp;Marquer contacté&nbsp;» dans la fiche. Cette action existe déjà : elle passe par <span class="num">definirStatut</span>, qui écrit aussi <span class="num">pipeline_event</span>.
+        </p>
+      </div>
+
+      <div style="background: var(--surface2); border: 1px solid var(--border); border-radius: 11px; padding: 12px 14px">
+        <span class="sectT" style="display: block; margin-bottom: 10px">Après — la ligne a rejoint «&nbsp;Contacté&nbsp;»</span>
+        <div style="display: flex; flex-direction: column; gap: 3px">
+          <div style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 8px; border: 1px dashed var(--border2); background: transparent">
+            <span style="flex: 1; font-size: 12px; color: var(--muted)"><b style="color: var(--text); font-weight: 600">Aquatech Nantes</b> est passé à «&nbsp;Contacté&nbsp;»</span>
+            <button class="btn" style="height: 22px; padding: 0 9px; font-size: 11px">Annuler</button>
+            <button class="btn" style="height: 22px; padding: 0 9px; font-size: 11px">Voir l'onglet</button>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 8px; background: rgba(109,146,255,0.10); border: 1px solid rgba(109,146,255,0.35)">
+            <span class="num" style="font-size: 13px; font-weight: 700; width: 24px; text-align: right; color: var(--blue)">79</span>
+            <span class="trunc" style="flex: 1; font-weight: 500">Serrurier Express 44</span>
+            <span class="badge b-mute b-dash">Jamais contacté</span>
+          </div>
+        </div>
+        <p style="margin: 10px 0 0; font-size: 11px; color: var(--faint); line-height: 1.5">
+          La ligne ne s'évapore pas : elle laisse à sa place, le temps d'un geste, <b style="color: var(--text); font-weight: 600">ce qu'elle est devenue et où elle est allée</b>. La sélection descend d'un cran, la fiche reste ouverte sur le prospect suivant. Sans cela, marquer dix prospects d'affilée fait clignoter la liste sans qu'on sache ce qu'on a fait.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

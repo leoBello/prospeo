@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ProspectView } from './prospect.js';
-import {
-  MAX_ROWS_PER_LIST,
-  buildToday,
-  followUpReason,
-  highlightLines,
-  matchesQuery,
-} from './today.js';
+import { MAX_ROWS_PER_LIST, buildToday, followUpReason, matchesQuery } from './today.js';
 
 const AUJOURDHUI = new Date('2026-09-01T09:00:00');
 
@@ -71,70 +65,7 @@ describe('followUpReason', () => {
   });
 });
 
-describe('highlightLines', () => {
-  it('ouvre toujours par la presence web, qui est le motif de qualification', () => {
-    const lignes = highlightLines(
-      [
-        { code: 'reputation', label: '4,6 ★', points: 25, group: 'vitalite' },
-        { code: 'presence_social_only', label: 'Page sociale', points: 45, group: 'presence' },
-        { code: 'phone_mobile', label: 'Mobile trouvé', points: 20, group: 'joignabilite' },
-      ],
-      3,
-    );
-    expect(lignes[0]?.code).toBe('presence_social_only');
-  });
-
-  it('ecarte les lignes qui ne rapportent rien, une raison ne se justifiant pas par un manque', () => {
-    const lignes = highlightLines(
-      [
-        { code: 'presence_none', label: 'Aucune présence', points: 35, group: 'presence' },
-        { code: 'phone_none', label: 'Aucun téléphone', points: -25, group: 'joignabilite' },
-      ],
-      3,
-    );
-    expect(lignes.map((l) => l.code)).toEqual(['presence_none']);
-  });
-
-  it('garde les lignes les plus lourdes en premier, dans la limite demandee', () => {
-    const lignes = highlightLines(
-      [
-        { code: 'presence_none', label: 'p', points: 35, group: 'presence' },
-        { code: 'age', label: 'a', points: 10, group: 'vitalite' },
-        { code: 'reputation', label: 'r', points: 25, group: 'vitalite' },
-      ],
-      2,
-    );
-    expect(lignes.map((l) => l.code)).toEqual(['presence_none', 'reputation']);
-  });
-});
-
 describe('buildToday', () => {
-  const enAttente = [vue({ id: 'x1' }), vue({ id: 'x2' })];
-  const scores = [
-    vue({ id: 's1', score: scoreDe(70) }),
-    vue({ id: 's2', score: scoreDe(90) }),
-  ];
-
-  it('classe les nouveaux prospects par score decroissant', () => {
-    const today = buildToday([...enAttente, ...scores], AUJOURDHUI);
-    expect(today.newHighScore.items.map((r) => r.prospect.id)).toEqual(['s2', 's1']);
-  });
-
-  it('n inscrit un prospect sans score dans aucune file de travail', () => {
-    // 10 prospects sur 139 sont dans ce cas (releve du 2 septembre 2026,
-    // apres qu'une campagne de scoring a couvert la majorite de la base).
-    // Les faire tomber a zero les
-    // placerait en bas d'une liste ou ils n'ont rien a faire ; leur donner une
-    // file a eux couterait douze arrets aux fleches pour des lignes sur
-    // lesquelles aucune action n'est possible. Leur nombre n'est plus compte
-    // nulle part sur cet ecran (voir le rapport de la tache 8).
-    const today = buildToday([...enAttente, ...scores], AUJOURDHUI);
-    const affiches = [...today.followUps.items, ...today.newHighScore.items].map(
-      (r) => r.prospect.id,
-    );
-    expect(affiches).toEqual(['s2', 's1']);
-  });
-
   it('ne retient comme relance due que ce qui est echu, jamais une echeance a venir', () => {
     const rows = [
       vue({ id: 'due', pipeline: { status: 'relance', nextActionAt: '2026-08-30T10:00:00', updatedAt: '2026-08-30T10:00:00Z' } }),
@@ -174,39 +105,31 @@ describe('buildToday', () => {
     ];
     const today = buildToday(rows, AUJOURDHUI);
     expect(today.followUps.items).toHaveLength(0);
-    expect(today.newHighScore.items).toHaveLength(0);
   });
 
-  it('ne propose comme nouveaux que les prospects jamais engages dans le pipeline', () => {
-    const rows = [
-      vue({ id: 'deja', score: scoreDe(80), pipeline: { status: 'contacte', nextActionAt: null, updatedAt: '2026-08-25T10:00:00Z' } }),
-      vue({ id: 'neuf', score: scoreDe(60) }),
-    ];
-    const today = buildToday(rows, AUJOURDHUI);
-    expect(today.newHighScore.items.map((r) => r.prospect.id)).toEqual(['neuf']);
-  });
-
-  it('annonce le nombre reel meme lorsqu il depasse ce qui tient dans la liste', () => {
-    // Sans quoi « Nouveaux prospects · 12 » cacherait les suivants derriere une
-    // liste tronquee, et l'ecran mentirait sur l'etat de la base.
+  it('annonce le nombre reel meme lorsqu il depasse ce qui tient dans la file', () => {
+    // Sans quoi « Relances dues · 12 » cacherait les suivantes derriere une
+    // liste tronquee, et l'ecran mentirait sur ce qui est du.
     const beaucoup = Array.from({ length: MAX_ROWS_PER_LIST + 4 }, (_, i) =>
-      vue({ id: `p${i}`, score: scoreDe(90 - i) }),
+      vue({
+        id: `p${i}`,
+        pipeline: { status: 'relance', nextActionAt: '2026-08-30T10:00:00', updatedAt: '2026-08-30T10:00:00Z' },
+      }),
     );
     const today = buildToday(beaucoup, AUJOURDHUI);
-    expect(today.newHighScore.items).toHaveLength(MAX_ROWS_PER_LIST);
-    expect(today.newHighScore.totalCount).toBe(MAX_ROWS_PER_LIST + 4);
+    expect(today.followUps.items).toHaveLength(MAX_ROWS_PER_LIST);
+    expect(today.followUps.totalCount).toBe(MAX_ROWS_PER_LIST + 4);
   });
 
-  it('porte une raison sur chaque ligne des deux listes', () => {
+  it('porte une raison sur chaque ligne de la file', () => {
     const rows = [
       vue({ id: 'r', pipeline: { status: 'relance', nextActionAt: '2026-08-30T10:00:00', updatedAt: '2026-08-30T10:00:00Z' } }),
       vue({ id: 's', score: scoreDe(60) }),
     ];
     const today = buildToday(rows, AUJOURDHUI);
-    for (const liste of [today.followUps, today.newHighScore]) {
-      for (const ligne of liste.items) {
-        expect(ligne.reason.length).toBeGreaterThan(0);
-      }
+    expect(today.followUps.items).toHaveLength(1);
+    for (const ligne of today.followUps.items) {
+      expect(ligne.reason.length).toBeGreaterThan(0);
     }
   });
 });

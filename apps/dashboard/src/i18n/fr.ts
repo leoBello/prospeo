@@ -26,10 +26,14 @@ export const fr = {
   // ici ne connaît l'identité de la personne connectée.
   'account.button': 'Préférences du compte',
 
-  // Le champ dit explicitement ce qu'il filtre — les listes de travail déjà
-  // affichées sur cet écran — et jamais les 139 prospects de la base, hors
-  // périmètre du chantier (décision du pilote, lot 3 tâche 2).
-  'header.search.label': 'Filtrer les listes du jour (relances dues, nouveaux prospects à fort score)',
+  // Le champ dit explicitement ce qu'il filtre — la bande des relances dues
+  // ET la table de veille, puisque la recherche s'applique en amont des
+  // deux (`TodayScreen`) — et ce sur quoi il NE le fait jamais : la table
+  // montre désormais toute la base (tâche 9), mais toujours les prospects
+  // déjà chargés en mémoire, jamais une requête de plus. Réécrit tâche 9,
+  // correctif de revue : l'ancien texte nommait « nouveaux prospects à fort
+  // score », une liste que cette même tâche a supprimée.
+  'header.search.label': 'Filtrer les relances dues et la table de statuts, parmi les prospects déjà chargés',
   // `{modifier}` vaut « ⌘ » ou « Ctrl+ » selon la plateforme détectée
   // (`ui/plateforme.ts`) : afficher ⌘K sur Windows serait une promesse que
   // rien ne tient.
@@ -41,6 +45,8 @@ export const fr = {
   'auth.password': 'Mot de passe',
   'auth.submit': 'Se connecter',
   'auth.pending': 'Connexion…',
+  'auth.google': 'Continuer avec Google',
+  'auth.googleAide': 'Nécessaire pour envoyer les mails depuis votre compte.',
   'auth.error.credentials': 'Adresse e-mail ou mot de passe incorrect.',
   'auth.error.generic': 'Connexion impossible : {message}',
   'auth.noSignup':
@@ -54,15 +60,15 @@ export const fr = {
   'today.subtitle': 'Ce que la base sait, et ce qu’elle ne sait pas encore.',
 
   'today.section.followUps': 'Relances dues',
-  'today.section.newHighScore': 'Nouveaux prospects à fort score',
 
   'today.empty.followUps':
     'Aucune relance : la table de suivi ne contient encore aucune ligne. Aucun écrivain ne l’alimente à ce jour.',
-  'today.empty.newHighScore': 'Aucun prospect scoré pour le moment.',
-  // Distincte des deux ci-dessus : une recherche sans résultat ne dit rien
-  // sur l'état réel des relances ou des nouveaux prospects, seulement sur ce
-  // qui a été tapé. Les confondre ferait croire, une fois la recherche
-  // effacée, que la liste avait toujours été vide.
+  // Distincte de celle ci-dessus : une recherche sans résultat ne dit rien
+  // sur l'état réel des relances dues, seulement sur ce qui a été tapé. Les
+  // confondre ferait croire, une fois la recherche effacée, que la bande
+  // avait toujours été vide. La table de veille tient la même distinction de
+  // son côté, avec ses propres textes (`veille.vide.recherche.*`) : elle
+  // peut, elle, dire combien de lignes l'onglet contient malgré tout.
   'today.empty.search': 'Aucune ligne ne correspond à votre recherche.',
 
   'today.reason.followUp.today': 'relance prévue aujourd’hui',
@@ -73,6 +79,128 @@ export const fr = {
   'today.reason.followUp.undated': 'relance sans date prévue',
 
   'today.reason.separator': ' · ',
+
+  // La veille par onglets (maquettes Veille.dc.html, VeilleEtats.dc.html).
+  'veille.titre': 'Toute la veille',
+  'veille.onglets.aria': 'Statut de suivi',
+  'veille.onglet.toutes': 'Toutes',
+  'veille.onglet.compte.aria': '{label} : {count} prospects',
+  'veille.onglet.compte.aria_one': '{label} : {count} prospect',
+
+  // La ligne de compte de `TableVeille.tsx` : ce que l'onglet montre, et ce
+  // qu'il ne montre pas.
+  'veille.compte.a_contacter':
+    '{classables} classables, sur {total} sans aucune ligne de suivi en base',
+  'veille.compte.statut': '{count} prospects, sur {classables} classables',
+  'veille.compte.statut_one': '{count} prospect, sur {classables} classables',
+  'veille.compte.vide': 'aucun prospect à ce statut',
+  'veille.compte.toutes': '{classables} classables, sur {total} prospects en base',
+  'veille.sansScore':
+    "{count} jamais scorés, non classables",
+  'veille.sansScore_one': '{count} jamais scoré, non classable',
+  'veille.sansScore.hint':
+    "Un score manquant n'est pas un score nul : ces prospects n'ont pas de rang, et n'apparaissent donc dans aucun onglet. L'étage « score » n'est pas passé sur eux.",
+
+  'veille.colonne.score': 'Score',
+  'veille.colonne.prospect': 'Prospect',
+  'veille.colonne.presence': 'Présence web',
+  'veille.colonne.telephone': 'Téléphone',
+  'veille.colonne.site': 'Site',
+  'veille.colonne.suivi': 'Suivi',
+  'veille.colonne.prochaineAction': 'Prochaine action',
+  'veille.colonne.closDepuis': 'Clos depuis',
+  'veille.colonne.depuis': 'Depuis',
+  'veille.colonne.statut': 'Statut',
+
+  'veille.tri.score_desc': 'Tri : score décroissant',
+  'veille.tri.score_asc': 'Tri : score croissant',
+
+  // La colonne « Téléphone » et la colonne contextuelle de `RangeeVeille.tsx`.
+  'veille.telephone.mobile': 'mobile',
+  'veille.telephone.fixe': 'fixe',
+  'veille.telephone.absent': 'aucune coordonnée',
+  'veille.telephone.absent.detail': 'étage « enrich » non passé',
+
+  'veille.echeance.aujourdhui': 'aujourd’hui',
+  'veille.echeance.retard': 'en retard de {days} j',
+  'veille.echeance.retard_one': 'en retard d’un jour',
+  'veille.echeance.future': 'dans {days} j',
+  'veille.echeance.future_one': 'demain',
+  'veille.echeance.absente': 'non datée',
+  'veille.depuis': '{days} j',
+  'veille.depuis_one': '{days} j',
+  'veille.depuis.absente': 'non datée',
+
+  // Les vides nommés de `TableVeille.tsx` (maquette `VeilleEtats.dc.html`,
+  // blocs A à D) : une absence par onglet, jamais un texte générique.
+  'veille.vide.a_contacter.titre': 'Aucun prospect à contacter',
+  'veille.vide.a_contacter.texte':
+    'Tous les prospects scorés portent une décision. La collecte en apportera d’autres.',
+  'veille.vide.contacte.titre': 'Aucun prospect contacté pour l’instant',
+  'veille.vide.contacte.texte':
+    'Un prospect arrive ici dès qu’un premier message part. L’onglet reste visible à zéro : c’est une étape du parcours, pas une absence de données.',
+  'veille.vide.relance.titre': 'Aucune relance en cours',
+  'veille.vide.relance.texte':
+    'Un prospect relancé sans réponse arrive ici. L’onglet reste visible à zéro : c’est une étape du parcours, pas une absence de données.',
+  'veille.vide.interesse.titre': 'Aucun prospect intéressé pour l’instant',
+  'veille.vide.interesse.texte':
+    'Un prospect arrive ici quand il répond favorablement. L’onglet reste visible à zéro : c’est une étape du parcours, pas une absence de données.',
+  'veille.vide.gagne.titre': 'Aucune vente conclue pour l’instant',
+  'veille.vide.gagne.texte':
+    'Le premier prospect passé à « Gagné » débloquera aussi le jalon verrouillé du brief. La table est neuve, pas en panne.',
+  'veille.vide.perdu.titre': 'Aucun prospect perdu',
+  'veille.vide.perdu.texte':
+    'Un prospect classé « Perdu » quitte les files de travail mais garde son onglet : on doit pouvoir relire pourquoi une piste s’est fermée.',
+  'veille.vide.ne_pas_contacter.titre': 'Aucun refus enregistré',
+  'veille.vide.ne_pas_contacter.texte':
+    'Un prospect qui demande à ne plus être contacté arrive ici, définitivement. Une liste vide est une bonne nouvelle, pas une panne de lecture.',
+  'veille.vide.toutes.titre': 'Aucun prospect classable',
+  'veille.vide.toutes.texte':
+    'Aucun prospect n’a encore de score : l’étage « score » n’est pas passé. La collecte et le scoring rempliront cette table.',
+  'veille.vide.sortie': 'Voir les {count} à contacter',
+  'veille.vide.recherche.titre': 'Aucune ligne ne correspond à votre recherche',
+  'veille.vide.recherche.texte':
+    '{count} prospects sont bien dans cet onglet — aucun ne porte « {query} ».',
+  'veille.vide.recherche.texte_one':
+    '{count} prospect est bien dans cet onglet — il ne porte pas « {query} ».',
+  'veille.vide.recherche.effacer': 'Effacer la recherche',
+
+  // Le brief du jour, repliable (maquettes Veille.dc.html, VeilleCompacte.dc.html).
+  // Le résumé replié réemploie `jeu.objectif.titre` (« Objectif du jour ») :
+  // cette clé-là dit exactement ce qu'il faut, dans les deux contextes.
+  // `jeu.objectif.denominateur.inconnu` (« pas encore »), en revanche,
+  // n'est PAS reprise ici : elle a été écrite pour tenir sous un chiffre,
+  // dans l'anneau de `BandeProgression` — un dénominateur, pas une fin de
+  // phrase. Sortie de ce contexte elle laisse « pas encore » en suspens, un
+  // fragment plutôt qu'une formulation sobre (correctif de revue, tâche 8).
+  // D'où `veille.brief.objectif.inconnu`, dédiée : le vocabulaire partagé
+  // interdit le doublon de *sens*, pas le doublon de *chaîne* — une clé qui
+  // change de rôle grammatical en changeant de contexte se dédouble, elle ne
+  // s'étire pas.
+  'veille.brief.titre': 'Brief du jour',
+  'veille.brief.replier': 'Replier le brief',
+  'veille.brief.deplier': 'Déplier',
+  'veille.brief.relances': '{count} relances dues, dont {retard} en retard',
+  'veille.brief.relances_one': '{count} relance due, dont {retard} en retard',
+  'veille.brief.relances.aucune': 'aucune relance due',
+  'veille.brief.objectif.inconnu': 'pas encore connu',
+
+  // Les deux seuls métiers de `packages/core/src/trades.ts` : `RangeeVeille.tsx`
+  // compose `trade.${prospect.tradeSlug}` sur ces slugs plutôt que de lire
+  // `getTrade(...)?.label`, pour que le badge de métier passe par `t()` comme
+  // tout le reste de la rangée.
+  'trade.plombier': 'Plombier',
+  'trade.serrurier': 'Serrurier',
+
+  // La barre de pagination, au kit (`ui/kit/Pagination.tsx`) : partagée avec
+  // l'écran Déploiements, elle ne connaît ni prospect, ni onglet, ni score.
+  'pagination.etendue': '{premier}–{dernier} sur {total}',
+  'pagination.taille': '{count} par page',
+  'pagination.unePage': 'une seule page — les boutons de page ne s’affichent pas',
+  'pagination.precedentes': 'Précédentes',
+  'pagination.suivantes': 'Suivantes',
+  'pagination.page.aria': 'Page {page} sur {pages}',
+  'pagination.aria': 'Pagination de la liste',
 
   // Lot 3, tâche 8 — la bande de progression qui remplace `KpiBand` sous le
   // titre « Aujourd'hui », et le compteur de série de la barre du haut. Voir
@@ -460,9 +588,53 @@ export const fr = {
 
   'campagne.action.deployer': 'Déployer',
   'campagne.action.rejouer': 'Rejouer',
+  'campagne.action.relire': 'Relire',
   'campagne.action.retirer': 'Retirer',
   'campagne.action.impossible':
     'Le collector est à l’arrêt : une demande déposée maintenant ne partirait pas.',
+  'relecture.destinataire': 'Destinataire',
+  'relecture.origine.saisie': 'Saisie',
+  'relecture.origine.collecte': 'Collectée',
+  'relecture.origine.aucune': 'Aucune adresse',
+  'relecture.origineAide.saisie': 'Adresse saisie à la main dans cet écran.',
+  'relecture.origineAide.collecte': 'Adresse relevée automatiquement à l’enrichissement.',
+  'relecture.origineAide.aucune':
+    'Aucune adresse n’a été trouvée ni saisie. La saisir permet d’envoyer.',
+  'relecture.corriger': 'Corriger',
+  'relecture.saisir': 'Saisir l’adresse',
+  'relecture.enregistrer': 'Enregistrer',
+  'relecture.annuler': 'Annuler',
+  'relecture.objet': 'Objet',
+  'relecture.corps': 'Corps du message',
+  'relecture.tracabilite': 'Rédigé par {modele} · consignes {consignes} · {date}',
+  'relecture.pasDeMail': 'Aucun mail n’a encore été rédigé pour ce prospect.',
+  'relecture.partiraDe':
+    'Le mail partira de {expediteur}. Les réponses arriveront dans cette boîte.',
+  'relecture.consequence':
+    'À l’envoi, le prospect passe en « contacté » et l’échange rejoint son historique.',
+  'relecture.envoyer': 'Envoyer',
+  'relecture.envoiEnCours': 'Envoi…',
+  'relecture.dejaEnvoye': 'Déjà envoyé',
+  'relecture.echecPrise': 'Un envoi est déjà en cours ou parti pour ce prospect.',
+  'relecture.echecGmail': 'Gmail a refusé l’envoi : {message}',
+  'relecture.echecSuite':
+    'Le mail est parti, mais la suite a échoué : {message}. Le prospect peut être en retard d’un statut.',
+  'relecture.adresseEchec': 'L’adresse n’a pas pu être enregistrée : {message}',
+
+  'campagne.envoi.titre': 'Envoi prêt',
+  'campagne.envoi.pret': 'Le mail partira de {expediteur}.',
+  'campagne.envoi.sansJeton': 'Aucun compte d’envoi',
+  'campagne.envoi.sansJetonRaison':
+    'Session ouverte par mot de passe. Le déploiement et la rédaction fonctionnent ; l’envoi, non.',
+  'campagne.envoi.sansJetonRemede':
+    'Envoyer demande un jeton Google, qui ne s’obtient qu’à la connexion. Déployer et rédiger restent disponibles d’ici là.',
+  'campagne.envoi.sansJetonAction': 'Se reconnecter avec Google',
+  'campagne.envoi.expire': 'Jeton expiré',
+  'campagne.envoi.expireRaison':
+    'L’envoi est en pause. Rien n’est perdu : les brouillons vivent en base.',
+  'campagne.envoi.expireRemede':
+    'Le jeton d’envoi vit une heure et ne se renouvelle pas seul. Se reconnecter reprend là où l’envoi s’est arrêté.',
+  'campagne.envoi.expireAction': 'Se reconnecter et reprendre',
   'campagne.worker.ecoute': "Collector à l'écoute",
   'campagne.worker.arret': "Collector à l'arrêt",
   'campagne.worker.arret.raison':
